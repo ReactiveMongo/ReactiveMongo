@@ -123,10 +123,10 @@ class GenericDriverException private[core] (
   val message: String) extends DriverException with NoStackTrace
   with Product1[String] with Serializable {
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _1 = message
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def canEqual(that: Any): Boolean = that match {
     case _: GenericDriverException => true
     case _                         => false
@@ -163,20 +163,20 @@ sealed class ConnectionNotInitialized private[core] (
   override val cause: Throwable) extends DriverException
   with Product with java.io.Serializable with Serializable with Equals {
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   override val productPrefix = "ConnectionNotInitialized"
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def productElement(i: Int): Any = i match {
     case 0 => message
     case 1 => cause
     case _ => throw new NoSuchElementException
   }
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   override def productIterator: Iterator[Any] = Iterator(message, cause)
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   val productArity = 2
 
   override lazy val hashCode = (message -> cause).hashCode
@@ -188,7 +188,7 @@ sealed class ConnectionNotInitialized private[core] (
     case _ => false
   }
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def canEqual(other: Any): Boolean = other match {
     case _: ConnectionNotInitialized => true
     case _                           => false
@@ -202,10 +202,10 @@ object ConnectionNotInitialized {
 class ConnectionException private[core] (val message: String)
   extends DriverException with Product1[String] with Serializable {
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _1 = message
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def canEqual(that: Any): Boolean = that match {
     case _: ConnectionException => true
     case _                      => false
@@ -245,13 +245,13 @@ class GenericDatabaseException private[core] (
 
   val originalDocument = None
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _1 = message
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _2 = code
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def canEqual(that: Any): Boolean = that match {
     case _: GenericDatabaseException => true
     case _                           => false

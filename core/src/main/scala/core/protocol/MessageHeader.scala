@@ -12,7 +12,7 @@ import reactivemongo.core.protocol.BufferAccessors.writeTupleToBuffer4
  * @param responseTo id of the request that the message including this a response to (> 0 for reply operation, else 0).
  * @param opCode operation code of this message.
  */
-@deprecated("No longer a case class, no longer a case class", "1.0.0-rc.1")
+@deprecated("No longer a case class, no longer a case class", "0.20.3")
 class MessageHeader(
   val messageLength: Int,
   val requestID: Int,
@@ -28,19 +28,19 @@ class MessageHeader(
   private[core] lazy val tupled =
     Tuple4(messageLength, requestID, responseTo, opCode)
 
-  @deprecated("No longer case class", "1.0.0-rc.1")
+  @deprecated("No longer case class", "0.20.3")
   @inline def _1 = messageLength
 
-  @deprecated("No longer case class", "1.0.0-rc.1")
+  @deprecated("No longer case class", "0.20.3")
   @inline def _2 = requestID
 
-  @deprecated("No longer case class", "1.0.0-rc.1")
+  @deprecated("No longer case class", "0.20.3")
   @inline def _3 = responseTo
 
-  @deprecated("No longer case class", "1.0.0-rc.1")
+  @deprecated("No longer case class", "0.20.3")
   @inline def _4 = opCode
 
-  @deprecated("No longer case class", "1.0.0-rc.1")
+  @deprecated("No longer case class", "0.20.3")
   def canEqual(that: Any): Boolean = that match {
     case _: MessageHeader => true
     case _                => false
@@ -61,7 +61,7 @@ class MessageHeader(
 }
 
 /** Header deserializer from a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]]. */
-@deprecated("Internal: will be made private", "1.0.0-rc.1")
+@deprecated("Internal: will be made private", "0.20.3")
 object MessageHeader extends scala.runtime.AbstractFunction4[Int, Int, Int, Int, MessageHeader] with ChannelBufferReadable[MessageHeader] {
 
   def apply(

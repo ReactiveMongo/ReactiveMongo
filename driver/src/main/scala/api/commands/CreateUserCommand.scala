@@ -17,13 +17,13 @@ class DBUserRole private[api] (
   val db: String) extends UserRole(name)
   with Product2[String, String] with Serializable {
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _1 = name
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _2 = db
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def canEqual(that: Any): Boolean = that match {
     case _: DBUserRole => true
     case _             => false
@@ -49,7 +49,7 @@ object DBUserRole extends scala.runtime.AbstractFunction2[String, String, DBUser
   def apply(name: String, db: String): DBUserRole =
     new DBUserRole(name, db)
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def unapply(role: DBUserRole) = Option(role).map(_.tupled)
 }
 

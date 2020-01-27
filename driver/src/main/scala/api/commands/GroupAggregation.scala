@@ -44,10 +44,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$avg", builder.string("$" + field))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: AvgField => true
       case _           => false
@@ -73,7 +73,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(field: String): AvgField =
       new AvgField(field)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(avgField: AvgField): Option[String] =
       Option(avgField).map(_.field)
   }
@@ -85,10 +85,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$avg", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Avg => true
       case _      => false
@@ -114,7 +114,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(expression: pack.Value): Avg =
       new Avg(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(avg: Avg): Option[pack.Value] =
       Option(avg).map(_.expression)
   }
@@ -129,10 +129,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$first", builder.string("$" + field))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: FirstField => true
       case _             => false
@@ -158,7 +158,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(field: String): FirstField =
       new FirstField(field)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(firstField: FirstField): Option[String] =
       Option(firstField).map(_.field)
   }
@@ -170,10 +170,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$first", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: First => true
       case _        => false
@@ -199,7 +199,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(expression: pack.Value): First =
       new First(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(first: First): Option[pack.Value] =
       Option(first).map(_.expression)
   }
@@ -214,10 +214,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$last", builder.string("$" + field))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: LastField => true
       case _            => false
@@ -243,7 +243,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(field: String): LastField =
       new LastField(field)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(lastField: LastField): Option[String] =
       Option(lastField).map(_.field)
   }
@@ -255,10 +255,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$last", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Last => true
       case _       => false
@@ -284,7 +284,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(expression: pack.Value): Last =
       new Last(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(last: Last): Option[pack.Value] =
       Option(last).map(_.expression)
   }
@@ -299,10 +299,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$max", builder.string("$" + field))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: MaxField => true
       case _           => false
@@ -328,7 +328,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(field: String): MaxField =
       new MaxField(field)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(maxField: MaxField): Option[String] =
       Option(maxField).map(_.field)
   }
@@ -341,10 +341,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   class Max(@deprecatedName(Symbol("maxExpr")) val expression: pack.Value) extends GroupFunction {
     val makeFunction = pipe(f"$$max", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Max => true
       case _      => false
@@ -370,7 +370,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(expression: pack.Value): Max =
       new Max(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(max: Max): Option[pack.Value] =
       Option(max).map(_.expression)
   }
@@ -384,10 +384,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$mergeObjects", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: MergeObjects => true
       case _               => false
@@ -413,7 +413,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(expression: pack.Value): MergeObjects =
       new MergeObjects(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(mergeObjects: MergeObjects): Option[pack.Value] =
       Option(mergeObjects).map(_.expression)
   }
@@ -428,10 +428,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$min", builder.string("$" + field))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: MinField => true
       case _           => false
@@ -457,7 +457,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(field: String): MinField =
       new MinField(field)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(minField: MinField): Option[String] =
       Option(minField).map(_.field)
   }
@@ -472,10 +472,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$min", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Min => true
       case _      => false
@@ -501,7 +501,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(expression: pack.Value): Min =
       new Min(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(min: Min): Option[pack.Value] =
       Option(min).map(_.expression)
   }
@@ -516,10 +516,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$push", builder.string("$" + field))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: PushField => true
       case _            => false
@@ -545,7 +545,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(field: String): PushField =
       new PushField(field)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(pushField: PushField): Option[String] =
       Option(pushField).map(_.field)
   }
@@ -559,10 +559,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$push", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Push => true
       case _       => false
@@ -588,7 +588,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(expression: pack.Value): Push =
       new Push(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(push: Push): Option[pack.Value] =
       Option(push).map(_.expression)
   }
@@ -603,10 +603,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$addToSet", builder.string("$" + field))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: AddFieldToSet => true
       case _                => false
@@ -632,7 +632,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(field: String): AddFieldToSet =
       new AddFieldToSet(field)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(addFieldToSet: AddFieldToSet): Option[String] =
       Option(addFieldToSet).map(_.field)
   }
@@ -645,10 +645,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   class AddToSet private[api] (@deprecatedName(Symbol("addToSetExpr")) val expression: pack.Value) extends GroupFunction with Product1[pack.Value] with Serializable {
     val makeFunction = pipe(f"$$addToSet", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: AddToSet => true
       case _           => false
@@ -674,7 +674,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(expression: pack.Value): AddToSet =
       new AddToSet(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(addToSet: AddToSet): Option[pack.Value] =
       Option(addToSet).map(_.expression)
   }
@@ -688,10 +688,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     with Product1[pack.Value] with Serializable {
     val makeFunction = pipe(f"$$stdDevPop", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: StdDevPop => true
       case _            => false
@@ -717,7 +717,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(expression: pack.Value): StdDevPop =
       new StdDevPop(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(stdDevPop: StdDevPop): Option[pack.Value] =
       Option(stdDevPop).map(_.expression)
   }
@@ -733,10 +733,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$stdDevPop", builder.string("$" + field))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: StdDevPopField => true
       case _                 => false
@@ -762,7 +762,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(field: String): StdDevPopField =
       new StdDevPopField(field)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(stdDevPopField: StdDevPopField): Option[String] =
       Option(stdDevPopField).map(_.field)
   }
@@ -777,10 +777,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$stdDevSamp", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: StdDevSamp => true
       case _             => false
@@ -806,7 +806,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(expression: pack.Value): StdDevSamp =
       new StdDevSamp(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(stdDevSamp: StdDevSamp): Option[pack.Value] =
       Option(stdDevSamp).map(_.expression)
   }
@@ -822,10 +822,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$stdDevSamp", builder.string("$" + field))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: StdDevSampField => true
       case _                  => false
@@ -851,7 +851,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(field: String): StdDevSampField =
       new StdDevSampField(field)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(stdDevSampField: StdDevSampField): Option[String] =
       Option(stdDevSampField).map(_.field)
   }
@@ -866,10 +866,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction = pipe(f"$$sum", builder.string("$" + field))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: SumField => true
       case _           => false
@@ -895,7 +895,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(field: String): SumField =
       new SumField(field)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(sumField: SumField): Option[String] =
       Option(sumField).map(_.field)
   }
@@ -909,10 +909,10 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     val makeFunction: pack.Document = pipe(f"$$sum", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Sum => true
       case _      => false
@@ -938,7 +938,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     def apply(expression: pack.Value): Sum =
       new Sum(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(sum: Sum): Option[pack.Value] =
       Option(sum).map(_.expression)
   }

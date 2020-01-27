@@ -60,10 +60,10 @@ object ReadPreference {
     extends ReadPreference with Taggable
     with Product1[List[Map[String, String]]] with Serializable {
 
-    @deprecated("No longer case class", "1.0.0-rc.1")
+    @deprecated("No longer case class", "0.20.3")
     @inline def _1 = tags
 
-    @deprecated("No longer case class", "1.0.0-rc.1")
+    @deprecated("No longer case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: PrimaryPreferred => false
       case _                   => false
@@ -95,10 +95,10 @@ object ReadPreference {
     extends ReadPreference with Taggable
     with Product1[List[Map[String, String]]] with Serializable {
 
-    @deprecated("No longer case class", "1.0.0-rc.1")
+    @deprecated("No longer case class", "0.20.3")
     @inline def _1 = tags
 
-    @deprecated("No longer case class", "1.0.0-rc.1")
+    @deprecated("No longer case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Secondary => false
       case _            => false
@@ -133,10 +133,10 @@ object ReadPreference {
     extends ReadPreference with Taggable
     with Product1[List[Map[String, String]]] with Serializable {
 
-    @deprecated("No longer case class", "1.0.0-rc.1")
+    @deprecated("No longer case class", "0.20.3")
     @inline def _1 = tags
 
-    @deprecated("No longer case class", "1.0.0-rc.1")
+    @deprecated("No longer case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: SecondaryPreferred => false
       case _                     => false
@@ -171,10 +171,10 @@ object ReadPreference {
     extends ReadPreference with Taggable
     with Product1[List[Map[String, String]]] with Serializable {
 
-    @deprecated("No longer case class", "1.0.0-rc.1")
+    @deprecated("No longer case class", "0.20.3")
     @inline def _1 = tags
 
-    @deprecated("No longer case class", "1.0.0-rc.1")
+    @deprecated("No longer case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Nearest => false
       case _          => false

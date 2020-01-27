@@ -31,10 +31,10 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
   class Ascending private[api] (val field: String)
     extends SortOrder with Product1[String] with Serializable {
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Ascending => true
       case _            => false
@@ -66,10 +66,10 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
   class Descending private[api] (val field: String)
     extends SortOrder with Product1[String] with Serializable {
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Descending => true
       case _             => false
@@ -109,13 +109,13 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
     val keyword: MetadataKeyword) extends SortOrder
     with Product2[String, MetadataKeyword] with Serializable {
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = keyword
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: MetadataSort => true
       case _               => false

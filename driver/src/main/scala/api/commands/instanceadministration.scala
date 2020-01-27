@@ -282,52 +282,52 @@ class ReplSetMember private[api] (
   val syncingTo: Option[String],
   val configVersion: Option[Int]) extends Product15[Long, String, Int, Int, String, Long, Long, Option[Long], Option[Long], Option[String], Option[Long], Boolean, Option[Long], Option[String], Option[Int]] with Serializable {
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _1 = _id
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _2 = name
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _3 = health
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _4 = state
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _5 = stateStr
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _6 = uptime
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _7 = optime
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _8 = lastHeartbeat
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _9 = lastHeartbeatRecv
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _10 = lastHeartbeatMessage
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _11 = electionTime
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _12 = self
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _13 = pingMs
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _14 = syncingTo
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _15 = configVersion
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def canEqual(that: Any): Boolean = that match {
     case _: ReplSetMember => true
     case _                => false
@@ -367,7 +367,7 @@ object ReplSetMember extends scala.runtime.AbstractFunction15[Long, String, Int,
     syncingTo: Option[String],
     configVersion: Option[Int]): ReplSetMember = new ReplSetMember(_id, name, health, state, stateStr, uptime, optime, lastHeartbeat, lastHeartbeatRecv, lastHeartbeatMessage, electionTime, self, pingMs, syncingTo, configVersion)
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def unapply(other: ReplSetMember) = Option(other).map(_.tupled)
 }
 
@@ -385,19 +385,19 @@ class ReplSetStatus private[api] (
   val myState: Int,
   val members: List[ReplSetMember]) extends Product4[String, Long, Int, List[ReplSetMember]] with Serializable {
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _1 = name
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _2 = time
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _3 = myState
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _4 = members
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def canEqual(that: Any): Boolean = that match {
     case _: ReplSetStatus => true
     case _                => false
@@ -427,7 +427,7 @@ object ReplSetStatus extends scala.runtime.AbstractFunction4[String, Long, Int, 
     members: List[ReplSetMember]): ReplSetStatus =
     new ReplSetStatus(name, time, myState, members)
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def unapply(status: ReplSetStatus) = Option(status).map(_.tupled)
 }
 

@@ -30,10 +30,10 @@ trait AggregationFramework[P <: SerializationPack]
    */
   @deprecated("Use `api.collections.Aggregator`", "0.12.7")
   class Cursor private[api] (val batchSize: Int) extends Product1[Int] {
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = batchSize
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Cursor => true
       case _         => false
@@ -55,7 +55,7 @@ trait AggregationFramework[P <: SerializationPack]
   object Cursor extends AbstractFunction1[Int, Cursor] {
     def apply(batchSize: Int): Cursor = new Cursor(batchSize)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(cursor: Cursor): Option[Int] = Option(cursor).map(_.batchSize)
   }
 
@@ -110,10 +110,10 @@ trait AggregationFramework[P <: SerializationPack]
 
     val makePipe = pipe(f"$$addFields", specifications)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = specifications
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: AddFields => true
       case _            => false
@@ -139,7 +139,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(specifications: pack.Document): AddFields =
       new AddFields(specifications)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(addFields: AddFields): Option[pack.Document] =
       Option(addFields).map(_.specifications)
   }
@@ -172,16 +172,16 @@ trait AggregationFramework[P <: SerializationPack]
       pipe(f"$$bucket", document(opts.result()))
     }
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = groupBy
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = boundaries
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _3 = default
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _4 = output
 
     def canEqual(that: Any): Boolean = that match {
@@ -213,7 +213,7 @@ trait AggregationFramework[P <: SerializationPack]
       output: (String, GroupFunction)*): Bucket =
       new Bucket(groupBy, boundaries, default)(output: _*)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(res: Bucket) = Option(res).map(_.tupled)
   }
 
@@ -254,16 +254,16 @@ trait AggregationFramework[P <: SerializationPack]
       pipe(f"$$bucketAuto", document(opts.result()))
     }
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = groupBy
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = buckets
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _3 = granularity
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _4 = output
 
     def canEqual(that: Any): Boolean = that match {
@@ -295,7 +295,7 @@ trait AggregationFramework[P <: SerializationPack]
       output: (String, GroupFunction)*): BucketAuto =
       new BucketAuto(groupBy, buckets, granularity)(output: _*)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(res: BucketAuto) = Option(res).map(_.tupled).collect {
       case (a, b, c, _) => Tuple3(a, b, c)
     }
@@ -330,13 +330,13 @@ trait AggregationFramework[P <: SerializationPack]
       pipe(f"$$collStats", document(opts.result()))
     }
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = latencyStatsHistograms
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = storageStatsScale
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _3 = count
 
     def canEqual(that: Any): Boolean = that match {
@@ -367,7 +367,7 @@ trait AggregationFramework[P <: SerializationPack]
       count: Boolean): CollStats =
       new CollStats(latencyStatsHistograms, storageStatsScale, count)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(collStats: CollStats) = Option(collStats).map(_.tupled)
   }
 
@@ -382,10 +382,10 @@ trait AggregationFramework[P <: SerializationPack]
 
     val makePipe: pack.Document = pipe(f"$$count", builder.string(outputName))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = outputName
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Count => true
       case _        => false
@@ -410,7 +410,7 @@ trait AggregationFramework[P <: SerializationPack]
   object Count extends AbstractFunction1[String, Count] {
     def apply(outputName: String): Count = new Count(outputName)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(count: Count): Option[String] = Option(count).map(_.outputName)
   }
 
@@ -438,19 +438,19 @@ trait AggregationFramework[P <: SerializationPack]
       element("idleSessions", boolean(idleSessions)),
       element("localOps", boolean(localOps)))))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = allUsers
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = idleConnections
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _3 = idleCursors
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _4 = idleSessions
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _5 = localOps
 
     def canEqual(that: Any): Boolean = that match {
@@ -483,7 +483,7 @@ trait AggregationFramework[P <: SerializationPack]
       localOps: Boolean = false): CurrentOp = new CurrentOp(
       allUsers, idleConnections, idleCursors, idleSessions, localOps)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(res: CurrentOp) = Option(res).map(_.tupled)
   }
 
@@ -514,10 +514,10 @@ trait AggregationFramework[P <: SerializationPack]
       pipe(f"$$facet", specDoc)
     }
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = specifications
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Facet => true
       case _        => false
@@ -543,7 +543,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(specifications: Iterable[(String, Pipeline)]): Facet =
       new Facet(specifications)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(facet: Facet): Option[Iterable[(String, Pipeline)]] =
       Option(facet).map(_.specifications)
   }
@@ -693,13 +693,13 @@ trait AggregationFramework[P <: SerializationPack]
         case (field, op) => element(field, op.makeFunction)
       })))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = identifiers
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = ops
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Group => true
       case _        => false
@@ -723,7 +723,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(identifiers: pack.Value)(ops: (String, GroupFunction)*): Group =
       new Group(identifiers)(ops: _*)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(other: Group): Option[pack.Value] =
       Option(other).map(_.identifiers)
 
@@ -743,13 +743,13 @@ trait AggregationFramework[P <: SerializationPack]
 
     val makePipe = Group(builder.string("$" + idField))(ops: _*).makePipe
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = idField
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = ops
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: GroupField => true
       case _             => false
@@ -773,7 +773,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(idField: String)(ops: (String, GroupFunction)*): GroupField =
       new GroupField(idField)(ops: _*)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(other: GroupField): Option[String] =
       Option(other).map(_.idField)
 
@@ -796,13 +796,13 @@ trait AggregationFramework[P <: SerializationPack]
         builder.elementProducer(alias, builder.string("$" + attribute))
     }))(ops: _*).makePipe
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = idFields
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = ops
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: GroupMulti => true
       case _             => false
@@ -826,7 +826,7 @@ trait AggregationFramework[P <: SerializationPack]
 
     def apply(idFields: Seq[(String, String)])(ops: (String, GroupFunction)*): GroupMulti = new GroupMulti(idFields: _*)(ops: _*)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapplySeq(other: GroupMulti): Seq[(String, String)] =
       other.idFields
 
@@ -849,13 +849,13 @@ trait AggregationFramework[P <: SerializationPack]
     val ops: Long,
     val since: Long) extends Product2[Long, Long] with Serializable {
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = ops
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = since
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: IndexStatAccesses => true
       case _                    => false
@@ -880,7 +880,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(ops: Long, since: Long): IndexStatAccesses =
       new IndexStatAccesses(ops, since)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(other: IndexStatAccesses): Option[(Long, Long)] =
       Option(other).map { i => i.ops -> i.since }
 
@@ -898,16 +898,16 @@ trait AggregationFramework[P <: SerializationPack]
     val host: String,
     val accesses: IndexStatAccesses) extends Product4[String, pack.Document, String, IndexStatAccesses] with Serializable {
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = name
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = key
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _3 = host
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _4 = accesses
 
     def canEqual(that: Any): Boolean = that match {
@@ -939,7 +939,7 @@ trait AggregationFramework[P <: SerializationPack]
       accesses: IndexStatAccesses): IndexStatsResult =
       new IndexStatsResult(name, key, host, accesses)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(res: IndexStatsResult) = Option(res).map(_.tupled)
   }
 
@@ -953,10 +953,10 @@ trait AggregationFramework[P <: SerializationPack]
 
     val makePipe: pack.Document = pipe(f"$$limit", builder.int(limit))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = limit
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Limit => true
       case _        => false
@@ -978,7 +978,7 @@ trait AggregationFramework[P <: SerializationPack]
   object Limit extends AbstractFunction1[Int, Limit] {
     def apply(limit: Int): Limit = new Limit(limit)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(limit: Limit): Option[Int] = Option(limit).map(_.limit)
   }
 
@@ -992,10 +992,10 @@ trait AggregationFramework[P <: SerializationPack]
     val expression: pack.Document) extends PipelineOperator {
     def makePipe: pack.Document = pipe(f"$$listLocalSessions", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: ListLocalSessions => true
       case _                    => false
@@ -1021,7 +1021,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(expression: pack.Document): ListLocalSessions =
       new ListLocalSessions(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(listLocalSessions: ListLocalSessions): Option[pack.Document] =
       Option(listLocalSessions).map(_.expression)
   }
@@ -1036,10 +1036,10 @@ trait AggregationFramework[P <: SerializationPack]
     val expression: pack.Document) extends PipelineOperator {
     def makePipe: pack.Document = pipe(f"$$listSessions", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: ListSessions => true
       case _               => false
@@ -1065,7 +1065,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(expression: pack.Document): ListSessions =
       new ListSessions(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(listSessions: ListSessions): Option[pack.Document] =
       Option(listSessions).map(_.expression)
   }
@@ -1121,31 +1121,31 @@ trait AggregationFramework[P <: SerializationPack]
       opts.result()
     }
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = from
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = startWith
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _3 = connectFromField
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _4 = connectToField
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _5 = as
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _6 = maxDepth
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _7 = depthField
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _8 = restrictSearchWithMatch
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: GraphLookup => true
       case _              => false
@@ -1179,7 +1179,7 @@ trait AggregationFramework[P <: SerializationPack]
       new GraphLookup(from, startWith, connectFromField, connectToField,
         as, maxDepth, depthField, restrictSearchWithMatch)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(stage: GraphLookup) = Option(stage).map(_.tupled)
   }
 
@@ -1206,16 +1206,16 @@ trait AggregationFramework[P <: SerializationPack]
         element("foreignField", string(foreignField)),
         element("as", string(as)))))))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = from
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = localField
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _3 = foreignField
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _4 = as
 
     def canEqual(that: Any): Boolean = that match {
@@ -1247,7 +1247,7 @@ trait AggregationFramework[P <: SerializationPack]
       as: String): Lookup =
       new Lookup(from, localField, foreignField, as)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(res: Lookup) = Option(res).map(_.tupled)
   }
 
@@ -1262,10 +1262,10 @@ trait AggregationFramework[P <: SerializationPack]
 
     val makePipe: pack.Document = pipe(f"$$match", predicate)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = predicate
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Match => true
       case _        => false
@@ -1290,7 +1290,7 @@ trait AggregationFramework[P <: SerializationPack]
   object Match extends AbstractFunction1[pack.Document, Match] {
     def apply(predicate: pack.Document): Match = new Match(predicate)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(`match`: Match): Option[pack.Document] =
       Option(`match`).map(_.predicate)
   }
@@ -1337,25 +1337,25 @@ trait AggregationFramework[P <: SerializationPack]
       pipe(f"$$merge", builder.document(opts.result()))
     }
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = intoDb
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = intoCollection
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _3 = on
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _4 = whenMatched
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _5 = let
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _6 = whenNotMatched
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Merge => true
       case _        => false
@@ -1385,7 +1385,7 @@ trait AggregationFramework[P <: SerializationPack]
       whenNotMatched: Option[String]): Merge =
       new Merge(intoDb, intoCollection, on, whenMatched, let, whenNotMatched)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(merge: Merge) = Option(merge).map(_.tupled)
   }
 
@@ -1399,10 +1399,10 @@ trait AggregationFramework[P <: SerializationPack]
 
     def makePipe: pack.Document = pipe(f"$$out", builder.string(collection))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = collection
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Out => true
       case _      => false
@@ -1427,7 +1427,7 @@ trait AggregationFramework[P <: SerializationPack]
   object Out extends AbstractFunction1[String, Out] {
     def apply(collection: String): Out = new Out(collection)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(out: Out): Option[String] =
       Option(out).map(_.collection)
   }
@@ -1452,10 +1452,10 @@ trait AggregationFramework[P <: SerializationPack]
 
     val makePipe: pack.Document = pipe(f"$$project", specifications)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = specifications
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Project => true
       case _          => false
@@ -1481,7 +1481,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(specifications: pack.Document): Project =
       new Project(specifications)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(project: Project): Option[pack.Document] =
       Option(project).map(_.specifications)
   }
@@ -1496,10 +1496,10 @@ trait AggregationFramework[P <: SerializationPack]
 
     val makePipe: pack.Document = pipe(f"$$redact", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Redact => true
       case _         => false
@@ -1525,7 +1525,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(expression: pack.Document): Redact =
       new Redact(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(redact: Redact): Option[pack.Document] =
       Option(redact).map(_.expression)
   }
@@ -1542,10 +1542,10 @@ trait AggregationFramework[P <: SerializationPack]
     val makePipe: pack.Document =
       pipe(f"$$replaceRoot", pipe("newRoot", builder.string("$" + newRoot)))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = newRoot
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: ReplaceRootField => true
       case _                   => false
@@ -1571,7 +1571,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(newRoot: String): ReplaceRootField =
       new ReplaceRootField(newRoot)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(replaceRootField: ReplaceRootField): Option[String] =
       Option(replaceRootField).map(_.newRoot)
   }
@@ -1588,10 +1588,10 @@ trait AggregationFramework[P <: SerializationPack]
     val makePipe: pack.Document =
       pipe(f"$$replaceRoot", pipe("newRoot", newRoot))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = newRoot
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: ReplaceRoot => true
       case _              => false
@@ -1617,7 +1617,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(newRoot: pack.Document): ReplaceRoot =
       new ReplaceRoot(newRoot)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(replaceRoot: ReplaceRoot): Option[pack.Document] =
       Option(replaceRoot).map(_.newRoot)
   }
@@ -1634,10 +1634,10 @@ trait AggregationFramework[P <: SerializationPack]
 
     def makePipe: pack.Document = pipe(f"$$replaceWith", replacementDocument)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = replacementDocument
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: ReplaceWith => true
       case _              => false
@@ -1666,7 +1666,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(replacementDocument: pack.Document): ReplaceWith =
       new ReplaceWith(replacementDocument)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(replaceWith: ReplaceWith): Option[pack.Document] =
       Option(replaceWith).map(_.replacementDocument)
   }
@@ -1682,10 +1682,10 @@ trait AggregationFramework[P <: SerializationPack]
     val makePipe: pack.Document =
       pipe(f"$$sample", pipe("size", builder.int(size)))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = size
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Sample => true
       case _         => false
@@ -1707,7 +1707,7 @@ trait AggregationFramework[P <: SerializationPack]
   object Sample extends AbstractFunction1[Int, Sample] {
     def apply(size: Int): Sample = new Sample(size)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(size: Sample): Option[Int] = Option(size).map(_.size)
   }
 
@@ -1719,10 +1719,10 @@ trait AggregationFramework[P <: SerializationPack]
 
     def makePipe: pack.Document = pipe(f"$$set", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Set => true
       case _      => false
@@ -1748,7 +1748,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(expression: pack.Document): Set =
       new Set(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(set: Set): Option[pack.Document] =
       Option(set).map(_.expression)
   }
@@ -1764,10 +1764,10 @@ trait AggregationFramework[P <: SerializationPack]
     val makePipe: pack.Document = builder.document(Seq(
       builder.elementProducer(f"$$skip", builder.int(skip))))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = skip
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Skip => true
       case _       => false
@@ -1789,7 +1789,7 @@ trait AggregationFramework[P <: SerializationPack]
   object Skip extends AbstractFunction1[Int, Skip] {
     def apply(skip: Int): Skip = new Skip(skip)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(skip: Skip): Option[Int] = Option(skip).map(_.skip)
   }
 
@@ -1816,10 +1816,10 @@ trait AggregationFramework[P <: SerializationPack]
         }
       }))))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = fields
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Sort => true
       case _       => false
@@ -1843,7 +1843,7 @@ trait AggregationFramework[P <: SerializationPack]
   object Sort extends AbstractFunction1[Seq[SortOrder], Sort] {
     def apply(fields: Seq[SortOrder]): Sort = new Sort(fields: _*)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapplySeq(sort: Sort): Seq[SortOrder] = sort.fields
   }
 
@@ -1858,10 +1858,10 @@ trait AggregationFramework[P <: SerializationPack]
 
     def makePipe: pack.Document = pipe(f"$$sortByCount", expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = expression
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: SortByCount => true
       case _              => false
@@ -1887,7 +1887,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(expression: pack.Value): SortByCount =
       new SortByCount(expression)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(sortByCount: SortByCount): Option[pack.Value] =
       Option(sortByCount).map(_.expression)
   }
@@ -1905,10 +1905,10 @@ trait AggregationFramework[P <: SerializationPack]
     def makePipe: pack.Document =
       pipe(f"$$sortByCount", builder.string("$" + field))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: SortByFieldCount => true
       case _                   => false
@@ -1934,7 +1934,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(field: String): SortByFieldCount =
       new SortByFieldCount(field)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(sortByFieldCount: SortByFieldCount): Option[String] =
       Option(sortByFieldCount).map(_.field)
   }
@@ -1954,13 +1954,13 @@ trait AggregationFramework[P <: SerializationPack]
     def makePipe: pack.Document = pipe(f"$$unset", builder.array(
       builder.string(field), otherFields.map(builder.string)))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = field
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = otherFields
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Unset => true
       case _        => false
@@ -1985,7 +1985,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(field: String, otherFields: Seq[String]): Unset =
       new Unset(field, otherFields)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(other: Unset): Option[(String, Seq[String])] =
       Option(other).map { i => i.field -> i.otherFields }
 
@@ -2034,7 +2034,7 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(field: String): UnwindField =
       new UnwindField(field)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(unwindField: UnwindField): Option[String] =
       Option(unwindField).map(_.field)
   }

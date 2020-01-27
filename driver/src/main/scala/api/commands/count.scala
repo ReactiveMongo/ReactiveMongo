@@ -22,7 +22,7 @@ trait CountCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   class HintString private[api] (val s: String)
     extends Hint with Product1[String] with Serializable {
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = s
 
     def canEqual(that: Any): Boolean = that match {
@@ -44,7 +44,7 @@ trait CountCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
     override def toString = s"Hint['$s']"
   }
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   object HintString
     extends scala.runtime.AbstractFunction1[String, HintString] {
 
@@ -56,7 +56,7 @@ trait CountCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   class HintDocument private[api] (val doc: pack.Document)
     extends Hint with Product1[pack.Document] with Serializable {
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = doc
 
     def canEqual(that: Any): Boolean = that match {
@@ -78,7 +78,7 @@ trait CountCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
     override def toString = s"Hint${pack pretty doc}"
   }
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   object HintDocument
     extends scala.runtime.AbstractFunction1[pack.Document, HintDocument] {
 
@@ -97,10 +97,10 @@ trait CountCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
 
   class CountResult private[api] (@deprecatedName(Symbol("count")) val value: Int) extends BoxedAnyVal[Int] with Product1[Int] with Serializable {
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = value
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: CountResult => true
       case _              => false
@@ -116,7 +116,7 @@ trait CountCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
     override def toString = s"CountResult($value)"
   }
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   object CountResult
     extends scala.runtime.AbstractFunction1[Int, CountResult] {
 

@@ -480,10 +480,10 @@ object NSIndex extends scala.runtime.AbstractFunction2[String, Index.Aux[Seriali
 
   type Default = NSIndex.Aux[Serialization.Pack]
 
-  @deprecated("Will be removed", "1.0.0-rc.1")
+  @deprecated("Will be removed", "0.20.3")
   def apply(namespace: String, index: Index.Aux[Serialization.Pack]): NSIndex.Aux[Serialization.Pack] = at[Serialization.Pack](namespace, index)
 
-  @deprecated("Will be renamed", "1.0.0-rc.1")
+  @deprecated("Will be renamed", "0.20.3")
   def at[P <: SerializationPack](
     namespace: String, index: Index.Aux[P]): NSIndex.Aux[P] = {
     @inline def nsp = namespace

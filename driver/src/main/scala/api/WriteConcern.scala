@@ -83,10 +83,10 @@ package commands {
       extends WC.TagSet(tag) with W
       with Product1[String] with Serializable {
 
-      @deprecated("No longer a case class", "1.0.0-rc.1")
+      @deprecated("No longer a case class", "0.20.3")
       @inline def _1 = tag
 
-      @deprecated("No longer a case class", "1.0.0-rc.1")
+      @deprecated("No longer a case class", "0.20.3")
       def canEqual(that: Any): Boolean = that match {
         case _: TagSet => true
         case _         => false
@@ -108,7 +108,7 @@ package commands {
     object TagSet extends scala.runtime.AbstractFunction1[String, TagSet] {
       def apply(tag: String): TagSet = new TagSet(tag)
 
-      @deprecated("No longer a case class", "1.0.0-rc.1")
+      @deprecated("No longer a case class", "0.20.3")
       def unapply(set: TagSet): Option[String] = Option(set).map(_.tag)
     }
 
@@ -120,10 +120,10 @@ package commands {
       extends WC.WaitForAcknowledgments(i) with W
       with Product1[Int] with Serializable {
 
-      @deprecated("No longer a case class", "1.0.0-rc.1")
+      @deprecated("No longer a case class", "0.20.3")
       @inline def _1 = i
 
-      @deprecated("No longer a case class", "1.0.0-rc.1")
+      @deprecated("No longer a case class", "0.20.3")
       def canEqual(that: Any): Boolean = that match {
         case _: WaitForAcknowledgments => true
         case _                         => false
@@ -145,7 +145,7 @@ package commands {
     object WaitForAcknowledgments extends scala.runtime.AbstractFunction1[Int, WaitForAcknowledgments] {
       def apply(i: Int): WaitForAcknowledgments = new WaitForAcknowledgments(i)
 
-      @deprecated("No longer a case class", "1.0.0-rc.1")
+      @deprecated("No longer a case class", "0.20.3")
       def unapply(set: WaitForAcknowledgments): Option[Int] = Option(set).map(_.i)
     }
 

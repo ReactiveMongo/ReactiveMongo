@@ -318,10 +318,10 @@ object Cursor {
 
     def map[U](f: T => U): State[U] = Cont(f(value))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = value
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Cont[T] => true
       case _          => false
@@ -341,10 +341,10 @@ object Cursor {
 
     def map[U](f: T => U): State[U] = Done(f(value))
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = value
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Done[T] => true
       case _          => false
@@ -364,10 +364,10 @@ object Cursor {
 
     def map[U](f: T => U): State[U] = Fail[U](cause)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = cause
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Fail[T] => true
       case _          => false

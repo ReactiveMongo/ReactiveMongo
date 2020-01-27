@@ -26,19 +26,19 @@ class FailoverStrategy private[api] (
   val delayFactor: Int => Double)
   extends Product3[FiniteDuration, Int, Int => Double] with Serializable {
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _1 = initialDelay
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _2 = retries
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _3 = delayFactor
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def canEqual(that: Any): Boolean = false
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def copy(
     initialDelay: FiniteDuration = this.initialDelay,
     retries: Int = this.retries,
@@ -78,10 +78,10 @@ object FailoverStrategy {
 
     override lazy val toString = s"× $multiplier"
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = multiplier
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: FactorFun => true
       case _            => false
@@ -116,7 +116,7 @@ object FailoverStrategy {
     delayFactor: Int => Double = defaultFactor): FailoverStrategy =
     new FailoverStrategy(initialDelay, retries, delayFactor)
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def unapply(strategy: FailoverStrategy): Option[Tuple3[FiniteDuration, Int, Int => Double]] = Option(strategy).map { s => Tuple3(s.initialDelay, s.retries, s.delayFactor) }
 
 }

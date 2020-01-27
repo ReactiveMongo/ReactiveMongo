@@ -138,18 +138,18 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
     override val upsert: Boolean) extends Modify with FindAndModifyCommand.UpdateOp[pack.type] with Product3[Document, Boolean, Boolean] with Serializable {
     val pack: self.pack.type = self.pack
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _1 = update
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _2 = fetchNewObject
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     @inline def _3 = upsert
 
     private[api] lazy val tupled = Tuple3(update, fetchNewObject, upsert)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def canEqual(that: Any): Boolean = that match {
       case _: Update => true
       case _         => false
@@ -176,7 +176,7 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
 
     def apply(update: ImplicitlyDocumentProducer, fetchNewObject: Boolean = false, upsert: Boolean = false): Update = Update(update.produce, fetchNewObject, upsert)
 
-    @deprecated("No longer a case class", "1.0.0-rc.1")
+    @deprecated("No longer a case class", "0.20.3")
     def unapply(update: Update): Option[(Document, Boolean, Boolean)] =
       Option(update).map(_.tupled)
   }

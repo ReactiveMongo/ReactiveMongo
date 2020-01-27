@@ -108,51 +108,51 @@ class LastError private[api] (
 
   override lazy val message = errmsg.getOrElse("<none>")
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _1 = ok
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _2 = errmsg
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _3 = code
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _4 = lastOp
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _5 = n
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _6 = singleShard
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _7 = updatedExisting
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _8 = upserted
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _9 = wnote
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _10 = wtimeout
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _11 = waited
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _12 = wtime
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _13 = writeErrors
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _14 = writeConcernError
 
   private[api] lazy val tupled = Tuple14(ok, errmsg, code, lastOp, n, singleShard, updatedExisting, upserted, wnote, wtimeout, waited, wtime, writeErrors, writeConcernError)
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def canEqual(that: Any): Boolean = that match {
     case _: LastError => true
     case _            => false
@@ -188,7 +188,7 @@ object LastError extends scala.runtime.AbstractFunction14[Boolean, Option[String
     writeErrors: Seq[WriteError] = Nil,
     writeConcernError: Option[WriteConcernError] = None): LastError = new LastError(ok, errmsg, code, lastOp, n, singleShard, updatedExisting, upserted, wnote, wtimeout, waited, wtime, writeErrors, writeConcernError)
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def unapply(error: LastError) = Option(error).map(_.tupled)
 }
 
@@ -201,22 +201,22 @@ class WriteError private[api] (
   val code: Int,
   val errmsg: String) extends Product3[Int, Int, String] with Serializable {
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _1 = index
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _2 = code
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _3 = errmsg
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def canEqual(that: Any): Boolean = that match {
     case _: WriteError => true
     case _             => false
   }
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def copy(
     index: Int = this.index,
     code: Int = this.code,
@@ -245,7 +245,7 @@ object WriteError extends scala.runtime.AbstractFunction3[Int, Int, String, Writ
     code: Int,
     errmsg: String): WriteError = new WriteError(index, code, errmsg)
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def unapply(error: WriteError) = Option(error).map(_.tupled)
 }
 
@@ -257,13 +257,13 @@ class WriteConcernError private[api] (
   val code: Int,
   val errmsg: String) extends Product2[Int, String] with Serializable {
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _1 = code
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _2 = errmsg
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def canEqual(that: Any): Boolean = that match {
     case _: WriteConcernError => true
     case _                    => false
@@ -288,7 +288,7 @@ object WriteConcernError extends scala.runtime.AbstractFunction2[Int, String, Wr
   def apply(code: Int, errmsg: String): WriteConcernError =
     new WriteConcernError(code, errmsg)
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def unapply(error: WriteConcernError) = Option(error).map(_.tupled)
 }
 

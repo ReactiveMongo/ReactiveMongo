@@ -15,7 +15,7 @@
  */
 package reactivemongo.util
 
-@deprecated("Internal: will be made private", "1.0.0-rc.1")
+@deprecated("Internal: will be made private", "0.20.3")
 object LazyLogger {
   import org.slf4j.{ LoggerFactory, Logger }
 

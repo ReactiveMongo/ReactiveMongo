@@ -207,7 +207,7 @@ sealed trait IndexesManager {
  *
  * @param db The subject database.
  */
-@deprecated("Internal: will be made private", "1.0.0-rc.1")
+@deprecated("Internal: will be made private", "0.20.3")
 private[api] sealed abstract class AbstractLegacyManager(db: DB)( // TODO: Remove
   implicit
   ec: ExecutionContext) extends IndexesManager { self =>
@@ -356,7 +356,7 @@ private[api] sealed abstract class AbstractLegacyManager(db: DB)( // TODO: Remov
  *
  * @param db The subject database.
  */
-@deprecated("Internal: will be made private", "1.0.0-rc.1")
+@deprecated("Internal: will be made private", "0.20.3")
 class LegacyIndexesManager(db: DB)( // TODO: Remove
   implicit
   ec: ExecutionContext) extends AbstractLegacyManager(db) { self =>
@@ -473,7 +473,7 @@ private[api] sealed abstract class AbstractIndexesManager(
  *
  * @param db the subject database
  */
-@deprecated("Internal: will be made private", "1.0.0-rc.1")
+@deprecated("Internal: will be made private", "0.20.3")
 class DefaultIndexesManager(db: DB with DBMetaCommands)(
   implicit
   ec: ExecutionContext) extends AbstractIndexesManager(db) {

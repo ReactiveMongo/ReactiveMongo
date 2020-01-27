@@ -70,7 +70,7 @@ object ReplyDocumentIterator {
   }
 }
 
-@deprecated("Internal: will be made private", "1.0.0-rc.1")
+@deprecated("Internal: will be made private", "0.20.3")
 class ReplyDocumentIteratorExhaustedException private[core] (
   val cause: Exception) extends Exception(cause) with Product1[Exception] with Serializable {
 
@@ -96,7 +96,7 @@ class ReplyDocumentIteratorExhaustedException private[core] (
   override def hashCode: Int = if (cause == null) -1 else cause.hashCode
 }
 
-@deprecated("Internal: will be made private", "1.0.0-rc.1")
+@deprecated("Internal: will be made private", "0.20.3")
 object ReplyDocumentIteratorExhaustedException extends scala.runtime.AbstractFunction1[Exception, ReplyDocumentIteratorExhaustedException] {
   def apply(cause: Exception): ReplyDocumentIteratorExhaustedException =
     new ReplyDocumentIteratorExhaustedException(cause)

@@ -19,7 +19,7 @@ import reactivemongo.api.ReadPreference
  * @param version the replicaSet version
  */
 @SerialVersionUID(527078726L)
-@deprecated("Internal: will be made private", "1.0.0-rc.1")
+@deprecated("Internal: will be made private", "0.20.3")
 class NodeSet private[reactivemongo] (
   val name: Option[String],
   val version: Option[Long],
@@ -195,25 +195,25 @@ class NodeSet private[reactivemongo] (
       nearest.map(_.info))
   }
 
-  @deprecated("No longer case class", "1.0.0-rc.1")
+  @deprecated("No longer case class", "0.20.3")
   @inline def _1 = name
 
-  @deprecated("No longer case class", "1.0.0-rc.1")
+  @deprecated("No longer case class", "0.20.3")
   @inline def _2 = version
 
-  @deprecated("No longer case class", "1.0.0-rc.1")
+  @deprecated("No longer case class", "0.20.3")
   @inline def _3 = nodes
 
-  @deprecated("No longer case class", "1.0.0-rc.1")
+  @deprecated("No longer case class", "0.20.3")
   @inline def _4 = authenticates
 
-  @deprecated("No longer case class", "1.0.0-rc.1")
+  @deprecated("No longer case class", "0.20.3")
   def canEqual(that: Any): Boolean = that match {
     case _: NodeSet => true
     case _          => false
   }
 
-  @deprecated("No longer case class", "1.0.0-rc.1")
+  @deprecated("No longer case class", "0.20.3")
   def copy(
     name: Option[String] = this.name,
     version: Option[Long] = this.version,
@@ -236,7 +236,7 @@ class NodeSet private[reactivemongo] (
   override def toString = s"NodeSet${tupled.toString}"
 }
 
-@deprecated("Internal: will be made private", "1.0.0-rc.1")
+@deprecated("Internal: will be made private", "0.20.3")
 object NodeSet extends scala.runtime.AbstractFunction4[Option[String], Option[Long], Vector[Node], Set[Authenticate], NodeSet] {
 
   def apply(

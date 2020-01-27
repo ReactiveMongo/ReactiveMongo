@@ -66,13 +66,13 @@ class ResultCursor private[api] (
   val fullCollectionName: String)
   extends Product2[Long, String] with Serializable {
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _1 = cursorId
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   @inline def _2 = fullCollectionName
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def canEqual(that: Any): Boolean = that match {
     case _: ResultCursor => true
     case _               => false
@@ -101,7 +101,7 @@ object ResultCursor
     fullCollectionName: String): ResultCursor = new ResultCursor(
     cursorId, fullCollectionName)
 
-  @deprecated("No longer a case class", "1.0.0-rc.1")
+  @deprecated("No longer a case class", "0.20.3")
   def unapply(other: ResultCursor) = Option(other).map(_.tupled)
 }
 
@@ -327,7 +327,7 @@ object Command {
  * @param collection the name of the collection against which the command is executed
  * @param command the executed command
  */
-@deprecated("Internal: will be made private", "1.0.0-rc.1")
+@deprecated("Internal: will be made private", "0.20.3")
 final case class ResolvedCollectionCommand[C <: CollectionCommand](
   collection: String,
   command: C) extends Command
