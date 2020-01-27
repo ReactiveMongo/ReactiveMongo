@@ -404,11 +404,7 @@ private[api] sealed abstract class AbstractIndexesManager(
   private final class CollectionManager(
     collectionName: String) extends CollectionIndexesManager {
 
-    import reactivemongo.api.commands.{
-      CreateIndexes,
-      Command,
-      ListIndexes
-    }
+    import reactivemongo.api.commands.{ CreateIndexes, ListIndexes }
 
     private[api] lazy val collection = db(collectionName)
 
