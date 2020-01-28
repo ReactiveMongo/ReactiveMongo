@@ -87,7 +87,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       val result = coll.aggregateWith1[IndexStatsResult]() { framework =>
         import framework._
 
-        IndexStats -> List(Sort(Seq(Ascending("name"))))
+        IndexStats -> List(Sort(Ascending("name")))
       }.collect[List](
         Int.MaxValue, Cursor.FailOnError[List[IndexStatsResult]]()).
         map(_.find(_.name != "_id_"))
@@ -129,7 +129,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
           Group(BSONString(f"$$state"))(
             "totalPop" -> SumField("population")) -> List(
               Match(document("totalPop" -> document(f"$$gte" -> 10000000L))),
-              Sort(Seq(Ascending("_id"))))
+              Sort(Ascending("_id")))
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()))
       }
 
@@ -154,7 +154,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
               "totalPop" -> SumField("population")),
             pipeline = Seq(
               Match(document("totalPop" -> document(f"$$gte" -> 10000000L))),
-              Sort(Seq(Ascending("_id")))))
+              Sort(Ascending("_id"))))
           view: BSONCollection = db(viewName)
           res <- view.find(
             BSONDocument.empty).cursor[BSONDocument]().collect[List](
@@ -212,7 +212,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         val pipeline = List(
           Group(BSONString(f"$$_id.state"))(
             "avgCityPop" -> aggregationFramework.AvgField("pop")),
-          Sort(Seq(Ascending("_id"))))
+          Sort(Ascending("_id")))
 
         f(firstOp, pipeline)
       }
@@ -256,8 +256,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
             val firstOp = Match(BSONDocument(
               f"$$text" -> BSONDocument(f"$$search" -> "JP")))
-            val pipeline = List(Sort(Seq(
-              MetadataSort("score", TextScore), Descending("city"))))
+            val pipeline = List(Sort(
+              MetadataSort("score", TextScore), Descending("city")))
 
             firstOp -> pipeline
           }.collect[List](4, Cursor.FailOnError[List[ZipCode]]()).
@@ -344,8 +344,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         "pop" -> SumField("population"))
 
       val groupPipeline = List(
-        Sort(Seq( // enforce order before Group using {First,Last}Field
-          Ascending("state"), Ascending("pop"))),
+        Sort( // enforce order before Group using {First,Last}Field
+          Ascending("state"), Ascending("pop")),
         Group(BSONString(f"$$_id.state"))(
           "biggestCity" -> LastField("_id.city"),
           "biggestPop" -> LastField("pop"),
@@ -356,7 +356,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
             "name" -> f"$$biggestCity", "population" -> f"$$biggestPop"),
           "smallestCity" -> document(
             "name" -> f"$$smallestCity", "population" -> f"$$smallestPop"))),
-        Sort(Seq(Ascending("state"))))
+        Sort(Ascending("state")))
 
       coll.aggregateWith1[BSONDocument]() { _ =>
         primGroup -> groupPipeline
@@ -576,7 +576,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       books.aggregateWith1[Author]() { framework =>
         import framework._
 
-        Sort(Seq(Ascending("title"))) -> List(
+        Sort(Ascending("title")) -> List(
           Group(BSONString(f"$$author"))("books" -> PushField("title")),
           Out(outColl))
       }.collect[List](Int.MaxValue, Cursor.FailOnError[List[Author]]()).map(_ => {}) must beEqualTo({}).await(0, timeout) and {
@@ -645,7 +645,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
           Group(BSONString(f"$$quiz"))(
             "stdDev" -> StdDevPopField("score")) -> List(
-              Sort(Seq(Ascending("_id"))))
+              Sort(Ascending("_id")))
       }.collect[List](Int.MaxValue, Cursor.FailOnError[List[QuizStdDev]]()).aka(f"$$stdDevPop results") must beTypedEqualTo(List(
         QuizStdDev(1, 8.04155872120988D), QuizStdDev(2, 8.04155872120988D))).await(0, timeout)
 

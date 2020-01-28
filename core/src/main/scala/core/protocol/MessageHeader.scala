@@ -13,7 +13,7 @@ import reactivemongo.core.protocol.BufferAccessors.writeTupleToBuffer4
  * @param opCode operation code of this message.
  */
 @deprecated("No longer a case class, no longer a case class", "0.20.3")
-class MessageHeader(
+class MessageHeader private[core] (
   val messageLength: Int,
   val requestID: Int,
   val responseTo: Int,
@@ -71,6 +71,7 @@ object MessageHeader extends scala.runtime.AbstractFunction4[Int, Int, Int, Int,
     opCode: Int): MessageHeader =
     new MessageHeader(messageLength, requestID, responseTo, opCode)
 
+  @deprecated("No longer case class", "0.20.3")
   def unapply(header: MessageHeader): Option[Tuple4[Int, Int, Int, Int]] =
     Option(header).map(_.tupled)
 

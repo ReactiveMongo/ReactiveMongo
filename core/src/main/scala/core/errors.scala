@@ -152,6 +152,7 @@ object GenericDriverException
   def apply(message: String): GenericDriverException =
     new GenericDriverException(message)
 
+  @deprecated("No longer a case class", "0.20.3")
   def unapply(exception: GenericDriverException): Option[String] =
     Option(exception).collect {
       case x if x.message != null => x.message
@@ -231,6 +232,7 @@ object ConnectionException
   def apply(message: String): ConnectionException =
     new ConnectionException(message)
 
+  @deprecated("No longer a case class", "0.20.3")
   def unapply(exception: ConnectionException): Option[String] =
     Option(exception).collect {
       case x if x.message != null => x.message
@@ -277,6 +279,7 @@ object GenericDatabaseException extends scala.runtime.AbstractFunction2[String, 
   def apply(message: String, code: Option[Int]): GenericDatabaseException =
     new GenericDatabaseException(message, code)
 
+  @deprecated("No longer a case class", "0.20.3")
   def unapply(exception: GenericDatabaseException): Option[(String, Option[Int])] = Option(exception).map(_.tupled)
 }
 

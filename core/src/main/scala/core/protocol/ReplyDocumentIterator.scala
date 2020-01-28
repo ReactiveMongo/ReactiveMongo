@@ -76,6 +76,7 @@ class ReplyDocumentIteratorExhaustedException private[core] (
 
   @inline def _1 = cause
 
+  @deprecated("No longer case class", "0.20.3")
   def canEqual(that: Any): Boolean = that match {
     case _: ReplyDocumentIteratorExhaustedException =>
       true
@@ -101,5 +102,6 @@ object ReplyDocumentIteratorExhaustedException extends scala.runtime.AbstractFun
   def apply(cause: Exception): ReplyDocumentIteratorExhaustedException =
     new ReplyDocumentIteratorExhaustedException(cause)
 
+  @deprecated("No longer case class", "0.20.3")
   def unapply(exception: ReplyDocumentIteratorExhaustedException): Option[Exception] = Option(exception).map(_.cause)
 }

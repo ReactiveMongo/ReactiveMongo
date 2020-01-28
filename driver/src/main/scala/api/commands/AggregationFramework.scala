@@ -1798,7 +1798,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param fields the fields to sort by
    */
-  class Sort private[api] (val fields: SortOrder*) extends PipelineOperator
+  class Sort private[api] (val fields: Seq[SortOrder]) extends PipelineOperator
     with Product1[Seq[SortOrder]] with Serializable {
 
     import builder.{ document, elementProducer => element }
@@ -1840,8 +1840,8 @@ trait AggregationFramework[P <: SerializationPack]
     override def toString: String = s"Sort(${fields})"
   }
 
-  object Sort extends AbstractFunction1[Seq[SortOrder], Sort] {
-    def apply(fields: Seq[SortOrder]): Sort = new Sort(fields: _*)
+  object Sort {
+    def apply(fields: SortOrder*): Sort = new Sort(fields)
 
     @deprecated("No longer a case class", "0.20.3")
     def unapplySeq(sort: Sort): Seq[SortOrder] = sort.fields
