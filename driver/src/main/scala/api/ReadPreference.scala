@@ -56,37 +56,148 @@ object ReadPreference {
   }
 
   /** Reads from the primary if it is available, or secondaries if it is not. */
-  case class PrimaryPreferred(val tags: List[Map[String, String]])
-    extends ReadPreference with Taggable {
+  class PrimaryPreferred private[api] (val tags: List[Map[String, String]])
+    extends ReadPreference with Taggable
+    with Product1[List[Map[String, String]]] with Serializable {
+
+    @deprecated("No longer case class", "0.20.3")
+    @inline def _1 = tags
+
+    @deprecated("No longer case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: PrimaryPreferred => false
+      case _                   => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: PrimaryPreferred =>
+        this.tags == other.tags
+
+      case _ =>
+        false
+    }
+
+    @inline override def hashCode: Int = tags.hashCode
 
     override val toString = s"""PrimaryPreferred(${tags mkString ", "})"""
   }
 
+  object PrimaryPreferred extends scala.runtime.AbstractFunction1[List[Map[String, String]], PrimaryPreferred] {
+    def apply(tags: List[Map[String, String]]): PrimaryPreferred =
+      new PrimaryPreferred(tags)
+
+    def unapply(pref: PrimaryPreferred): Option[List[Map[String, String]]] =
+      Option(pref).map(_.tags)
+  }
+
   /** Reads only from any secondary. */
-  case class Secondary(val tags: List[Map[String, String]])
-    extends ReadPreference with Taggable {
+  class Secondary private[api] (val tags: List[Map[String, String]])
+    extends ReadPreference with Taggable
+    with Product1[List[Map[String, String]]] with Serializable {
+
+    @deprecated("No longer case class", "0.20.3")
+    @inline def _1 = tags
+
+    @deprecated("No longer case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Secondary => false
+      case _            => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Secondary =>
+        this.tags == other.tags
+
+      case _ =>
+        false
+    }
+
+    @inline override def hashCode: Int = tags.hashCode
 
     override val toString = s"""Secondary(${tags mkString ", "})"""
+  }
+
+  object Secondary extends scala.runtime.AbstractFunction1[List[Map[String, String]], Secondary] {
+    def apply(tags: List[Map[String, String]]): Secondary =
+      new Secondary(tags)
+
+    def unapply(pref: Secondary): Option[List[Map[String, String]]] =
+      Option(pref).map(_.tags)
   }
 
   /**
    * Reads from any secondary,
    * or from the primary if they are not available.
    */
-  case class SecondaryPreferred(val tags: List[Map[String, String]])
-    extends ReadPreference with Taggable {
+  class SecondaryPreferred private[api] (val tags: List[Map[String, String]])
+    extends ReadPreference with Taggable
+    with Product1[List[Map[String, String]]] with Serializable {
+
+    @deprecated("No longer case class", "0.20.3")
+    @inline def _1 = tags
+
+    @deprecated("No longer case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: SecondaryPreferred => false
+      case _                     => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: SecondaryPreferred =>
+        this.tags == other.tags
+
+      case _ =>
+        false
+    }
+
+    @inline override def hashCode: Int = tags.hashCode
 
     override val toString = s"""SecondaryPreferred(${tags mkString ", "})"""
+  }
+
+  object SecondaryPreferred extends scala.runtime.AbstractFunction1[List[Map[String, String]], SecondaryPreferred] {
+    def apply(tags: List[Map[String, String]]): SecondaryPreferred =
+      new SecondaryPreferred(tags)
+
+    def unapply(pref: SecondaryPreferred): Option[List[Map[String, String]]] =
+      Option(pref).map(_.tags)
   }
 
   /**
    * Reads from the faster node (e.g. the node which replies faster than
    * all others), regardless its status (primary or secondary).
    */
-  case class Nearest(val tags: List[Map[String, String]])
-    extends ReadPreference with Taggable {
+  class Nearest private[api] (val tags: List[Map[String, String]])
+    extends ReadPreference with Taggable
+    with Product1[List[Map[String, String]]] with Serializable {
+
+    @deprecated("No longer case class", "0.20.3")
+    @inline def _1 = tags
+
+    @deprecated("No longer case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Nearest => false
+      case _          => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Nearest =>
+        this.tags == other.tags
+
+      case _ =>
+        false
+    }
+
+    @inline override def hashCode: Int = tags.hashCode
 
     override val toString = s"""Nearest(${tags mkString ", "})"""
+  }
+
+  object Nearest extends scala.runtime.AbstractFunction1[List[Map[String, String]], Nearest] {
+    def apply(tags: List[Map[String, String]]): Nearest = new Nearest(tags)
+
+    def unapply(pref: Nearest): Option[List[Map[String, String]]] =
+      Option(pref).map(_.tags)
   }
 
   /** [[https://docs.mongodb.com/manual/reference/read-preference/#primary Reads only from the primary]]. This is the default choice. */

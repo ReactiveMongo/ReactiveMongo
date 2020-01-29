@@ -70,6 +70,8 @@ trait DBMetaCommands { self: DB =>
    */
   def indexesManager(implicit ec: ExecutionContext) = IndexesManager(self)
 
+  private[api] def indexesManager[P <: SerializationPack with Singleton](pack: P)(implicit ec: ExecutionContext): IndexesManager.Aux[P] = IndexesManager[P](pack, self)
+
   private lazy val collectionNameReader = {
     val prefixLength = name.size + 1
     val dec = internalSerializationPack.newDecoder

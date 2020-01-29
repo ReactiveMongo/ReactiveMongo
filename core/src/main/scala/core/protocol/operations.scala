@@ -20,6 +20,7 @@ import reactivemongo.io.netty.buffer.ByteBuf
 import BufferAccessors._
 
 /** A Mongo Wire Protocol operation */
+@deprecated("Internal: will be made private", "0.20.3")
 sealed trait Op {
   /** The operation code */
   val code: Int
@@ -30,6 +31,7 @@ sealed trait Op {
  *
  * Actually, all operations excepted Reply are requests.
  */
+@deprecated("Internal: will be made private", "0.20.3")
 sealed trait RequestOp extends Op with ChannelBufferWritable {
   /** States if this request expects a response. */
   val expectsResponse: Boolean = false
@@ -39,6 +41,7 @@ sealed trait RequestOp extends Op with ChannelBufferWritable {
 }
 
 /** A request that needs to know the full collection name. */
+@deprecated("Internal: will be made private", "0.20.3")
 sealed trait CollectionAwareRequestOp extends RequestOp {
   /** The full collection name (''<dbname.collectionname>'') */
   val fullCollectionName: String
@@ -49,6 +52,7 @@ sealed trait CollectionAwareRequestOp extends RequestOp {
 }
 
 /** A request that will perform a write on the database */
+@deprecated("Internal: will be made private", "0.20.3")
 sealed trait WriteRequestOp extends CollectionAwareRequestOp
 
 /**
@@ -59,6 +63,7 @@ sealed trait WriteRequestOp extends CollectionAwareRequestOp
  * @param startingFrom The index the returned documents start from.
  * @param numberReturned The number of documents that are present in this reply.
  */
+@deprecated("Internal: will be made private", "0.20.3")
 case class Reply(
   flags: Int,
   cursorID: Long,
@@ -83,6 +88,7 @@ case class Reply(
   lazy val stringify = toString + " [" + str(cursorNotFound, "CursorNotFound;") + str(queryFailure, "QueryFailure;") + str(awaitCapable, "AwaitCapable") + "]"
 }
 
+@deprecated("Internal: will be made private", "0.20.3")
 object Reply extends ChannelBufferReadable[Reply] {
   /** OP_REPLY = 1 */
   val code = 1
@@ -101,6 +107,7 @@ object Reply extends ChannelBufferReadable[Reply] {
  *
  * @param flags Operation flags.
  */
+@deprecated("Internal: will be made private", "0.20.3")
 case class Update(
   fullCollectionName: String,
   flags: Int) extends WriteRequestOp {
@@ -110,6 +117,7 @@ case class Update(
   override val requiresPrimary = true
 }
 
+@deprecated("Internal: will be made private", "0.20.3")
 object UpdateFlags {
   /** If set, the database will insert the supplied object into the collection if no matching document is found. */
   val Upsert = 0x01
@@ -123,6 +131,7 @@ object UpdateFlags {
  *
  * @param flags Operation flags.
  */
+@deprecated("Internal: will be made private", "0.20.3")
 case class Insert(
   flags: Int,
   fullCollectionName: String) extends WriteRequestOp {
@@ -140,6 +149,7 @@ case class Insert(
  * @param numberToSkip the number of documents to skip in the response.
  * @param numberToReturn The number of documents to return in the response. 0 means the server will choose.
  */
+@deprecated("Internal: will be made private", "0.20.3")
 case class Query(
   flags: Int,
   fullCollectionName: String,
@@ -156,6 +166,7 @@ case class Query(
 /**
  * Query flags.
  */
+@deprecated("Internal: will be made private", "0.20.3")
 object QueryFlags {
   /** Makes the cursor not to close after all the data is consumed. */
   val TailableCursor = 0x02
@@ -193,6 +204,7 @@ object QueryFlags {
  * @param numberToReturn number of documents to return in the response. 0 means the server will choose.
  * @param cursorId id of the cursor.
  */
+@deprecated("Internal: will be made private", "0.20.3")
 case class GetMore(
   fullCollectionName: String,
   numberToReturn: Int,
@@ -211,6 +223,7 @@ case class GetMore(
  *
  * @param flags operation flags.
  */
+@deprecated("Internal: will be made private", "0.20.3")
 case class Delete(
   fullCollectionName: String,
   flags: Int) extends WriteRequestOp {
@@ -225,6 +238,7 @@ case class Delete(
  *
  * @param cursorIDs ids of the cursors to kill. Should not be empty.
  */
+@deprecated("Internal: will be made private", "0.20.3")
 case class KillCursors(cursorIDs: Set[Long]) extends RequestOp {
   val code = 2007
 

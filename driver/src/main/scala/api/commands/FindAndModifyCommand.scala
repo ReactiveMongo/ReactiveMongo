@@ -132,15 +132,53 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
    * @param fetchNewObject the command result must be the new object instead of the old one.
    * @param upsert if true, creates a new document if no document matches the query, or if documents match the query, findAndModify performs an update
    */
-  case class Update(
-    update: Document,
-    fetchNewObject: Boolean,
-    override val upsert: Boolean) extends Modify with FindAndModifyCommand.UpdateOp[pack.type] {
+  class Update private[api] (
+    val update: Document,
+    val fetchNewObject: Boolean,
+    override val upsert: Boolean) extends Modify with FindAndModifyCommand.UpdateOp[pack.type] with Product3[Document, Boolean, Boolean] with Serializable {
     val pack: self.pack.type = self.pack
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = update
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _2 = fetchNewObject
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _3 = upsert
+
+    private[api] lazy val tupled = Tuple3(update, fetchNewObject, upsert)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Update => true
+      case _         => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Update =>
+        this.tupled == other.tupled
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"Update${tupled.toString}"
   }
 
   object Update {
+    def apply(
+      update: Document,
+      fetchNewObject: Boolean,
+      upsert: Boolean): Update = new Update(update, fetchNewObject, upsert)
+
     def apply(update: ImplicitlyDocumentProducer, fetchNewObject: Boolean = false, upsert: Boolean = false): Update = Update(update.produce, fetchNewObject, upsert)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(update: Update): Option[(Document, Boolean, Boolean)] =
+      Option(update).map(_.tupled)
   }
 
   /** Remove (part of a FindAndModify command). */

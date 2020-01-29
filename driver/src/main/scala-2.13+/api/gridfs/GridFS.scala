@@ -62,7 +62,7 @@ import reactivemongo.api.gridfs.{ ReadFile => RF }
  * @define readFileParam the file to be read
  * @define fileReader fileReader a file reader automatically resolved if `Id` is a valid value
  */
-sealed trait GridFS[P <: SerializationPack]
+sealed trait GridFS[P <: SerializationPack with Singleton]
   extends GridFSSerialization[P] { self =>
 
   /* The database where this store is located. */
@@ -329,7 +329,7 @@ sealed trait GridFS[P <: SerializationPack]
    * @return A future containing true if the index was created, false if it already exists.
    */
   def ensureIndex()(implicit ec: ExecutionContext): Future[Boolean] = {
-    val indexMngr = db.indexesManager
+    val indexMngr = db.indexesManager[P](pack)(ec)
 
     for {
       _ <- create(chunkColl)

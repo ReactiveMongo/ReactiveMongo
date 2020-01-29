@@ -313,18 +313,71 @@ object Cursor {
   }
 
   /** Continue with given value */
-  case class Cont[T](value: T) extends State[T] {
+  class Cont[T] private[api] (val value: T)
+    extends State[T] with Product1[T] with Serializable {
+
     def map[U](f: T => U): State[U] = Cont(f(value))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = value
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Cont[T] => true
+      case _          => false
+    }
+
+  }
+
+  object Cont {
+    def apply[T](value: T): Cont[T] = new Cont[T](value)
+
+    def unapply[T](cont: Cont[T]): Option[T] = Option(cont).map(_.value)
   }
 
   /** Successfully stop processing with given value */
-  case class Done[T](value: T) extends State[T] {
+  class Done[T] private[api] (val value: T)
+    extends State[T] with Product1[T] with Serializable {
+
     def map[U](f: T => U): State[U] = Done(f(value))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = value
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Done[T] => true
+      case _          => false
+    }
+
+  }
+
+  object Done {
+    def apply[T](value: T): Done[T] = new Done[T](value)
+
+    def unapply[T](done: Done[T]): Option[T] = Option(done).map(_.value)
   }
 
   /** Ends processing due to failure of given `cause` */
-  case class Fail[T](cause: Throwable) extends State[T] {
+  class Fail[T] private[api] (val cause: Throwable)
+    extends State[T] with Product1[Throwable] with Serializable {
+
     def map[U](f: T => U): State[U] = Fail[U](cause)
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = cause
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Fail[T] => true
+      case _          => false
+    }
+  }
+
+  object Fail {
+    def apply[T](cause: Throwable): Fail[T] = new Fail[T](cause)
+
+    def unapply[T](fail: Fail[T]): Option[Throwable] = Option(fail).map(_.cause)
   }
 
   /** Indicates that a required result cannot be found. */

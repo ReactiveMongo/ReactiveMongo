@@ -31,6 +31,8 @@ import reactivemongo.api.indexes._, IndexType._
 
 import reactivemongo.api.collections.bson.BSONCollection
 
+import reactivemongo.api.tests.{ builder, pack }
+
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.specification.core.Fragments
 
@@ -166,7 +168,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       "with expected count" in {
         import coll.aggregationFramework
         import aggregationFramework.{ Group, SumAll }
-        val result = coll.aggregatorContext[BSONDocument](Group(BSONString(f"$$state"))("count" -> SumAll)).prepared.cursor
+        val result = coll.aggregatorContext[BSONDocument](
+          Group(BSONString(f"$$state"))("count" -> SumAll)).prepared.cursor
           .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]())
 
         result must beTypedEqualTo(Set(
@@ -207,8 +210,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
           "pop" -> SumField("population"))
 
         val pipeline = List(
-          Group(BSONString(f"$$_id.state"))("avgCityPop" ->
-            aggregationFramework.AvgField("pop")),
+          Group(BSONString(f"$$_id.state"))(
+            "avgCityPop" -> aggregationFramework.AvgField("pop")),
           Sort(Ascending("_id")))
 
         f(firstOp, pipeline)
@@ -640,8 +643,9 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         framework =>
           import framework._
 
-          Group(BSONString(f"$$quiz"))("stdDev" -> StdDevPopField("score")) -> List(
-            Sort(Ascending("_id")))
+          Group(BSONString(f"$$quiz"))(
+            "stdDev" -> StdDevPopField("score")) -> List(
+              Sort(Ascending("_id")))
       }.collect[List](Int.MaxValue, Cursor.FailOnError[List[QuizStdDev]]()).aka(f"$$stdDevPop results") must beTypedEqualTo(List(
         QuizStdDev(1, 8.04155872120988D), QuizStdDev(2, 8.04155872120988D))).await(0, timeout)
 
@@ -656,7 +660,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
       contest.aggregatorContext[BSONDocument](
         Group(BSONString(f"$$quiz"))(
-          "hash" -> Sum(document(f"$$multiply" -> array(f"$$_id", f"$$score"))))).prepared.cursor
+          "hash" -> Sum(document(
+            f"$$multiply" -> array(f"$$_id", f"$$score"))))).prepared.cursor
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beTypedEqualTo(Set(
           document("_id" -> 2, "hash" -> 1261),
           document("_id" -> 1, "hash" -> 478))).await(1, timeout)
@@ -666,7 +671,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       import coll.aggregationFramework.{ Group, MaxField }
 
       contest.aggregatorContext[BSONDocument](
-        Group(BSONString(f"$$quiz"))("maxScore" -> MaxField("score"))).prepared.cursor
+        Group(BSONString(f"$$quiz"))(
+          "maxScore" -> MaxField("score"))).prepared.cursor
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beTypedEqualTo(Set(
           document("_id" -> 2, "maxScore" -> 96),
           document("_id" -> 1, "maxScore" -> 90))).await(1, timeout)
@@ -687,7 +693,9 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     "return the minimum score per quiz" in {
       import coll.aggregationFramework.{ Group, MinField }
 
-      contest.aggregatorContext[BSONDocument](Group(BSONString(f"$$quiz"))("minScore" -> MinField("score"))).prepared.cursor
+      contest.aggregatorContext[BSONDocument](
+        Group(BSONString(f"$$quiz"))(
+          "minScore" -> MinField("score"))).prepared.cursor
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beTypedEqualTo(Set(
           document("_id" -> 2, "minScore" -> 77),
           document("_id" -> 1, "minScore" -> 71))).await(1, timeout)
@@ -716,7 +724,9 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
       contest.aggregatorContext[QuizScores](
         Group(BSONString(f"$$quiz"))(
-          "scores" -> Push(document("name" -> f"$$name", "score" -> f"$$score")))).prepared.cursor
+          "scores" -> Push(
+            document("name" -> f"$$name", "score" -> f"$$score")))).
+        prepared.cursor
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[QuizScores]]()) must beTypedEqualTo(expected).await(1, timeout)
     }
 
@@ -731,7 +741,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
       contest.aggregatorContext[QuizScores](
         Group(BSONString(f"$$quiz"))(
-          "scores" -> AddToSet(document("name" -> f"$$name", "score" -> f"$$score")))).prepared.cursor
+          "scores" -> AddToSet(document(
+            "name" -> f"$$name", "score" -> f"$$score")))).prepared.cursor
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[QuizScores]]()) must beTypedEqualTo(expected).await(1, timeout)
     }
   }
@@ -1509,8 +1520,8 @@ db.accounts.aggregate([
     dropDups: Boolean = false,
     sparse: Boolean = false,
     version: Option[Int] = None, // let MongoDB decide
-    partialFilter: Option[BSONDocument] = None,
-    options: BSONDocument = BSONDocument.empty) = Index(BSONSerializationPack)(key, name, unique, background, dropDups, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
+    partialFilter: Option[pack.Document] = None,
+    options: pack.Document = builder.document(Seq.empty)) = Index(pack)(key, name, unique, background, dropDups, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
 
   case class User(
     _id: Int,

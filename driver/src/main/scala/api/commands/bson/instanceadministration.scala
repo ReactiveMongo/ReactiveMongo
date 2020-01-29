@@ -216,17 +216,20 @@ object BSONListIndexesImplicits {
 
 @deprecated("Internal: will be made private", "0.16.0")
 object BSONCreateIndexesImplicits {
+  import reactivemongo.api.{ BSONSerializationPack => LegacyPack }
   import reactivemongo.api.commands.WriteResult
 
   object BSONCreateIndexesWriter extends BSONDocumentWriter[ResolvedCollectionCommand[CreateIndexes]] {
-    import reactivemongo.api.indexes.{ IndexesManager, NSIndex }
-    implicit val nsIndexWriter = IndexesManager.nsIndexWriter(
-      reactivemongo.api.BSONSerializationPack)
+    import reactivemongo.api.indexes.{ IndexesManager, NSIndex, Index }
+    implicit val nsIndexWriter = IndexesManager.nsIndexWriter(LegacyPack)
 
     def write(cmd: ResolvedCollectionCommand[CreateIndexes]): BSONDocument = {
-      val indexes = cmd.command.indexes.map { i =>
-        val nsi = NSIndex(cmd.command.db + "." + cmd.collection, i)
-        nsIndexWriter.write(nsi)
+      type Index = Index.Aux[LegacyPack.type]
+      val indexes = cmd.command.indexes.collect {
+        case i: Index =>
+          val nsi = NSIndex.at(cmd.command.db + "." + cmd.collection, i)
+
+          nsIndexWriter.write(nsi)
       }
 
       BSONDocument(

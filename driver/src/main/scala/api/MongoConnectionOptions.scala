@@ -176,7 +176,7 @@ class MongoConnectionOptions private[reactivemongo] (
     case _                         => false
   }
 
-  override def toString = s"""MongoConnectionOptions { ${MongoConnectionOptions.toStrings(this).mkString(", ")} }"""
+  override def toString = s"""MongoConnectionOptions { ${MongoConnectionOptions.toStrings(this).map { case (k, v) => k + ": " + v }.mkString(", ")} }"""
 
   override def hashCode: Int = tupled.hashCode
 
@@ -277,7 +277,45 @@ object MongoConnectionOptions {
    * @param user the name (or subject) of the user
    * @param password the associated password if some
    */
-  case class Credential(user: String, password: Option[String])
+  class Credential private[api] (
+    val user: String,
+    val password: Option[String])
+    extends Product2[String, Option[String]] with Serializable {
+
+    private[api] lazy val tupled = user -> password
+
+    @deprecated("No longer case class", "0.20.3")
+    @inline def _1 = user
+
+    @deprecated("No longer case class", "0.20.3")
+    @inline def _2 = password
+
+    @deprecated("No longer case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Credential => true
+      case _             => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Credential =>
+        this.tupled == other.tupled
+
+      case _ =>
+        false
+    }
+
+    @inline override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"Credential${tupled.toString}"
+  }
+
+  object Credential {
+    def apply(user: String, password: Option[String]): Credential =
+      new Credential(user, password)
+
+    @deprecated("No longer case class", "0.20.3")
+    def unapply(credential: Credential) = Option(credential).map(_.tupled)
+  }
 
   final class KeyStore(
     val resource: URI,

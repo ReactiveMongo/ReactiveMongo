@@ -445,11 +445,15 @@ object MongoConnection {
     }
 
     override def equals(that: Any): Boolean = that match {
-      case other: ParsedURI => other.tupled == tupled
-      case _                => false
+      case other: ParsedURI =>
+        other.tupled == tupled
+
+      case _ => false
     }
 
     override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"ParsedURI${tupled.toString}"
 
     private[api] lazy val tupled =
       Tuple5(_hosts.toList, options, ignoredOptions, db, authenticate)

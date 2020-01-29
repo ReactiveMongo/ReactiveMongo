@@ -12,7 +12,7 @@ import reactivemongo.api.indexes.{ Index, IndexesManager, NSIndex }
  */
 @deprecated("Internal: will be made private", "0.16.0")
 class CreateIndexes(val db: String, val indexes: List[Index])
-  extends Product with Serializable
+  extends Product with Serializable // TODO: Remove
   with CollectionCommand with CommandWithResult[WriteResult] {
 
   val productArity = 2
@@ -47,15 +47,16 @@ object CreateIndexes extends scala.runtime.AbstractFunction2[String, List[Index]
 
   @inline def apply(db: String, indexes: List[Index]): CreateIndexes = new CreateIndexes(db, indexes)
 
-  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[CreateIndexes]] = {
+  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[Command[P]]] = {
     val builder = pack.newBuilder
-    val nsIndexWriter = IndexesManager.nsIndexWriter(pack)
+    val nsIndexWriter = IndexesManager.nsIndexWriter[P](pack)
 
     import builder.{ elementProducer => element }
 
-    pack.writer[ResolvedCollectionCommand[CreateIndexes]] { create =>
+    pack.writer[ResolvedCollectionCommand[Command[P]]] { create =>
       val indexes = create.command.indexes.map { i =>
-        val nsi = NSIndex(create.command.db + "." + create.collection, i)
+        val nsi = NSIndex.at[P](create.command.db + "." + create.collection, i)
+
         pack.serialize(nsi, nsIndexWriter)
       }
 
@@ -72,5 +73,26 @@ object CreateIndexes extends scala.runtime.AbstractFunction2[String, List[Index]
 
       builder.document(elements.result())
     }
+  }
+
+  // ---
+
+  private[api] class Command[P <: SerializationPack](
+    val db: String,
+    val indexes: List[Index.Aux[P]]) extends CollectionCommand with CommandWithResult[WriteResult] {
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Command[P] =>
+        this.tupled == other.tupled
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString: String = s"CreateIndexes($db, $indexes)"
+
+    private[commands] def tupled = db -> indexes
   }
 }
