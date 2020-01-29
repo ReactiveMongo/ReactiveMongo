@@ -57,7 +57,7 @@ sealed abstract class Index extends Product with Serializable {
   def name: Option[String] = None
 
   /**
-   * Ff this index should be built in background.
+   * If this index should be built in background.
    * You should read [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-background%3Atrue the documentation about background indexing]] before using it.
    */
   def background: Boolean = false
@@ -206,12 +206,16 @@ sealed abstract class Index extends Product with Serializable {
   }
 
   override def hashCode: Int = tupled.hashCode
+
+  override def toString = s"Index${tupled.toString}"
 }
 
 object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], Option[String], Boolean, Boolean, Boolean, Boolean, Option[Int], Option[BSONDocument], BSONDocument, Index] {
   import reactivemongo.api.BSONSerializationPack
 
   type Aux[P] = Index { type Pack = P }
+
+  type Default = Aux[Serialization.Pack]
 
   @deprecated("Use constructor with pack parameter", "0.19.1")
   def apply(
@@ -278,7 +282,7 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
     wildcardProjection: Option[_pack.Document],
     version: Option[Int],
     partialFilter: Option[_pack.Document],
-    options: _pack.Document): Index.Aux[_pack.type] = {
+    options: _pack.Document): Index.Aux[P] = {
     def k = key
     def n = name
     def u = unique
@@ -302,8 +306,8 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
     def o = options
 
     new Index {
-      type Pack = _pack.type
-      val pack: Pack = _pack
+      type Pack = P
+      val pack: _pack.type = _pack
 
       override val key = k
       override val name = n
@@ -330,6 +334,36 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
     }
   }
 
+  /**
+   * {{{
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONSerializationPack
+   * import reactivemongo.api.indexes.{ Index, IndexType }
+   *
+   * val bsonIndex = Index(
+   *   key = Seq("name" -> IndexType.Ascending),
+   *   name = Some("name_idx"),
+   *   unique = false,
+   *   background = false,
+   *   sparse = false,
+   *   expireAfterSeconds = None,
+   *   storageEngine = None,
+   *   weights = None,
+   *   defaultLanguage = None,
+   *   languageOverride = None,
+   *   textIndexVersion = None,
+   *   sphereIndexVersion = None,
+   *   bits = None,
+   *   min = None,
+   *   max = None,
+   *   bucketSize = None,
+   *   collation = None,
+   *   wildcardProjection = None,
+   *   version = None,
+   *   partialFilter = None,
+   *   options = BSONDocument.empty)
+   * }}}
+   */
   def apply(
     key: Seq[(String, IndexType)],
     name: Option[String],
@@ -398,9 +432,69 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
  * @param namespace The fully qualified name of the indexed collection.
  * @param index The other fields of the index.
  */
-case class NSIndex(namespace: String, index: Index) {
-  val (dbName: String, collectionName: String) = {
+class NSIndex extends Product2[String, Index] with Serializable {
+  type Pack <: SerializationPack
+
+  def namespace: String = ???
+
+  private[api] def idx: Index.Aux[Pack] = ??? // TODO: Remove
+
+  // TODO: ?
+  def index: Index = idx
+
+  lazy val (dbName: String, collectionName: String) = {
     val spanned = namespace.span(_ != '.')
     spanned._1 -> spanned._2.drop(1)
   }
+
+  @inline def _1 = namespace
+
+  @inline def _2 = index
+
+  def canEqual(that: Any): Boolean = that match {
+    case _: NSIndex =>
+      true
+
+    case _ =>
+      false
+  }
+
+  private[api] lazy val tupled = namespace -> index
+
+  override def equals(that: Any): Boolean = that match {
+    case other: NSIndex =>
+      this.tupled == other.tupled
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = tupled.hashCode
+
+  override def toString = s"NSIndex${tupled.toString}"
+}
+
+// TODO: Remove inheritance
+object NSIndex extends scala.runtime.AbstractFunction2[String, Index.Aux[Serialization.Pack], NSIndex { type Pack = Serialization.Pack }] {
+  type Aux[P <: SerializationPack] = NSIndex { type Pack = P }
+
+  type Default = NSIndex.Aux[Serialization.Pack]
+
+  @deprecated("Will be removed", "0.20.3")
+  def apply(namespace: String, index: Index.Aux[Serialization.Pack]): NSIndex.Aux[Serialization.Pack] = at[Serialization.Pack](namespace, index)
+
+  @deprecated("Will be renamed", "0.20.3")
+  def at[P <: SerializationPack](
+    namespace: String, index: Index.Aux[P]): NSIndex.Aux[P] = {
+    @inline def nsp = namespace
+    @inline def i = index
+    new NSIndex {
+      type Pack = P
+      override val namespace = nsp
+      override val idx = i
+    }
+  }
+
+  def unapply(nsIndex: NSIndex): Option[(String, Index)] =
+    Option(nsIndex).map(_.tupled)
 }

@@ -613,9 +613,9 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
       // Primary and SecondaryPreferred are encoded as the slaveOk flag;
       // the others are encoded as $readPreference field.
 
-      queryOption.foreach {
-        elements += element(f"$$query", _)
-      }
+      elements += element(
+        f"$$query",
+        queryOption.getOrElse(builder.document(Seq.empty)))
 
       sortOption.foreach {
         elements += element(f"$$orderby", _)

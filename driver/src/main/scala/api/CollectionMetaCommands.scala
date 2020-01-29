@@ -225,8 +225,7 @@ trait CollectionMetaCommands { self: Collection =>
    *   })
    * }}}
    */
-  def indexesManager(implicit ec: ExecutionContext): CollectionIndexesManager =
-    CollectionIndexesManager(self.db, name)
+  def indexesManager(implicit ec: ExecutionContext): CollectionIndexesManager.Aux[Serialization.Pack] = CollectionIndexesManager(self.db, name)
 
   // Command runner
   private lazy val command =

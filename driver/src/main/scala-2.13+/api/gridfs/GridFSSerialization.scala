@@ -6,8 +6,7 @@ import reactivemongo.api.SerializationPack
 
 import reactivemongo.api.gridfs.{ ReadFile => RF }
 
-private[gridfs] trait GridFSSerialization[P <: SerializationPack] {
-  self: GridFS[P] =>
+private[gridfs] trait GridFSSerialization[P <: SerializationPack with Singleton] { self: GridFS[P] =>
 
   @annotation.implicitNotFound("Cannot resolve a file reader: make sure Id type ${Id} is a serialized value (e.g. kind of BSON value) and that a ClassTag instance is implicitly available for")
   private[api] sealed trait FileReader[Id <: P#Value] {

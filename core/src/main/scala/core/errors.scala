@@ -119,24 +119,65 @@ trait DriverException extends ReactiveMongoException {
 }
 
 /** A generic driver error. */
-case class GenericDriverException(
-  message: String) extends DriverException with NoStackTrace
+class GenericDriverException private[core] (
+  val message: String) extends DriverException with NoStackTrace
+  with Product1[String] with Serializable {
 
-sealed class ConnectionNotInitialized(
+  @deprecated("No longer a case class", "0.20.3")
+  @inline def _1 = message
+
+  @deprecated("No longer a case class", "0.20.3")
+  def canEqual(that: Any): Boolean = that match {
+    case _: GenericDriverException => true
+    case _                         => false
+  }
+
+  override def equals(that: Any): Boolean = that match {
+    case other: GenericDriverException =>
+      (this.message == null && other.message == null) || (
+        this.message != null && this.message.equals(other.message))
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = if (message == null) -1 else message.hashCode
+
+  override def toString = s"GenericDriverException($message)"
+}
+
+object GenericDriverException
+  extends scala.runtime.AbstractFunction1[String, GenericDriverException] {
+
+  def apply(message: String): GenericDriverException =
+    new GenericDriverException(message)
+
+  @deprecated("No longer a case class", "0.20.3")
+  def unapply(exception: GenericDriverException): Option[String] =
+    Option(exception).collect {
+      case x if x.message != null => x.message
+    }
+}
+
+sealed class ConnectionNotInitialized private[core] (
   val message: String,
   override val cause: Throwable) extends DriverException
   with Product with java.io.Serializable with Serializable with Equals {
 
+  @deprecated("No longer a case class", "0.20.3")
   override val productPrefix = "ConnectionNotInitialized"
 
+  @deprecated("No longer a case class", "0.20.3")
   def productElement(i: Int): Any = i match {
     case 0 => message
     case 1 => cause
     case _ => throw new NoSuchElementException
   }
 
+  @deprecated("No longer a case class", "0.20.3")
   override def productIterator: Iterator[Any] = Iterator(message, cause)
 
+  @deprecated("No longer a case class", "0.20.3")
   val productArity = 2
 
   override lazy val hashCode = (message -> cause).hashCode
@@ -148,6 +189,7 @@ sealed class ConnectionNotInitialized(
     case _ => false
   }
 
+  @deprecated("No longer a case class", "0.20.3")
   def canEqual(other: Any): Boolean = other match {
     case _: ConnectionNotInitialized => true
     case _                           => false
@@ -158,13 +200,87 @@ object ConnectionNotInitialized {
   def MissingMetadata(cause: Throwable): ConnectionNotInitialized = new ConnectionNotInitialized("Connection is missing metadata (like protocol version, etc.) The connection pool is probably being initialized.", cause)
 }
 
-case class ConnectionException(message: String) extends DriverException
+class ConnectionException private[core] (val message: String)
+  extends DriverException with Product1[String] with Serializable {
+
+  @deprecated("No longer a case class", "0.20.3")
+  @inline def _1 = message
+
+  @deprecated("No longer a case class", "0.20.3")
+  def canEqual(that: Any): Boolean = that match {
+    case _: ConnectionException => true
+    case _                      => false
+  }
+
+  override def equals(that: Any): Boolean = that match {
+    case other: ConnectionException =>
+      (this.message == null && other.message == null) || (
+        this.message != null && this.message.equals(other.message))
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = if (message == null) -1 else message.hashCode
+
+  override def toString = s"ConnectionException($message)"
+}
+
+object ConnectionException
+  extends scala.runtime.AbstractFunction1[String, ConnectionException] {
+
+  def apply(message: String): ConnectionException =
+    new ConnectionException(message)
+
+  @deprecated("No longer a case class", "0.20.3")
+  def unapply(exception: ConnectionException): Option[String] =
+    Option(exception).collect {
+      case x if x.message != null => x.message
+    }
+}
 
 /** A generic error thrown by a MongoDB node. */
-case class GenericDatabaseException(
-  message: String,
-  code: Option[Int]) extends DatabaseException {
+class GenericDatabaseException private[core] (
+  val message: String,
+  val code: Option[Int]) extends DatabaseException
+  with Product2[String, Option[Int]] with Serializable {
+
   val originalDocument = None
+
+  @deprecated("No longer a case class", "0.20.3")
+  @inline def _1 = message
+
+  @deprecated("No longer a case class", "0.20.3")
+  @inline def _2 = code
+
+  @deprecated("No longer a case class", "0.20.3")
+  def canEqual(that: Any): Boolean = that match {
+    case _: GenericDatabaseException => true
+    case _                           => false
+  }
+
+  private[core] lazy val tupled = message -> code
+
+  override def equals(that: Any): Boolean = that match {
+    case other: GenericDatabaseException =>
+      this.tupled == other.tupled
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = tupled.hashCode
+
+  override def toString = s"GenericDatabaseException($message)"
+}
+
+object GenericDatabaseException extends scala.runtime.AbstractFunction2[String, Option[Int], GenericDatabaseException] {
+
+  def apply(message: String, code: Option[Int]): GenericDatabaseException =
+    new GenericDatabaseException(message, code)
+
+  @deprecated("No longer a case class", "0.20.3")
+  def unapply(exception: GenericDatabaseException): Option[(String, Option[Int])] = Option(exception).map(_.tupled)
 }
 
 /** An error thrown by a MongoDB node (containing the original document of the error). */
