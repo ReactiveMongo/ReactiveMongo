@@ -1,5 +1,13 @@
 package reactivemongo.api.commands
 
+import scala.runtime.{
+  AbstractFunction1,
+  AbstractFunction2,
+  AbstractFunction3,
+  AbstractFunction4,
+  AbstractFunction5
+}
+
 import reactivemongo.api.{ ChangeStreams, ReadConcern, SerializationPack }
 import reactivemongo.core.protocol.MongoWireVersion
 
@@ -21,7 +29,35 @@ trait AggregationFramework[P <: SerializationPack]
    * @param batchSize the initial batch size for the cursor
    */
   @deprecated("Use `api.collections.Aggregator`", "0.12.7")
-  case class Cursor(batchSize: Int)
+  class Cursor private[api] (val batchSize: Int) extends Product1[Int] {
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = batchSize
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Cursor => true
+      case _         => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Cursor =>
+        this.batchSize == other.batchSize
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = batchSize
+
+    override def toString: String = s"Cursor(${batchSize})"
+  }
+
+  object Cursor extends AbstractFunction1[Int, Cursor] {
+    def apply(batchSize: Int): Cursor = new Cursor(batchSize)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(cursor: Cursor): Option[Int] = Option(cursor).map(_.batchSize)
+  }
 
   /**
    * @since MongoDB 3.2
@@ -68,18 +104,54 @@ trait AggregationFramework[P <: SerializationPack]
    * @param specifications The fields to include.
    * The resulting objects will also contain these fields.
    */
-  case class AddFields(specifications: pack.Document) extends PipelineOperator {
+  class AddFields private[api] (val specifications: pack.Document)
+    extends PipelineOperator
+    with Product1[pack.Document] with Serializable {
+
     val makePipe = pipe(f"$$addFields", specifications)
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = specifications
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: AddFields => true
+      case _            => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: AddFields =>
+        (this.specifications == null && other.specifications == null) || (
+          this.specifications != null && this.specifications.
+          equals(other.specifications))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (specifications == null) -1 else specifications.hashCode
+
+    override def toString: String = s"AddFields(${pack pretty specifications})"
+  }
+
+  object AddFields extends AbstractFunction1[pack.Document, AddFields] {
+    def apply(specifications: pack.Document): AddFields =
+      new AddFields(specifications)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(addFields: AddFields): Option[pack.Document] =
+      Option(addFields).map(_.specifications)
   }
 
   /**
    * [[https://docs.mongodb.com/manual/reference/operator/aggregation/bucket/ \$bucket]] aggregation stage.
    */
-  case class Bucket(
-    groupBy: pack.Value,
-    boundaries: Seq[pack.Value],
-    default: String)(
-    output: (String, GroupFunction)*) extends PipelineOperator {
+  class Bucket private[api] (
+    val groupBy: pack.Value,
+    val boundaries: Seq[pack.Value],
+    val default: String)(
+    val output: (String, GroupFunction)*) extends PipelineOperator with Product4[pack.Value, Seq[pack.Value], String, Seq[(String, GroupFunction)]] {
 
     import builder.{ document, elementProducer => element }
 
@@ -99,6 +171,50 @@ trait AggregationFramework[P <: SerializationPack]
 
       pipe(f"$$bucket", document(opts.result()))
     }
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = groupBy
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _2 = boundaries
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _3 = default
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _4 = output
+
+    def canEqual(that: Any): Boolean = that match {
+      case _: Bucket => true
+      case _         => false
+    }
+
+    private[api] lazy val tupled =
+      Tuple4(groupBy, boundaries, default, output)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Bucket =>
+        this.tupled == other.tupled
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"Bucket${tupled.toString}"
+  }
+
+  object Bucket {
+    def apply(
+      groupBy: pack.Value,
+      boundaries: Seq[pack.Value],
+      default: String)(
+      output: (String, GroupFunction)*): Bucket =
+      new Bucket(groupBy, boundaries, default)(output: _*)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(res: Bucket) = Option(res).map(_.tupled)
   }
 
   /**
@@ -114,12 +230,12 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * Document fields identifier must be prefixed with `$`.
    */
-  case class BucketAuto(
-    groupBy: pack.Value,
-    buckets: Int,
-    granularity: Option[String])(
-    output: (String, GroupFunction)*)
-    extends PipelineOperator {
+  class BucketAuto private[api] (
+    val groupBy: pack.Value,
+    val buckets: Int,
+    val granularity: Option[String])(
+    val output: (String, GroupFunction)*)
+    extends PipelineOperator with Product4[pack.Value, Int, Option[String], Seq[(String, GroupFunction)]] with Serializable {
 
     import builder.{ document, elementProducer => element }
 
@@ -137,15 +253,62 @@ trait AggregationFramework[P <: SerializationPack]
 
       pipe(f"$$bucketAuto", document(opts.result()))
     }
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = groupBy
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _2 = buckets
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _3 = granularity
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _4 = output
+
+    def canEqual(that: Any): Boolean = that match {
+      case _: BucketAuto => true
+      case _             => false
+    }
+
+    private[api] lazy val tupled =
+      Tuple4(groupBy, buckets, granularity, output)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: BucketAuto =>
+        this.tupled == other.tupled
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"BucketAuto${tupled.toString}"
+  }
+
+  object BucketAuto {
+    def apply(
+      groupBy: pack.Value,
+      buckets: Int,
+      granularity: Option[String])(
+      output: (String, GroupFunction)*): BucketAuto =
+      new BucketAuto(groupBy, buckets, granularity)(output: _*)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(res: BucketAuto) = Option(res).map(_.tupled).collect {
+      case (a, b, c, _) => Tuple3(a, b, c)
+    }
   }
 
   /**
    * [[https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/ \$collStats]] aggregation stage.
    */
-  case class CollStats(
-    latencyStatsHistograms: Boolean,
-    storageStatsScale: Option[Double],
-    count: Boolean) {
+  class CollStats private[api] (
+    val latencyStatsHistograms: Boolean,
+    val storageStatsScale: Option[Double],
+    val count: Boolean) extends PipelineOperator
+    with Product3[Boolean, Option[Double], Boolean] with Serializable {
 
     import builder.{ document, elementProducer => element }
 
@@ -166,6 +329,46 @@ trait AggregationFramework[P <: SerializationPack]
 
       pipe(f"$$collStats", document(opts.result()))
     }
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = latencyStatsHistograms
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _2 = storageStatsScale
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _3 = count
+
+    def canEqual(that: Any): Boolean = that match {
+      case _: CollStats => true
+      case _            => false
+    }
+
+    private[api] lazy val tupled =
+      Tuple3(latencyStatsHistograms, storageStatsScale, count)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: CollStats =>
+        this.tupled == other.tupled
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"CollStats${tupled.toString}"
+  }
+
+  object CollStats extends AbstractFunction3[Boolean, Option[Double], Boolean, CollStats] {
+    def apply(
+      latencyStatsHistograms: Boolean,
+      storageStatsScale: Option[Double],
+      count: Boolean): CollStats =
+      new CollStats(latencyStatsHistograms, storageStatsScale, count)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(collStats: CollStats) = Option(collStats).map(_.tupled)
   }
 
   /**
@@ -174,8 +377,41 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 3.4
    * @param outputName the name of the output field which has the count as its value
    */
-  case class Count(outputName: String) extends PipelineOperator {
+  class Count private[api] (val outputName: String)
+    extends PipelineOperator with Product1[String] with Serializable {
+
     val makePipe: pack.Document = pipe(f"$$count", builder.string(outputName))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = outputName
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Count => true
+      case _        => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Count =>
+        (this.outputName == null && other.outputName == null) || (
+          this.outputName != null && this.outputName.
+          equals(other.outputName))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (outputName == null) -1 else outputName.hashCode
+
+    override def toString: String = s"Count(${outputName})"
+  }
+
+  object Count extends AbstractFunction1[String, Count] {
+    def apply(outputName: String): Count = new Count(outputName)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(count: Count): Option[String] = Option(count).map(_.outputName)
   }
 
   /**
@@ -188,12 +424,12 @@ trait AggregationFramework[P <: SerializationPack]
    * @param idleSessions (Defaults to `true`; new in 4.0)
    * @param localOps (Defaults to false; new in 4.0)
    */
-  case class CurrentOp(
-    allUsers: Boolean = false,
-    idleConnections: Boolean = false,
-    idleCursors: Boolean = false,
-    idleSessions: Boolean = true,
-    localOps: Boolean = false) extends PipelineOperator {
+  class CurrentOp private[api] (
+    val allUsers: Boolean,
+    val idleConnections: Boolean,
+    val idleCursors: Boolean,
+    val idleSessions: Boolean,
+    val localOps: Boolean) extends PipelineOperator with Product5[Boolean, Boolean, Boolean, Boolean, Boolean] {
     import builder.{ boolean, elementProducer => element }
     val makePipe: pack.Document = pipe(f"$$currentOp", builder.document(Seq(
       element("allUsers", boolean(allUsers)),
@@ -201,6 +437,54 @@ trait AggregationFramework[P <: SerializationPack]
       element("idleCursors", boolean(idleCursors)),
       element("idleSessions", boolean(idleSessions)),
       element("localOps", boolean(localOps)))))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = allUsers
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _2 = idleConnections
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _3 = idleCursors
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _4 = idleSessions
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _5 = localOps
+
+    def canEqual(that: Any): Boolean = that match {
+      case _: CurrentOp => true
+      case _            => false
+    }
+
+    private[api] lazy val tupled =
+      Tuple5(allUsers, idleConnections, idleCursors, idleSessions, localOps)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: CurrentOp =>
+        this.tupled == other.tupled
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"CurrentOp${tupled.toString}"
+  }
+
+  object CurrentOp extends AbstractFunction5[Boolean, Boolean, Boolean, Boolean, Boolean, CurrentOp] {
+    def apply(
+      allUsers: Boolean = false,
+      idleConnections: Boolean = false,
+      idleCursors: Boolean = false,
+      idleSessions: Boolean = true,
+      localOps: Boolean = false): CurrentOp = new CurrentOp(
+      allUsers, idleConnections, idleCursors, idleSessions, localOps)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(res: CurrentOp) = Option(res).map(_.tupled)
   }
 
   /**
@@ -213,8 +497,10 @@ trait AggregationFramework[P <: SerializationPack]
    * @param specifications the subpipelines to run
    * @see https://docs.mongodb.com/manual/reference/operator/aggregation/facet/
    */
-  case class Facet(
-    specifications: Iterable[(String, Pipeline)]) extends PipelineOperator {
+  class Facet private[api] (
+    val specifications: Iterable[(String, Pipeline)])
+    extends PipelineOperator with Product1[Iterable[(String, Pipeline)]]
+    with Serializable {
 
     val makePipe: pack.Document = {
       import builder.{ document, elementProducer => elem }
@@ -227,6 +513,39 @@ trait AggregationFramework[P <: SerializationPack]
 
       pipe(f"$$facet", specDoc)
     }
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = specifications
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Facet => true
+      case _        => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Facet =>
+        (this.specifications == null && other.specifications == null) || (
+          this.specifications != null && this.specifications.
+          equals(other.specifications))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (specifications == null) -1 else specifications.hashCode
+
+    override def toString: String = s"Facet(${specifications})"
+  }
+
+  object Facet extends AbstractFunction1[Iterable[(String, Pipeline)], Facet] {
+    def apply(specifications: Iterable[(String, Pipeline)]): Facet =
+      new Facet(specifications)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(facet: Facet): Option[Iterable[(String, Pipeline)]] =
+      Option(facet).map(_.specifications)
   }
 
   /**
@@ -362,14 +681,52 @@ trait AggregationFramework[P <: SerializationPack]
    * @param identifiers any BSON value acceptable by mongodb as identifier
    * @param ops the sequence of operators specifying aggregate calculation
    */
-  case class Group(identifiers: pack.Value)(ops: (String, GroupFunction)*)
-    extends PipelineOperator {
+  class Group private[api] (val identifiers: pack.Value)(val ops: (String, GroupFunction)*)
+    extends PipelineOperator
+    with Product2[pack.Value, Seq[(String, GroupFunction)]]
+    with Serializable {
+
     import builder.{ document, elementProducer => element }
 
     val makePipe: pack.Document = pipe(f"$$group", document(
       element("_id", identifiers) +: ops.map({
         case (field, op) => element(field, op.makeFunction)
       })))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = identifiers
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _2 = ops
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Group => true
+      case _        => false
+    }
+
+    private[api] lazy val tupled = identifiers -> ops
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Group =>
+        this.tupled == other.tupled
+
+      case _ => false
+    }
+
+    @inline override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"Group${tupled.toString}"
+  }
+
+  object Group {
+    def apply(identifiers: pack.Value)(ops: (String, GroupFunction)*): Group =
+      new Group(identifiers)(ops: _*)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(other: Group): Option[pack.Value] =
+      Option(other).map(_.identifiers)
+
   }
 
   /**
@@ -379,10 +736,47 @@ trait AggregationFramework[P <: SerializationPack]
    * @param idField the name of the field to aggregate on
    * @param ops the sequence of operators specifying aggregate calculation
    */
-  case class GroupField(idField: String)(ops: (String, GroupFunction)*)
-    extends PipelineOperator {
+  class GroupField private[api] (val idField: String)(val ops: (String, GroupFunction)*)
+    extends PipelineOperator
+    with Product2[String, Seq[(String, GroupFunction)]]
+    with Serializable {
 
     val makePipe = Group(builder.string("$" + idField))(ops: _*).makePipe
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = idField
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _2 = ops
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: GroupField => true
+      case _             => false
+    }
+
+    private[api] lazy val tupled = idField -> ops
+
+    override def equals(that: Any): Boolean = that match {
+      case other: GroupField =>
+        this.tupled == other.tupled
+
+      case _ => false
+    }
+
+    @inline override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"GroupField${tupled.toString}"
+  }
+
+  object GroupField {
+    def apply(idField: String)(ops: (String, GroupFunction)*): GroupField =
+      new GroupField(idField)(ops: _*)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(other: GroupField): Option[String] =
+      Option(other).map(_.idField)
+
   }
 
   /**
@@ -392,12 +786,50 @@ trait AggregationFramework[P <: SerializationPack]
    * @param idFields The fields to aggregate on, and the names they should be aggregated under.
    * @param ops the sequence of operators specifying aggregate calculation
    */
-  case class GroupMulti(idFields: (String, String)*)(
-    ops: (String, GroupFunction)*) extends PipelineOperator {
+  class GroupMulti private[api] (val idFields: (String, String)*)(
+    val ops: (String, GroupFunction)*) extends PipelineOperator
+    with Product2[Seq[(String, String)], Seq[(String, GroupFunction)]]
+    with Serializable {
+
     val makePipe = Group(builder.document(idFields.map {
       case (alias, attribute) =>
         builder.elementProducer(alias, builder.string("$" + attribute))
     }))(ops: _*).makePipe
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = idFields
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _2 = ops
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: GroupMulti => true
+      case _             => false
+    }
+
+    private[api] lazy val tupled = idFields -> ops
+
+    override def equals(that: Any): Boolean = that match {
+      case other: GroupMulti =>
+        this.tupled == other.tupled
+
+      case _ => false
+    }
+
+    @inline override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"GroupMulti${tupled.toString}"
+  }
+
+  object GroupMulti {
+
+    def apply(idFields: Seq[(String, String)])(ops: (String, GroupFunction)*): GroupMulti = new GroupMulti(idFields: _*)(ops: _*)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapplySeq(other: GroupMulti): Seq[(String, String)] =
+      other.idFields
+
   }
 
   /**
@@ -413,7 +845,46 @@ trait AggregationFramework[P <: SerializationPack]
    * @param ops the number of operations that used the index
    * @param since the time from which MongoDB gathered the statistics
    */
-  case class IndexStatAccesses(ops: Long, since: Long)
+  class IndexStatAccesses private[api] (
+    val ops: Long,
+    val since: Long) extends Product2[Long, Long] with Serializable {
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = ops
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _2 = since
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: IndexStatAccesses => true
+      case _                    => false
+    }
+
+    private[api] lazy val tupled = ops -> since
+
+    override def equals(that: Any): Boolean = that match {
+      case other: IndexStatAccesses =>
+        this.tupled == other.tupled
+
+      case _ => false
+    }
+
+    @inline override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"IndexStatAccesses${tupled.toString}"
+  }
+
+  object IndexStatAccesses extends AbstractFunction2[Long, Long, IndexStatAccesses] {
+
+    def apply(ops: Long, since: Long): IndexStatAccesses =
+      new IndexStatAccesses(ops, since)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(other: IndexStatAccesses): Option[(Long, Long)] =
+      Option(other).map { i => i.ops -> i.since }
+
+  }
 
   /**
    * @param name the index name
@@ -421,19 +892,94 @@ trait AggregationFramework[P <: SerializationPack]
    * @param host the hostname and port of the mongod
    * @param accesses the index statistics
    */
-  case class IndexStatsResult(
-    name: String,
-    key: pack.Document,
-    host: String,
-    accesses: IndexStatAccesses)
+  class IndexStatsResult private[api] (
+    val name: String,
+    val key: pack.Document,
+    val host: String,
+    val accesses: IndexStatAccesses) extends Product4[String, pack.Document, String, IndexStatAccesses] with Serializable {
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = name
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _2 = key
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _3 = host
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _4 = accesses
+
+    def canEqual(that: Any): Boolean = that match {
+      case _: IndexStatsResult => true
+      case _                   => false
+    }
+
+    private[api] lazy val tupled =
+      Tuple4(name, key, host, accesses)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: IndexStatsResult =>
+        this.tupled == other.tupled
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"IndexStatsResult${tupled.toString}"
+  }
+
+  object IndexStatsResult extends AbstractFunction4[String, pack.Document, String, IndexStatAccesses, IndexStatsResult] {
+    def apply(
+      name: String,
+      key: pack.Document,
+      host: String,
+      accesses: IndexStatAccesses): IndexStatsResult =
+      new IndexStatsResult(name, key, host, accesses)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(res: IndexStatsResult) = Option(res).map(_.tupled)
+  }
 
   /**
    * [[http://docs.mongodb.org/manual/reference/aggregation/limit/#_S_limit \$limit]]s the number of documents that pass through the stream.
    *
    * @param limit the number of documents to allow through
    */
-  case class Limit(limit: Int) extends PipelineOperator {
+  class Limit private[api] (val limit: Int) extends PipelineOperator
+    with Product1[Int] with Serializable {
+
     val makePipe: pack.Document = pipe(f"$$limit", builder.int(limit))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = limit
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Limit => true
+      case _        => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Limit =>
+        this.limit == other.limit
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = this.limit
+
+    override def toString: String = s"Limit(${limit})"
+  }
+
+  object Limit extends AbstractFunction1[Int, Limit] {
+    def apply(limit: Int): Limit = new Limit(limit)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(limit: Limit): Option[Int] = Option(limit).map(_.limit)
   }
 
   /**
@@ -442,9 +988,42 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 3.6
    * @param expression
    */
-  case class ListLocalSessions(
-    expression: pack.Document) extends PipelineOperator {
+  class ListLocalSessions(
+    val expression: pack.Document) extends PipelineOperator {
     def makePipe: pack.Document = pipe(f"$$listLocalSessions", expression)
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = expression
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: ListLocalSessions => true
+      case _                    => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: ListLocalSessions =>
+        (this.expression == null && other.expression == null) || (
+          this.expression != null && this.expression.
+          equals(other.expression))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (expression == null) -1 else expression.hashCode
+
+    override def toString: String = s"ListLocalSessions(${pack pretty expression})"
+  }
+
+  object ListLocalSessions extends AbstractFunction1[pack.Document, ListLocalSessions] {
+    def apply(expression: pack.Document): ListLocalSessions =
+      new ListLocalSessions(expression)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(listLocalSessions: ListLocalSessions): Option[pack.Document] =
+      Option(listLocalSessions).map(_.expression)
   }
 
   /**
@@ -453,9 +1032,42 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 3.6
    * @param expression
    */
-  case class ListSessions(
-    expression: pack.Document) extends PipelineOperator {
+  class ListSessions(
+    val expression: pack.Document) extends PipelineOperator {
     def makePipe: pack.Document = pipe(f"$$listSessions", expression)
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = expression
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: ListSessions => true
+      case _               => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: ListSessions =>
+        (this.expression == null && other.expression == null) || (
+          this.expression != null && this.expression.
+          equals(other.expression))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (expression == null) -1 else expression.hashCode
+
+    override def toString: String = s"ListSessions(${pack pretty expression})"
+  }
+
+  object ListSessions extends AbstractFunction1[pack.Document, ListSessions] {
+    def apply(expression: pack.Document): ListSessions =
+      new ListSessions(expression)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(listSessions: ListSessions): Option[pack.Document] =
+      Option(listSessions).map(_.expression)
   }
 
   /**
@@ -471,15 +1083,15 @@ trait AggregationFramework[P <: SerializationPack]
    * @param depthField an optional name for a field to add to each traversed document in the search path
    * @param restrictSearchWithMatch an optional filter expression
    */
-  case class GraphLookup(
-    from: String,
-    startWith: pack.Value,
-    connectFromField: String,
-    connectToField: String,
-    as: String,
-    maxDepth: Option[Int] = None,
-    depthField: Option[String] = None,
-    restrictSearchWithMatch: Option[pack.Value] = None) extends PipelineOperator {
+  class GraphLookup private[api] (
+    val from: String,
+    val startWith: pack.Value,
+    val connectFromField: String,
+    val connectToField: String,
+    val as: String,
+    val maxDepth: Option[Int],
+    val depthField: Option[String],
+    val restrictSearchWithMatch: Option[pack.Value]) extends PipelineOperator with Product8[String, pack.Value, String, String, String, Option[Int], Option[String], Option[pack.Value]] with Serializable {
     import builder.{ document, elementProducer => element, string }
 
     val makePipe: pack.Document = pipe(f"$$graphLookup", document(options))
@@ -508,6 +1120,67 @@ trait AggregationFramework[P <: SerializationPack]
 
       opts.result()
     }
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = from
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _2 = startWith
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _3 = connectFromField
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _4 = connectToField
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _5 = as
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _6 = maxDepth
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _7 = depthField
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _8 = restrictSearchWithMatch
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: GraphLookup => true
+      case _              => false
+    }
+
+    private[api] lazy val tupled = Tuple8(from, startWith, connectFromField, connectToField, as, maxDepth, depthField, restrictSearchWithMatch)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: GraphLookup =>
+        this.tupled == other.tupled
+
+      case _ =>
+        false
+    }
+
+    @inline override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"GraphLookup${tupled.toString}"
+  }
+
+  object GraphLookup extends scala.runtime.AbstractFunction8[String, pack.Value, String, String, String, Option[Int], Option[String], Option[pack.Value], GraphLookup] {
+    def apply(
+      from: String,
+      startWith: pack.Value,
+      connectFromField: String,
+      connectToField: String,
+      as: String,
+      maxDepth: Option[Int] = None,
+      depthField: Option[String] = None,
+      restrictSearchWithMatch: Option[pack.Value] = None): GraphLookup =
+      new GraphLookup(from, startWith, connectFromField, connectToField,
+        as, maxDepth, depthField, restrictSearchWithMatch)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(stage: GraphLookup) = Option(stage).map(_.tupled)
   }
 
   /**
@@ -519,11 +1192,12 @@ trait AggregationFramework[P <: SerializationPack]
    * @param foreignField the field from the documents in the `from` collection
    * @param as the name of the new array field to add to the input documents
    */
-  case class Lookup(
-    from: String,
-    localField: String,
-    foreignField: String,
-    as: String) extends PipelineOperator {
+  class Lookup private[api] (
+    val from: String,
+    val localField: String,
+    val foreignField: String,
+    val as: String) extends PipelineOperator with Product4[String, String, String, String] with Serializable {
+
     import builder.{ document, elementProducer => element, string }
     val makePipe: pack.Document = document(Seq(
       element(f"$$lookup", document(Seq(
@@ -531,6 +1205,50 @@ trait AggregationFramework[P <: SerializationPack]
         element("localField", string(localField)),
         element("foreignField", string(foreignField)),
         element("as", string(as)))))))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = from
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _2 = localField
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _3 = foreignField
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _4 = as
+
+    def canEqual(that: Any): Boolean = that match {
+      case _: Lookup => true
+      case _         => false
+    }
+
+    private[api] lazy val tupled =
+      Tuple4(from, localField, foreignField, as)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Lookup =>
+        this.tupled == other.tupled
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"Lookup${tupled.toString}"
+  }
+
+  object Lookup extends AbstractFunction4[String, String, String, String, Lookup] {
+    def apply(
+      from: String,
+      localField: String,
+      foreignField: String,
+      as: String): Lookup =
+      new Lookup(from, localField, foreignField, as)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(res: Lookup) = Option(res).map(_.tupled)
   }
 
   /**
@@ -538,8 +1256,43 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param predicate the query that documents must satisfy to be in the stream
    */
-  case class Match(predicate: pack.Document) extends PipelineOperator {
+  class Match private[api] (val predicate: pack.Document)
+    extends PipelineOperator
+    with Product1[pack.Document] with Serializable {
+
     val makePipe: pack.Document = pipe(f"$$match", predicate)
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = predicate
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Match => true
+      case _        => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Match =>
+        (this.predicate == null && other.predicate == null) || (
+          this.predicate != null && this.predicate.
+          equals(other.predicate))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (predicate == null) -1 else predicate.hashCode
+
+    override def toString: String = s"Match(${pack pretty predicate})"
+  }
+
+  object Match extends AbstractFunction1[pack.Document, Match] {
+    def apply(predicate: pack.Document): Match = new Match(predicate)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(`match`: Match): Option[pack.Document] =
+      Option(`match`).map(_.predicate)
   }
 
   /**
@@ -549,13 +1302,14 @@ trait AggregationFramework[P <: SerializationPack]
    * @param intoDb the name of the `into` database
    * @param intoCollection the name of the `into` collection
    */
-  case class Merge(
-    intoDb: String,
-    intoCollection: String,
-    on: Seq[String],
-    whenMatched: Option[String],
-    let: Option[pack.Document],
-    whenNotMatched: Option[String]) extends PipelineOperator {
+  class Merge private[api] (
+    val intoDb: String,
+    val intoCollection: String,
+    val on: Seq[String],
+    val whenMatched: Option[String],
+    val let: Option[pack.Document],
+    val whenNotMatched: Option[String]) extends PipelineOperator
+    with Product6[String, String, Seq[String], Option[String], Option[pack.Document], Option[String]] with Serializable {
 
     import builder.{ elementProducer => element, string }
 
@@ -582,6 +1336,57 @@ trait AggregationFramework[P <: SerializationPack]
 
       pipe(f"$$merge", builder.document(opts.result()))
     }
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = intoDb
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _2 = intoCollection
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _3 = on
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _4 = whenMatched
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _5 = let
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _6 = whenNotMatched
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Merge => true
+      case _        => false
+    }
+
+    private[api] lazy val tupled = Tuple6(intoDb, intoCollection, on, whenMatched, let, whenNotMatched)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Merge =>
+        this.tupled == other.tupled
+
+      case _ => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"Merge${tupled.toString}"
+  }
+
+  object Merge extends scala.runtime.AbstractFunction6[String, String, Seq[String], Option[String], Option[pack.Document], Option[String], Merge] {
+    def apply(
+      intoDb: String,
+      intoCollection: String,
+      on: Seq[String],
+      whenMatched: Option[String],
+      let: Option[pack.Document],
+      whenNotMatched: Option[String]): Merge =
+      new Merge(intoDb, intoCollection, on, whenMatched, let, whenNotMatched)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(merge: Merge) = Option(merge).map(_.tupled)
   }
 
   /**
@@ -589,8 +1394,42 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param collection the name of the output collection
    */
-  case class Out(collection: String) extends PipelineOperator {
+  class Out private[api] (val collection: String) extends PipelineOperator
+    with Product1[String] with Serializable {
+
     def makePipe: pack.Document = pipe(f"$$out", builder.string(collection))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = collection
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Out => true
+      case _      => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Out =>
+        (this.collection == null && other.collection == null) || (
+          this.collection != null && this.collection.
+          equals(other.collection))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (collection == null) -1 else collection.hashCode
+
+    override def toString: String = s"Out(${collection})"
+  }
+
+  object Out extends AbstractFunction1[String, Out] {
+    def apply(collection: String): Out = new Out(collection)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(out: Out): Option[String] =
+      Option(out).map(_.collection)
   }
 
   /**
@@ -608,8 +1447,43 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param specifications The fields to include. The resulting objects will contain only these fields.
    */
-  case class Project(specifications: pack.Document) extends PipelineOperator {
+  class Project private[api] (val specifications: pack.Document)
+    extends PipelineOperator with Product1[pack.Document] with Serializable {
+
     val makePipe: pack.Document = pipe(f"$$project", specifications)
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = specifications
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Project => true
+      case _          => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Project =>
+        (this.specifications == null && other.specifications == null) || (
+          this.specifications != null && this.specifications.
+          equals(other.specifications))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (specifications == null) -1 else specifications.hashCode
+
+    override def toString: String = s"Project(${pack pretty specifications})"
+  }
+
+  object Project extends AbstractFunction1[pack.Document, Project] {
+    def apply(specifications: pack.Document): Project =
+      new Project(specifications)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(project: Project): Option[pack.Document] =
+      Option(project).map(_.specifications)
   }
 
   /**
@@ -617,8 +1491,43 @@ trait AggregationFramework[P <: SerializationPack]
    * http://docs.mongodb.org/manual/reference/operator/aggregation/redact/#pipe._S_redact Redact
    * @param expression the redact expression
    */
-  case class Redact(expression: pack.Document) extends PipelineOperator {
+  class Redact private[api] (val expression: pack.Document)
+    extends PipelineOperator with Product1[pack.Document] with Serializable {
+
     val makePipe: pack.Document = pipe(f"$$redact", expression)
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = expression
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Redact => true
+      case _         => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Redact =>
+        (this.expression == null && other.expression == null) || (
+          this.expression != null && this.expression.
+          equals(other.expression))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (expression == null) -1 else expression.hashCode
+
+    override def toString: String = s"Redact(${pack pretty expression})"
+  }
+
+  object Redact extends AbstractFunction1[pack.Document, Redact] {
+    def apply(expression: pack.Document): Redact =
+      new Redact(expression)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(redact: Redact): Option[pack.Document] =
+      Option(redact).map(_.expression)
   }
 
   /**
@@ -627,9 +1536,44 @@ trait AggregationFramework[P <: SerializationPack]
    * https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot
    * @param newRoot The field name to become the new root
    */
-  case class ReplaceRootField(newRoot: String) extends PipelineOperator {
+  class ReplaceRootField private[api] (val newRoot: String)
+    extends PipelineOperator with Product1[String] with Serializable {
+
     val makePipe: pack.Document =
       pipe(f"$$replaceRoot", pipe("newRoot", builder.string("$" + newRoot)))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = newRoot
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: ReplaceRootField => true
+      case _                   => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: ReplaceRootField =>
+        (this.newRoot == null && other.newRoot == null) || (
+          this.newRoot != null && this.newRoot.
+          equals(other.newRoot))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (newRoot == null) -1 else newRoot.hashCode
+
+    override def toString: String = s"ReplaceRootField(${newRoot})"
+  }
+
+  object ReplaceRootField extends AbstractFunction1[String, ReplaceRootField] {
+    def apply(newRoot: String): ReplaceRootField =
+      new ReplaceRootField(newRoot)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(replaceRootField: ReplaceRootField): Option[String] =
+      Option(replaceRootField).map(_.newRoot)
   }
 
   /**
@@ -638,9 +1582,44 @@ trait AggregationFramework[P <: SerializationPack]
    * https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot
    * @param newRoot The new root object
    */
-  case class ReplaceRoot(newRoot: pack.Document) extends PipelineOperator {
+  class ReplaceRoot private[api] (val newRoot: pack.Document)
+    extends PipelineOperator with Product1[pack.Document] with Serializable {
+
     val makePipe: pack.Document =
       pipe(f"$$replaceRoot", pipe("newRoot", newRoot))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = newRoot
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: ReplaceRoot => true
+      case _              => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: ReplaceRoot =>
+        (this.newRoot == null && other.newRoot == null) || (
+          this.newRoot != null && this.newRoot.
+          equals(other.newRoot))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (newRoot == null) -1 else newRoot.hashCode
+
+    override def toString: String = s"ReplaceRoot(${pack pretty newRoot})"
+  }
+
+  object ReplaceRoot extends AbstractFunction1[pack.Document, ReplaceRoot] {
+    def apply(newRoot: pack.Document): ReplaceRoot =
+      new ReplaceRoot(newRoot)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(replaceRoot: ReplaceRoot): Option[pack.Document] =
+      Option(replaceRoot).map(_.newRoot)
   }
 
   /**
@@ -649,10 +1628,47 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 4.2
    * @param replacementDocument
    */
-  case class ReplaceWith(
-    replacementDocument: pack.Document) extends PipelineOperator {
+  class ReplaceWith private[api] (val replacementDocument: pack.Document)
+    extends PipelineOperator
+    with Product1[pack.Document] with Serializable {
 
     def makePipe: pack.Document = pipe(f"$$replaceWith", replacementDocument)
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = replacementDocument
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: ReplaceWith => true
+      case _              => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: ReplaceWith =>
+        (this.replacementDocument == null &&
+          other.replacementDocument == null) || (
+            this.replacementDocument != null && this.replacementDocument.
+            equals(other.replacementDocument))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (replacementDocument == null) -1 else replacementDocument.hashCode
+
+    override def toString: String = s"ReplaceWith(${pack pretty replacementDocument})"
+  }
+
+  object ReplaceWith
+    extends AbstractFunction1[pack.Document, ReplaceWith] {
+
+    def apply(replacementDocument: pack.Document): ReplaceWith =
+      new ReplaceWith(replacementDocument)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(replaceWith: ReplaceWith): Option[pack.Document] =
+      Option(replaceWith).map(_.replacementDocument)
   }
 
   /**
@@ -660,16 +1676,81 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param size the number of documents to return
    */
-  case class Sample(size: Int) extends PipelineOperator {
+  class Sample private[api] (val size: Int) extends PipelineOperator
+    with Product1[Int] with Serializable {
+
     val makePipe: pack.Document =
       pipe(f"$$sample", pipe("size", builder.int(size)))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = size
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Sample => true
+      case _         => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Sample =>
+        this.size == other.size
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = this.size
+
+    override def toString: String = s"Sample(${size})"
+  }
+
+  object Sample extends AbstractFunction1[Int, Sample] {
+    def apply(size: Int): Sample = new Sample(size)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(size: Sample): Option[Int] = Option(size).map(_.size)
   }
 
   /**
    * [[https://docs.mongodb.com/manual/reference/operator/aggregation/set/ \$set]] aggregation stage
    */
-  case class Set(expression: pack.Document) extends PipelineOperator {
+  class Set private[api] (val expression: pack.Document)
+    extends PipelineOperator with Product1[pack.Document] with Serializable {
+
     def makePipe: pack.Document = pipe(f"$$set", expression)
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = expression
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Set => true
+      case _      => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Set =>
+        (this.expression == null && other.expression == null) || (
+          this.expression != null && this.expression.
+          equals(other.expression))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (expression == null) -1 else expression.hashCode
+
+    override def toString: String = s"Set(${pack pretty expression})"
+  }
+
+  object Set extends AbstractFunction1[pack.Document, Set] {
+    def apply(expression: pack.Document): Set =
+      new Set(expression)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(set: Set): Option[pack.Document] =
+      Option(set).map(_.expression)
   }
 
   /**
@@ -677,9 +1758,39 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param skip the number of documents to skip
    */
-  case class Skip(skip: Int) extends PipelineOperator {
+  class Skip private[api] (val skip: Int) extends PipelineOperator
+    with Product1[Int] with Serializable {
+
     val makePipe: pack.Document = builder.document(Seq(
       builder.elementProducer(f"$$skip", builder.int(skip))))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = skip
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Skip => true
+      case _       => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Skip =>
+        this.skip == other.skip
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = this.skip
+
+    override def toString: String = s"Skip(${skip})"
+  }
+
+  object Skip extends AbstractFunction1[Int, Skip] {
+    def apply(skip: Int): Skip = new Skip(skip)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(skip: Skip): Option[Int] = Option(skip).map(_.skip)
   }
 
   /**
@@ -687,7 +1798,9 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param fields the fields to sort by
    */
-  case class Sort(fields: SortOrder*) extends PipelineOperator {
+  class Sort private[api] (val fields: Seq[SortOrder]) extends PipelineOperator
+    with Product1[Seq[SortOrder]] with Serializable {
+
     import builder.{ document, elementProducer => element }
     val makePipe: pack.Document = document(Seq(
       element(f"$$sort", document(fields.map {
@@ -702,6 +1815,36 @@ trait AggregationFramework[P <: SerializationPack]
           element(field, meta)
         }
       }))))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = fields
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Sort => true
+      case _       => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Sort =>
+        (this.fields == null && other.fields == null) || (
+          this.fields != null && this.fields.equals(other.fields))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (fields == null) -1 else fields.hashCode
+
+    override def toString: String = s"Sort(${fields})"
+  }
+
+  object Sort {
+    def apply(fields: SortOrder*): Sort = new Sort(fields)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapplySeq(sort: Sort): Seq[SortOrder] = sort.fields
   }
 
   /**
@@ -710,8 +1853,43 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 3.4
    * @param expression
    */
-  case class SortByCount(expression: pack.Value) extends PipelineOperator {
+  class SortByCount private[api] (val expression: pack.Value)
+    extends PipelineOperator with Product1[pack.Value] with Serializable {
+
     def makePipe: pack.Document = pipe(f"$$sortByCount", expression)
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = expression
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: SortByCount => true
+      case _              => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: SortByCount =>
+        (this.expression == null && other.expression == null) || (
+          this.expression != null && this.expression.
+          equals(other.expression))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (expression == null) -1 else expression.hashCode
+
+    override def toString: String = s"SortByCount(${expression})"
+  }
+
+  object SortByCount extends AbstractFunction1[pack.Value, SortByCount] {
+    def apply(expression: pack.Value): SortByCount =
+      new SortByCount(expression)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(sortByCount: SortByCount): Option[pack.Value] =
+      Option(sortByCount).map(_.expression)
   }
 
   /**
@@ -720,9 +1898,45 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 3.4
    * @param field the field name
    */
-  case class SortByFieldCount(field: String) extends PipelineOperator {
+  class SortByFieldCount private[api] (val field: String)
+    extends PipelineOperator
+    with Product1[String] with Serializable {
+
     def makePipe: pack.Document =
       pipe(f"$$sortByCount", builder.string("$" + field))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = field
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: SortByFieldCount => true
+      case _                   => false
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: SortByFieldCount =>
+        (this.field == null && other.field == null) || (
+          this.field != null && this.field.
+          equals(other.field))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (field == null) -1 else field.hashCode
+
+    override def toString: String = s"SortByFieldCount(${field})"
+  }
+
+  object SortByFieldCount extends AbstractFunction1[String, SortByFieldCount] {
+    def apply(field: String): SortByFieldCount =
+      new SortByFieldCount(field)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(sortByFieldCount: SortByFieldCount): Option[String] =
+      Option(sortByFieldCount).map(_.field)
   }
 
   /**
@@ -732,11 +1946,49 @@ trait AggregationFramework[P <: SerializationPack]
    * @param field the field name
    * @param otherFields
    */
-  case class Unset(
-    field: String,
-    otherFields: Seq[String]) extends PipelineOperator {
+  class Unset private[api] (
+    val field: String,
+    val otherFields: Seq[String]) extends PipelineOperator
+    with Product2[String, Seq[String]] with Serializable {
+
     def makePipe: pack.Document = pipe(f"$$unset", builder.array(
       builder.string(field), otherFields.map(builder.string)))
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _1 = field
+
+    @deprecated("No longer a case class", "0.20.3")
+    @inline def _2 = otherFields
+
+    @deprecated("No longer a case class", "0.20.3")
+    def canEqual(that: Any): Boolean = that match {
+      case _: Unset => true
+      case _        => false
+    }
+
+    private[api] lazy val tupled = field -> otherFields
+
+    override def equals(that: Any): Boolean = that match {
+      case other: Unset =>
+        this.tupled == other.tupled
+
+      case _ => false
+    }
+
+    @inline override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"Unset${tupled.toString}"
+  }
+
+  object Unset extends AbstractFunction2[String, Seq[String], Unset] {
+
+    def apply(field: String, otherFields: Seq[String]): Unset =
+      new Unset(field, otherFields)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(other: Unset): Option[(String, Seq[String])] =
+      Option(other).map { i => i.field -> i.otherFields }
+
   }
 
   class Unwind private[commands] (
@@ -758,8 +2010,34 @@ trait AggregationFramework[P <: SerializationPack]
    * http://docs.mongodb.org/manual/reference/aggregation/unwind/#_S_unwind
    * @param field the name of the array to unwind
    */
-  case class UnwindField(field: String) extends Unwind(1, { case 0 => field },
+  class UnwindField(val field: String) extends Unwind(1, { case 0 => field },
     pipe(f"$$unwind", builder.string("$" + field)))
+    with Serializable {
+
+    override def equals(that: Any): Boolean = that match {
+      case other: UnwindField =>
+        (this.field == null && other.field == null) || (
+          this.field != null && this.field.
+          equals(other.field))
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int =
+      if (field == null) -1 else field.hashCode
+
+    override def toString: String = s"UnwindField(${field})"
+  }
+
+  object UnwindField extends AbstractFunction1[String, UnwindField] {
+    def apply(field: String): UnwindField =
+      new UnwindField(field)
+
+    @deprecated("No longer a case class", "0.20.3")
+    def unapply(unwindField: UnwindField): Option[String] =
+      Option(unwindField).map(_.field)
+  }
 
   object Unwind {
     /**
@@ -872,5 +2150,4 @@ trait AggregationFramework[P <: SerializationPack]
       startAtOperationTime.map(v => builder.elementProducer("startAtOperationTime", v)),
       fullDocumentStrategy.map(v => builder.elementProducer("fullDocument", builder.string(v.name)))).flatten))
   }
-
 }
