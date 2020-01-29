@@ -21,6 +21,7 @@ import reactivemongo.core.errors.ReactiveMongoException
 @deprecated("Will be removed; See `Command`", "0.16.0")
 sealed trait AbstractCommand
 
+// TODO: Review
 trait Command extends AbstractCommand
 trait CollectionCommand extends AbstractCommand
 
@@ -105,7 +106,7 @@ object ResultCursor
   def unapply(other: ResultCursor) = Option(other).map(_.tupled)
 }
 
-trait ImplicitCommandHelpers[P <: SerializationPack] {
+trait ImplicitCommandHelpers[P <: SerializationPack] { // TODO: Remove
   import scala.language.implicitConversions
 
   val pack: P

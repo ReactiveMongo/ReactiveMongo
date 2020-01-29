@@ -13,7 +13,7 @@ object Publish {
   private val repoName = env("PUBLISH_REPO_NAME")
   private val repoUrl = env("PUBLISH_REPO_URL")
 
-  val previousVersion = "0.11.0"
+  val previousVersion = "0.20.3" // TODO: 1.0.0
 
   val missingMethodInOld: ProblemFilter = {
     case ReversedAbstractMethodProblem(_) |
@@ -32,9 +32,7 @@ object Publish {
     mimaPreviousArtifacts := {
       val v = scalaBinaryVersion.value
 
-      if (v == "2.12" && crossPaths.value) {
-        Set(organization.value % s"${moduleName.value}_${scalaBinaryVersion.value}" % "0.12.7")
-      } else if (v == "2.13") {
+      if (v == "2.13") {
         Set.empty
       } else if (crossPaths.value) {
         Set(organization.value % s"${moduleName.value}_${scalaBinaryVersion.value}" % previousVersion)

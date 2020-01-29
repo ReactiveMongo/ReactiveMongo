@@ -10,7 +10,7 @@ import reactivemongo.core.protocol.Request
  * @param signaling if true it's a signaling connection (not for r/w ops)
  */
 @deprecated("Internal: will be made private", "0.17.0")
-class Connection(
+class Connection( // TODO: private
   val channel: Channel,
   val status: ConnectionStatus,
   val authenticated: Set[Authenticated],
@@ -69,7 +69,7 @@ class Connection(
 }
 
 @deprecated("Internal: will be made private", "0.17.0")
-object Connection extends scala.runtime.AbstractFunction4[Channel, ConnectionStatus, Set[Authenticated], Option[Authenticating], Connection] {
+object Connection extends scala.runtime.AbstractFunction4[Channel, ConnectionStatus, Set[Authenticated], Option[Authenticating], Connection] { // TODO: private and remove inheritance
   @deprecated("", "")
   def apply(
     channel: Channel,

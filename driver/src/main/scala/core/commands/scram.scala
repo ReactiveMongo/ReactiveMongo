@@ -85,7 +85,7 @@ private[core] case class ScramSha1Initiate(
 }
 
 @deprecated("Internal: will be made private", "0.18.4")
-object ScramSha1Initiate extends BSONCommandResultMaker[ScramChallenge[ScramSha1Authentication.type]] {
+object ScramSha1Initiate extends BSONCommandResultMaker[ScramChallenge[ScramSha1Authentication.type]] { // TODO: private
   def parseResponse(response: Response): Either[CommandError, ScramChallenge[ScramSha1Authentication.type]] = apply(response)
 
   def apply(bson: BSONDocument) = ScramInitiate.parseResponse(ScramSha1Authentication, bson)(ScramSha1Challenge.apply)
@@ -175,7 +175,7 @@ private[core] case class ScramSha256Negociation(
   request: BSONDocument)
 
 @deprecated("Internal: will be made private", "0.18.4")
-object ScramSha1Negociation {
+object ScramSha1Negociation { // TODO: private
   @inline def parsePayload(payload: String): Map[String, String] =
     ScramNegociation.parsePayload(payload)
 
@@ -423,7 +423,7 @@ private[core] object ScramStartNegociation {
   }
 }
 
-sealed trait ScramFinalNegociation extends Command[SuccessfulAuthentication] {
+sealed trait ScramFinalNegociation extends Command[SuccessfulAuthentication] { // TODO: private
   /** The ID of the SCRAM conversation */
   def conversationId: Int
 
@@ -451,7 +451,7 @@ private[core] case class ScramSha1FinalNegociation(
 }
 
 @deprecated("Unused", "0.18.4")
-object ScramSha1FinalNegociation
+object ScramSha1FinalNegociation // TODO: Remove
   extends BSONCommandResultMaker[SuccessfulAuthentication] {
 
   def apply(bson: BSONDocument) = ???

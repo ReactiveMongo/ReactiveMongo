@@ -30,7 +30,7 @@ object Common extends AutoPlugin {
 
   private val java8 = scala.util.Properties.isJavaAtLeast("1.8")
 
-  val scalaCompatVer = "2.11.12"
+  val scala211 = "2.11.12"
 
   val closeableObject = SettingKey[String]("class name of a closeable object")
 
@@ -40,10 +40,10 @@ object Common extends AutoPlugin {
   val pomTransformer = settingKey[Option[XmlElem => Option[XmlElem]]](
     "Optional XML node transformer")
 
-  override def projectSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
+  def foo = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
     scalaVersion := "2.12.10",
     crossScalaVersions := Seq(
-      "2.10.7", scalaCompatVer, scalaVersion.value, "2.13.1"),
+      "2.10.7", scala211, scalaVersion.value, "2.13.1"),
     crossVersion := CrossVersion.binary,
     useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
     target := {
@@ -61,8 +61,49 @@ object Common extends AutoPlugin {
         case (a, b) => s"${a}${suffix}${b}"
       }
     },
-    //parallelExecution in Test := false,
-    //fork in Test := true, // Don't share executioncontext between SBT CLI/tests
+    unmanagedSourceDirectories in Compile ++= {
+      val jdir = if (java8) "java8" else "java7"
+
+      Seq((sourceDirectory in Compile).value / jdir)
+    },
+    unmanagedSourceDirectories in Test ++= {
+      val jdir = if (java8) "java8" else "java7"
+
+      Seq((sourceDirectory in Compile).value / jdir)
+    },
+    scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation",
+      /*"-diagrams", */"-implicits", "-skip-packages", "samples"),
+    scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
+    scalacOptions in (Compile, doc) ++= Opts.doc.version(Release.major.value),
+    mappings in (Compile, packageBin) ~= filter,
+    mappings in (Compile, packageSrc) ~= filter,
+    mappings in (Compile, packageDoc) ~= filter,
+    //testFrameworks ~= { _.filterNot(_ == TestFrameworks.ScalaTest) },
+    closeableObject in Test := "Common$",
+    pomTransformer := None,
+  )
+
+  override def projectSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
+    scalaVersion := "2.12.10",
+    crossScalaVersions := Seq(
+      "2.10.7", scala211, scalaVersion.value, "2.13.1"),
+    crossVersion := CrossVersion.binary,
+    useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
+    target := {
+      if (useShaded.value) target.value / "shaded"
+      else target.value / "noshaded"
+    },
+    version := { 
+      val ver = (version in ThisBuild).value
+      val suffix = {
+        if (useShaded.value) "" // default ~> no suffix
+        else "-noshaded"
+      }
+
+      ver.span(_ != '-') match {
+        case (a, b) => s"${a}${suffix}${b}"
+      }
+    },
     unmanagedSourceDirectories in Compile ++= {
       val jdir = if (java8) "java8" else "java7"
 

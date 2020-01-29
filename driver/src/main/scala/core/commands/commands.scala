@@ -27,7 +27,7 @@ import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
 import reactivemongo.core.netty._
 
 @deprecated("consider using reactivemongo.api.commands instead", "0.11.0")
-object `package` {}
+object `package` {} // TODO: Remove
 
 /**
  * A MongoDB Command.
