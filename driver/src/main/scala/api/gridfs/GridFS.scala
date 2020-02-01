@@ -21,6 +21,8 @@ import java.security.MessageDigest
 
 import scala.util.control.NonFatal
 
+import scala.reflect.ClassTag
+
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{
@@ -52,7 +54,7 @@ import reactivemongo.api.collections.{ GenericCollection, GenericQueryBuilder }
 
 import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.Ascending
 
-import reactivemongo.api.gridfs.{ ReadFile => RF }
+import reactivemongo.api.gridfs.{ FileToSave => SF, ReadFile => RF }
 
 /**
  * A GridFS store.
@@ -61,9 +63,8 @@ import reactivemongo.api.gridfs.{ ReadFile => RF }
  * @define fileSelector the query to find the files
  * @define readFileParam the file to be read
  * @define fileReader fileReader a file reader automatically resolved if `Id` is a valid value
- */
-sealed trait GridFS[P <: SerializationPack with Singleton]
-  extends GridFSSerialization[P] { self =>
+ */ // TODO: Remove 'with Singleton'
+sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
 
   /* The database where this store is located. */
   protected def db: DB with DBMetaCommands
@@ -99,7 +100,28 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
 
   import builder.{ document, elementProducer => elem }
 
-  type ReadFile[Id <: P#Value] = RF[P, Id]
+  type ReadFile[+Id <: P#Value] = RF[Id, pack.Document]
+
+  type FileToSave[Id <: P#Value] = SF[Id, pack.Document]
+
+  @annotation.implicitNotFound("Cannot resolve a file reader: make sure Id type ${Id} is a serialized value (e.g. kind of BSON value) and that a ClassTag instance is implicitly available for")
+  private[api] sealed trait FileReader[Id <: P#Value] {
+    def read(doc: pack.Document): ReadFile[Id]
+
+    implicit lazy val reader = pack.reader[ReadFile[Id]](read(_))
+  }
+
+  private[api] object FileReader {
+    implicit def default[Id <: pack.Value](
+      implicit
+      idTag: ClassTag[Id]): FileReader[Id] = {
+      val underlying = RF.reader[P, Id](pack)
+
+      new FileReader[Id] {
+        def read(doc: pack.Document) = pack.deserialize(doc, underlying)
+      }
+    }
+  }
 
   /**
    * $findDescription.
@@ -153,8 +175,10 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
    *   gfs.find(BSONDocument("filename" -> n)).headOption
    * }}}
    */
-  def find(selector: pack.Document)(implicit ec: ExecutionContext, r: FileReader[pack.Value], cp: CursorProducer[ReadFile[pack.Value]]): cp.ProducedCursor = {
+  def find(selector: pack.Document)(implicit ec: ExecutionContext, cp: CursorProducer[ReadFile[pack.Value]]): cp.ProducedCursor = {
     implicit def w = pack.IdentityWriter
+    implicit def r = FileReader.default(pack.IsValue)
+
     find[pack.Document, pack.Value](selector)
   }
 
@@ -209,7 +233,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
   }
 
   /** Writes the data provided by the given InputStream to the given file. */
-  def writeFromInputStream[Id <: pack.Value](file: FileToSave[pack.type, Id], input: InputStream, chunkSize: Int = 262144)(implicit ec: ExecutionContext): Future[ReadFile[Id]] = {
+  def writeFromInputStream[Id <: pack.Value](file: FileToSave[Id], input: InputStream, chunkSize: Int = 262144)(implicit ec: ExecutionContext): Future[ReadFile[Id]] = {
     type M = MessageDigest
 
     lazy val digestInit = MessageDigest.getInstance("MD5")
@@ -278,15 +302,6 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
 
     go(Chunk(Array.empty, 0, digestInit, 0)).flatMap(_.finish)
   }
-
-  /**
-   * Removes a file from this store.
-   * Note that if the file does not actually exist,
-   * the returned future will not be hold an error.
-   *
-   * @param file the file entry to remove from this store
-   */
-  @inline def remove[Id <: pack.Value](file: BasicMetadata[Id])(implicit ec: ExecutionContext): Future[WriteResult] = remove(file.id)
 
   /**
    * Removes a file from this store.
@@ -402,34 +417,30 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
    * The unique ID is automatically generated.
    */
   def fileToSave(
-    _filename: Option[String] = None,
-    _contentType: Option[String] = None,
-    _uploadDate: Option[Long] = None,
-    _metadata: pack.Document = document(Seq.empty)): FileToSave[pack.type, pack.Value] =
-    new FileToSave[pack.type, pack.Value] {
-      val pack: self.pack.type = self.pack
-      val filename = _filename
-      val contentType = _contentType
-      val uploadDate = _uploadDate
-      val metadata = _metadata
-      val id = builder.generateObjectId()
-    }
+    filename: Option[String] = None,
+    contentType: Option[String] = None,
+    uploadDate: Option[Long] = None,
+    metadata: pack.Document = document(Seq.empty)): FileToSave[pack.Value] =
+    new FileToSave[pack.Value](
+      filename = filename,
+      contentType = contentType,
+      uploadDate = uploadDate,
+      metadata = metadata,
+      id = builder.generateObjectId())
 
   /** Prepare the information to save a file. */
   def fileToSave[Id <: pack.Value](
-    _filename: Option[String],
-    _contentType: Option[String],
-    _uploadDate: Option[Long],
-    _metadata: pack.Document,
-    _id: Id): FileToSave[pack.type, Id] =
-    new FileToSave[pack.type, Id] {
-      val pack: self.pack.type = self.pack
-      val filename = _filename
-      val contentType = _contentType
-      val uploadDate = _uploadDate
-      val metadata = _metadata
-      val id = _id
-    }
+    filename: Option[String],
+    contentType: Option[String],
+    uploadDate: Option[Long],
+    metadata: pack.Document,
+    id: Id): FileToSave[Id] =
+    new FileToSave[Id](
+      filename = filename,
+      contentType = contentType,
+      uploadDate = uploadDate,
+      metadata = metadata,
+      id = id)
 
   // ---
 
@@ -456,7 +467,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
   }
 
   private[reactivemongo] def finalizeFile[Id <: pack.Value](
-    file: FileToSave[pack.type, Id],
+    file: FileToSave[Id],
     previous: Array[Byte],
     n: Int,
     chunkSize: Int,
@@ -502,21 +513,22 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
         implicit def resultReader = insertReader
 
         runner(fileColl, insertFileCmd, defaultReadPreference).map { _ =>
-          RF[P, Id](pack)(
-            _id = file.id,
-            _contentType = file.contentType,
-            _filename = file.filename,
-            _uploadDate = file.uploadDate,
-            _chunkSize = chunkSize,
-            _length = length,
-            _metadata = file.metadata,
-            _md5 = md5Hex)
+          new ReadFile[Id](
+            id = file.id,
+            contentType = file.contentType,
+            filename = file.filename,
+            uploadDate = file.uploadDate,
+            chunkSize = chunkSize,
+            length = length,
+            metadata = file.metadata,
+            md5 = md5Hex)
         }
       }
     } yield res
   }
 
-  @inline private def chunkSelector(file: ReadFile[pack.Value]): pack.Document =
+  @inline private def chunkSelector[Id <: pack.Value](
+    file: ReadFile[Id]): pack.Document =
     document(Seq(
       elem("files_id", file.id),
       elem("n", document(Seq(
@@ -647,9 +659,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
 }
 
 object GridFS {
-  import reactivemongo.api.CollectionProducer
-
-  def apply[P <: SerializationPack with Singleton](
+  private[api] def apply[P <: SerializationPack with Singleton](
     _pack: P,
     db: DB with DBMetaCommands,
     prefix: String): GridFS[P] = {
@@ -662,14 +672,4 @@ object GridFS {
       val pack: P = _pack
     }
   }
-
-  def apply(
-    db: DB with DBMetaCommands,
-    prefix: String): GridFS[Serialization.Pack] =
-    apply[Serialization.Pack](
-      Serialization.internalSerializationPack, db, prefix)
-
-  def apply(db: DB with DBMetaCommands): GridFS[Serialization.Pack] =
-    apply[Serialization.Pack](
-      Serialization.internalSerializationPack, db, prefix = "fs")
 }

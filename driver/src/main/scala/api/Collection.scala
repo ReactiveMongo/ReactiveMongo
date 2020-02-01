@@ -16,9 +16,9 @@
 package reactivemongo.api
 
 /**
- * A MongoDB Collection, resolved from a [[reactivemongo.api.DefaultDB]].
+ * Basic information resolved for a MongoDB Collection, resolved from a [[reactivemongo.api.DefaultDB]].
  *
- * You should consider the generic API
+ * For collection operations, you should consider the generic API
  * ([[reactivemongo.api.collections.GenericCollection]]).
  *
  * @define failoverStrategyParam the failover strategy to override the default one

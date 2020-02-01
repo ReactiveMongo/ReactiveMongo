@@ -62,7 +62,7 @@ import reactivemongo.api.commands.{
  * @define endSessionDescription [[https://docs.mongodb.com/manual/reference/command/endSessions Ends (closes) the session]] associated with this database reference (since MongoDB 3.6)
  */
 sealed trait DB {
-  protected type DBType <: DB
+  protected type DBType <: DB // Merge Database types
 
   /** The [[reactivemongo.api.MongoConnection]] that will be used to query this database. */
   @transient def connection: MongoConnection
@@ -140,8 +140,6 @@ sealed trait DB {
   /**
    * $startSessionDescription, does nothing if a session has already being started .
    *
-   * '''EXPERIMENTAL:''' API may change without notice.
-   *
    * {{{
    * import scala.concurrent.ExecutionContext
    * import reactivemongo.api.DefaultDB
@@ -156,8 +154,6 @@ sealed trait DB {
 
   /**
    * $startSessionDescription.
-   *
-   * '''EXPERIMENTAL:''' API may change without notice.
    *
    * {{{
    * import scala.concurrent.ExecutionContext
@@ -179,8 +175,6 @@ sealed trait DB {
    * the current client session otherwise does nothing.
    *
    * It fails if no session is previously started (see `startSession`).
-   *
-   * '''EXPERIMENTAL:''' API may change without notice.
    *
    * {{{
    * import scala.concurrent.ExecutionContext
@@ -204,8 +198,6 @@ sealed trait DB {
    * It fails if no session is previously started (see `startSession`).
    *
    *
-   * '''EXPERIMENTAL:''' API may change without notice.
-   *
    * {{{
    * import scala.concurrent.ExecutionContext
    * import reactivemongo.api.{ DefaultDB, WriteConcern }
@@ -224,8 +216,6 @@ sealed trait DB {
   /**
    * $abortTxDescription, if any otherwise does nothing .
    *
-   * '''EXPERIMENTAL:''' API may change without notice.
-   *
    * {{{
    * import scala.concurrent.ExecutionContext
    * import reactivemongo.api.DefaultDB
@@ -241,16 +231,12 @@ sealed trait DB {
   /**
    * $abortTxDescription, if any otherwise does nothing .
    *
-   * '''EXPERIMENTAL:''' API may change without notice.
-   *
    * @return The database reference with transaction aborted (but not session)
    */
   def abortTransaction(failIfNotStarted: Boolean)(implicit ec: ExecutionContext): Future[DBType]
 
   /**
    * $commitTxDescription, if any otherwise does nothing .
-   *
-   * '''EXPERIMENTAL:''' API may change without notice.
    *
    * {{{
    * import scala.concurrent.ExecutionContext
@@ -267,8 +253,6 @@ sealed trait DB {
   /**
    * $commitTxDescription, if any otherwise does nothing .
    *
-   * '''EXPERIMENTAL:''' API may change without notice.
-   *
    * {{{
    * import scala.concurrent.ExecutionContext
    * import reactivemongo.api.DefaultDB
@@ -283,8 +267,6 @@ sealed trait DB {
 
   /**
    * $endSessionDescription, if any otherwise does nothing .
-   *
-   * '''EXPERIMENTAL:''' API may change without notice.
    *
    * {{{
    * import scala.concurrent.ExecutionContext
@@ -301,16 +283,12 @@ sealed trait DB {
   /**
    * $endSessionDescription, if any otherwise does nothing .
    *
-   * '''EXPERIMENTAL:''' API may change without notice.
-   *
    * @return The database reference with session ended
    */
   def endSession(failIfNotStarted: Boolean)(implicit ec: ExecutionContext): Future[DBType]
 
   /**
    * $killSessionDescription, if any otherwise does nothing .
-   *
-   * '''EXPERIMENTAL:''' API may change without notice.
    *
    * {{{
    * import scala.concurrent.ExecutionContext
@@ -327,12 +305,9 @@ sealed trait DB {
   /**
    * $killSessionDescription, if any otherwise does nothing .
    *
-   * '''EXPERIMENTAL:''' API may change without notice.
-   *
    * @return The database reference with session aborted
    */
   def killSession(failIfNotStarted: Boolean)(implicit ec: ExecutionContext): Future[DBType]
-
 }
 
 /**
@@ -409,6 +384,7 @@ private[api] sealed trait GenericDB[P <: SerializationPack with Singleton] { sel
 }
 
 /** The default DB implementation, that mixes in the database traits. */
+// TODO: private
 @SerialVersionUID(235871232L)
 class DefaultDB private[api] (
   val name: String,
