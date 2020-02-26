@@ -30,6 +30,7 @@ class Bson() {
       libraryDependencies ++= shaded.value ++ Seq(
         specs.value,
         "org.specs2" %% "specs2-scalacheck" % specsVer.value % Test,
+        "org.specs2" %% "specs2-matcher-extra" % specsVer.value % Test,
         discipline.value % Test,
         "org.typelevel" %% "spire-laws" % spireLawsVer.value % Test),
       mimaBinaryIssueFilters ++= {

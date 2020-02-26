@@ -17,8 +17,9 @@ package reactivemongo.bson
  * limitations under the License.
  */
 import java.util.Date
+import org.specs2.execute._, Typecheck._
 
-class HandlerSpec extends org.specs2.mutable.Specification {
+class HandlerSpec extends org.specs2.mutable.Specification with org.specs2.matcher.TypecheckMatchers {
   "Handler" title
 
   section("unit")
@@ -280,6 +281,14 @@ class HandlerSpec extends org.specs2.mutable.Specification {
       val h = implicitly[BSONHandler[BSONString, Foo]]
 
       h.write(foo) must_=== bson and (h.read(bson) must_=== foo)
+    }
+  }
+
+  "BSONHandler" should {
+    "summon Seq instance" in {
+      typecheck {
+        "implicitly[BSONHandler[BSONArray, Seq[Int]]]"
+      }
     }
   }
 
