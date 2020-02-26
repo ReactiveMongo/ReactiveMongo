@@ -159,7 +159,7 @@ trait DefaultBSONHandlers extends LowPrioBSONHandlers {
     def write(b: BSONJavaScript) = b
   }
 
-  implicit def findWriter[T](implicit writer: VariantBSONWriter[T, _ <: BSONValue]): BSONWriter[T, _ <: BSONValue] =
+  implicit def findWriter[T, B <: BSONValue](implicit writer: VariantBSONWriter[T, B]): BSONWriter[T, B] =
     new VariantBSONWriterWrapper(writer)
 
   implicit def MapReader[K, V](implicit keyReader: BSONReader[BSONString, K], valueReader: BSONReader[_ <: BSONValue, V]): BSONDocumentReader[Map[K, V]] =
