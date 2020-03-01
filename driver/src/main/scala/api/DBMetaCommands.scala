@@ -10,6 +10,8 @@ import reactivemongo.api.commands.{
 import reactivemongo.api.indexes.IndexesManager
 import reactivemongo.bson.{ BSONDocument => LegacyDoc, BSONDocumentWriter }
 
+import reactivemongo.api.gridfs.GridFS
+
 /** A mixin that provides commands about this database itself. */
 @deprecated("Internal: will be made private", "0.19.8")
 trait DBMetaCommands { self: DB =>
@@ -51,6 +53,44 @@ trait DBMetaCommands { self: DB =>
   def drop()(implicit ec: ExecutionContext): Future[Unit] =
     Command.run(internalSerializationPack, failoverStrategy).
       unboxed(self, DropDatabase, ReadPreference.primary)
+
+  /**
+   * The GridFS with the default serialization and collection prefix.
+   *
+   * {{{
+   * import scala.concurrent.ExecutionContext
+   *
+   * import scala.reflect.ClassTag
+   *
+   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.bson.{ BSONDocument, BSONValue }
+   *
+   * def findFile(db: DefaultDB, query: BSONDocument)(
+   *   implicit ec: ExecutionContext, it: ClassTag[BSONValue]) =
+   *   db.gridfs.find(query)
+   * }}}
+   */
+  @inline def gridfs: GridFS[Serialization.Pack] = gridfs("fs")
+
+  /**
+   * The GridFS with the default serialization.
+   *
+   * @param prefix the collection prefix
+   */
+  @inline def gridfs(prefix: String): GridFS[Serialization.Pack] =
+    gridfs[Serialization.Pack](
+      Serialization.internalSerializationPack, prefix)
+
+  /**
+   * The GridFS with the default serialization.
+   *
+   * @tparam P the type of serialization
+   * @param pack the serialization pack
+   * @param prefix the collection prefix
+   */
+  def gridfs[P <: SerializationPack with Singleton](
+    pack: P, prefix: String): GridFS[P] =
+    GridFS[P](pack, this, prefix)
 
   /**
    * Returns an index manager for this database.

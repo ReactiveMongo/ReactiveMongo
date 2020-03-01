@@ -10,7 +10,7 @@ object Travis {
       val (jdkLower, jdkUpper) = "openjdk8" -> "oraclejdk9"
 
       // Scala
-      import Common.{ scalaCompatVer => scalaLower }
+      import Common.scala211
       val scalaUpper = scalaVersion.value
 
       // Major libs
@@ -123,7 +123,7 @@ object Travis {
         "  - os: osx",
         s"    env: ${unitTestEnv}",
         s"    jdk: ${jdkLower}",
-        s"    scala: ${scalaLower}",
+        s"    scala: ${scala211}",
         "  - os: linux",
         s"    env: ${unitTestEnv}",
         s"    jdk: ${jdkUpper}",

@@ -35,7 +35,6 @@ lazy val `ReactiveMongo-BSON-Compat` = project.in(file("bson-compat")).
       }
     }).value,
     fork in Test := true,
-    mimaPreviousArtifacts := Set.empty,
     libraryDependencies ++= {
       if (scalaBinaryVersion.value != "2.10") {
         Dependencies.shaded.value ++ Seq(
@@ -53,47 +52,6 @@ lazy val `ReactiveMongo-Core` = project.in(file("core")).
   dependsOn(`ReactiveMongo-BSON` % Provided).
   settings(
     Findbugs.settings ++ Seq(
-      mimaPreviousArtifacts := {
-        val v = scalaBinaryVersion.value
-        import Publish.previousVersion
-
-        if (v == "2.12" && crossPaths.value) {
-          Set(organization.value % s"reactivemongo_${scalaBinaryVersion.value}" % "0.12.7")
-        } else if (v == "2.13") {
-          Set.empty
-        } else if (crossPaths.value) {
-          Set(organization.value % s"reactivemongo_${scalaBinaryVersion.value}" % previousVersion)
-        } else {
-          Set(organization.value % "reactivemongo" % previousVersion)
-        }
-      },
-      mimaBinaryIssueFilters ++= {
-        import com.typesafe.tools.mima.core._, ProblemFilters.{ exclude => x }
-
-        @inline def fcp(s: String) = x[FinalClassProblem](s)
-        @inline def mtp(s: String) = x[MissingTypesProblem](s)
-        @inline def isp(s: String) = x[IncompatibleSignatureProblem](s)
-
-        Seq(
-          mtp("reactivemongo.core.protocol.ResponseDecoder"),
-          mtp("reactivemongo.core.protocol.ResponseInfo$"),
-          fcp("reactivemongo.core.protocol.ResponseInfo"),
-          isp("reactivemongo.core.protocol.KillCursors.writeTo"),
-          isp("reactivemongo.core.protocol.Query.writeTo"),
-          isp("reactivemongo.core.protocol.GetMore.writeTo"),
-          isp("reactivemongo.core.protocol.Insert.writeTo"),
-          isp("reactivemongo.core.protocol.Update.writeTo"),
-          isp("reactivemongo.core.protocol.MessageHeader.writeTo"),
-          isp("reactivemongo.core.protocol.ChannelBufferWritable.writeTo"),
-          isp("reactivemongo.core.protocol.Delete.writeTo"),
-          isp("reactivemongo.core.protocol.Response.unapply"),
-          isp("reactivemongo.core.protocol.ResponseInfo.andThen"),
-          isp("reactivemongo.core.protocol.ResponseInfo.compose"),
-          isp("reactivemongo.api.BSONSerializationPack.readAndDeserialize"),
-          isp("reactivemongo.api.BSONSerializationPack.serializeAndWrite")
-        )
-      },
-      //mimaPreviousArtifacts := Set.empty,
       sourceDirectories in Compile ++= {
         if (scalaBinaryVersion.value != "2.10") {
           Seq((sourceDirectory in Compile).value / "scala-2.11+")
@@ -131,8 +89,7 @@ lazy val `ReactiveMongo-Root` = project.in(file(".")).
       publishArtifact := false,
       publishTo := None,
       publishLocal := {},
-      publish := {},
-      mimaPreviousArtifacts := Set.empty
+      publish := {}
   )).aggregate(
     `ReactiveMongo-BSON`,
     `ReactiveMongo-BSON-Macros`,

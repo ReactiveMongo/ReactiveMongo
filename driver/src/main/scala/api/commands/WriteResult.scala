@@ -27,6 +27,7 @@ sealed trait WriteResult {
 }
 
 object WriteResult {
+  // TODO: private
   def lastError(result: WriteResult): Option[LastError] = result match {
     case error @ LastError(_, _, _, _, _, _, _, _, _, _, _, _, _, _) => Some(error)
     case _ if (result.ok) => None
@@ -83,6 +84,7 @@ object WriteResult {
     true, 0, Seq.empty, Option.empty, Option.empty, Option.empty)
 }
 
+// TODO: private
 class LastError private[api] (
   val ok: Boolean,
   val errmsg: Option[String],

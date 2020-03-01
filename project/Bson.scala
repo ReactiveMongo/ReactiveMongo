@@ -1,11 +1,6 @@
 import sbt._
 import sbt.Keys._
 
-import com.typesafe.tools.mima.plugin.MimaKeys.{
-  mimaBinaryIssueFilters,
-  mimaPreviousArtifacts
-}
-
 import com.github.sbt.cpd.CpdPlugin
 
 class Bson() {
@@ -31,41 +26,6 @@ class Bson() {
         specs.value,
         "org.specs2" %% "specs2-scalacheck" % specsVer.value % Test,
         discipline.value % Test,
-        "org.typelevel" %% "spire-laws" % spireLawsVer.value % Test),
-      mimaBinaryIssueFilters ++= {
-        import com.typesafe.tools.mima.core._, ProblemFilters.{ exclude => x }
-
-        @inline def irt(s: String) = x[IncompatibleResultTypeProblem](s)
-        @inline def mtp(s: String) = x[MissingTypesProblem](s)
-        @inline def fmp(s: String) = x[FinalMethodProblem](s)
-        @inline def imt(s: String) = x[IncompatibleMethTypeProblem](s)
-        @inline def isp(s: String) = x[IncompatibleSignatureProblem](s)
-
-        val pkg = "reactivemongo.bson"
-
-        Seq(
-          isp(/* package private */
-            s"${pkg}.buffer.BSONIterator.pretty"),
-          isp(s"${pkg}.BSONDocument.++"),
-          isp(s"${pkg}.BSONDocument.elements"),
-          isp(s"${pkg}.BSONDocument.stream"),
-          isp(s"${pkg}.BSONDocument.copy"),
-          isp(s"${pkg}.BSONDocument.copy$$default$$1"),
-          isp(s"${pkg}.BSONDocument.apply"),
-          isp(s"${pkg}.BSONDocument.unapply"),
-          isp(s"${pkg}.BSONDocument.this"),
-          isp(s"${pkg}.BSONHandler.apply"),
-          isp(s"${pkg}.package.document"),
-          mtp(s"${pkg}.BSONDBPointer$$"),
-          mtp(s"${pkg}.BSONDBPointer"),
-          mtp(s"${pkg}.BSONTimestamp$$"),
-          mtp(s"${pkg}.ExtendedNumeric"),
-          fmp(s"${pkg}.ExtendedNumeric.value"),
-          imt(s"${pkg}.ExtendedNumeric.this"),
-          mtp(s"${pkg}.ExtendedNumeric$$"),
-          x[UpdateForwarderBodyProblem](s"${pkg}.DefaultBSONHandlers.collectionToBSONArrayCollectionWriter"),
-          x[UpdateForwarderBodyProblem](s"${pkg}.DefaultBSONHandlers.bsonArrayToCollectionReader")
-        )
-      }
+        "org.typelevel" %% "spire-laws" % spireLawsVer.value % Test)
     ))
 }

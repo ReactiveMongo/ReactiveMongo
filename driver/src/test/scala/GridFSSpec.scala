@@ -5,7 +5,7 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson.utils.Converters
 
-import reactivemongo.api.{ Cursor, SerializationPack, WrappedCursor }
+import reactivemongo.api.{ Cursor, DefaultDB, SerializationPack, WrappedCursor }
 
 import reactivemongo.api.tests.{ Pack, pack, newBuilder }
 
@@ -35,22 +35,23 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
   "Default connection" should {
     val prefix = s"fs${System identityHashCode db}"
 
-    gridFsSpec(pack: Pack)(GridFS(db, prefix), timeout)
+    gridFsSpec(db, prefix, timeout)
   }
 
   "Slow connection" should {
-    import reactivemongo.api.{ BSONSerializationPack => LegacyPack }
-    import reactivemongo.api.collections.bson.BSONCollectionProducer
-
     val prefix = s"fs${System identityHashCode slowDb}"
 
-    gridFsSpec(LegacyPack)(GridFS(LegacyPack, slowDb, prefix), slowTimeout)
+    gridFsSpec(slowDb, prefix, slowTimeout)
   }
 
   // ---
 
-  def gridFsSpec[P <: SerializationPack with Singleton](
-    pack: P)(gfs: GridFS[pack.type], timeout: FiniteDuration)(implicit ev: scala.reflect.ClassTag[pack.Value]) = {
+  def gridFsSpec(
+    db: DefaultDB,
+    prefix: String,
+    timeout: FiniteDuration)(implicit ev: scala.reflect.ClassTag[pack.Value]) = {
+
+    val gfs = db.gridfs(prefix)
     type GFile = gfs.ReadFile[pack.Value]
     val builder = newBuilder(pack)
     import builder.{ document, elementProducer => elem, string => str }
@@ -84,11 +85,11 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
 
     val filename2 = s"file2-${System identityHashCode gfs}"
     lazy val file2 = gfs.fileToSave(
-      _filename = Some(filename2),
-      _contentType = Some("text/plain"),
-      _uploadDate = None,
-      _metadata = document(Seq(elem("foo", str("bar")))),
-      _id = str(filename2))
+      filename = Some(filename2),
+      contentType = Some("text/plain"),
+      uploadDate = None,
+      metadata = document(Seq(elem("foo", str("bar")))),
+      id = str(filename2))
 
     lazy val content2 = (100 to 200).view.map(_.toByte).toArray
 

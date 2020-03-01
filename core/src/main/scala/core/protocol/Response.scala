@@ -17,7 +17,7 @@ import reactivemongo.core.errors._
  * @param info some meta information about this response
  */
 @deprecated("Internal: will be made private", "0.16.0")
-sealed abstract class Response(
+sealed abstract class Response( // TODO: private
   val header: MessageHeader,
   val reply: Reply,
   val documents: ByteBuf,
@@ -50,7 +50,7 @@ sealed abstract class Response(
 }
 
 @deprecated("Internal: will be made private", "0.16.0")
-object Response {
+object Response { // TODO: private
   import reactivemongo.api.{ BSONSerializationPack, SerializationPack }
   import reactivemongo.bson.BSONDocument
 

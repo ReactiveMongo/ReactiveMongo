@@ -13,7 +13,7 @@ object Publish {
   private val repoName = env("PUBLISH_REPO_NAME")
   private val repoUrl = env("PUBLISH_REPO_URL")
 
-  val previousVersion = "0.11.0"
+  val previousVersion = "1.0.0-rc.1-SNAPSHOT" // TODO: 1.0.0
 
   val missingMethodInOld: ProblemFilter = {
     case ReversedAbstractMethodProblem(_) |
@@ -29,19 +29,7 @@ object Publish {
   }
 
   val mimaSettings = mimaDefaultSettings ++ Seq(
-    mimaPreviousArtifacts := {
-      val v = scalaBinaryVersion.value
-
-      if (v == "2.12" && crossPaths.value) {
-        Set(organization.value % s"${moduleName.value}_${scalaBinaryVersion.value}" % "0.12.7")
-      } else if (v == "2.13") {
-        Set.empty
-      } else if (crossPaths.value) {
-        Set(organization.value % s"${moduleName.value}_${scalaBinaryVersion.value}" % previousVersion)
-      } else {
-        Set(organization.value % moduleName.value % previousVersion)
-      }
-    },
+    mimaPreviousArtifacts := Set.empty, // TODO
     mimaBinaryIssueFilters ++= Seq(missingMethodInOld))
 
   val siteUrl = "http://reactivemongo.org"
