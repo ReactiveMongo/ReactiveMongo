@@ -52,4 +52,8 @@ trait CursorCompatAPI[T] { _: Cursor[T] =>
    * }}}
    */
   def collect[M[_]](maxDocs: Int, err: ErrorHandler[M[T]])(implicit cbf: Factory[T, M[T]], ec: ExecutionContext): Future[M[T]]
+
+  /** '''EXPERIMENTAL:''' The cursor state, if already resolved. */
+  def peek[M[_]](maxDocs: Int)(implicit cbf: Factory[T, M[T]], ec: ExecutionContext): Future[Cursor.Result[M[T]]] = Future.failed(Cursor.NoSuchResultException) // TODO: Remove default impl
+
 }

@@ -62,7 +62,7 @@ import reactivemongo.api.commands.{
  * @define endSessionDescription [[https://docs.mongodb.com/manual/reference/command/endSessions Ends (closes) the session]] associated with this database reference (since MongoDB 3.6)
  */
 sealed trait DB {
-  protected type DBType <: DB // Merge Database types
+  protected type DBType <: DB // TODO: Merge Database types
 
   /** The [[reactivemongo.api.MongoConnection]] that will be used to query this database. */
   @transient def connection: MongoConnection
@@ -308,6 +308,36 @@ sealed trait DB {
    * @return The database reference with session aborted
    */
   def killSession(failIfNotStarted: Boolean)(implicit ec: ExecutionContext): Future[DBType]
+
+  /**
+   * '''EXPERIMENTAL:''' API may change without notice.
+   */
+  def getMore[P <: SerializationPack, T](
+    pack: P,
+    reference: Cursor.Reference,
+    readPreference: ReadPreference = defaultReadPreference,
+    failoverStrategy: FailoverStrategy = this.failoverStrategy,
+    maxTimeMS: Option[Long] = None,
+    isMongo26WriteOp: Boolean = false)(
+    implicit
+    reader: pack.Reader[T],
+    cp: CursorProducer[T]): cp.ProducedCursor = {
+    @inline def r = reader
+
+    val cur = new DefaultCursor.GetMoreCursor[T](
+      db = this,
+      _ref = reference,
+      readPreference = readPreference,
+      failover = failoverStrategy,
+      maxTimeMS = maxTimeMS,
+      isMongo26WriteOp = isMongo26WriteOp) {
+      type P = pack.type
+      val _pack: P = pack
+      val reader = r
+    }
+
+    cp.produce(cur)
+  }
 }
 
 /**
