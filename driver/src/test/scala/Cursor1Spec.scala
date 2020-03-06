@@ -35,7 +35,7 @@ trait Cursor1Spec { spec: CursorSpec =>
 
       insert(nDocs, Seq.empty).map { _ =>
         info(s"inserted $nDocs records")
-      } aka "fixtures" must beEqualTo({}).await(1, timeout)
+      } aka "fixtures" must beTypedEqualTo({}).await(1, timeout)
     }
 
     "request for cursor query" in {
@@ -136,10 +136,53 @@ trait Cursor1Spec { spec: CursorSpec =>
       }
     }
 
+    "peek operation" in {
+      import reactivemongo.api.tests.{ decoder, reader => docReader, pack }
+      implicit val reader = docReader[Int] { decoder.int(_, "i").get }
+
+      def cursor = coll.find(matchAll("foo")).
+        sort(BSONDocument("i" -> 1)).batchSize(2).cursor[Int]()
+
+      val cn = s"${db.name}.${coll.name}"
+
+      cursor.headOption must beSome(0).await(1, timeout) and {
+        cursor.peek[List](100) must beLike[Cursor.Result[List[Int]]] {
+          case Cursor.Result(0 :: 1 :: Nil, ref1) => // batchSize(2) ~> 0,1
+            ref1.collectionName must_=== cn and {
+              def getMore = db.getMore(pack, ref1)
+
+              getMore.peek[Seq](3) must beLike[Cursor.Result[Seq[Int]]] {
+                case Cursor.Result(2 +: 3 +: 4 +: Nil, ref2) =>
+                  ref2.cursorId must_=== ref1.cursorId and {
+                    ref2.collectionName must_=== cn
+                  } and {
+                    db.getMore(pack, ref2).
+                      peek[Seq](2) must beLike[Cursor.Result[Seq[Int]]] {
+                        case Cursor.Result(5 +: 6 +: Nil, ref3) =>
+                          ref3.cursorId must_=== ref1.cursorId and {
+                            ref3.collectionName must_=== cn
+                          }
+                      }.await(1, timeout)
+                  }
+              }.await(1, timeout) and {
+                getMore.peek[Set](1) must beLike[Cursor.Result[Set[Int]]] {
+                  case Cursor.Result(s, ref4) =>
+                    s must_=== Set(7) and {
+                      ref4.cursorId must_=== ref1.cursorId
+                    } and {
+                      ref4.collectionName must_=== cn
+                    }
+                }.await(1, timeout)
+              }
+            }
+        }.await(1, timeout)
+      }
+    } tag "not_mongo26"
+
     // head
     "find first document when matching" in {
       coll.find(matchAll("head1") ++ ("i" -> 0)).cursor[BSONDocument]().head.
-        map(_ -- "_id") must beEqualTo(BSONDocument(
+        map(_ -- "_id") must beTypedEqualTo(BSONDocument(
           "i" -> 0, "record" -> "record0")).await(1, timeout)
     }
 
@@ -156,7 +199,7 @@ trait Cursor1Spec { spec: CursorSpec =>
 
     "read one document with success" in {
       coll.find(matchAll("one2") ++ ("i" -> 1)).requireOne[BSONDocument].
-        map(_ -- "_id") must beEqualTo(BSONDocument(
+        map(_ -- "_id") must beTypedEqualTo(BSONDocument(
           "i" -> 1, "record" -> "record1")).await(0, timeout)
     }
 
@@ -180,7 +223,8 @@ trait Cursor1Spec { spec: CursorSpec =>
       { // .fold
         "fold all the documents" in {
           c.find(matchAll("cursorspec2a")).batchSize(2096).cursor().fold(0)(
-            { (st, _) => debug(s"fold: $st"); st + 1 }) aka "result size" must beEqualTo(16517).await(1, timeout) and {
+            { (st, _) => debug(s"fold: $st"); st + 1 }).
+            aka("result size") must beEqualTo(16517).await(1, timeout) and {
               c.find(matchAll("cursorspec2b")).
                 batchSize(2096).cursor().fold(0, -1)(
                   { (st, _) => st + 1 }) aka "result size" must beEqualTo(16517).await(1, timeout)

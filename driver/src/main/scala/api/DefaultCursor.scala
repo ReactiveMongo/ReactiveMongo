@@ -85,26 +85,26 @@ object DefaultCursor {
 
       val makeIterator = ReplyDocumentIterator.parse(pack)(_: Response)(reader)
 
-      @inline def makeRequest(maxDocs: Int)(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[Response] = Failover2(connection, failoverStrategy) { () =>
-        val ntr = toReturn(numberToReturn, maxDocs, 0)
+      @inline def makeRequest(maxDocs: Int)(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[Response] =
+        Failover2(connection, failoverStrategy) { () =>
+          val ntr = toReturn(numberToReturn, maxDocs, 0)
 
-        // MongoDB2.6: Int.MaxValue
+          // MongoDB2.6: Int.MaxValue
+          val op = query.copy(numberToReturn = ntr)
+          val req = new RequestMakerExpectingResponse(
+            requestMaker = RequestMaker(
+              op, requestBuffer(maxDocs), readPreference),
+            isMongo26WriteOp = isMongo26WriteOp,
+            pinnedNode = transaction.flatMap(_.pinnedNode))
 
-        val op = query.copy(numberToReturn = ntr)
-        val req = new RequestMakerExpectingResponse(
-          requestMaker = RequestMaker(
-            op, requestBuffer(maxDocs), readPreference),
-          isMongo26WriteOp = isMongo26WriteOp,
-          pinnedNode = transaction.flatMap(_.pinnedNode))
+          requester(0, maxDocs, req)(ec)
+        }.future.flatMap {
+          case Response.CommandError(_, _, _, cause) =>
+            Future.failed[Response](cause)
 
-        requester(0, maxDocs, req)(ec)
-      }.future.flatMap {
-        case Response.CommandError(_, _, _, cause) =>
-          Future.failed[Response](cause)
-
-        case response =>
-          Future.successful(response)
-      }
+          case response =>
+            Future.successful(response)
+        }
 
       val builder = pack.newBuilder
 
@@ -112,6 +112,7 @@ object DefaultCursor {
         if (lessThenV32) { (cursorId, ntr) =>
           GetMore(fullCollectionName, ntr, cursorId) -> BufferSequence.empty
         } else {
+          // TODO: re-check numberToReturn = 1
           val moreQry = query.copy(numberToSkip = 0, numberToReturn = 1)
           val collName = fullCollectionName.span(_ != '.')._2.tail
 
@@ -134,6 +135,94 @@ object DefaultCursor {
         }
       }
     }
+
+  private[reactivemongo] abstract class GetMoreCursor[A](
+    db: DB,
+    _ref: Cursor.Reference,
+    readPreference: ReadPreference,
+    failover: FailoverStrategy,
+    isMongo26WriteOp: Boolean,
+    maxTimeMS: Option[Long]) extends Impl[A] {
+    protected type P <: SerializationPack
+    protected val _pack: P
+    protected def reader: _pack.Reader[A]
+
+    val preference = readPreference
+    val database = db
+    val failoverStrategy = failover
+    val mongo26WriteOp = isMongo26WriteOp
+
+    @inline def fullCollectionName = _ref.collectionName
+
+    val numberToReturn = {
+      val version = connection._metadata.
+        fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
+
+      if (version.compareTo(MongoWireVersion.V32) < 0) {
+        // see QueryOpts.batchSizeN
+
+        if (_ref.numberToReturn <= 0) {
+          Cursor.DefaultBatchSize
+        } else _ref.numberToReturn
+      } else {
+        1 // nested 'cursor' document
+      }
+    }
+
+    @inline def tailable: Boolean = _ref.tailable
+
+    val makeIterator = ReplyDocumentIterator.parse(_pack)(_: Response)(reader)
+
+    @inline def makeRequest(maxDocs: Int)(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[Response] = {
+      val pinnedNode = transaction.flatMap(_.pinnedNode)
+
+      Failover2(connection, failoverStrategy) { () =>
+        // MongoDB2.6: Int.MaxValue
+        val op = getMoreOpCmd(_ref.cursorId, maxDocs)
+        val req = new RequestMakerExpectingResponse(
+          requestMaker = RequestMaker(op._1, op._2, readPreference),
+          isMongo26WriteOp = isMongo26WriteOp,
+          pinnedNode = pinnedNode)
+
+        requester(0, maxDocs, req)(ec)
+      }.future.flatMap {
+        case Response.CommandError(_, _, _, cause) =>
+          Future.failed[Response](cause)
+
+        case response =>
+          Future.successful(response)
+      }
+    }
+
+    lazy val builder = _pack.newBuilder
+
+    val getMoreOpCmd: Function2[Long, Int, (RequestOp, BufferSequence)] = {
+      if (lessThenV32) { (cursorId, ntr) =>
+        GetMore(fullCollectionName, ntr, cursorId) -> BufferSequence.empty
+      } else {
+        val collName = fullCollectionName.span(_ != '.')._2.tail
+
+        { (cursorId, ntr) =>
+          import builder.{ elementProducer => elem, int, long, string }
+
+          val moreQry = GetMore(fullCollectionName, ntr, cursorId)
+
+          val cmdOpts = Seq.newBuilder[_pack.ElementProducer] ++= Seq(
+            elem("getMore", long(cursorId)),
+            elem("collection", string(collName)),
+            elem("batchSize", int(ntr)))
+
+          maxTimeMS.foreach { ms =>
+            cmdOpts += elem("maxTimeMS", long(ms))
+          }
+
+          val cmd = builder.document(cmdOpts.result())
+
+          moreQry -> BufferSequence.single[_pack.type](_pack)(cmd)
+        }
+      }
+    }
+  }
 
   @deprecated("No longer implemented", "0.16.0")
   def getMore[P <: SerializationPack, A](
@@ -220,11 +309,11 @@ object DefaultCursor {
             }
           }
         }
-      } else { (startingFrom: Int, _: Int, req: RequestMakerExpectingResponse) =>
+      } else { (from: Int, _: Int, req: RequestMakerExpectingResponse) =>
         { implicit ec: ExecutionContext =>
           base(ec)(req).map {
             // Normalizes as 'new' cursor doesn't indicate such property
-            _.startingFrom(startingFrom)
+            _.startingFrom(from)
           }
         }
       }
@@ -288,7 +377,7 @@ object DefaultCursor {
       }
     }
 
-    def kill(cursorID: Long): Unit = // DEPRECATED
+    def kill(cursorID: Long): Unit = // TODO: DEPRECATED
       killCursor(cursorID)(connection.actorSystem.dispatcher)
 
     def killCursor(id: Long)(implicit ec: ExecutionContext): Unit =

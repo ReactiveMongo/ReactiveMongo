@@ -386,4 +386,77 @@ object Cursor {
     with scala.util.control.NoStackTrace
 
   private[api] val DefaultBatchSize = 101
+
+  /** '''EXPERIMENTAL''' */
+  final class Reference(
+    val collectionName: String,
+    val cursorId: Long,
+    val numberToReturn: Int,
+    val tailable: Boolean,
+    val pinnedNode: Option[String]) {
+
+    override def equals(that: Any): Boolean = that match {
+      case null => false
+
+      case other: Reference =>
+        (this.cursorId == other.cursorId) && (
+          this.tailable == other.tailable) && (
+            this.numberToReturn == other.numberToReturn) && (
+              (this.pinnedNode == null && other.pinnedNode == null) ||
+              (this.pinnedNode != null &&
+                this.pinnedNode == other.pinnedNode)) && (
+                  (this.collectionName == null &&
+                    other.collectionName == null) ||
+                    (this.collectionName != null &&
+                      this.collectionName == other.collectionName))
+
+      case _ => false
+    }
+
+    override def hashCode: Int = {
+      import scala.util.hashing.MurmurHash3
+
+      val nh1 = MurmurHash3.mix(MurmurHash3.productSeed, cursorId.##)
+      val nh2 = MurmurHash3.mix(nh1, numberToReturn)
+      val nh3 = MurmurHash3.mix(nh2, tailable.##)
+      val nh4 = MurmurHash3.mix(nh3, collectionName.##)
+
+      MurmurHash3.mixLast(nh4, pinnedNode.##)
+    }
+
+    override def toString: String = s"""Result(collection = $collectionName, cursorId = $cursorId, numberToReturn = $numberToReturn, tailable = $tailable, pinnedNode = ${pinnedNode.getOrElse("<none>")})"""
+  }
+
+  /** '''EXPERIMENTAL''' */
+  final class Result[T](
+    val value: T,
+    val reference: Reference) {
+
+    override def equals(that: Any): Boolean = that match {
+      case null => false
+
+      case other: Result[_] =>
+        ((this.value == null && other.value == null) || (
+          this.value != null && this.value == other.value)) && ((
+            this.reference == null && other.reference == null) || (
+              this.reference != null && this.reference == other.reference))
+
+      case _ => false
+    }
+
+    override def hashCode: Int = {
+      import scala.util.hashing.MurmurHash3
+
+      val nh1 = MurmurHash3.mix(MurmurHash3.productSeed, value.##)
+      MurmurHash3.mixLast(nh1, reference.##)
+    }
+
+    override def toString: String = s"Result($value, $reference)"
+  }
+
+  /** '''EXPERIMENTAL''' */
+  object Result {
+    def unapply[T](other: Result[T]): Option[(T, Reference)] =
+      Option(other).map { r => r.value -> r.reference }
+  }
 }
