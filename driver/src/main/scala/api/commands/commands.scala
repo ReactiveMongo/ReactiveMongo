@@ -16,7 +16,7 @@ import reactivemongo.api.{
 
 import reactivemongo.core.protocol.{ Reply, Response }
 import reactivemongo.core.actors.RequestMakerExpectingResponse
-import reactivemongo.core.errors.ReactiveMongoException
+import reactivemongo.core.errors.GenericDriverException
 
 @deprecated("Will be removed; See `Command`", "0.16.0")
 sealed trait AbstractCommand
@@ -190,7 +190,7 @@ object Command {
           }
 
         case response @ Response.Successful(_, Reply(_, _, _, 0), _, _) =>
-          Future.failed[T](ReactiveMongoException(
+          Future.failed[T](new GenericDriverException(
             s"Cannot parse empty response: $response"))
 
         case response => db.session match {
@@ -268,7 +268,7 @@ object Command {
         iterator = cursor.documentIterator(resp)
         result <- {
           if (!iterator.hasNext) {
-            Future.failed(ReactiveMongoException("missing result"))
+            Future.failed(new GenericDriverException("missing result"))
           } else Future.successful(iterator.next())
         }
       } yield ResponseResult(resp, cursor.numberToReturn, result)

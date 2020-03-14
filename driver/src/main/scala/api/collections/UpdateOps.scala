@@ -179,7 +179,7 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
 
       case _ =>
         Future.failed[MultiBulkWriteResult](
-          GenericDriverException("No update to be performed"))
+          new GenericDriverException("No update to be performed"))
     }
 
     // ---
@@ -262,14 +262,13 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
           if (!flattened.ok) {
             // was ordered, with one doc => fail if has an error
             Future.failed(WriteResult.lastError(flattened).
-              getOrElse[Exception](GenericDriverException(
+              getOrElse[Exception](new GenericDriverException(
                 s"fails to update: $updates")))
 
           } else Future.successful(wr)
         }
       } else { // Mongo < 2.6
-        Future.failed[UpdateWriteResult](GenericDriverException(
-          s"unsupported MongoDB version: $metadata"))
+        Future.failed[UpdateWriteResult](unsupportedVersion(metadata))
       }
     }
   }

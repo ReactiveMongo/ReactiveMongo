@@ -19,7 +19,6 @@ import reactivemongo.bson.{
   document
 }
 import reactivemongo.api.{
-  BSONSerializationPack,
   Cursor,
   CursorOps,
   CursorProducer,

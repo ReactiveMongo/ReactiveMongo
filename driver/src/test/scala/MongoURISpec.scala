@@ -13,7 +13,7 @@ import reactivemongo.api.{
 }, MongoConnection.{ ParsedURI, URIParsingException }
 
 import reactivemongo.core.nodeset.Authenticate
-import reactivemongo.core.errors.GenericDriverException
+import reactivemongo.core.errors.ReactiveMongoException
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -469,7 +469,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         } else {
           throw new IllegalArgumentException(s"Unexpected name '$name'")
         }
-      }) must throwA[GenericDriverException](
+      }) must throwA[ReactiveMongoException](
         ".*mongo1\\.other\\.tld\\. is not subdomain of domain\\.tld\\..*").
         awaitFor(timeout)
     }
@@ -483,7 +483,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           Type.A, 3600, java.net.InetAddress.getLoopbackAddress))
 
       parseURI(validSeedList, srvRecResolver(_ => records)).
-        aka("failure") must throwA[GenericDriverException](
+        aka("failure") must throwA[ReactiveMongoException](
           ".*Unexpected record: mongo\\.domain\\.tld\\..*").awaitFor(timeout)
     }
 

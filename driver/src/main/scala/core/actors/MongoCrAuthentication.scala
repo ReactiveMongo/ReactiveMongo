@@ -46,9 +46,9 @@ private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
       try {
         val nonce = pack.readAndDeserialize(response, getCrNonceReader).value
 
-        debug(s"Got authentication nonce for channel #${response.info._channelId}: $nonce")
+        debug(s"Got authentication nonce for channel #${response.info.channelId}: $nonce")
 
-        val chanId = response.info._channelId
+        val chanId = response.info.channelId
 
         updateNodeSet(s"CrNonce($chanId)") { ns =>
           ns.pickByChannelId(chanId).fold(ns) { byChan =>
@@ -92,7 +92,7 @@ private[reactivemongo] trait MongoCrAuthentication { system: MongoDBSystem =>
     }
 
     case resp: Response if RequestIdGenerator.authenticate accepts resp => {
-      val chanId = resp.info._channelId
+      val chanId = resp.info.channelId
 
       debug(s"Got authenticated response #${chanId}! ${resp.getClass}")
 

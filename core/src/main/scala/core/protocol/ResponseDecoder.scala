@@ -65,9 +65,8 @@ private[reactivemongo] class ResponseDecoder
 
     val reply = Reply(frame)
     val chanId = Option(context).map(_.channel.id).orNull
-    def info = ResponseInfo(chanId)
+    def info = new ResponseInfo(chanId)
 
-    @com.github.ghik.silencer.silent(".*ResponseDecoder\\ is\\ deprecated.*")
     def response = if (reply.cursorID == 0 && reply.numberReturned > 0) {
       // Copy as unpooled (non-derived) buffer
       val docs = Unpooled.buffer(frame.readableBytes)
@@ -147,8 +146,7 @@ private[reactivemongo] class ResponseDecoder
 }
 
 private[reactivemongo] object ResponseDecoder {
-  @deprecated("Internal: will be made private", "0.19.0")
-  @inline private[reactivemongo] def first(buf: ByteBuf) = Try[LegacyDoc] {
+  @inline def first(buf: ByteBuf) = Try[LegacyDoc] {
     val sz = buf.getIntLE(buf.readerIndex)
     val bytes = Array.ofDim[Byte](sz)
 

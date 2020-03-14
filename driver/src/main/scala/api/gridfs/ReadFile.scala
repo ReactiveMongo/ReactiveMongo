@@ -1,8 +1,6 @@
 package reactivemongo.api.gridfs
 
-import reactivemongo.bson.{ BSONDocument, BSONValue }
-
-import reactivemongo.api.{ BSONSerializationPack, SerializationPack }
+import reactivemongo.api.SerializationPack
 
 /**
  * A file read from a GridFS store.

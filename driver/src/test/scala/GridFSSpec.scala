@@ -5,11 +5,11 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson.utils.Converters
 
-import reactivemongo.api.{ Cursor, DefaultDB, SerializationPack, WrappedCursor }
+import reactivemongo.api.{ Cursor, DefaultDB, WrappedCursor }
 
-import reactivemongo.api.tests.{ Pack, pack, newBuilder }
+import reactivemongo.api.tests.{ pack, newBuilder }
 
-import reactivemongo.api.gridfs.{ FileToSave, GridFS }
+import reactivemongo.api.gridfs.FileToSave
 
 import org.specs2.concurrent.ExecutionEnv
 

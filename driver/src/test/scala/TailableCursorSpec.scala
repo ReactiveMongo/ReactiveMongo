@@ -8,7 +8,7 @@ import reactivemongo.api.bson.BSONDocument
 
 import _root_.tests.Common
 
-import reactivemongo.api.tests.{ decoder, reader => docReader }
+import reactivemongo.api.tests.{ decoder, parseResponse, reader => docReader }
 
 trait TailableCursorSpec { specs: CursorSpec =>
   def tailableSpec = {
@@ -52,7 +52,7 @@ trait TailableCursorSpec { specs: CursorSpec =>
           implicit val reader = legacyIdReader
 
           tailable("foldr0").foldResponses(List.empty[Int], 6) { (s, resp) =>
-            val bulk = Response.parse(resp).flatMap(_.asOpt[Int].toList)
+            val bulk = parseResponse(resp).flatMap(_.asOpt[Int].toList)
 
             Cursor.Cont(s ++ bulk)
           } must beEqualTo(List(0, 1, 2, 3, 4, 5)).await(1, timeout)
@@ -61,7 +61,7 @@ trait TailableCursorSpec { specs: CursorSpec =>
         "to fold responses with async function" in {
           implicit val reader = legacyIdReader
           tailable("foldr0").foldResponsesM(List.empty[Int], 6) { (s, resp) =>
-            val bulk = Response.parse(resp).flatMap(_.asOpt[Int].toList)
+            val bulk = parseResponse(resp).flatMap(_.asOpt[Int].toList)
 
             Future.successful(Cursor.Cont(s ++ bulk))
           } must beEqualTo(List(0, 1, 2, 3, 4, 5)).await(1, timeout)

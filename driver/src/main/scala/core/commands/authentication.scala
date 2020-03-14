@@ -10,6 +10,7 @@ import reactivemongo.bson.{
 }
 
 import reactivemongo.core.protocol.Response
+import reactivemongo.core.errors.{ CommandError, BSONCommandError }
 
 // --- MongoDB CR authentication ---
 
@@ -18,8 +19,7 @@ import reactivemongo.core.protocol.Response
  *
  * Gets a nonce for authentication token.
  */
-@deprecated("Internal: will be made private", "0.19.0")
-object GetCrNonce extends Command[String] {
+private[core] object GetCrNonce extends Command[String] {
   override def makeDocuments = BSONDocument("getnonce" -> BSONInteger(1))
 
   object ResultMaker extends BSONCommandResultMaker[String] {
@@ -56,8 +56,7 @@ private[core] case class CrAuthenticate(
 }
 
 /** Authentication command's response deserializer. */
-@deprecated("Internal: will be made private", "0.19.0")
-object CrAuthenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
+private[core] object CrAuthenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
   def parseResponse(response: Response): Either[CommandError, SuccessfulAuthentication] = apply(response)
 
   def apply(document: BSONDocument) = {
@@ -92,8 +91,7 @@ private[core] case class X509Authenticate(user: Option[String])
   override val ResultMaker = X509Authenticate
 }
 
-@deprecated("Internal: will be made private", "0.19.0")
-object X509Authenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
+private[core] object X509Authenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
   def parseResponse(response: Response): Either[CommandError, SuccessfulAuthentication] = apply(response)
 
   def apply(document: BSONDocument) = {
@@ -108,16 +106,13 @@ object X509Authenticate extends BSONCommandResultMaker[SuccessfulAuthentication]
 }
 
 /** An authentication result */
-@deprecated("Internal: will be made private", "0.19.0")
 sealed trait AuthenticationResult
 
 /** A successful authentication result. */
-@deprecated("Internal: will be made private", "0.19.0")
 sealed trait SuccessfulAuthentication extends AuthenticationResult
 
 /** A silent successful authentication result (MongoDB <= 2.0).*/
-@deprecated("Internal: will be made private", "0.19.0")
-object SilentSuccessfulAuthentication extends SuccessfulAuthentication
+private[reactivemongo] object SilentSuccessfulAuthentication extends SuccessfulAuthentication
 
 /**
  * A verbose successful authentication result (MongoDB >= 2.2).
@@ -128,8 +123,7 @@ object SilentSuccessfulAuthentication extends SuccessfulAuthentication
  * @param user the user name
  * @param readOnly states if the authentication gives us only the right to read from the database.
  */
-@deprecated("Internal: will be made private", "0.19.0")
-case class VerboseSuccessfulAuthentication(
+private[reactivemongo] case class VerboseSuccessfulAuthentication(
   db: String,
   user: String,
   readOnly: Boolean) extends SuccessfulAuthentication
@@ -137,14 +131,12 @@ case class VerboseSuccessfulAuthentication(
 /**
  * A failed authentication result
  */
-@deprecated("Internal: will be made private", "0.19.1")
 sealed abstract class FailedAuthentication
-  extends BSONCommandError with AuthenticationResult
-  with Product with Serializable {
+  extends BSONCommandError with AuthenticationResult {
 
-  type Pack <: SerializationPack
+  private[core] type Pack <: SerializationPack
 
-  val pack: Pack
+  private[core] val pack: Pack
 
   /** The explanation of the error */
   def message: String = "<error>"
@@ -152,12 +144,12 @@ sealed abstract class FailedAuthentication
   private[reactivemongo] def response: Option[pack.Document]
 
   @deprecated("Use `response`", "0.19.1")
-  lazy val originalDocument: Option[BSONDocument] =
+  private[reactivemongo] lazy val originalDocument: Option[BSONDocument] =
     response.map(pack.bsonValue(_)).collect {
       case doc: BSONDocument => doc
     }
 
-  private[reactivemongo] lazy val tupled = message -> originalDocument
+  private[reactivemongo] lazy val tupled = message -> response
 
   override def hashCode: Int = tupled.hashCode
 
@@ -168,32 +160,12 @@ sealed abstract class FailedAuthentication
     case _ =>
       false
   }
-
-  def canEqual(that: Any): Boolean = that match {
-    case _: FailedAuthentication => true
-    case _                       => false
-  }
-
-  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
-  val productArity: Int = 2
-
-  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
-  def productElement(n: Int): Any = tupled.productElement(n)
 }
 
-object FailedAuthentication extends scala.runtime.AbstractFunction2[String, Option[BSONDocument], FailedAuthentication] {
-  private[reactivemongo] type Aux[P <: SerializationPack] = FailedAuthentication { type Pack = P }
+private[reactivemongo] object FailedAuthentication {
+  type Aux[P <: SerializationPack] = FailedAuthentication { type Pack = P }
 
-  @deprecated("Use constructor with pack", "0.19.1")
-  def apply(
-    message: String,
-    originalDocument: Option[BSONDocument] = None): FailedAuthentication =
-    apply(BSONSerializationPack)(message, None, originalDocument)
-
-  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
-  def unapply(that: FailedAuthentication): Option[(String, Option[BSONDocument])] = Option(that).map { a => a.message -> a.originalDocument }
-
-  private[reactivemongo] def apply[P <: SerializationPack](_pack: P)(
+  def apply[P <: SerializationPack](_pack: P)(
     msg: String,
     c: Option[Int],
     doc: Option[_pack.Document]): Aux[_pack.type] = new FailedAuthentication {

@@ -21,7 +21,10 @@ import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
 import reactivemongo.core.errors.DatabaseException
 import reactivemongo.core.protocol.{
+  Query,
+  MessageHeader,
   Request,
+  Reply,
   Response,
   ResponseInfo,
   ResponseFrameDecoder,
@@ -51,6 +54,8 @@ package object tests {
   lazy val decoder = pack.newDecoder
   lazy val builder = pack.newBuilder
 
+  def logger(category: String) = reactivemongo.util.LazyLogger(category)
+
   def newBuilder[P <: SerializationPack](pack: P) = pack.newBuilder
 
   def reader[T](f: pack.Document => T): pack.Reader[T] = pack.reader[T](f)
@@ -58,6 +63,8 @@ package object tests {
   def writer[T](f: T => pack.Document): pack.Writer[T] = pack.writer[T](f)
 
   def numConnections(d: AsyncDriver): Int = d.numConnections
+
+  type Response = reactivemongo.core.protocol.Response
 
   // Test alias
   def _failover2[A](c: MongoConnection, s: FailoverStrategy)(p: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] = Failover2.apply(c, s)(p)(ec)
@@ -116,7 +123,7 @@ package object tests {
     reqID: Int = 2,
     respTo: Int = 1,
     chanId: ChannelId = DefaultChannelId.newInstance()): Response = {
-    val reply = reactivemongo.core.protocol.Reply(
+    val reply = new Reply(
       flags = 1,
       cursorID = 1,
       startingFrom = 0,
@@ -124,7 +131,7 @@ package object tests {
 
     val message = bufferSeq(doc).merged
 
-    val header = reactivemongo.core.protocol.MessageHeader(
+    val header = new MessageHeader(
       messageLength = message.capacity,
       requestID = reqID,
       responseTo = respTo,
@@ -134,15 +141,15 @@ package object tests {
       header,
       reply,
       documents = message,
-      info = ResponseInfo(chanId))
+      info = new ResponseInfo(chanId))
   }
 
   def fakeResponseError(
-    doc: BSONDocument,
+    doc: pack.Document,
     reqID: Int = 2,
     respTo: Int = 1,
     chanId: ChannelId = DefaultChannelId.newInstance()): Response = {
-    val reply = reactivemongo.core.protocol.Reply(
+    val reply = new Reply(
       flags = 1,
       cursorID = 1,
       startingFrom = 0,
@@ -150,7 +157,7 @@ package object tests {
 
     val message = bufferSeq(doc).merged
 
-    val header = reactivemongo.core.protocol.MessageHeader(
+    val header = new MessageHeader(
       messageLength = message.capacity,
       requestID = reqID,
       responseTo = respTo,
@@ -160,7 +167,7 @@ package object tests {
       _header = header,
       _reply = reply,
       _info = ResponseInfo(chanId),
-      cause = DatabaseException(doc))
+      cause = DatabaseException(pack)(doc))
   }
 
   def foldResponses[T](
@@ -219,8 +226,10 @@ package object tests {
     isMaster(reqId) // RequestIdGenerator.isMaster
   }
 
-  @inline def isMasterResponse(response: Response) =
-    RequestIdGenerator.isMaster accepts response
+  object IsMasterResponse {
+    def unapply(response: Response) =
+      Option(response).filter(RequestIdGenerator.isMaster.accepts)
+  }
 
   def decodeResponse[T]: Array[Byte] => (Tuple2[ByteBuf, Response] => T) => T = {
     val decoder = new ResponseDecoder()
@@ -304,11 +313,46 @@ package object tests {
 
   def sessionId(db: DB): Option[UUID] = db.session.map(_.lsid)
 
-  def preload(resp: Response)(implicit ec: ExecutionContext): Future[(Response, BSONDocument)] = Response.preload(resp)
+  def preload(resp: Response)(implicit ec: ExecutionContext): Future[(Response, BSONDocument)] = reactivemongo.core.protocol.Response.preload(resp)
 
   @inline def session(db: DefaultDB): Option[Session] = db.session
 
   @inline def indexOptions[P <: SerializationPack](i: Index.Aux[P]): i.pack.Document = i.optionDocument
+
+  def messageHeader(
+    messageLength: Int,
+    requestID: Int,
+    responseTo: Int,
+    opCode: Int): MessageHeader =
+    new MessageHeader(messageLength, requestID, responseTo, opCode)
+
+  def reply(
+    flags: Int,
+    cursorID: Long,
+    startingFrom: Int,
+    numberReturned: Int) = new Reply(flags, cursorID, startingFrom, numberReturned)
+
+  def query(
+    flags: Int,
+    fullCollectionName: String,
+    numberToSkip: Int,
+    numberToReturn: Int) = Query(flags, fullCollectionName, numberToSkip, numberToReturn)
+
+  def response(
+    header: MessageHeader,
+    reply: Reply,
+    documents: ByteBuf,
+    info: ResponseInfo) =
+    reactivemongo.core.protocol.Response(header, reply, documents, info)
+
+  def parseResponse(response: Response) =
+    reactivemongo.core.protocol.Response.parse(response)
+
+  def responseInfo(cid: ChannelId) = new ResponseInfo(cid)
+
+  def readMessageHeader(buffer: ByteBuf) = MessageHeader.readFrom(buffer)
+
+  def readReply(buffer: ByteBuf) = Reply.readFrom(buffer)
 
   object commands {
     implicit val replSetMaintenanceWriter =

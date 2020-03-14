@@ -43,7 +43,7 @@ object BSONListCollectionNamesImplicits {
       fb <- cr.getAs[List[BSONDocument]]("firstBatch")
       ns <- wtColNames(fb, Nil)
     } yield CollectionNames(ns)).getOrElse[CollectionNames](
-      throw GenericDriverException("fails to read collection names"))
+      throw new GenericDriverException("fails to read collection names"))
   }
 
   @annotation.tailrec
@@ -208,7 +208,7 @@ object BSONListIndexesImplicits {
     def readResult(doc: BSONDocument): List[Index] = (for {
       a <- doc.getAs[BSONDocument]("cursor")
       b <- a.getAs[List[BSONDocument]]("firstBatch")
-    } yield b).fold[List[Index]](throw GenericDriverException(
+    } yield b).fold[List[Index]](throw new GenericDriverException(
       "the cursor and firstBatch must be defined"))(readBatch(_, Nil).get)
 
   }

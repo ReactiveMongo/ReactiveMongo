@@ -16,28 +16,18 @@ import reactivemongo.core.errors._
  * @param documents the body of this response, a [[http://static.netty.io/3.5/api/org/jboss/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents
  * @param info some meta information about this response
  */
-@deprecated("Internal: will be made private", "0.16.0")
-sealed abstract class Response( // TODO: private
+private[reactivemongo] sealed abstract class Response(
   val header: MessageHeader,
   val reply: Reply,
   val documents: ByteBuf,
-  val info: ResponseInfo) extends Product4[MessageHeader, Reply, ByteBuf, ResponseInfo] with Serializable {
-  @inline def _1 = header
-  @inline def _2 = reply
-  @inline def _3 = documents
-  @inline def _4 = info
-
-  def canEqual(that: Any): Boolean = that match {
-    case _: Response => true
-    case _           => false
-  }
+  val info: ResponseInfo) {
 
   /** If this response is in error, explain this error. */
   lazy val error: Option[DatabaseException] = {
     if (reply.inError) {
       val bson = Response.parse(this)
 
-      if (bson.hasNext) Some(DatabaseException(bson.next))
+      if (bson.hasNext) Some(new DetailedDatabaseException(bson.next))
       else None
     } else None
   }
@@ -49,8 +39,7 @@ sealed abstract class Response( // TODO: private
   override def toString = s"Response($header, $reply, $info)"
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-object Response { // TODO: private
+private[reactivemongo] object Response {
   import reactivemongo.api.{ BSONSerializationPack, SerializationPack }
   import reactivemongo.bson.BSONDocument
 
@@ -63,13 +52,11 @@ object Response { // TODO: private
   @inline def parse(response: Response): Iterator[BSONDocument] =
     parse(BSONSerializationPack)(response)
 
-  private[reactivemongo] def parse[P <: SerializationPack](pack: P)(
+  def parse[P <: SerializationPack](pack: P)(
     response: Response): Iterator[pack.Document] =
     ReplyDocumentIterator.parse(pack)(response)(pack.IdentityReader)
 
-  def unapply(response: Response): Option[(MessageHeader, Reply, ByteBuf, ResponseInfo)] = Some((response.header, response.reply, response.documents, response.info))
-
-  private[reactivemongo] def preload(response: Response)(
+  def preload(response: Response)(
     implicit
     ec: ExecutionContext): Future[(Response, BSONDocument)] =
     response match {
@@ -80,7 +67,7 @@ object Response { // TODO: private
         Future.failed(cause)
 
       case Successful(_, Reply(_, _, _, 0), _, _) =>
-        Future.failed(ReactiveMongoException(
+        Future.failed(new GenericDriverException(
           s"Cannot preload empty response: $response"))
 
       case Successful(header, reply, docs, info) => {

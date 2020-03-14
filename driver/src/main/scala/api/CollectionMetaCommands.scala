@@ -138,7 +138,7 @@ trait CollectionMetaCommands { self: Collection =>
   def drop(failIfNotFound: Boolean)(implicit ec: ExecutionContext): Future[Boolean] = {
     command(self, DropCollection, ReadPreference.primary).flatMap {
       case DropCollectionResult(false) if failIfNotFound =>
-        Future.failed[Boolean](GenericDatabaseException(
+        Future.failed[Boolean](new GenericDatabaseException(
           s"fails to drop collection: $name", Some(26)))
 
       case DropCollectionResult(dropped) =>

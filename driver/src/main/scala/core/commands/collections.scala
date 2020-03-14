@@ -18,6 +18,8 @@ package reactivemongo.core.commands
 import reactivemongo.bson._
 import DefaultBSONHandlers._
 
+import reactivemongo.core.errors.CommandError
+
 case class CappedOptions(
   size: Long,
   maxDocuments: Option[Int] = None) {

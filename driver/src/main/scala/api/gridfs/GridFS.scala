@@ -35,7 +35,6 @@ import reactivemongo.api.{
   FailoverStrategy,
   QueryOpts,
   ReadPreference,
-  Serialization,
   SerializationPack
 }
 
@@ -48,9 +47,9 @@ import reactivemongo.api.commands.{
   WriteResult
 }
 
-import reactivemongo.core.errors.ReactiveMongoException
+import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.collections.{ GenericCollection, GenericQueryBuilder }
+import reactivemongo.api.collections.GenericQueryBuilder
 
 import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.Ascending
 
@@ -225,7 +224,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
           val errmsg = s"not a chunk! failed assertion: data field is missing: ${pack pretty doc}"
 
           logger.error(errmsg)
-          Cursor.Fail(ReactiveMongoException(errmsg))
+          Cursor.Fail(new GenericDriverException(errmsg))
         }
       }
 

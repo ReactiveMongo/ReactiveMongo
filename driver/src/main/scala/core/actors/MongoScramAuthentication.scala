@@ -11,10 +11,10 @@ import reactivemongo.api.{
 }
 
 import reactivemongo.core.commands.{
-  CommandError,
   FailedAuthentication,
   SuccessfulAuthentication
 }
+import reactivemongo.core.errors.CommandError
 
 import reactivemongo.api.commands.{
   Command,
@@ -164,7 +164,7 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
 
           ()
         }, { challenge =>
-          val chanId = resp.info._channelId
+          val chanId = resp.info.channelId
 
           debug(s"Got $mechanism nonce on channel #${chanId}: $challenge")
 
@@ -218,7 +218,7 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
     }
 
     case response: Response if RequestIdGenerator.authenticate accepts response => {
-      val chanId = response.info._channelId
+      val chanId = response.info.channelId
 
       debug(s"Got authenticated response #${chanId}!")
 

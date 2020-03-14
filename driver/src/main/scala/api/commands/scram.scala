@@ -14,11 +14,11 @@ import reactivemongo.api.{
 import reactivemongo.util
 
 import reactivemongo.core.commands.{
-  CommandError => CmdErr,
   FailedAuthentication,
   SilentSuccessfulAuthentication,
   SuccessfulAuthentication
 }
+import reactivemongo.core.errors.{ CommandError => CmdErr }
 
 // --- MongoDB SCRAM authentication ---
 

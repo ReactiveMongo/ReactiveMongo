@@ -153,7 +153,7 @@ private[api] trait Driver {
 
     if (nodes.isEmpty) {
       Future.failed[MongoConnection](
-        reactivemongo.core.errors.ConnectionException("No node specified"))
+        new reactivemongo.core.errors.ConnectionException("No node specified"))
     } else {
       val nm = name.getOrElse(
         s"Connection-${connectionCounter.incrementAndGet()}")

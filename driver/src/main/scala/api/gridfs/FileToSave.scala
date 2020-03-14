@@ -1,9 +1,5 @@
 package reactivemongo.api.gridfs
 
-import reactivemongo.bson.{ BSONDocument, BSONObjectID, BSONValue }
-
-import reactivemongo.api.{ BSONSerializationPack, SerializationPack }
-
 /**
  * A file that will be saved in a GridFS store.
  * @tparam Id Type of the id of this file (generally BSON ObjectID).

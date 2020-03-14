@@ -35,7 +35,7 @@ private[reactivemongo] trait MongoX509Authentication { system: MongoDBSystem =>
 
   protected val authReceive: Receive = {
     case resp: Response if RequestIdGenerator.authenticate accepts resp => {
-      val chanId = resp.info._channelId
+      val chanId = resp.info.channelId
 
       debug(s"AUTH: got authenticated response #${chanId}!")
 

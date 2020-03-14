@@ -39,50 +39,77 @@ trait Cursor1Spec { spec: CursorSpec =>
     }
 
     "request for cursor query" in {
-      import reactivemongo.core.protocol.{ Response, Reply }
-      import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
+      import reactivemongo.api.tests.{
+        makeRequest => req,
+        nextResponse,
+        Response
+      }
 
       def cursor(batchSize: Int = 0) =
         coll.find(matchAll("makeReq1")).batchSize(batchSize).cursor()
 
       req(cursor(nDocs + 1), nDocs + 1) must beLike[Response] {
-        case Response(_, Reply(_, id, from, ret), _, _) =>
-          id aka "cursor ID #1" must_== 0 and {
-            from must_== 0 and (ret aka "returned" must_== nDocs)
+        case resp =>
+          val r = resp.reply
+
+          r.cursorID aka "cursor ID #1" must_=== 0 and {
+            r.startingFrom must_=== 0
+          } and {
+            r.numberReturned aka "returned" must_=== nDocs
           }
       }.await(1, timeout) and {
         req(cursor(nDocs), 1) must beLike[Response] {
-          case Response(_, Reply(_, id, from, ret), _, _) =>
-            id aka "cursor ID #2" must_== 0 and {
-              from must_== 0 and (ret must_== 1)
+          case resp =>
+            val r = resp.reply
+
+            r.cursorID aka "cursor ID #2" must_=== 0 and {
+              r.startingFrom must_=== 0
+            } and {
+              r.numberReturned must_=== 1
             }
         }.await(1, timeout)
       } and {
         req(cursor(128), Int.MaxValue) must beLike[Response] {
-          case Response(_, Reply(_, id, from, ret), _, _) =>
-            id aka "cursor ID #3" must not(beEqualTo(0)) and {
-              from must_== 0 and (ret must_== 128)
+          case resp =>
+            val r = resp.reply
+
+            r.cursorID aka "cursor ID #3" must not(beEqualTo(0)) and {
+              r.startingFrom must_=== 0
+            } and {
+              r.numberReturned must_=== 128
             }
         }.await(1, timeout)
       } and {
         req(cursor(), 10) must beLike[Response] {
-          case Response(_, Reply(_, id, from, ret), _, _) =>
-            id aka "cursor ID #4" must_== 0 and {
-              from must_== 0 and (ret must_== 10)
+          case resp =>
+            val r = resp.reply
+
+            r.cursorID aka "cursor ID #4" must_=== 0 and {
+              r.startingFrom must_=== 0
+            } and {
+              r.numberReturned must_=== 10
             }
         }.await(1, timeout)
       } and {
         req(cursor(), 101) must beLike[Response] {
-          case Response(_, Reply(_, id, from, ret), _, _) =>
-            id aka "cursor ID #5" must_== 0 and {
-              from must_== 0 and (ret must_== 101 /* default batch size */ )
+          case resp =>
+            val r = resp.reply
+
+            r.cursorID aka "cursor ID #5" must_== 0 and {
+              r.startingFrom must_=== 0
+            } and {
+              r.numberReturned must_=== 101 /* default batch size */
             }
         }.await(1, timeout)
       } and {
         req(cursor(), Int.MaxValue /* unlimited */ ) must beLike[Response] {
-          case Response(_, Reply(_, id, from, ret), _, _) =>
-            id aka "cursor ID #6" must not(beEqualTo(0)) and {
-              from must_== 0 and (ret must_== 101 /* default batch size */ )
+          case resp =>
+            val r = resp.reply
+
+            r.cursorID aka "cursor ID #6" must not(beEqualTo(0)) and {
+              r.startingFrom must_=== 0
+            } and {
+              r.numberReturned must_=== 101 /* default batch size */
             }
         }.await(1, timeout)
       } and {
@@ -92,20 +119,24 @@ trait Cursor1Spec { spec: CursorSpec =>
         @volatile var r1: Response = null // Workaround to avoid nesting .await
 
         req(cur, max) must beLike[Response] {
-          case r @ Response(_, Reply(_, id1, from1, ret1), _, _) =>
-            id1 aka "cursor ID #7a" must not(beEqualTo(0)) and {
-              from1 must_== 0 and (ret1 must_== batchSize)
+          case r =>
+            val rp1 = r.reply
+            r1 = r
+
+            rp1.cursorID aka "cursor ID #7a" must not(beEqualTo(0)) and {
+              rp1.startingFrom must_=== 0
             } and {
-              r1 = r
-              r1 aka "r1" must not(beNull)
+              rp1.numberReturned must_=== batchSize
             }
         }.await(1, timeout) and {
           nextResponse(cur, max)(ee.ec, r1) must beSome[Response].like {
-            case r2 @ Response(_, Reply(_, id2, from2, ret2), _, _) =>
-              id2 aka "cursor ID #7b" must_== 0 and {
-                from2 aka "from #7b" must_== 128
+            case r2 =>
+              val rp2 = r2.reply
+
+              rp2.cursorID aka "cursor ID #7b" must_=== 0 and {
+                rp2.startingFrom aka "from #7b" must_=== 128
               } and {
-                ret2 must_== (batchSize - 1)
+                rp2.numberReturned must_=== (batchSize - 1)
               } and {
                 nextResponse(cur, 1)(ee.ec, r2) must beNone.await(1, timeout)
               }

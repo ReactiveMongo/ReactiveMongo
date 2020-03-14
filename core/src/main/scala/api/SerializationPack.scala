@@ -32,27 +32,20 @@ trait SerializationPack extends SerializationPackCompat { self: Singleton =>
   def IdentityWriter: Writer[Document]
   def IdentityReader: Reader[Document]
 
-  @deprecated("Internal: will be made private", "0.19.1")
-  def serialize[A](a: A, writer: Writer[A]): Document
+  private[reactivemongo] def serialize[A](a: A, writer: Writer[A]): Document
 
-  @deprecated("Internal: will be made private", "0.19.1")
-  def deserialize[A](document: Document, reader: Reader[A]): A
+  private[reactivemongo] def deserialize[A](document: Document, reader: Reader[A]): A
 
-  @deprecated("Internal: will be made private", "0.19.1")
-  def writeToBuffer(buffer: LegacyWritable, document: Document): LegacyWritable
+  private[reactivemongo] def writeToBuffer(buffer: LegacyWritable, document: Document): LegacyWritable
 
-  @deprecated("Internal: will be made private", "0.19.1")
-  def readFromBuffer(buffer: ReadableBuffer): Document
+  private[reactivemongo] def readFromBuffer(buffer: ReadableBuffer): Document
 
-  @deprecated("Internal: will be made private", "0.19.1")
-  def serializeAndWrite[A](buffer: LegacyWritable, document: A, writer: Writer[A]): LegacyWritable = writeToBuffer(buffer, serialize(document, writer))
+  private[reactivemongo] def serializeAndWrite[A](buffer: LegacyWritable, document: A, writer: Writer[A]): LegacyWritable = writeToBuffer(buffer, serialize(document, writer))
 
-  @deprecated("Internal: will be made private", "0.19.1")
-  def readAndDeserialize[A](buffer: ReadableBuffer, reader: Reader[A]): A =
+  private[reactivemongo] def readAndDeserialize[A](buffer: ReadableBuffer, reader: Reader[A]): A =
     deserialize(readFromBuffer(buffer), reader)
 
-  @deprecated("Internal: will be made private", "0.19.1")
-  def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
+  private[reactivemongo] def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
     val channelBuf = ChannelBufferReadableBuffer(response.documents)
     readAndDeserialize(channelBuf, reader)
   }

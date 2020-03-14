@@ -126,7 +126,7 @@ package object util extends UtilCompat {
         val service = Name.fromConstantString(name + '.')
 
         if (service.labels < 3) {
-          Future.failed[Array[Record]](GenericDriverException(
+          Future.failed[Array[Record]](new GenericDriverException(
             s"Invalid DNS service name (e.g. 'service.domain.tld'): $service"))
 
         } else Future {

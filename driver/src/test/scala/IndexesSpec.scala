@@ -14,7 +14,7 @@ import reactivemongo.api.bson.BSONDocument
 
 import reactivemongo.core.errors.DatabaseException
 
-import reactivemongo.api.tests.{ decoder, pack, indexOptions, Pack }
+import reactivemongo.api.tests.{ pack, Pack }
 import reactivemongo.api.TestCompat._
 
 import org.specs2.concurrent.ExecutionEnv

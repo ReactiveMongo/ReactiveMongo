@@ -20,7 +20,7 @@ import org.specs2.concurrent.ExecutionEnv
 
 import reactivemongo.core.actors.StandardDBSystem
 import reactivemongo.core.nodeset.{ Authenticate, Connection, Node, NodeSet }
-import reactivemongo.core.protocol.{ Response, ResponseInfo }
+import reactivemongo.core.protocol.Response
 
 import reactivemongo.api.{
   AsyncDriver,
@@ -164,7 +164,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
               aka("channel #1") must beSome[(Node, Connection)]
           } and { // #2
             val respWithNulls = Response(null, null, null,
-              ResponseInfo(DefaultChannelId.newInstance()))
+              responseInfo(DefaultChannelId.newInstance()))
 
             dbsystem.receive(respWithNulls).
               aka("invalid response") must throwA[NullPointerException] and {

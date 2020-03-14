@@ -337,7 +337,7 @@ object DefaultCursor {
         def req = new RequestMakerExpectingResponse(
           requestMaker = RequestMaker(op, cmd,
             readPreference = preference,
-            channelIdHint = Some(response.info._channelId)),
+            channelIdHint = Some(response.info.channelId)),
           isMongo26WriteOp = mongo26WriteOp,
           pinnedNode = transaction.flatMap(_.pinnedNode))
 
@@ -457,7 +457,7 @@ object DefaultCursor {
           Future.successful(Cont(v))
         } else Try(it.next) match {
           case Failure(
-            x @ ReplyDocumentIteratorExhaustedException(_)) =>
+            x: ReplyDocumentIteratorExhaustedException) =>
             Future.successful(Fail(x))
 
           case Failure(e) => err(v, e) match {

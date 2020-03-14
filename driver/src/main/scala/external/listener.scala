@@ -13,7 +13,7 @@ import reactivemongo.core.nodeset.NodeSetInfo
  */
 trait ConnectionListener {
   /** Logger available for the listener implementation. */
-  lazy val logger: org.slf4j.Logger = ConnectionListener.logger.slf4j
+  lazy val logger: org.slf4j.Logger = ConnectionListener.logger
 
   /**
    * The connection pool is initialized.
@@ -58,7 +58,7 @@ object ConnectionListener {
     "external/reactivemongo/StaticListenerBinder.class";
 
   private[reactivemongo] val logger =
-    reactivemongo.util.LazyLogger("reactivemongo.core.ConnectionListener")
+    org.slf4j.LoggerFactory.getLogger("reactivemongo.core.ConnectionListener")
 
   /** Optionally creates a listener according the available binding. */
   def apply(): Option[ConnectionListener] = {

@@ -101,7 +101,7 @@ private[reactivemongo] object BulkOps {
   // ---
 
   private def unorderedApply[I, O](current: BulkProducer[I], tasks: Seq[Future[O]])(f: Iterable[I] => Future[O], recover: Exception => Future[O])(implicit ec: ExecutionContext): Future[Seq[O]] = current() match {
-    case Left(cause) => Future.failed[Seq[O]](GenericDriverException(cause))
+    case Left(cause) => Future.failed[Seq[O]](new GenericDriverException(cause))
 
     case Right(BulkStage(bulk, _)) if bulk.isEmpty =>
       Future.sequence(tasks.reverse)
@@ -119,7 +119,8 @@ private[reactivemongo] object BulkOps {
 
   private def orderedApply[I, O](current: BulkProducer[I], values: Seq[O])(f: Iterable[I] => Future[O])(implicit ec: ExecutionContext): Future[Seq[O]] =
     current() match {
-      case Left(cause) => Future.failed[Seq[O]](GenericDriverException(cause))
+      case Left(cause) => Future.failed[Seq[O]](
+        new GenericDriverException(cause))
 
       case Right(BulkStage(bulk, _)) if bulk.isEmpty =>
         Future.successful(values.reverse)

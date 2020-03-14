@@ -30,8 +30,6 @@ import reactivemongo.io.netty.channel.socket.nio.{
   NioServerSocketChannel
 }
 
-import reactivemongo.util.LazyLogger
-
 final class NettyProxy(
   localAddresses: Seq[InetSocketAddress],
   remoteAddress: InetSocketAddress,
@@ -272,7 +270,7 @@ object NettyProxy {
   import scala.concurrent.duration._
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  val log = LazyLogger("reactivemongo.test.NettyProxy")
+  val log = reactivemongo.api.tests.logger("reactivemongo.test.NettyProxy")
 
   /**
    * Usage:

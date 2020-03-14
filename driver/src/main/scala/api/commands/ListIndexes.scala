@@ -70,7 +70,7 @@ object ListIndexes
     CommandCodecs.dealingWithGenericCommandErrorsReader[P, List[Index.Aux[P]]](pack) { doc =>
       decoder.child(doc, "cursor").map {
         decoder.children(_, "firstBatch")
-      }.fold[List[Index.Aux[P]]](throw GenericDriverException(
+      }.fold[List[Index.Aux[P]]](throw new GenericDriverException(
         "the cursor and firstBatch must be defined"))(readBatch(_, Nil))
     }
   }

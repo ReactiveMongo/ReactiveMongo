@@ -232,7 +232,7 @@ object ListCollectionNames
         fb = decoder.children(cr, "firstBatch")
         ns <- wtColNames[pack.type](pack)(decoder, fb, List.empty)
       } yield CollectionNames(ns)).getOrElse[CollectionNames](
-        throw GenericDriverException("fails to read collection names"))
+        throw new GenericDriverException("fails to read collection names"))
     }
   }
 

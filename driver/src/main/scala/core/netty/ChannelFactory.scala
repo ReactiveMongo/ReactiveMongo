@@ -66,7 +66,7 @@ private[reactivemongo] final class ChannelFactory(
 
       info(msg)
 
-      Failure(GenericDriverException(s"$msg ($supervisor/$connection)"))
+      Failure(new GenericDriverException(s"$msg ($supervisor/$connection)"))
     } else {
       // Create a channel bootstrap from config, with state as attributes
       // so available for the coming init (event before calling connect)

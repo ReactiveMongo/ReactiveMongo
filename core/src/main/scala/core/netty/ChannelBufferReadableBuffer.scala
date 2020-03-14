@@ -20,8 +20,7 @@ import reactivemongo.io.netty.buffer.ByteBuf
 import reactivemongo.bson.BSONDocument
 import reactivemongo.bson.buffer.ReadableBuffer
 
-@deprecated("Internal: will be made private", "0.19.1")
-class ChannelBufferReadableBuffer(
+private[reactivemongo] class ChannelBufferReadableBuffer(
   protected[netty] val buffer: ByteBuf) extends ReadableBuffer {
 
   def size = buffer.capacity()
@@ -55,7 +54,7 @@ class ChannelBufferReadableBuffer(
   def duplicate() = new ChannelBufferReadableBuffer(buffer.duplicate())
 }
 
-object ChannelBufferReadableBuffer {
+private[reactivemongo] object ChannelBufferReadableBuffer {
   def apply(buffer: ByteBuf) = new ChannelBufferReadableBuffer(buffer)
 
   def document(buffer: ByteBuf): BSONDocument =

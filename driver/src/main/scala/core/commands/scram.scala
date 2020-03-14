@@ -18,7 +18,9 @@ import reactivemongo.bson.{
   Subtype
 }
 import reactivemongo.util
+
 import reactivemongo.core.protocol.Response
+import reactivemongo.core.errors.CommandError
 
 // --- MongoDB SCRAM authentication ---
 

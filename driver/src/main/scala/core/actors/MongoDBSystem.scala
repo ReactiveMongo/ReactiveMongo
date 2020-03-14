@@ -45,7 +45,7 @@ import reactivemongo.api.Serialization
 import reactivemongo.core.netty.{ ChannelBufferReadableBuffer, ChannelFactory }
 
 import reactivemongo.core.ClientMetadata
-import reactivemongo.core.errors.GenericDriverException
+import reactivemongo.core.errors.{ CommandError, GenericDriverException }
 import reactivemongo.core.protocol.{
   GetMore,
   Query,
@@ -56,7 +56,6 @@ import reactivemongo.core.protocol.{
   Response
 }
 import reactivemongo.core.commands.{
-  CommandError,
   FailedAuthentication,
   SuccessfulAuthentication
 }
@@ -505,7 +504,7 @@ trait MongoDBSystem extends Actor {
     else { promise.failure(cause); () }
   }
 
-  val SocketDisconnected = GenericDriverException(s"Socket disconnected ($lnm)")
+  val SocketDisconnected = new GenericDriverException(s"Socket disconnected ($lnm)")
 
   protected def authReceive: Receive
 
@@ -723,7 +722,7 @@ trait MongoDBSystem extends Actor {
 
       warn("Fails to authenticate", cause)
 
-      updateNodeSet(s"AuthenticationFailure(${err.info._channelId})") { ns =>
+      updateNodeSet(s"AuthenticationFailure(${err.info.channelId})") { ns =>
         handleAuthResponse(ns, err)(
           Left(FailedAuthentication(pack)(cause.getMessage, None, None)))
       }
@@ -788,7 +787,7 @@ trait MongoDBSystem extends Actor {
           case Some(AwaitingResponse(
             _, chanId, promise, isGetLastError, isMongo26WriteOp)) => {
 
-            trace(s"Got a response from ${response.info._channelId} to ${response.header.responseTo}! Will give back message=$response to promise ${System.identityHashCode(promise)}")
+            trace(s"Got a response from ${response.info.channelId} to ${response.header.responseTo}! Will give back message=$response to promise ${System.identityHashCode(promise)}")
 
             resps -= response.header.responseTo
 
@@ -1025,7 +1024,7 @@ trait MongoDBSystem extends Actor {
       if (notAPrimary) {
         debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
 
-        onPrimaryUnavailable(GenericDriverException("Not a primary"))
+        onPrimaryUnavailable(new GenericDriverException("Not a primary"))
       }
 
       promise.failure(new PrimaryUnavailableException(
@@ -1138,7 +1137,7 @@ trait MongoDBSystem extends Actor {
 
         // Update the details of the node corresponding to the response chan
         val prepared =
-          nodeSet.updateNodeByChannelId(response.info._channelId) { node =>
+          nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
             val pingTime: Long = {
               if (node.pingInfo.lastIsMasterId == respTo) {
                 System.nanoTime() - node.pingInfo.lastIsMasterTime
@@ -1327,7 +1326,7 @@ trait MongoDBSystem extends Actor {
   protected final def handleAuthResponse(nodeSet: NodeSet, resp: Response)(
     check: => Either[CommandError, SuccessfulAuthentication]): NodeSet = {
 
-    val chanId = resp.info._channelId
+    val chanId = resp.info.channelId
     val authed = check
     val authenticate = Promise[Authenticate]()
 

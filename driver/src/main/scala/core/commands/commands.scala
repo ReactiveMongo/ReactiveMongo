@@ -22,7 +22,7 @@ import reactivemongo.api.{
 }
 
 import reactivemongo.bson.{ BSONDocument, BSONNumberLike }
-import reactivemongo.core.errors.ReactiveMongoException
+import reactivemongo.core.errors.CommandError
 import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
 import reactivemongo.core.netty._
 
@@ -125,76 +125,6 @@ trait BSONCommandResultMaker[Result] extends CommandResultMaker[Result] {
    */
   def apply(document: BSONDocument): Either[CommandError, Result]
 }
-
-/** A generic command error. */
-trait CommandError extends ReactiveMongoException {
-  /** error code */
-  val code: Option[Int]
-
-  override def getMessage: String = s"CommandError['$message'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]"
-}
-
-/** A command error that optionally holds the original TraversableBSONDocument */
-trait BSONCommandError extends CommandError {
-  val originalDocument: Option[BSONDocument]
-
-  override def getMessage: String =
-    s"BSONCommandError['$message'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]" +
-      originalDocument.map(doc => " with original doc " + BSONDocument.pretty(doc)).getOrElse("")
-}
-
-object CommandError {
-  /**
-   * Makes a 'DefaultCommandError'.
-   *
-   * @param message The error message.
-   * @param originalDocument The original document contained in the response.
-   * @param code The code of the error, if any.
-   */
-  def apply(message: String, originalDocument: Option[BSONDocument] = None, code: Option[Int] = None): DefaultCommandError =
-    new DefaultCommandError(message, code, originalDocument)
-
-  private[reactivemongo] def apply[P <: SerializationPack](pack: P)(
-    _message: String,
-    originalDocument: Option[pack.Document],
-    _code: Option[Int]): CommandError =
-    new CommandError {
-      val code = _code
-      val message = _message
-
-      override def getMessage: String =
-        s"CommandError['$message'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]" +
-          originalDocument.map(doc => " with original doc " + pack.pretty(doc)).getOrElse("")
-    }
-
-  /**
-   * Checks if the given document contains a 'ok' field which value equals 1, and produces a command error if not.
-   *
-   * @param doc The document of the response.
-   * @param name The optional name of the command.
-   * @param error A function that takes the document of the response and the optional name of the command as arguments, and produces a command error.
-   */
-  def checkOk(
-    doc: BSONDocument, name: Option[String],
-    error: (BSONDocument, Option[String]) => CommandError = (doc, name) => CommandError("command " + name.map(_ + " ").getOrElse("") + "failed because the 'ok' field is missing or equals 0", Some(doc))): Option[CommandError] = {
-    doc.getAs[BSONNumberLike]("ok").map(_.toInt).orElse(Some(0)).flatMap {
-      case 1 => None
-      case _ => Some(error(doc, name))
-    }
-  }
-}
-
-/**
- * A default command error, which may contain the original BSONDocument of the response.
- *
- * @param message The error message.
- * @param code The optional error code.
- * @param originalDocument The original BSONDocument of this error.
- */
-class DefaultCommandError(
-  val message: String,
-  val code: Option[Int],
-  val originalDocument: Option[BSONDocument]) extends BSONCommandError
 
 /**
  * A makable command, that can produce a request maker ready to be sent to a [[reactivemongo.core.actors.MongoDBSystem]] actor.

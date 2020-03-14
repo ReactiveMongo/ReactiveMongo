@@ -1,33 +1,34 @@
 import reactivemongo.io.netty.buffer.Unpooled
 
-import reactivemongo.core.protocol.{
-  MessageHeader,
-  Query,
-  Reply,
-  Response,
-  ResponseInfo
-}
 import reactivemongo.bson.BSONDocument
 
 import org.specs2.specification.core.Fragments
 import org.specs2.concurrent.ExecutionEnv
 
-class ProtocolSpec(implicit ee: ExecutionEnv)
+final class ProtocolSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
   "Protocol" title
 
-  import reactivemongo.api.tests.getBytes
+  import reactivemongo.api.tests.{
+    Response,
+    query,
+    getBytes,
+    messageHeader,
+    readMessageHeader,
+    readReply,
+    reply => _reply
+  }
 
   section("unit")
 
-  val header = MessageHeader(205, 0, 0, 1 /* OP_REPLY */ )
+  val header = messageHeader(205, 0, 0, 1 /* OP_REPLY */ )
 
   header.toString should {
     def buffer = Unpooled.buffer(msg1Bytes.size, msg1Bytes.size)
 
     "be read from Netty buffer" in {
-      MessageHeader.readFrom(buffer writeBytes msg1Bytes) must_=== header
+      readMessageHeader(buffer writeBytes msg1Bytes) must_=== header
     }
 
     "be written to Netty buffer" in {
@@ -44,14 +45,14 @@ class ProtocolSpec(implicit ee: ExecutionEnv)
     }
   }
 
-  val reply = Reply(8, 0, 0, 1)
+  val reply = _reply(8, 0, 0, 1)
 
   reply.toString should {
     val byteSize = msg1Bytes.size - header.size
     def buffer = Unpooled.buffer(byteSize, byteSize)
 
     "be read from Netty buffer (after message)" in {
-      Reply.readFrom(
+      readReply(
         buffer writeBytes msg1Bytes.drop(header.size)) must_=== reply
     }
   }
@@ -59,7 +60,7 @@ class ProtocolSpec(implicit ee: ExecutionEnv)
   "Request" should {
     "be written to Netty buffer" >> {
       "for Query" in {
-        val queryOp = Query(4, f"admin.$$cmd", 0, 1)
+        val queryOp = query(4, f"admin.$$cmd", 0, 1)
         val buffer = Unpooled.buffer(queryOp.size, queryOp.size)
         val opBytes = Array[Byte](4, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0)
 
@@ -100,8 +101,11 @@ class ProtocolSpec(implicit ee: ExecutionEnv)
 
     "be read from Netty buffer" in {
       decodeResponse(msg1Bytes) {
-        case (buf, response @ Response(
-          `header`, `reply`, documents, info @ ResponseInfo(_))) => {
+        case (buf, response) => response.header must_=== header and {
+          response.reply must_=== reply
+        } and {
+          import response.{ documents, info }
+
           val offset = header.size + ( /*reply*/ 4 + 8 + 4 + 4)
           val docsSize = msg1Bytes.size - offset
 
@@ -112,10 +116,15 @@ class ProtocolSpec(implicit ee: ExecutionEnv)
           val expectedBytes = msg1Bytes.drop(offset)
 
           preload(response) must beLike[(Response, BSONDocument)] {
-            case (Response(`header`, `reply`, docs, `info`), doc) =>
-              doc.getAs[Boolean]("ismaster") must beSome(true) and {
-                getBytes(docs, docsSize) must_=== expectedBytes
-              }
+            case (resp, doc) => resp.header must_=== header and {
+              resp.reply must_=== reply
+            } and {
+              resp.info must_=== info
+            } and {
+              doc.getAs[Boolean]("ismaster") must beSome(true)
+            } and {
+              getBytes(resp.documents, docsSize) must_=== expectedBytes
+            }
           }.await and {
             getBytes(documents, docsSize) must_=== expectedBytes
           }

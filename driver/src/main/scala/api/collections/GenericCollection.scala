@@ -33,7 +33,10 @@ import reactivemongo.api.commands.{
 }
 
 import reactivemongo.core.protocol.MongoWireVersion
-import reactivemongo.core.errors.ConnectionNotInitialized
+import reactivemongo.core.errors.{
+  ConnectionNotInitialized,
+  GenericDriverException
+}
 
 trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: GenericCollection[P]] extends CollectionProducer[C] {
   private[reactivemongo] val pack: P
@@ -906,8 +909,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
       prepareDelete(true, writeConcern).one(selector, limit)
     } else {
       // Mongo < 2.6
-      Future.failed[WriteResult](new scala.RuntimeException(
-        s"unsupported MongoDB version: $metadata"))
+      Future.failed[WriteResult](unsupportedVersion(metadata))
     }
   }
 
@@ -966,8 +968,9 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   protected def watchFailure[T](future: => Future[T]): Future[T] =
     Try(future).recover { case NonFatal(e) => Future.failed(e) }.get
 
-  @inline protected def MissingMetadata() =
-    ConnectionNotInitialized.MissingMetadata(db.connection.history())
+  @inline protected def MissingMetadata() = new ConnectionNotInitialized("Connection is missing metadata (like protocol version, etc.) The connection pool is probably being initialized.", db.connection.history())
+
+  @inline protected def unsupportedVersion(metadata: reactivemongo.core.nodeset.ProtocolMetadata) = new GenericDriverException(s"Unsupported MongoDB version: $metadata")
 
   override def toString: String = s"collection[${name}]"
 }

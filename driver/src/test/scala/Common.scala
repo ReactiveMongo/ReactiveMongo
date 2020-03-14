@@ -14,7 +14,7 @@ import reactivemongo.api.{
 }
 
 object Common extends CommonAuth {
-  val logger = reactivemongo.util.LazyLogger("tests")
+  val logger = reactivemongo.api.tests.logger("tests")
 
   val replSetOn = sys.props.get("test.replicaSet").fold(false) {
     case "true" => true

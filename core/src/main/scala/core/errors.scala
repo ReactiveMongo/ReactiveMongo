@@ -19,44 +19,35 @@ import reactivemongo.api.SerializationPack
 
 import scala.util.control.NoStackTrace
 
-import reactivemongo.bson.{ BSONDocument, BSONInteger }
+import reactivemongo.bson.{ BSONDocument, BSONInteger, BSONNumberLike }
 import reactivemongo.bson.DefaultBSONHandlers._
 
 /** An error that can come from a MongoDB node or not. */
-trait ReactiveMongoException extends Exception {
+sealed trait ReactiveMongoException extends Exception {
   /** explanation message */
   def message: String
 
   override def getMessage: String = s"MongoError['$message']"
 }
 
-object ReactiveMongoException {
-  def apply(message: String): ReactiveMongoException =
-    GenericDriverException(message)
-
-  @deprecated("Use [[DatabaseException]]", "0.13.0")
-  def apply(doc: BSONDocument) = DatabaseException(doc)
-}
-
 /** An error thrown by a MongoDB node. */
 trait DatabaseException extends ReactiveMongoException {
   /** original document of this error */
-  @deprecated("Internal: will be made private", "0.19.0")
-  def originalDocument: Option[BSONDocument]
+  private[reactivemongo] def originalDocument: Option[BSONDocument]
 
   /** error code */
   def code: Option[Int]
 
-  override def getMessage: String = s"DatabaseException['$message'" + code.map(c => s" (code = $c)").getOrElse("") + "]"
+  final override def getMessage: String = s"DatabaseException['$message'" + code.map(c => s" (code = $c)").getOrElse("") + "]"
 
   /** Tells if this error is due to a write on a secondary node. */
-  def isNotAPrimaryError: Boolean = code.map {
+  private[reactivemongo] final def isNotAPrimaryError: Boolean = code.map {
     case 10054 | 10056 | 10058 | 10107 | 13435 | 13436 => true
     case _ => false
   }.getOrElse(false)
 
   /** Tells if this error is related to authentication issues. */
-  def isUnauthorized: Boolean = code.map {
+  private[reactivemongo] final def isUnauthorized: Boolean = code.map {
     case 10057 | 15845 | 16550 => true
     case _                     => false
   }.getOrElse(false)
@@ -73,15 +64,10 @@ trait DatabaseException extends ReactiveMongoException {
 
   override def toString: String = getMessage
 
-  @com.github.ghik.silencer.silent(".*Internal:\\ will\\ be\\ private.*")
   private lazy val tupled = originalDocument -> code
 }
 
 private[reactivemongo] object DatabaseException {
-  @deprecated("Will be remove", "0.19.0")
-  def apply(doc: BSONDocument): DatabaseException =
-    new DetailedDatabaseException(doc)
-
   def apply(cause: Throwable): DatabaseException = new Default(cause)
 
   def apply[P <: SerializationPack](pack: P)(doc: pack.Document): DatabaseException = new DatabaseException {
@@ -113,24 +99,14 @@ private[reactivemongo] object DatabaseException {
 }
 
 /** A driver-specific error */
-trait DriverException extends ReactiveMongoException {
+private[reactivemongo] trait DriverException extends ReactiveMongoException {
   protected def cause: Throwable = null
   override def getCause = cause
 }
 
 /** A generic driver error. */
-class GenericDriverException private[core] (
-  val message: String) extends DriverException with NoStackTrace
-  with Product1[String] with Serializable {
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _1 = message
-
-  @deprecated("No longer a case class", "0.20.3")
-  def canEqual(that: Any): Boolean = that match {
-    case _: GenericDriverException => true
-    case _                         => false
-  }
+private[reactivemongo] final class GenericDriverException(
+  val message: String) extends DriverException with NoStackTrace {
 
   override def equals(that: Any): Boolean = that match {
     case other: GenericDriverException =>
@@ -146,39 +122,9 @@ class GenericDriverException private[core] (
   override def toString = s"GenericDriverException($message)"
 }
 
-object GenericDriverException
-  extends scala.runtime.AbstractFunction1[String, GenericDriverException] {
-
-  def apply(message: String): GenericDriverException =
-    new GenericDriverException(message)
-
-  @deprecated("No longer a case class", "0.20.3")
-  def unapply(exception: GenericDriverException): Option[String] =
-    Option(exception).collect {
-      case x if x.message != null => x.message
-    }
-}
-
-sealed class ConnectionNotInitialized private[core] (
+private[reactivemongo] final class ConnectionNotInitialized(
   val message: String,
-  override val cause: Throwable) extends DriverException
-  with Product with java.io.Serializable with Serializable with Equals {
-
-  @deprecated("No longer a case class", "0.20.3")
-  override val productPrefix = "ConnectionNotInitialized"
-
-  @deprecated("No longer a case class", "0.20.3")
-  def productElement(i: Int): Any = i match {
-    case 0 => message
-    case 1 => cause
-    case _ => throw new NoSuchElementException
-  }
-
-  @deprecated("No longer a case class", "0.20.3")
-  override def productIterator: Iterator[Any] = Iterator(message, cause)
-
-  @deprecated("No longer a case class", "0.20.3")
-  val productArity = 2
+  override val cause: Throwable) extends DriverException {
 
   override lazy val hashCode = (message -> cause).hashCode
 
@@ -188,29 +134,10 @@ sealed class ConnectionNotInitialized private[core] (
 
     case _ => false
   }
-
-  @deprecated("No longer a case class", "0.20.3")
-  def canEqual(other: Any): Boolean = other match {
-    case _: ConnectionNotInitialized => true
-    case _                           => false
-  }
 }
 
-object ConnectionNotInitialized {
-  def MissingMetadata(cause: Throwable): ConnectionNotInitialized = new ConnectionNotInitialized("Connection is missing metadata (like protocol version, etc.) The connection pool is probably being initialized.", cause)
-}
-
-class ConnectionException private[core] (val message: String)
-  extends DriverException with Product1[String] with Serializable {
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _1 = message
-
-  @deprecated("No longer a case class", "0.20.3")
-  def canEqual(that: Any): Boolean = that match {
-    case _: ConnectionException => true
-    case _                      => false
-  }
+private[reactivemongo] final class ConnectionException(
+  val message: String) extends DriverException {
 
   override def equals(that: Any): Boolean = that match {
     case other: ConnectionException =>
@@ -226,38 +153,12 @@ class ConnectionException private[core] (val message: String)
   override def toString = s"ConnectionException($message)"
 }
 
-object ConnectionException
-  extends scala.runtime.AbstractFunction1[String, ConnectionException] {
-
-  def apply(message: String): ConnectionException =
-    new ConnectionException(message)
-
-  @deprecated("No longer a case class", "0.20.3")
-  def unapply(exception: ConnectionException): Option[String] =
-    Option(exception).collect {
-      case x if x.message != null => x.message
-    }
-}
-
 /** A generic error thrown by a MongoDB node. */
-class GenericDatabaseException private[core] (
+private[reactivemongo] final class GenericDatabaseException(
   val message: String,
-  val code: Option[Int]) extends DatabaseException
-  with Product2[String, Option[Int]] with Serializable {
+  val code: Option[Int]) extends DatabaseException {
 
   val originalDocument = None
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _1 = message
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _2 = code
-
-  @deprecated("No longer a case class", "0.20.3")
-  def canEqual(that: Any): Boolean = that match {
-    case _: GenericDatabaseException => true
-    case _                           => false
-  }
 
   private[core] lazy val tupled = message -> code
 
@@ -274,18 +175,8 @@ class GenericDatabaseException private[core] (
   override def toString = s"GenericDatabaseException($message)"
 }
 
-object GenericDatabaseException extends scala.runtime.AbstractFunction2[String, Option[Int], GenericDatabaseException] {
-
-  def apply(message: String, code: Option[Int]): GenericDatabaseException =
-    new GenericDatabaseException(message, code)
-
-  @deprecated("No longer a case class", "0.20.3")
-  def unapply(exception: GenericDatabaseException): Option[(String, Option[Int])] = Option(exception).map(_.tupled)
-}
-
 /** An error thrown by a MongoDB node (containing the original document of the error). */
-@deprecated("Will be remove", "0.19.0")
-class DetailedDatabaseException(
+private[reactivemongo] class DetailedDatabaseException(
   doc: BSONDocument) extends DatabaseException with NoStackTrace {
 
   type Document = BSONDocument
@@ -298,4 +189,74 @@ class DetailedDatabaseException(
     s"message is not present, unknown error: ${BSONDocument pretty doc}")
 
   lazy val code = doc.getAs[BSONInteger]("code").map(_.value)
+}
+
+/** A generic command error. TODO: Remove */
+private[reactivemongo] trait CommandError extends ReactiveMongoException {
+  /** error code */
+  val code: Option[Int]
+
+  override def getMessage: String = s"CommandError['$message'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]"
+}
+
+private[reactivemongo] object CommandError {
+  /**
+   * Makes a 'DefaultCommandError'.
+   *
+   * @param message The error message.
+   * @param originalDocument The original document contained in the response.
+   * @param code The code of the error, if any.
+   */
+  def apply(message: String, originalDocument: Option[BSONDocument] = None, code: Option[Int] = None): DefaultCommandError =
+    new DefaultCommandError(message, code, originalDocument)
+
+  private[reactivemongo] def apply[P <: SerializationPack](pack: P)(
+    _message: String,
+    originalDocument: Option[pack.Document],
+    _code: Option[Int]): CommandError =
+    new CommandError {
+      val code = _code
+      val message = _message
+
+      override def getMessage: String =
+        s"CommandError['$message'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]" +
+          originalDocument.map(doc => " with original doc " + pack.pretty(doc)).getOrElse("")
+    }
+
+  /**
+   * Checks if the given document contains a 'ok' field which value equals 1, and produces a command error if not.
+   *
+   * @param doc The document of the response.
+   * @param name The optional name of the command.
+   * @param error A function that takes the document of the response and the optional name of the command as arguments, and produces a command error.
+   */
+  def checkOk(
+    doc: BSONDocument, name: Option[String],
+    error: (BSONDocument, Option[String]) => CommandError = (doc, name) => CommandError("command " + name.map(_ + " ").getOrElse("") + "failed because the 'ok' field is missing or equals 0", Some(doc))): Option[CommandError] = {
+    doc.getAs[BSONNumberLike]("ok").map(_.toInt).orElse(Some(0)).flatMap {
+      case 1 => None
+      case _ => Some(error(doc, name))
+    }
+  }
+}
+
+/**
+ * A default command error, which may contain the original BSONDocument of the response.
+ *
+ * @param message The error message.
+ * @param code The optional error code.
+ * @param originalDocument The original BSONDocument of this error.
+ */
+private[reactivemongo] final class DefaultCommandError( // TODO: Remove
+  val message: String,
+  val code: Option[Int],
+  val originalDocument: Option[BSONDocument]) extends BSONCommandError
+
+/** A command error that optionally holds the original TraversableBSONDocument; TODO: Remove */
+private[reactivemongo] trait BSONCommandError extends CommandError {
+  private[reactivemongo] val originalDocument: Option[BSONDocument]
+
+  override def getMessage: String =
+    s"BSONCommandError['$message'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]" +
+      originalDocument.map(doc => " with original doc " + BSONDocument.pretty(doc)).getOrElse("")
 }

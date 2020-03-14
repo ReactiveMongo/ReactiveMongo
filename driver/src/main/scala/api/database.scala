@@ -433,7 +433,7 @@ class DefaultDB private[api] (
 
   def startSession(failIfAlreadyStarted: Boolean)(implicit ec: ExecutionContext): Future[DefaultDB] = session match {
     case Some(s) if failIfAlreadyStarted =>
-      Future.failed[DefaultDB](GenericDriverException(
+      Future.failed[DefaultDB](new GenericDriverException(
         s"Session '${s.lsid}' is already started"))
 
     case Some(_) =>
@@ -489,7 +489,7 @@ class DefaultDB private[api] (
             Future.failed[DBType](cause)
 
           case Success((tx, false)) if failIfAlreadyStarted =>
-            Future.failed[DBType](GenericDriverException(s"Transaction ${tx.txnNumber} was already started with session '${s.lsid}'"))
+            Future.failed[DBType](new GenericDriverException(s"Transaction ${tx.txnNumber} was already started with session '${s.lsid}'"))
 
           case Success(_) =>
             Future.successful(this)
@@ -497,7 +497,7 @@ class DefaultDB private[api] (
       }
 
       case _ =>
-        Future.failed[DBType](GenericDriverException(
+        Future.failed[DBType](new GenericDriverException(
           s"Cannot start a transaction without a started session"))
     }
   }
@@ -516,7 +516,7 @@ class DefaultDB private[api] (
     ec: ExecutionContext): Future[DBType] = session match {
     case Some(s) => s.transaction match {
       case Failure(cause) if failIfNotStarted =>
-        Future.failed[DBType](GenericDriverException(
+        Future.failed[DBType](new GenericDriverException(
           s"Cannot end failed transaction (${cause.getMessage})"))
 
       case Failure(_) =>
@@ -540,7 +540,7 @@ class DefaultDB private[api] (
 
                   case _ if failIfNotStarted =>
                     Future.failed[DBType](
-                      GenericDriverException("Cannot end transaction"))
+                      new GenericDriverException("Cannot end transaction"))
 
                   case _ =>
                     Future.successful(this)
@@ -550,7 +550,7 @@ class DefaultDB private[api] (
         }
 
         case _ if failIfNotStarted =>
-          Future.failed[DBType](GenericDriverException(s"Cannot end transaction without write concern (session '${s.lsid}')"))
+          Future.failed[DBType](new GenericDriverException(s"Cannot end transaction without write concern (session '${s.lsid}')"))
 
         case _ =>
           Future.successful(this)
@@ -558,7 +558,7 @@ class DefaultDB private[api] (
     }
 
     case _ if failIfNotStarted =>
-      Future.failed[DBType](GenericDriverException(
+      Future.failed[DBType](new GenericDriverException(
         "Cannot end transaction without a started session"))
 
     case _ =>
@@ -583,7 +583,7 @@ class DefaultDB private[api] (
     }
 
     case _ if failIfNotStarted =>
-      Future.failed[DBType](GenericDriverException(
+      Future.failed[DBType](new GenericDriverException(
         "Cannot end not started session"))
 
     case _ =>

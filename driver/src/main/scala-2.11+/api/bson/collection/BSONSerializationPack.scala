@@ -6,7 +6,7 @@ import scala.util.{ Failure, Success, Try }
 
 import scala.reflect.ClassTag
 
-import reactivemongo.core.errors.ReactiveMongoException
+import reactivemongo.core.errors.GenericDriverException
 
 import reactivemongo.bson.{
   BSONDocument => LegacyDocument,
@@ -86,7 +86,7 @@ object BSONSerializationPack extends SerializationPack { self =>
     }
 
     case _ =>
-      throw ReactiveMongoException(s"Unsupported writable buffer: $buffer")
+      throw new GenericDriverException(s"Unsupported writable buffer: $buffer")
   }
 
   private[reactivemongo] def writeToBuffer(
@@ -111,7 +111,7 @@ object BSONSerializationPack extends SerializationPack { self =>
     }
 
     case _ =>
-      throw ReactiveMongoException(s"Unsupported readable buffer: $buffer")
+      throw new GenericDriverException(s"Unsupported readable buffer: $buffer")
   }
 
   override def readAndDeserialize[A](response: Response, reader: Reader[A]): A = response match {
