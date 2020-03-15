@@ -7,11 +7,7 @@ import reactivemongo.api.ReadPreference
 
 import reactivemongo.io.netty.channel.ChannelId
 
-import reactivemongo.core.protocol.{
-  CheckedWriteRequest,
-  RequestMaker,
-  Response
-}
+import reactivemongo.core.protocol.{ RequestMaker, Response }
 import reactivemongo.core.nodeset.ProtocolMetadata
 
 /**
@@ -19,8 +15,7 @@ import reactivemongo.core.nodeset.ProtocolMetadata
  * It holds a promise that will be completed by the MongoDBSystem actor.
  * The future can be used to get the error or the successful response.
  */
-@deprecated("Internal: will be made private", "0.16.0")
-sealed trait ExpectingResponse { // TODO#1.1: Merge with RequestMakerExpectingResponse once CheckedWriteRequestExpectingResponse is removed
+private[reactivemongo] sealed trait ExpectingResponse { // TODO#1.1: Merge with RequestMakerExpectingResponse once CheckedWriteRequestExpectingResponse is removed
   // TODO#1.1: final
   private[actors] val promise: Promise[Response] = Promise()
 
@@ -30,8 +25,7 @@ sealed trait ExpectingResponse { // TODO#1.1: Merge with RequestMakerExpectingRe
   private[reactivemongo] def pinnedNode: Option[String] = None
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-object ExpectingResponse {
+private[reactivemongo] object ExpectingResponse {
   def unapply(that: Any): Option[Promise[Response]] = that match {
     case req @ RequestMakerExpectingResponse(_, _) => Some(req.promise)
     case _                                         => None
@@ -44,20 +38,10 @@ object ExpectingResponse {
  * @param requestMaker the request maker
  * @param isMongo26WriteOp true if the operation is a MongoDB 2.6 write one
  */
-@deprecated("Internal: will be made private", "0.16.0")
-class RequestMakerExpectingResponse private[reactivemongo] (
+private[reactivemongo] class RequestMakerExpectingResponse(
   val requestMaker: RequestMaker,
   val isMongo26WriteOp: Boolean,
-  private[reactivemongo] override val pinnedNode: Option[String]) extends ExpectingResponse with Product with Serializable {
-  @deprecated("Use constructor with `pinnedNode`", "0.18.5")
-  def this(
-    requestMaker: RequestMaker,
-    isMongo26WriteOp: Boolean) = this(requestMaker, isMongo26WriteOp, None)
-
-  def canEqual(that: Any): Boolean = that match {
-    case _: RequestMakerExpectingResponse => true
-    case _                                => false
-  }
+  private[reactivemongo] override val pinnedNode: Option[String]) extends ExpectingResponse {
 
   override def equals(that: Any): Boolean = that match {
     case other: RequestMakerExpectingResponse =>
@@ -69,17 +53,12 @@ class RequestMakerExpectingResponse private[reactivemongo] (
 
   override lazy val hashCode: Int = tupled.hashCode
 
-  lazy val productArity: Int = tupled.productArity
-
-  @inline def productElement(n: Int): Any = tupled.productElement(n)
-
   private lazy val tupled = Tuple3(requestMaker, isMongo26WriteOp, pinnedNode)
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-object RequestMakerExpectingResponse extends scala.runtime.AbstractFunction2[RequestMaker, Boolean, RequestMakerExpectingResponse] {
+private[reactivemongo] object RequestMakerExpectingResponse {
 
-  def apply(
+  def apply( // TODO: Remove
     requestMaker: RequestMaker,
     isMongo26WriteOp: Boolean): RequestMakerExpectingResponse =
     new RequestMakerExpectingResponse(requestMaker, isMongo26WriteOp, None)
@@ -88,17 +67,7 @@ object RequestMakerExpectingResponse extends scala.runtime.AbstractFunction2[Req
 
 }
 
-/**
- * A checked write request expecting a response.
- *
- * @param checkedWriteRequest The request maker.
- */
-@deprecated("Unused", "0.16.0")
-case class CheckedWriteRequestExpectingResponse(
-  checkedWriteRequest: CheckedWriteRequest) extends ExpectingResponse
-
-@deprecated(message = "Internal: will be made private", since = "0.12.8")
-sealed class Close {
+private[reactivemongo] sealed class Close {
   def source: String = "unknown"
 
   private[reactivemongo] def timeout: FiniteDuration =
@@ -109,13 +78,7 @@ sealed class Close {
  * Message to close all active connections.
  * The MongoDBSystem actor must not be used after this message has been sent.
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case object Close extends Close {
-  @deprecated("Will be removed", "0.19.8")
-  def apply(src: String): Close = new Close {
-    override val source = src
-  }
-
+private[reactivemongo] case object Close extends Close {
   def apply(src: String, timeout: FiniteDuration): Close = {
     def t = timeout
     new Close {
@@ -137,20 +100,10 @@ private[reactivemongo] case class ChannelConnected(channelId: ChannelId)
 private[reactivemongo] case class ChannelDisconnected(channelId: ChannelId)
 
 /** Message sent when the primary has been discovered. */
-@deprecated("Internal: will be made private", "0.16.0")
-class PrimaryAvailable private[reactivemongo] (
+private[reactivemongo] class PrimaryAvailable(
   val metadata: ProtocolMetadata,
-  private[reactivemongo] val setName: Option[String],
-  private[reactivemongo] val isMongos: Boolean) extends Product with Serializable {
-
-  @deprecated("Use the constructor with `isMongos`", "0.18.5")
-  def this(
-    metadata: ProtocolMetadata,
-    setName: Option[String]) = this(metadata, setName, false)
-
-  @inline def productArity: Int = tupled.productArity
-
-  @inline def productElement(n: Int): Any = tupled.productElement(n)
+  val setName: Option[String],
+  val isMongos: Boolean) {
 
   override def equals(that: Any): Boolean = that match {
     case other: PrimaryAvailable =>
@@ -161,16 +114,10 @@ class PrimaryAvailable private[reactivemongo] (
 
   override lazy val hashCode: Int = tupled.hashCode
 
-  def canEqual(that: Any): Boolean = that match {
-    case _: PrimaryAvailable => true
-    case _                   => false
-  }
-
   private lazy val tupled = Tuple3(metadata, setName, isMongos)
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-object PrimaryAvailable extends scala.runtime.AbstractFunction1[ProtocolMetadata, PrimaryAvailable] {
+private[reactivemongo] object PrimaryAvailable {
 
   def apply(metadata: ProtocolMetadata): PrimaryAvailable =
     new PrimaryAvailable(metadata, None, false)
@@ -182,24 +129,12 @@ object PrimaryAvailable extends scala.runtime.AbstractFunction1[ProtocolMetadata
 }
 
 /** Message sent when the primary has been lost. */
-@deprecated("Internal: will be made private", "0.16.0")
-case object PrimaryUnavailable
+private[reactivemongo] case object PrimaryUnavailable
 
-@deprecated("Internal: will be made private", "0.16.0")
-class SetAvailable private[reactivemongo] (
+private[reactivemongo] class SetAvailable(
   val metadata: ProtocolMetadata,
-  private[reactivemongo] val setName: Option[String],
-  private[reactivemongo] val isMongos: Boolean)
-  extends Product with Serializable {
-
-  @deprecated("Use the constructor with `isMongos`", "0.18.5")
-  def this(
-    metadata: ProtocolMetadata, setName: Option[String]) =
-    this(metadata, setName, false)
-
-  lazy val productArity: Int = tupled.productArity
-
-  @inline def productElement(n: Int): Any = tupled.productElement(n)
+  val setName: Option[String],
+  val isMongos: Boolean) {
 
   override def equals(that: Any): Boolean = that match {
     case other: SetAvailable =>
@@ -210,16 +145,10 @@ class SetAvailable private[reactivemongo] (
 
   override lazy val hashCode: Int = tupled.hashCode
 
-  def canEqual(that: Any): Boolean = that match {
-    case _: SetAvailable => true
-    case _               => false
-  }
-
   private lazy val tupled = Tuple3(metadata, setName, isMongos)
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-object SetAvailable extends scala.runtime.AbstractFunction1[ProtocolMetadata, SetAvailable] {
+private[reactivemongo] object SetAvailable {
 
   def apply(metadata: ProtocolMetadata): SetAvailable =
     new SetAvailable(metadata, None, false)
@@ -230,23 +159,19 @@ object SetAvailable extends scala.runtime.AbstractFunction1[ProtocolMetadata, Se
   }
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-case object SetUnavailable
+private[reactivemongo] case object SetUnavailable
 
 /** Register a monitor. */
-@deprecated("Internal: will be made private", "0.16.0")
-case object RegisterMonitor
+private[reactivemongo] case object RegisterMonitor
 
 /** MongoDBSystem has been shut down. */
-@deprecated("Internal: will be made private", "0.16.0")
-case object Closed
+private[reactivemongo] case object Closed
 
-@deprecated("Unused", "0.16.0")
-case object GetLastMetadata
+private[reactivemongo] case object GetLastMetadata
 
 private[reactivemongo] case class PickNode(readPreference: ReadPreference) {
   private[actors] val promise = Promise[String]()
 
   /** The node name */
-  private[reactivemongo] def future: Future[String] = promise.future
+  def future: Future[String] = promise.future
 }

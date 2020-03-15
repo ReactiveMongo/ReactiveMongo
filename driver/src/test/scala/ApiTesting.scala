@@ -51,6 +51,26 @@ package object tests {
   type Pack = Serialization.Pack
   val pack: Pack = Serialization.internalSerializationPack
 
+  object PrimaryAvailable {
+    def unapply(msg: Any) = msg match {
+      case reactivemongo.core.actors.PrimaryAvailable(metadata) =>
+        Some(metadata)
+
+      case _ => None
+    }
+  }
+
+  object SetAvailable {
+    def unapply(msg: Any) = msg match {
+      case reactivemongo.core.actors.SetAvailable(metadata) =>
+        Some(metadata)
+
+      case _ => None
+    }
+  }
+
+  @inline def RegisterMonitor = reactivemongo.core.actors.RegisterMonitor
+
   lazy val decoder = pack.newDecoder
   lazy val builder = pack.newBuilder
 

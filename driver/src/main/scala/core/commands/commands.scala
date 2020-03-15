@@ -21,7 +21,7 @@ import reactivemongo.api.{
   SerializationPack
 }
 
-import reactivemongo.bson.{ BSONDocument, BSONNumberLike }
+import reactivemongo.bson.BSONDocument
 import reactivemongo.core.errors.CommandError
 import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
 import reactivemongo.core.netty._

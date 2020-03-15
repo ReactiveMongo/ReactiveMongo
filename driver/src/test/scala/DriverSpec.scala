@@ -15,11 +15,6 @@ import reactivemongo.api.{
 
 import reactivemongo.api.bson.BSONDocument
 
-import reactivemongo.core.actors.{
-  PrimaryAvailable,
-  RegisterMonitor,
-  SetAvailable
-}
 import reactivemongo.core.actors.Exceptions.{
   InternalState,
   PrimaryUnavailableException
@@ -93,14 +88,15 @@ final class DriverSpec(implicit ee: ExecutionEnv)
       val priAvailable = Promise[ProtocolMetadata]()
 
       val setMon = testMonitor(setAvailable) {
-        case msg: SetAvailable =>
-          SetAvailable.unapply(msg)
+        case reactivemongo.api.tests.PrimaryAvailable(metadata) =>
+          Some(metadata)
+
         case _ => None
       }
 
       val priMon = testMonitor(priAvailable) {
-        case msg: PrimaryAvailable =>
-          PrimaryAvailable.unapply(msg)
+        case reactivemongo.api.tests.PrimaryAvailable(metadata) =>
+          Some(metadata)
 
         case _ => None
       }
@@ -518,7 +514,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
     val receive: Receive = {
       case sys: akka.actor.ActorRef => {
         // Manually register this as connection/system monitor
-        sys ! RegisterMonitor
+        sys ! reactivemongo.api.tests.RegisterMonitor
       }
 
       case Msg(v) => {

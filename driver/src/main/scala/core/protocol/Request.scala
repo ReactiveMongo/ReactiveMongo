@@ -47,8 +47,7 @@ private[reactivemongo] case class Request(
  * @define documentsA body of this request, an Array containing 0, 1, or many documents.
  * @define documentsC body of this request, a [[http://netty.io/4.0/api/io/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents.
  */
-@deprecated("Internal: will be made private", "0.20.3")
-object Request {
+private[reactivemongo] object Request {
   /**
    * Create a request.
    *
