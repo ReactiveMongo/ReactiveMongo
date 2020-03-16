@@ -40,7 +40,7 @@ import com.github.ghik.silencer.silent
  *   options = BSONDocument.empty)
  * }}}
  */
-sealed abstract class Index extends Product with Serializable {
+sealed abstract class Index {
   type Pack <: SerializationPack
   val pack: Pack
 
@@ -70,7 +70,7 @@ sealed abstract class Index extends Product with Serializable {
    *
    * @since MongoDB 3.2
    */
-  private[api] def partialFilterDocument: Option[pack.Document]
+  def partialFilter: Option[pack.Document]
 
   /**
    * The flags to indicates if the index to build
@@ -147,13 +147,6 @@ sealed abstract class Index extends Product with Serializable {
   def wildcardProjection: Option[pack.Document] = None
 
   /**
-   * If duplicates should be discarded (if unique = true; default: `false`).
-   * _Warning_: you should read [[http://www.mongodb.org/display/DOCS/Indexes#Indexes-dropDups%3Atrue the documentation]].
-   */
-  @deprecated("Since MongoDB 2.6", "0.19.1")
-  def dropDups: Boolean = false
-
-  /**
    * Indicates the [[http://www.mongodb.org/display/DOCS/Index+Versions version]] of the index (1 for >= 2.0, else 0). You should let MongoDB decide.
    */
   def version: Option[Int] = None
@@ -161,24 +154,7 @@ sealed abstract class Index extends Product with Serializable {
   /**
    * Optional parameters for this index (typically specific to an IndexType like Geo2D).
    */
-  private[api] def optionDocument: pack.Document
-
-  @deprecated("Internal: will be made private", "0.19.0")
-  def partialFilter: Option[BSONDocument] = partialFilterDocument.flatMap {
-    pack.bsonValue(_) match {
-      case doc: BSONDocument =>
-        Some(doc)
-
-      case _ =>
-        None
-    }
-  }
-
-  @deprecated("Internal: will be made private", "0.19.0")
-  def options: BSONDocument = pack.bsonValue(optionDocument) match {
-    case doc: BSONDocument => doc
-    case _                 => BSONDocument.empty
-  }
+  def options: pack.Document
 
   /** The name of the index (a default one is computed if none). */
   lazy val eventualName: String = name.getOrElse(key.foldLeft("") {
@@ -186,20 +162,8 @@ sealed abstract class Index extends Product with Serializable {
       name + (if (name.length > 0) "_" else "") + kv._1 + "_" + kv._2.valueStr
   })
 
-  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
-  val productArity = 9
+  private[api] lazy val tupled = Tuple21(key, name, background, unique, partialFilter, sparse, expireAfterSeconds, storageEngine, weights, defaultLanguage, languageOverride, textIndexVersion, _2dsphereIndexVersion, bits, min, max, bucketSize, collation, wildcardProjection, version, options)
 
-  def productElement(n: Int): Any = tupled.productElement(n)
-
-  @silent(".*dropDups.*")
-  private[api] lazy val tupled = Tuple9(key, name, unique, background, dropDups, sparse, version, partialFilterDocument, optionDocument)
-
-  override def canEqual(that: Any): Boolean = that match {
-    case _: Index => true
-    case _        => false
-  }
-
-  // TODO#1.1: Review after deprecation cleanup (include all fields)
   override def equals(that: Any): Boolean = that match {
     case other: Index => tupled == other.tupled
     case _            => false
@@ -210,24 +174,12 @@ sealed abstract class Index extends Product with Serializable {
   override def toString = s"Index${tupled.toString}"
 }
 
-object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], Option[String], Boolean, Boolean, Boolean, Boolean, Option[Int], Option[BSONDocument], BSONDocument, Index] {
+object Index {
   import reactivemongo.api.BSONSerializationPack
 
   type Aux[P] = Index { type Pack = P }
 
   type Default = Aux[Serialization.Pack]
-
-  @deprecated("Use constructor with pack parameter", "0.19.1")
-  def apply(
-    key: Seq[(String, IndexType)],
-    name: Option[String] = None,
-    unique: Boolean = false,
-    background: Boolean = false,
-    @deprecated("Since MongoDB 2.6", "0.19.1") dropDups: Boolean = false,
-    sparse: Boolean = false,
-    version: Option[Int] = None, // let MongoDB decide
-    @deprecated("Internal: will be made private", "0.19.0") partialFilter: Option[BSONDocument] = None,
-    @deprecated("Internal: will be made private", "0.19.0") options: BSONDocument = BSONDocument.empty): Index = apply(BSONSerializationPack)(key, name, unique, background, dropDups, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
 
   /**
    * {{{
@@ -240,7 +192,6 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
    *   name = Some("name_idx"),
    *   unique = false,
    *   background = false,
-   *   dropDups = false,
    *   sparse = false,
    *   expireAfterSeconds = None,
    *   storageEngine = None,
@@ -265,7 +216,6 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
     name: Option[String],
     unique: Boolean,
     background: Boolean,
-    @deprecated("Since MongoDB 2.6", "0.19.1") dropDups: Boolean,
     sparse: Boolean,
     expireAfterSeconds: Option[Int],
     storageEngine: Option[_pack.Document],
@@ -287,7 +237,6 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
     def n = name
     def u = unique
     def b = background
-    @silent def d = dropDups
     def s = sparse
     def e = expireAfterSeconds
     def se = storageEngine
@@ -313,7 +262,6 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
       override val name = n
       override val unique = u
       override val background = b
-      override val dropDups = d
       override val sparse = s
       override val expireAfterSeconds = e
       override val storageEngine = se
@@ -329,8 +277,8 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
       override val collation = cl
       override val wildcardProjection = wp
       override val version = v
-      val partialFilterDocument = pf
-      val optionDocument = o
+      val partialFilter = pf
+      val options = o
     }
   }
 
@@ -391,7 +339,6 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
       name,
       unique,
       background,
-      dropDups = false,
       sparse,
       expireAfterSeconds,
       storageEngine,
@@ -410,12 +357,6 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
       partialFilter,
       options)
 
-  @deprecated("No longer a ReactiveMongo case class", "0.19.1")
-  def unapply(index: Index): Option[Tuple9[Seq[(String, IndexType)], Option[String], Boolean, Boolean, Boolean, Boolean, Option[Int], Option[BSONDocument], BSONDocument]] = Option(index).map { i =>
-    Tuple9(i.key, i.name, i.unique, i.background, i.dropDups,
-      i.sparse, i.version, i.partialFilter, i.options)
-  }
-
   /** '''EXPERIMENTAL:''' API may change */
   object Key {
     def unapplySeq(index: Index): Option[Seq[(String, IndexType)]] =
@@ -432,31 +373,16 @@ object Index extends scala.runtime.AbstractFunction9[Seq[(String, IndexType)], O
  * @param namespace The fully qualified name of the indexed collection.
  * @param index The other fields of the index.
  */
-class NSIndex extends Product2[String, Index] with Serializable {
+sealed trait NSIndex {
   type Pack <: SerializationPack
 
-  def namespace: String = ???
+  def namespace: String
 
-  private[api] def idx: Index.Aux[Pack] = ??? // TODO: Remove
-
-  // TODO: ?
-  def index: Index = idx
+  def index: Index.Aux[Pack]
 
   lazy val (dbName: String, collectionName: String) = {
     val spanned = namespace.span(_ != '.')
     spanned._1 -> spanned._2.drop(1)
-  }
-
-  @inline def _1 = namespace
-
-  @inline def _2 = index
-
-  def canEqual(that: Any): Boolean = that match {
-    case _: NSIndex =>
-      true
-
-    case _ =>
-      false
   }
 
   private[api] lazy val tupled = namespace -> index
@@ -474,27 +400,19 @@ class NSIndex extends Product2[String, Index] with Serializable {
   override def toString = s"NSIndex${tupled.toString}"
 }
 
-// TODO: Remove inheritance
-object NSIndex extends scala.runtime.AbstractFunction2[String, Index.Aux[Serialization.Pack], NSIndex { type Pack = Serialization.Pack }] {
+object NSIndex {
   type Aux[P <: SerializationPack] = NSIndex { type Pack = P }
 
   type Default = NSIndex.Aux[Serialization.Pack]
 
-  @deprecated("Will be removed", "0.20.3")
-  def apply(namespace: String, index: Index.Aux[Serialization.Pack]): NSIndex.Aux[Serialization.Pack] = at[Serialization.Pack](namespace, index)
-
-  @deprecated("Will be renamed", "0.20.3")
-  def at[P <: SerializationPack](
+  def apply[P <: SerializationPack](
     namespace: String, index: Index.Aux[P]): NSIndex.Aux[P] = {
     @inline def nsp = namespace
     @inline def i = index
     new NSIndex {
       type Pack = P
       override val namespace = nsp
-      override val idx = i
+      override val index = i
     }
   }
-
-  def unapply(nsIndex: NSIndex): Option[(String, Index)] =
-    Option(nsIndex).map(_.tupled)
 }

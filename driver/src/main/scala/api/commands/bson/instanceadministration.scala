@@ -177,44 +177,6 @@ object BSONDropIndexesImplicits {
 }
 
 @deprecated("Internal: will be made private", "0.16.0")
-object BSONListIndexesImplicits {
-  import scala.util.{ Failure, Success, Try }
-  import reactivemongo.api.indexes.{ Index, IndexesManager }
-
-  object BSONListIndexesWriter extends BSONDocumentWriter[ResolvedCollectionCommand[ListIndexes]] {
-    def write(command: ResolvedCollectionCommand[ListIndexes]): BSONDocument =
-      BSONDocument("listIndexes" -> command.collection)
-  }
-
-  object BSONIndexListReader
-    extends DealingWithGenericCommandErrorsReader[List[Index]] {
-
-    @deprecated("Only for internal use", "0.12.7")
-    @annotation.tailrec
-    def readBatch(batch: List[BSONDocument], indexes: List[Index]): Try[List[Index]] = batch match {
-      case d :: ds => d.asTry[Index](IndexesManager.IndexReader) match {
-        case Success(i) => readBatch(ds, i :: indexes)
-        case Failure(e) => Failure(e)
-      }
-      case _ => Success(indexes)
-    }
-
-    import BSONCommonWriteCommandsImplicits.DefaultWriteResultReader
-
-    @deprecated("Use [[BSONCommonWriteCommandsImplicits.DefaultWriteResultReader]]", "0.12.7")
-    val LastErrorReader: BSONDocumentReader[WriteResult] =
-      BSONDocumentReader[WriteResult] { DefaultWriteResultReader.read(_) }
-
-    def readResult(doc: BSONDocument): List[Index] = (for {
-      a <- doc.getAs[BSONDocument]("cursor")
-      b <- a.getAs[List[BSONDocument]]("firstBatch")
-    } yield b).fold[List[Index]](throw new GenericDriverException(
-      "the cursor and firstBatch must be defined"))(readBatch(_, Nil).get)
-
-  }
-}
-
-@deprecated("Internal: will be made private", "0.16.0")
 object BSONCreateIndexesImplicits {
   import reactivemongo.api.{ BSONSerializationPack => LegacyPack }
   import reactivemongo.api.commands.WriteResult
@@ -227,7 +189,7 @@ object BSONCreateIndexesImplicits {
       type Index = Index.Aux[LegacyPack.type]
       val indexes = cmd.command.indexes.collect {
         case i: Index =>
-          val nsi = NSIndex.at(cmd.command.db + "." + cmd.collection, i)
+          val nsi = NSIndex(cmd.command.db + "." + cmd.collection, i)
 
           nsIndexWriter.write(nsi)
       }

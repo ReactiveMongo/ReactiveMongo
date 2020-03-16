@@ -1516,11 +1516,10 @@ db.accounts.aggregate([
     name: Option[String] = None,
     unique: Boolean = false,
     background: Boolean = false,
-    dropDups: Boolean = false,
     sparse: Boolean = false,
     version: Option[Int] = None, // let MongoDB decide
     partialFilter: Option[pack.Document] = None,
-    options: pack.Document = builder.document(Seq.empty)) = Index(pack)(key, name, unique, background, dropDups, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
+    options: pack.Document = builder.document(Seq.empty)) = Index(pack)(key, name, unique, background, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
 
   case class User(
     _id: Int,

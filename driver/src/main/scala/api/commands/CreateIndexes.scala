@@ -55,7 +55,7 @@ object CreateIndexes extends scala.runtime.AbstractFunction2[String, List[Index]
 
     pack.writer[ResolvedCollectionCommand[Command[P]]] { create =>
       val indexes = create.command.indexes.map { i =>
-        val nsi = NSIndex.at[P](create.command.db + "." + create.collection, i)
+        val nsi = NSIndex[P](create.command.db + "." + create.collection, i)
 
         pack.serialize(nsi, nsIndexWriter)
       }

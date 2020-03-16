@@ -345,7 +345,7 @@ package object tests {
 
   @inline def session(db: DefaultDB): Option[Session] = db.session
 
-  @inline def indexOptions[P <: SerializationPack](i: Index.Aux[P]): i.pack.Document = i.optionDocument
+  @inline def indexOptions[P <: SerializationPack](i: Index.Aux[P]): i.pack.Document = i.options
 
   def messageHeader(
     messageLength: Int,

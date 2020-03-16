@@ -453,7 +453,6 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
               name = None,
               unique = true,
               background = false,
-              dropDups = false,
               sparse = false,
               expireAfterSeconds = None,
               storageEngine = None,

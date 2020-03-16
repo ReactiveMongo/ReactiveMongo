@@ -43,6 +43,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
 
   // ---
 
+  section("not_mongo26")
   "Geo Indexes" should {
     {
       def spec(c: DefaultCollection, timeout: FiniteDuration) = {
@@ -217,7 +218,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
       Future.sequence(fixturesInsert).
         map(_ => {}) must beEqualTo({}).await(0, timeout)
 
-    } tag "not_mongo26"
+    }
 
     "fail with already inserted documents" in {
       val idx = index(
@@ -230,7 +231,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
       }.awaitFor(timeout)
 
       spec(mngr.ensure(idx)) and spec(mngr.create(idx))
-    } tag "not_mongo26"
+    }
 
     "be created" in {
       partial.indexesManager.create(index(
@@ -239,7 +240,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
         partialFilter = Some(LegacyDoc(
           "age" -> LegacyDoc(f"$$gte" -> 21))))).
         map(_.ok) must beTrue.awaitFor(timeout)
-    } tag "not_mongo26"
+    }
 
     "not have duplicate fixtures" in {
       Future.fold(fixturesInsert)(false) { (inserted, res) =>
@@ -248,7 +249,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
         case err: DatabaseException => !err.code.exists(_ == 11000)
         case _                      => true
       } aka "inserted" must beFalse.await(0, timeout)
-    } tag "not_mongo26"
+    }
 
     "allow duplicate if the filter doesn't match" in {
       def insertAndCount = for {
@@ -263,7 +264,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
       } yield a -> b
 
       insertAndCount must beTypedEqualTo(3 -> 6).await(0, timeout)
-    } tag "not_mongo26"
+    }
   }
 
   "Text index" should {
@@ -287,6 +288,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
       mngr.ensure(textIndex) must beFalse.await(0, timeout)
     }
   }
+  section("not_mongo26")
 
   // ---
 
@@ -295,10 +297,9 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
     name: Option[String] = None,
     unique: Boolean = false,
     background: Boolean = false,
-    dropDups: Boolean = false,
     sparse: Boolean = false,
     version: Option[Int] = None, // let MongoDB decide
     partialFilter: Option[BSONDocument] = None,
-    options: BSONDocument = BSONDocument.empty) = Index[Pack](pack)(key, name, unique, background, dropDups, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
+    options: BSONDocument = BSONDocument.empty) = Index[Pack](pack)(key, name, unique, background, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
 
 }
