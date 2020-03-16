@@ -1,7 +1,6 @@
 package reactivemongo.core.nodeset
 
-@deprecated("Internal: will be made private", "0.20.3")
-sealed trait Authentication {
+private[reactivemongo] sealed trait Authentication {
   def user: String
   def db: String
 }
@@ -11,8 +10,7 @@ sealed trait Authentication {
  * @param user the name (or subject for X509) of the user
  * @param password the password for the [[user]] (`None` for X509)
  */
-@deprecated("Internal: will be made private", "0.14.0")
-case class Authenticate(
+private[reactivemongo] case class Authenticate(
   db: String,
   user: String,
   password: Option[String]) extends Authentication {
@@ -20,14 +18,9 @@ case class Authenticate(
   override def toString = s"Authenticate($db, $user)"
 }
 
-@deprecated("Internal: will be made private", "0.20.3")
-sealed trait Authenticating extends Authentication {
-  @deprecated("Will be removed", "0.14.0")
-  def password: String
-}
+private[reactivemongo] sealed trait Authenticating extends Authentication
 
-@deprecated("Internal: will be made private", "0.20.3")
-object Authenticating {
+private[reactivemongo] object Authenticating {
   def unapply(auth: Authenticating): Option[(String, String, Option[String])] =
     auth match {
       case CrAuthenticating(db, user, pass, _) =>
@@ -44,14 +37,17 @@ object Authenticating {
     }
 }
 
-@deprecated("Internal: will be made private", "0.20.3")
-case class CrAuthenticating(db: String, user: String, password: String, nonce: Option[String]) extends Authenticating {
+private[reactivemongo] case class CrAuthenticating(
+  db: String,
+  user: String,
+  password: String,
+  nonce: Option[String]) extends Authenticating {
+
   override def toString: String =
     s"Authenticating($db, $user, ${nonce.map(_ => "<nonce>").getOrElse("<>")})"
 }
 
-@deprecated("Internal: will be made private", "0.20.3")
-sealed trait ScramAuthenticating extends Authenticating {
+private[reactivemongo] sealed trait ScramAuthenticating extends Authenticating {
   def db: String
   def user: String
   def password: String
@@ -75,7 +71,6 @@ sealed trait ScramAuthenticating extends Authenticating {
     step: Int = this.step): ScramAuthenticating = ScramAuthenticating(db, user, password, randomPrefix, saslStart, conversationId, serverSignature, step)
 }
 
-@deprecated("Internal: will be made private", "0.20.3")
 private[reactivemongo] object ScramAuthenticating {
   def unapply(authing: ScramAuthenticating): Option[(String, String, String, String, String, Option[Int], Option[Array[Byte]], Int)] = Some((authing.db, authing.user, authing.password, authing.randomPrefix, authing.saslStart, authing.conversationId, authing.serverSignature, authing.step))
 
@@ -100,8 +95,7 @@ private[reactivemongo] object ScramAuthenticating {
     step: Int) extends ScramAuthenticating
 }
 
-@deprecated("Use `ScramAuthenticating`", "0.18.4")
-case class ScramSha1Authenticating(
+private[reactivemongo] case class ScramSha1Authenticating(
   db: String,
   user: String,
   password: String,
@@ -111,12 +105,16 @@ case class ScramSha1Authenticating(
   serverSignature: Option[Array[Byte]] = None,
   step: Int = 0) extends ScramAuthenticating
 
-@deprecated("Internal: will be made private", "0.20.3")
-case class X509Authenticating(db: String, user: String) extends Authenticating {
+private[reactivemongo] case class X509Authenticating(
+  db: String,
+  user: String) extends Authenticating {
+
   def password = "deprecated"
 }
 
-@deprecated("Internal: will be made private", "0.20.3")
-case class Authenticated(db: String, user: String) extends Authentication {
+private[reactivemongo] case class Authenticated(
+  db: String,
+  user: String) extends Authentication {
+
   val toShortString: String = s"${user}@${db}"
 }

@@ -7,8 +7,7 @@ import reactivemongo.api.ReadPreference
 
 import reactivemongo.io.netty.channel.ChannelId
 
-import reactivemongo.core.protocol.{ RequestMaker, Response }
-import reactivemongo.core.nodeset.ProtocolMetadata
+import reactivemongo.core.protocol.{ RequestMaker, Response, ProtocolMetadata }
 
 /**
  * A message expecting a response from database.

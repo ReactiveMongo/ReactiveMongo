@@ -1,8 +1,5 @@
-package reactivemongo.core.nodeset
+package reactivemongo.core.protocol
 
-import reactivemongo.core.protocol.MongoWireVersion
-
-// TODO#1.1: Move to `protocol` package
 case class ProtocolMetadata(
   minWireVersion: MongoWireVersion,
   maxWireVersion: MongoWireVersion,

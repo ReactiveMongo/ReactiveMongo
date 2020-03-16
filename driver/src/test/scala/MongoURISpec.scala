@@ -12,10 +12,11 @@ import reactivemongo.api.{
   WriteConcern
 }, MongoConnection.{ ParsedURI, URIParsingException }
 
-import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.core.errors.ReactiveMongoException
 
 import org.specs2.concurrent.ExecutionEnv
+
+import reactivemongo.api.tests.Authenticate
 
 final class MongoURISpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
@@ -439,7 +440,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         case uri => uri.db must beSome("foo") and {
           // enforced by default when seed list ...
           uri.options.sslEnabled must beTrue and {
-            uri.hosts must_=== List(
+            uri.hosts must_=== ListSet(
               "mongo1.domain.tld" -> 27017,
               "mongo2.domain.tld" -> 27018)
           } and {

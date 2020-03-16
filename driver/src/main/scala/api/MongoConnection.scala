@@ -28,7 +28,7 @@ import akka.util.Timeout
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
 import akka.pattern.ask
 
-import reactivemongo.core.protocol.Response
+import reactivemongo.core.protocol.{ ProtocolMetadata, Response }
 
 import reactivemongo.core.actors.{
   AuthRequest,
@@ -43,7 +43,7 @@ import reactivemongo.core.actors.{
   SetAvailable,
   SetUnavailable
 }
-import reactivemongo.core.nodeset.{ Authenticate, ProtocolMetadata }
+import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.core.commands.SuccessfulAuthentication
 import reactivemongo.api.commands.{ WriteConcern => WC }
 
@@ -416,33 +416,12 @@ object MongoConnection {
    */
   @com.github.ghik.silencer.silent(".*authenticate.*" /*deprecated*/ )
   sealed class ParsedURI(
-    private[api] val _hosts: ListSet[(String, Int)],
+    val hosts: ListSet[(String, Int)],
     val options: MongoConnectionOptions,
     val ignoredOptions: List[String],
     val db: Option[String],
-    val authenticate: Option[Authenticate]) extends Product with Serializable {
+    val authenticate: Option[Authenticate]) {
     // TODO: Type for URI with required DB name
-
-    @deprecated("Will return a ListSet", "0.19.8")
-    lazy val hosts = _hosts.toList
-
-    @deprecated("No longer a case class", "0.19.8")
-    val productArity = 5
-
-    @deprecated("No longer a case class", "0.19.8")
-    def productElement(n: Int): Any = n match {
-      case 0 => hosts
-      case 1 => options
-      case 2 => ignoredOptions
-      case 3 => db
-      case _ => authenticate
-    }
-
-    @deprecated("No longer a case class", "0.19.8")
-    def canEqual(that: Any): Boolean = that match {
-      case _: ParsedURI => true
-      case _            => false
-    }
 
     override def equals(that: Any): Boolean = that match {
       case other: ParsedURI =>
@@ -456,20 +435,11 @@ object MongoConnection {
     override def toString = s"ParsedURI${tupled.toString}"
 
     private[api] lazy val tupled =
-      Tuple5(_hosts.toList, options, ignoredOptions, db, authenticate)
+      Tuple5(hosts.toList, options, ignoredOptions, db, authenticate)
 
   }
 
-  object ParsedURI extends scala.runtime.AbstractFunction5[List[(String, Int)], MongoConnectionOptions, List[String], Option[String], Option[Authenticate], ParsedURI] {
-    @com.github.ghik.silencer.silent(".*authenticate.*" /*deprecated*/ )
-    @deprecated("Use factory with ListSet", "0.19.8")
-    def apply(
-      hosts: List[(String, Int)],
-      options: MongoConnectionOptions,
-      ignoredOptions: List[String],
-      db: Option[String],
-      authenticate: Option[Authenticate]) = new ParsedURI(ListSet.empty ++ hosts, options, ignoredOptions, db, authenticate)
-
+  object ParsedURI {
     @com.github.ghik.silencer.silent(".*authenticate.*" /*deprecated*/ )
     def apply(
       hosts: ListSet[(String, Int)],

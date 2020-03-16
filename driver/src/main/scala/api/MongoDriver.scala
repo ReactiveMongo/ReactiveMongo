@@ -159,7 +159,7 @@ class MongoDriver(
         logger.warn(s"Some options were ignored because they are not supported (yet): ${parsedURI.ignoredOptions.mkString(", ")}")
       }
 
-      Success(connection(parsedURI.hosts.map(h => h._1 + ':' + h._2), parsedURI.options, parsedURI.authenticate.toSeq, name))
+      Success(connection(parsedURI.hosts.map(h => h._1 + ':' + h._2).toSeq, parsedURI.options, parsedURI.authenticate.toSeq, name))
     }
   }
 

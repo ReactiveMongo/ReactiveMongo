@@ -970,7 +970,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
 
   @inline protected def MissingMetadata() = new ConnectionNotInitialized("Connection is missing metadata (like protocol version, etc.) The connection pool is probably being initialized.", db.connection.history())
 
-  @inline protected def unsupportedVersion(metadata: reactivemongo.core.nodeset.ProtocolMetadata) = new GenericDriverException(s"Unsupported MongoDB version: $metadata")
+  @inline protected def unsupportedVersion(metadata: reactivemongo.core.protocol.ProtocolMetadata) = new GenericDriverException(s"Unsupported MongoDB version: $metadata")
 
   override def toString: String = s"collection[${name}]"
 }

@@ -15,7 +15,9 @@ import reactivemongo.api.{
   ReadPreference
 }
 
-import reactivemongo.core.nodeset.{ Authenticate, NodeSet, ProtocolMetadata }
+import reactivemongo.core.protocol.ProtocolMetadata
+
+import reactivemongo.core.nodeset.NodeSet
 
 import reactivemongo.core.actors.{
   PrimaryAvailable,

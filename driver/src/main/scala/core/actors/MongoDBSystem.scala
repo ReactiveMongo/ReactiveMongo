@@ -53,7 +53,8 @@ import reactivemongo.core.protocol.{
   KillCursors,
   MongoWireVersion,
   Request,
-  Response
+  Response,
+  ProtocolMetadata
 }
 import reactivemongo.core.commands.{
   FailedAuthentication,
@@ -69,8 +70,7 @@ import reactivemongo.core.nodeset.{
   NodeSet,
   NodeSetInfo,
   NodeStatus,
-  PingInfo,
-  ProtocolMetadata
+  PingInfo
 }
 import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
 import reactivemongo.api.commands.LastError
@@ -203,7 +203,7 @@ trait MongoDBSystem extends Actor {
 
   /** On start or restart. */
   private def initNodeSet(): Try[NodeSet] = {
-    val seedNodeSet = NodeSet(None, None, seeds.map(seed => new Node(seed, Set.empty, NodeStatus.Unknown, Vector.empty, Set.empty, _tags = Map.empty[String, String], ProtocolMetadata.Default, PingInfo(), false)).toVector, initialAuthenticates.toSet)
+    val seedNodeSet = new NodeSet(None, None, seeds.map(seed => new Node(seed, Set.empty, NodeStatus.Unknown, Vector.empty, Set.empty, tags = Map.empty[String, String], ProtocolMetadata.Default, PingInfo(), false)).toVector, initialAuthenticates.toSet)
 
     debug(s"Initial node set: ${seedNodeSet.toShortString}")
 
@@ -1193,7 +1193,7 @@ trait MongoDBSystem extends Actor {
             case host if (!prepared.nodes.exists(_.names contains host)) =>
               // Prepare node for newly discovered host in the RS
               val n = new Node(host, Set.empty, NodeStatus.Uninitialized,
-                Vector.empty, Set.empty, _tags = Map.empty[String, String],
+                Vector.empty, Set.empty, tags = Map.empty[String, String],
                 ProtocolMetadata.Default, PingInfo(), false)
 
               n.createSignalingConnection(channelFactory, self) match {

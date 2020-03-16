@@ -1,8 +1,8 @@
 package reactivemongo.core.nodeset
 
-sealed trait ConnectionStatus
+private[reactivemongo] sealed trait ConnectionStatus
 
-object ConnectionStatus {
+private[reactivemongo] object ConnectionStatus {
   object Disconnected extends ConnectionStatus {
     override def toString = "Disconnected"
   }

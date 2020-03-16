@@ -20,7 +20,7 @@ import reactivemongo.core.actors.Exceptions.{
   PrimaryUnavailableException
 }
 
-import reactivemongo.core.nodeset.ProtocolMetadata
+import reactivemongo.core.protocol.ProtocolMetadata
 import reactivemongo.core.commands.{
   FailedAuthentication,
   SuccessfulAuthentication

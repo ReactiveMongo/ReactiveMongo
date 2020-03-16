@@ -69,6 +69,12 @@ package object tests {
     }
   }
 
+  def Authenticate(
+    db: String,
+    user: String,
+    password: Option[String]) =
+    reactivemongo.core.nodeset.Authenticate(db, user, password)
+
   @inline def RegisterMonitor = reactivemongo.core.actors.RegisterMonitor
 
   lazy val decoder = pack.newDecoder

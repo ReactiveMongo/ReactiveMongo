@@ -39,7 +39,7 @@ private[reactivemongo] case class RequestMaker(
   readPreference: ReadPreference = ReadPreference.primary,
   channelIdHint: Option[ChannelId] = None) {
 
-  def apply(@deprecatedName(Symbol("id")) requestID: Int) = Request(
+  def apply(requestID: Int) = Request(
     requestID, 0, op, documents, readPreference, channelIdHint)
 }
 
