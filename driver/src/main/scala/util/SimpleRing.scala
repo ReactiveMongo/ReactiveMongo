@@ -7,7 +7,7 @@ import scala.reflect.ClassTag
 /**
  * Note: This class is not thread-safe!
  */
-final class SimpleRing[T: ClassTag](val capacity: Int) {
+private[reactivemongo] final class SimpleRing[T: ClassTag](val capacity: Int) {
   private var head = 0
   private var tail = 0
   private var nextIndex = 0

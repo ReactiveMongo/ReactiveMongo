@@ -77,6 +77,8 @@ package object tests {
 
   @inline def RegisterMonitor = reactivemongo.core.actors.RegisterMonitor
 
+  @inline def SimpleRing[T](capacity: Int)(implicit cls: scala.reflect.ClassTag[T]) = new reactivemongo.util.SimpleRing[T](capacity)
+
   lazy val decoder = pack.newDecoder
   lazy val builder = pack.newBuilder
 

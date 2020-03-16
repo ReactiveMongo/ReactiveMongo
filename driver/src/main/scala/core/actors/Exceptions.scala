@@ -22,9 +22,6 @@ object Exceptions {
     def this() = this(primaryUnavailableMsg, null)
   }
 
-  @deprecated(message = "Use constructor with details", since = "0.12-RC0")
-  case object PrimaryUnavailableException extends PrimaryUnavailableException()
-
   /**
    * An exception thrown when the entire node set is unavailable.
    * The application may not have access to the network anymore.

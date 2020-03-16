@@ -66,8 +66,7 @@ package object util extends UtilCompat {
     java.security.MessageDigest.getInstance("MD5").digest(bytes)
 
   /** Makes an option of the value matching the condition. */
-  def option[T](cond: => Boolean, value: => T): Option[T] =
-    if (cond) Some(value) else None
+  private[reactivemongo] def option[T](cond: => Boolean, value: => T): Option[T] = if (cond) Some(value) else None
 
   // ---
 
@@ -104,7 +103,8 @@ package object util extends UtilCompat {
    * @param name the DNS name (e.g. `mycluster.mongodb.com`)
    * @param resolver the record resolver
    */
-  def srvRecords(name: String)(resolver: SRVRecordResolver)(
+  private[reactivemongo] def srvRecords(name: String)(
+    resolver: SRVRecordResolver)(
     implicit
     ec: ExecutionContext): Future[List[(String, Int)]] = {
     val resolve = new DefaultSRVResolver(resolver)

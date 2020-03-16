@@ -32,7 +32,7 @@ final class UtilSpec(implicit ee: ExecutionEnv)
 
   "Simple ring" should {
     "have a fixed-size & be circular" in {
-      val ring = new reactivemongo.util.SimpleRing[Int](3)
+      val ring = reactivemongo.api.tests.SimpleRing[Int](3)
 
       ring.enqueue(1) must_=== 1 and {
         ring.enqueue(2) must_=== 2

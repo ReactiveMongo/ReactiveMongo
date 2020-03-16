@@ -12,16 +12,7 @@ private[actors] class AwaitingResponse(
   val promise: Promise[Response],
   val isGetLastError: Boolean,
   val isMongo26WriteOp: Boolean,
-  val pinnedNode: Option[String]) extends Product with Serializable {
-
-  @deprecated("Use the complete constructor", "0.18.5")
-  def this(
-    request: Request,
-    channelID: ChannelId,
-    promise: Promise[Response],
-    isGetLastError: Boolean,
-    isMongo26WriteOp: Boolean) = this(
-    request, channelID, promise, isGetLastError, isMongo26WriteOp, None)
+  val pinnedNode: Option[String]) {
 
   @inline def requestID: Int = request.requestID
 
@@ -49,15 +40,6 @@ private[actors] class AwaitingResponse(
       req
     })
 
-  def copy( // TODO#1.1: Remove
-    request: Request,
-    channelID: ChannelId,
-    promise: Promise[Response],
-    isGetLastError: Boolean,
-    isMongo26WriteOp: Boolean): AwaitingResponse =
-    new AwaitingResponse(request, channelID, promise,
-      isGetLastError, isMongo26WriteOp, None)
-
   def copy(
     request: Request = this.request,
     channelID: ChannelId = this.channelID,
@@ -68,11 +50,6 @@ private[actors] class AwaitingResponse(
     new AwaitingResponse(request, channelID, promise,
       isGetLastError, isMongo26WriteOp, pinnedNode)
 
-  def canEqual(that: Any): Boolean = that match {
-    case _: AwaitingResponse => true
-    case _                   => false
-  }
-
   override def equals(that: Any): Boolean = that match {
     case other: AwaitingResponse =>
       tupled == other.tupled
@@ -81,10 +58,6 @@ private[actors] class AwaitingResponse(
       false
   }
 
-  lazy val productArity: Int = tupled.productArity
-
-  @inline def productElement(n: Int): Any = tupled.productElement(n)
-
   override lazy val hashCode: Int = tupled.hashCode
 
   private lazy val tupled = Tuple6(request, this.channelID, promise,
@@ -92,16 +65,6 @@ private[actors] class AwaitingResponse(
 
 }
 
-@deprecated("No longer a ReactiveMongo case class", "0.18.5")
-private[actors] object AwaitingResponse extends scala.runtime.AbstractFunction5[Request, ChannelId, Promise[Response], Boolean, Boolean, AwaitingResponse] {
-  def apply(
-    request: Request,
-    channelID: ChannelId,
-    promise: Promise[Response],
-    isGetLastError: Boolean,
-    isMongo26WriteOp: Boolean): AwaitingResponse =
-    new AwaitingResponse(request, channelID, promise,
-      isGetLastError, isMongo26WriteOp)
-
+private[actors] object AwaitingResponse {
   def unapply(req: AwaitingResponse): Option[(Request, ChannelId, Promise[Response], Boolean, Boolean)] = Some(Tuple5(req.request, req.channelID, req.promise, req.isGetLastError, req.isMongo26WriteOp))
 }

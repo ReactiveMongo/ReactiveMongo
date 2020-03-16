@@ -77,8 +77,7 @@ import reactivemongo.api.commands.LastError
 import external.reactivemongo.ConnectionListener
 
 /** Main actor that processes the requests. */
-@deprecated("Internal: will be made private", "0.11.14")
-trait MongoDBSystem extends Actor {
+private[reactivemongo] trait MongoDBSystem extends Actor {
   import scala.concurrent.duration._
   import Exceptions._
 
@@ -631,10 +630,11 @@ trait MongoDBSystem extends Actor {
             requestTracker.withAwaiting { (resps, chans) =>
               val chanId = con.channel.id
 
-              resps.put(reqId, AwaitingResponse(
+              resps.put(reqId, new AwaitingResponse(
                 request, chanId, req.promise,
                 isGetLastError = false,
-                isMongo26WriteOp = req.isMongo26WriteOp))
+                isMongo26WriteOp = req.isMongo26WriteOp,
+                pinnedNode = None))
 
               val countBefore = chans.getOrElse(chanId, 0)
 
@@ -1681,7 +1681,6 @@ trait MongoDBSystem extends Actor {
 
   @inline private def scheduler = context.system.scheduler
 
-  @deprecated(message = "Will be made private", since = "0.11.10")
   def allChannelGroup(nodeSet: NodeSet): DefaultChannelGroup = {
     val result = new DefaultChannelGroup(
       reactivemongo.io.netty.util.concurrent.GlobalEventExecutor.INSTANCE)
@@ -1771,8 +1770,7 @@ trait MongoDBSystem extends Actor {
     logger.error(s"[$lnm] $msg", cause)
 }
 
-@deprecated("Internal: will be made private", "0.11.14")
-final class LegacyDBSystem private[reactivemongo] (
+private[reactivemongo] final class LegacyDBSystem(
   val supervisor: String,
   val name: String,
   val seeds: Seq[String],
@@ -1784,8 +1782,7 @@ final class LegacyDBSystem private[reactivemongo] (
 
 }
 
-@deprecated("Internal: will be made private", "0.11.14")
-final class StandardDBSystem private[reactivemongo] (
+private[reactivemongo] final class StandardDBSystem(
   val supervisor: String,
   val name: String,
   val seeds: Seq[String],
@@ -1795,8 +1792,6 @@ final class StandardDBSystem private[reactivemongo] (
   def newChannelFactory(effect: Unit): ChannelFactory =
     new ChannelFactory(supervisor, name, options)
 
-  @deprecated("Initialize with an explicit supervisor and connection names", "0.11.14")
-  def this(s: Seq[String], a: Seq[Authenticate], opts: MongoConnectionOptions) = this(s"unknown-${System identityHashCode opts}", s"unknown-${System identityHashCode opts}", s, a, opts)
 }
 
 private[reactivemongo] final class StandardDBSystemWithScramSha256(
@@ -1820,10 +1815,6 @@ final class StandardDBSystemWithX509 private[reactivemongo] (
 
   def newChannelFactory(effect: Unit): ChannelFactory =
     new ChannelFactory(supervisor, name, options)
-}
-
-@deprecated("Internal: will be made private", "0.11.14")
-object MongoDBSystem {
 }
 
 case class AuthRequest(
