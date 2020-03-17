@@ -14,7 +14,7 @@ import reactivemongo.api.commands.{
 /**
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  */
-trait FindAndModifyOps[P <: SerializationPack with Singleton] {
+private[api] trait FindAndModifyOps[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
 
   private[reactivemongo] object FindAndModifyCommand

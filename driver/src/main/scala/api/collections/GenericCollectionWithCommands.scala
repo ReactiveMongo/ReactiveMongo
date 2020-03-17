@@ -15,7 +15,7 @@ import reactivemongo.api.commands.{
 }
 
 /** Collection operations to run commands with */
-trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { self: GenericCollection[P] =>
+private[api] trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { self: GenericCollection[P] =>
   val pack: P
 
   def runner = Command.run(pack, self.failoverStrategy)

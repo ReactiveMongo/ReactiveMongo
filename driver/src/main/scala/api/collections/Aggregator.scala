@@ -161,6 +161,8 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
 
         case HintDocument(doc) =>
           elements += element("hint", doc)
+
+        case _ =>
       }
 
       cmd.collation.foreach { collation =>

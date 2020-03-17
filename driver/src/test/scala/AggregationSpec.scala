@@ -83,7 +83,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       import bsoncommands.BSONAggregationFramework.IndexStatsResult
       import bsoncommands.BSONAggregationResultImplicits.BSONIndexStatsReader
 
-      val result = coll.aggregateWith1[IndexStatsResult]() { framework =>
+      val result = coll.aggregateWith[IndexStatsResult]() { framework =>
         import framework._
 
         IndexStats -> List(Sort(Ascending("name")))
@@ -122,7 +122,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         document("_id" -> "NY", "totalPop" -> 19746227L))
 
       def withRes[T](c: BSONCollection)(f: Future[List[BSONDocument]] => T): T = {
-        f(c.aggregateWith1[BSONDocument]() { framework =>
+        f(c.aggregateWith[BSONDocument]() { framework =>
           import framework.{ Ascending, Group, Match, Sort, SumField }
 
           Group(BSONString(f"$$state"))(
@@ -167,6 +167,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       "with expected count" in {
         import coll.aggregationFramework
         import aggregationFramework.{ Group, SumAll }
+
         val result = coll.aggregatorContext[BSONDocument](
           Group(BSONString(f"$$state"))("count" -> SumAll)).prepared.cursor
           .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]())
@@ -179,7 +180,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     }
 
     "explain simple result" in {
-      val result = coll.aggregateWith1[BSONDocument](explain = true) {
+      val result = coll.aggregateWith[BSONDocument](explain = true) {
         framework =>
           import framework.{ Group, Match, SumField }
 
@@ -218,7 +219,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
       "successfully as a single batch" in {
         withCtx(coll) { (firstOp, pipeline) =>
-          val result = coll.aggregateWith1[BSONDocument]() { _ =>
+          val result = coll.aggregateWith[BSONDocument]() { _ =>
             firstOp -> pipeline
           }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]())
 
@@ -229,7 +230,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       "with cursor" >> {
         def collect(c: BSONCollection, upTo: Int = Int.MaxValue) =
           withCtx(c) { (firstOp, pipeline) =>
-            c.aggregateWith1[BSONDocument](batchSize = Some(1)) { _ =>
+            c.aggregateWith[BSONDocument](batchSize = Some(1)) { _ =>
               firstOp -> pipeline
             }.collect[List](upTo, Cursor.FailOnError[List[BSONDocument]]())
           }
@@ -244,7 +245,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         }
 
         "with metadata sort" in {
-          coll.aggregateWith1[ZipCode]() { framework =>
+          coll.aggregateWith[ZipCode]() { framework =>
             import framework.{
               Descending,
               Match,
@@ -357,14 +358,14 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
             "name" -> f"$$smallestCity", "population" -> f"$$smallestPop"))),
         Sort(Ascending("state")))
 
-      coll.aggregateWith1[BSONDocument]() { _ =>
+      coll.aggregateWith[BSONDocument]() { _ =>
         primGroup -> groupPipeline
       }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected).await(1, timeout) and {
-        coll.aggregateWith1[BSONDocument]() { _ =>
+        coll.aggregateWith[BSONDocument]() { _ =>
           primGroup -> (groupPipeline :+ Limit(2))
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected take 2).await(1, timeout)
       } and {
-        coll.aggregateWith1[BSONDocument]() { _ =>
+        coll.aggregateWith[BSONDocument]() { _ =>
           primGroup -> (groupPipeline :+ Skip(2))
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected drop 2).await(1, timeout)
       }
@@ -519,12 +520,12 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         Lookup(inventory.name, "specs", "size", "docs"),
         Match(document("docs" -> document(f"$$ne" -> BSONArray()))))
 
-      orders.aggregateWith1[BSONDocument]() { framework =>
+      orders.aggregateWith[BSONDocument]() { framework =>
         import framework._
 
         UnwindField("specs") -> afterUnwind
       }.headOption must beSome(expected).await(0, timeout) and {
-        orders.aggregateWith1[BSONDocument]() {
+        orders.aggregateWith[BSONDocument]() {
           framework =>
             import framework._
 
@@ -572,7 +573,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         } yield id -> books).get
       }
 
-      books.aggregateWith1[Author]() { framework =>
+      books.aggregateWith[Author]() { framework =>
         import framework._
 
         Sort(Ascending("title")) -> List(
@@ -638,7 +639,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
          { $group: { _id: "$quiz", stdDev: { $stdDevPop: "$score" } } }
        ])
       */
-      contest.aggregateWith1[QuizStdDev]() {
+      contest.aggregateWith[QuizStdDev]() {
         framework =>
           import framework._
 
@@ -777,7 +778,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
        ])
       */
 
-      contest.aggregateWith1[BSONDocument]() { framework =>
+      contest.aggregateWith[BSONDocument]() { framework =>
         import framework._
 
         Sample(100) -> List(Group(BSONNull)(
@@ -959,7 +960,7 @@ db.forecasts.aggregate(
    ]
 );
  */
-      val result = forecasts.aggregateWith1[Redaction]() { framework =>
+      val result = forecasts.aggregateWith[Redaction]() { framework =>
         import framework.{ Match, Redact }
 
         Match(document("year" -> 2014)) -> List(
@@ -1088,7 +1089,7 @@ db.accounts.aggregate([
     }
   ])
  */
-      val result = customers.aggregateWith1[BSONDocument]() { framework =>
+      val result = customers.aggregateWith[BSONDocument]() { framework =>
         import framework.{ Match, Redact }
 
         Match(document("status" -> "A")) -> List(
@@ -1135,7 +1136,7 @@ db.accounts.aggregate([
     }
 
     "and reshaped using $replaceRoot" in {
-      val result = fruits.aggregateWith1[BSONDocument]() { framework =>
+      val result = fruits.aggregateWith[BSONDocument]() { framework =>
         import framework.{ Match, ReplaceRootField }
 
         Match(document("_id" -> 1)) -> List(ReplaceRootField("in_stock"))
@@ -1163,7 +1164,7 @@ db.accounts.aggregate([
     }
 
     "and reshaped using $replaceRoot" in {
-      val result = contacts.aggregateWith1[BSONDocument]() { framework =>
+      val result = contacts.aggregateWith[BSONDocument]() { framework =>
         import framework.{ Match, ReplaceRoot }
 
         Match(document("_id" -> 1)) -> List(ReplaceRoot(document(
@@ -1232,7 +1233,7 @@ db.accounts.aggregate([
           "totalQuiz" -> 16,
           "totalScore" -> 40))
 
-      students.aggregateWith1[BSONDocument]() { framework =>
+      students.aggregateWith[BSONDocument]() { framework =>
         import framework.AddFields
 
         AddFields(document(
@@ -1267,7 +1268,7 @@ db.accounts.aggregate([
     }
 
     f"be aggregated using $$slice and $$count" in {
-      users.aggregateWith1[User]() { framework =>
+      users.aggregateWith[User]() { framework =>
         import framework.{ Project, Slice }
 
         Project(BSONDocument(

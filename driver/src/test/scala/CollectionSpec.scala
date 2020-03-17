@@ -150,7 +150,8 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
       }
 
       "successfully with 'name' projection using collect" in {
-        collection.find(BSONDocument("age" -> 25), BSONDocument("name" -> 1)).
+        collection.find(
+          BSONDocument("age" -> 25), Some(BSONDocument("name" -> 1))).
           one[BSONDocument] must beSome[BSONDocument].which { doc =>
             doc.elements.size must_=== 2 /* _id+name */ and {
               decoder.string(doc, "name") aka "name" must beSome("Jack")

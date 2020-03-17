@@ -106,9 +106,9 @@ trait CollectionMetaSpec { collSpec: CollectionSpec =>
     val name1 = s"collection_one${System identityHashCode doc}"
     val name2 = s"collection_two${System identityHashCode doc}"
 
-    def i1 = db2(name1).insert(doc).map(_.ok)
+    def i1 = db2(name1).insert.one(doc).map(_.ok)
 
-    def i2 = db2(name2).insert(doc).map(_.ok)
+    def i2 = db2(name2).insert.one(doc).map(_.ok)
 
     i1 aka "insert #1" must beTrue.await(1, timeout) and {
       i2 aka "insert #2" must beTrue.await(1, timeout)

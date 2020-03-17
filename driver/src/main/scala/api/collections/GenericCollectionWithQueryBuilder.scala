@@ -25,7 +25,7 @@ import reactivemongo.api.{
 private[api] trait GenericCollectionWithQueryBuilder[P <: SerializationPack with Singleton] { parent: GenericCollection[P] =>
 
   protected final class CollectionQueryBuilder(
-    @deprecatedName(Symbol("failover")) val failoverStrategy: FailoverStrategy,
+    val failoverStrategy: FailoverStrategy,
     val queryOption: Option[pack.Document] = None,
     val sortOption: Option[pack.Document] = None,
     val projectionOption: Option[pack.Document] = None,
@@ -54,7 +54,7 @@ private[api] trait GenericCollectionWithQueryBuilder[P <: SerializationPack with
       snapshotFlag: Boolean = snapshotFlag,
       commentString: Option[String] = commentString,
       options: QueryOpts = options,
-      @deprecatedName(Symbol("failover")) failoverStrategy: FailoverStrategy = failoverStrategy,
+      failoverStrategy: FailoverStrategy = failoverStrategy,
       maxTimeMsOption: Option[Long] = maxTimeMsOption): CollectionQueryBuilder =
       new CollectionQueryBuilder(failoverStrategy, queryOption, sortOption,
         projectionOption, hintOption, explainFlag, snapshotFlag, commentString,

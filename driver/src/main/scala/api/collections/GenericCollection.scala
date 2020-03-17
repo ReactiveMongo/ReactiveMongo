@@ -121,11 +121,9 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    */
   type PipelineOperator = BatchCommands.AggregationFramework.PipelineOperator
 
-  @deprecated("Internal: will be made private", "0.16.0")
-  implicit def PackIdentityReader: pack.Reader[pack.Document] = pack.IdentityReader
+  private[reactivemongo] implicit def PackIdentityReader: pack.Reader[pack.Document] = pack.IdentityReader
 
-  @deprecated("Internal: will be made private", "0.16.0")
-  implicit def PackIdentityWriter: pack.Writer[pack.Document] = pack.IdentityWriter
+  private[reactivemongo] implicit def PackIdentityWriter: pack.Writer[pack.Document] = pack.IdentityWriter
 
   implicit protected lazy val unitBoxReader: pack.Reader[UnitBox.type] =
     CommandCodecs.unitBoxReader[pack.type](pack)
@@ -140,17 +138,18 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   def withReadPreference(pref: ReadPreference): GenericCollection[P]
 
   /**
-   * $findDescription.
+   * $findDescription, with the projection applied.
    * @see $queryLink
    *
    * @tparam S $selectorTParam
+   * @tparam P The type of the projection object. An implicit `Writer[P]` typeclass for handling it has to be in the scope.
    *
    * @param selector $selectorParam
    * @param swriter $swriterParam
+   * @param pwriter the writer for the projection
    * @return $returnQueryBuilder
    */
-  @deprecated("Use `find` with optional `projection`", "0.16.0")
-  def find[S](selector: S)(implicit swriter: pack.Writer[S]): GenericQueryBuilder[pack.type] = genericQueryBuilder.query(selector)
+  def find[S](selector: S)(implicit swriter: pack.Writer[S]): GenericQueryBuilder[pack.type] = find(selector, Option.empty[pack.Document])
 
   /**
    * $findDescription, with the projection applied.
@@ -165,23 +164,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param pwriter the writer for the projection
    * @return $returnQueryBuilder
    */
-  @deprecated("Use `find` with optional `projection`", "0.16.0")
-  def find[S, J](selector: S, projection: J)(implicit swriter: pack.Writer[S], pwriter: pack.Writer[J]): GenericQueryBuilder[pack.type] = genericQueryBuilder.query(selector).projection(projection)
-
-  /**
-   * $findDescription, with the projection applied.
-   * @see $queryLink
-   *
-   * @tparam S $selectorTParam
-   * @tparam P The type of the projection object. An implicit `Writer[P]` typeclass for handling it has to be in the scope.
-   *
-   * @param selector $selectorParam
-   * @param projection the projection document to select only a subset of each matching documents
-   * @param swriter $swriterParam
-   * @param pwriter the writer for the projection
-   * @return $returnQueryBuilder
-   */
-  def find[S, J](selector: S, projection: Option[J] = Option.empty)(implicit swriter: pack.Writer[S], pwriter: pack.Writer[J]): GenericQueryBuilder[pack.type] = {
+  def find[S, J](selector: S, projection: Option[J])(implicit swriter: pack.Writer[S], pwriter: pack.Writer[J]): GenericQueryBuilder[pack.type] = {
     @com.github.ghik.silencer.silent(".*filter\\ predicate.*")
     val queryBuilder: GenericQueryBuilder[pack.type] =
       genericQueryBuilder.filter(selector)
@@ -198,57 +181,15 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param skip the number of matching documents to skip before counting
    * @param hint the index to use (either the index name or the index document; see `hint(..)`)
    * @param readConcern $readConcernParam
+   * @param readPreference $readPrefParam
    */
   def count(
     selector: Option[pack.Document] = None,
     limit: Option[Int] = None,
     skip: Int = 0,
     hint: Option[Hint[pack.type]] = None,
-    readConcern: ReadConcern = readConcern)(implicit ec: ExecutionContext): Future[Long] =
-    countDocuments(selector, limit, skip, hint, readConcern, self.readPreference)
-
-  /**
-   * Counts the matching documents.
-   * @see $queryLink
-   *
-   * @param selector $selectorParam
-   * @param limit the maximum number of matching documents to count
-   * @param skip the number of matching documents to skip before counting
-   * @param hint the index to use (either the index name or the index document; see `hint(..)`)
-   * @param readConcern $readConcernParam
-   * @param readPreference $readPrefParam
-   */
-  def count(
-    selector: Option[pack.Document],
-    limit: Option[Int],
-    skip: Int,
-    hint: Option[Hint[pack.type]],
-    readConcern: ReadConcern,
-    readPreference: ReadPreference)(implicit ec: ExecutionContext): Future[Long] = countDocuments(selector, limit, skip, hint, readConcern, readPreference)
-
-  /**
-   * Inserts a document into the collection and waits for the [[reactivemongo.api.commands.WriteResult]].
-   *
-   * @tparam T The type of the document to insert. $implicitWriterT.
-   *
-   * @param document the document to insert
-   * @param writeConcern $writeConcernParam
-   * @param writer $writerParam to be inserted
-   * @return $returnWriteResult
-   *
-   * {{{
-   * import scala.concurrent.ExecutionContext
-   *
-   * import reactivemongo.api.bson.BSONDocument
-   * import reactivemongo.api.bson.collection.BSONCollection
-   *
-   * def withDefaultWriteConcern(coll: BSONCollection, myDoc: BSONDocument)(
-   *   implicit ec: ExecutionContext) = coll.insert(myDoc)
-   * }}}
-   */
-  @deprecated("Use `.insert(ordered = false).one(..)`", "0.16.1")
-  def insert[T](document: T, writeConcern: WriteConcern = writeConcern)(implicit writer: pack.Writer[T], ec: ExecutionContext): Future[WriteResult] =
-    prepareInsert(true, writeConcern, false).one(document)
+    readConcern: ReadConcern = this.readConcern,
+    readPreference: ReadPreference = this.readPreference)(implicit ec: ExecutionContext): Future[Long] = countDocuments(selector, limit, skip, hint, readConcern, readPreference)
 
   /**
    * Returns an unordered builder for insert operations.
@@ -348,30 +289,6 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     writeConcern: WriteConcern,
     bypassDocumentValidation: Boolean): InsertBuilder =
     prepareInsert(ordered, writeConcern, bypassDocumentValidation)
-
-  /**
-   * Updates one or more documents matching the given selector
-   * with the given modifier or update object.
-   *
-   * @tparam S $selectorTParam
-   * @tparam T The type of the modifier or update object. $implicitWriterT.
-   *
-   * @param selector the selector object, for finding the documents to update.
-   * @param update the modifier object (with special keys like \$set) or replacement object.
-   * @param writeConcern $writeConcernParam
-   * @param upsert $upsertParam (defaults: `false`)
-   * @param multi states whether the update may be done on all the matching documents (default: `false`)
-   * @param swriter $swriterParam
-   * @param writer $writerParam
-   *
-   * @return $returnWriteResult
-   */
-  @deprecated("Use `.update(ordered = false).one(..)`", "0.16.1")
-  def update[S, T](selector: S, update: T, writeConcern: WriteConcern = writeConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = prepareUpdate(
-    ordered = true,
-    writeConcern = writeConcern,
-    bypassDocumentValidation = false).
-    one(selector, update, upsert, multi)
 
   /**
    * Returns an unordered update builder.
@@ -486,22 +403,8 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): BatchCommands.FindAndModifyCommand.Update = BatchCommands.FindAndModifyCommand.Update(update, fetchNewObject, upsert)
 
   /** Returns a removal modifier, to be used with `findAndModify`. */
-  @deprecated("Internal: will be made private", "0.16.0")
   @transient lazy val removeModifier =
     BatchCommands.FindAndModifyCommand.Remove
-
-  @deprecated("Use other `findAndModify`", "0.14.0")
-  def findAndModify[S](selector: S, modifier: BatchCommands.FindAndModifyCommand.Modify, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndModify[S](
-    selector, modifier, sort, fields,
-    bypassDocumentValidation = false,
-    writeConcern = writeConcern,
-    maxTime = Option.empty[FiniteDuration],
-    collation = Option.empty[Collation],
-    arrayFilters = Seq.empty[pack.Document]).map { result =>
-    BatchCommands.FindAndModifyCommand.FindAndModifyResult(
-      lastError = result.lastError,
-      value = result.value)
-  }
 
   /**
    * Applies a [[http://docs.mongodb.org/manual/reference/command/findAndModify/ findAndModify]] operation. See `findAndUpdate` and `findAndRemove` convenient functions.
@@ -535,7 +438,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param modifier $modifierParam
    * @param sort $sortParam (default: `None`)
    * @param fields $fieldsParam
-   * @param bypassDocumentValidation
+   * @param bypassDocumentValidation $bypassDocumentValidationParam (default: `false`)
    * @param writeConcern $writeConcernParam
    * @param maxTime $maxTimeParam
    * @param collation $collationParam
@@ -545,13 +448,13 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   def findAndModify[S](
     selector: S,
     modifier: BatchCommands.FindAndModifyCommand.Modify,
-    sort: Option[pack.Document],
-    fields: Option[pack.Document],
-    bypassDocumentValidation: Boolean,
-    writeConcern: WriteConcern,
-    maxTime: Option[FiniteDuration],
-    collation: Option[Collation],
-    arrayFilters: Seq[pack.Document])(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[FNM.Result[pack.type]] = {
+    sort: Option[pack.Document] = None,
+    fields: Option[pack.Document] = None,
+    bypassDocumentValidation: Boolean = false,
+    writeConcern: WriteConcern = this.writeConcern,
+    maxTime: Option[FiniteDuration] = None,
+    collation: Option[Collation] = None,
+    arrayFilters: Seq[pack.Document] = Seq.empty)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[FNM.Result[pack.type]] = {
 
     val op = prepareFindAndModify(
       selector = selector,
@@ -565,23 +468,6 @@ trait GenericCollection[P <: SerializationPack with Singleton]
       arrayFilters = arrayFilters)
 
     op()
-  }
-
-  @deprecated("Use other `findAndUpdate`", "0.18.0")
-  def findAndUpdate[S, T](
-    selector: S,
-    update: T,
-    fetchNewObject: Boolean = false,
-    upsert: Boolean = false,
-    sort: Option[pack.Document] = None,
-    fields: Option[pack.Document] = None)(
-    implicit
-    swriter: pack.Writer[S],
-    writer: pack.Writer[T],
-    ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndUpdate[S, T](selector, update, fetchNewObject, upsert, sort, fields, bypassDocumentValidation = false, writeConcern = writeConcern, maxTime = None, collation = None, arrayFilters = Seq.empty).map { result =>
-    BatchCommands.FindAndModifyCommand.FindAndModifyResult(
-      lastError = result.lastError,
-      value = result.value)
   }
 
   /**
@@ -606,11 +492,11 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    *
    * @param selector $selectorParam
    * @param update $updateParam
-   * @param fetchNewObject the command result must be the new object instead of the old one.
-   * @param upsert $upsertParam
+   * @param fetchNewObject the command result must be the new object instead of the old one (default: `false`)
+   * @param upsert $upsertParam (default: `false`)
    * @param sort $sortParam (default: `None`)
    * @param fields $fieldsParam
-   * @param bypassDocumentValidation
+   * @param bypassDocumentValidation $bypassDocumentValidationParam (default: `false`)
    * @param writeConcern $writeConcernParam
    * @param swriter $swriterParam
    * @param writer $writerParam
@@ -621,15 +507,15 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   def findAndUpdate[S, T](
     selector: S,
     update: T,
-    fetchNewObject: Boolean,
-    upsert: Boolean,
-    sort: Option[pack.Document],
-    fields: Option[pack.Document],
-    bypassDocumentValidation: Boolean,
-    writeConcern: WriteConcern,
-    maxTime: Option[FiniteDuration],
-    collation: Option[Collation],
-    arrayFilters: Seq[pack.Document])(
+    fetchNewObject: Boolean = false,
+    upsert: Boolean = false,
+    sort: Option[pack.Document] = None,
+    fields: Option[pack.Document] = None,
+    bypassDocumentValidation: Boolean = false,
+    writeConcern: WriteConcern = this.writeConcern,
+    maxTime: Option[FiniteDuration] = None,
+    collation: Option[Collation] = None,
+    arrayFilters: Seq[pack.Document] = Seq.empty)(
     implicit
     swriter: pack.Writer[S],
     writer: pack.Writer[T],
@@ -642,13 +528,6 @@ trait GenericCollection[P <: SerializationPack with Singleton]
       maxTime = maxTime,
       collation = collation,
       arrayFilters = arrayFilters)
-  }
-
-  @deprecated("Use the other `findAndRemove`", "0.18.0")
-  def findAndRemove[S](selector: S, sort: Option[pack.Document] = None, fields: Option[pack.Document] = None)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[BatchCommands.FindAndModifyCommand.FindAndModifyResult] = findAndRemove[S](selector, sort, fields, writeConcern = this.writeConcern, maxTime = None, collation = None, arrayFilters = Seq.empty).map { result =>
-    BatchCommands.FindAndModifyCommand.FindAndModifyResult(
-      lastError = result.lastError,
-      value = result.value)
   }
 
   /**
@@ -683,12 +562,12 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    */
   def findAndRemove[S](
     selector: S,
-    sort: Option[pack.Document],
-    fields: Option[pack.Document],
-    writeConcern: WriteConcern,
-    maxTime: Option[FiniteDuration],
-    collation: Option[Collation],
-    arrayFilters: Seq[pack.Document])(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[FNM.Result[pack.type]] = findAndModify[S](
+    sort: Option[pack.Document] = None,
+    fields: Option[pack.Document] = None,
+    writeConcern: WriteConcern = this.writeConcern,
+    maxTime: Option[FiniteDuration] = None,
+    collation: Option[Collation] = None,
+    arrayFilters: Seq[pack.Document] = Seq.empty)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[FNM.Result[pack.type]] = findAndModify[S](
     selector, removeModifier, sort, fields,
     bypassDocumentValidation = false,
     writeConcern = writeConcern,
@@ -703,25 +582,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    *
    * @param explain $explainParam of the pipeline
    * @param allowDiskUse $allowDiskUseParam
-   * @param bypassDocumentValidation $bypassParam
-   * @param readConcern $readConcernParam
-   * @param readPreference $readPrefParam (default: primary)
-   * @param batchSize $aggBatchSizeParam
-   * @param f $aggregationPipelineFunction
-   * @param reader $readerParam
-   * @param cf $cursorFlattenerParam
-   */
-  @deprecated("Use [[aggregateWith]]", "0.16.0")
-  def aggregateWith1[T](explain: Boolean = false, allowDiskUse: Boolean = false, bypassDocumentValidation: Boolean = false, readConcern: Option[ReadConcern] = None, readPreference: ReadPreference = ReadPreference.primary, batchSize: Option[Int] = None)(f: AggregationFramework => AggregationPipeline)(implicit ec: ExecutionContext, reader: pack.Reader[T], cf: CursorFlattener[Cursor], cp: CursorProducer[T]): cp.ProducedCursor = aggregateWith[T](explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, batchSize)(f)
-
-  /**
-   * $aggregation.
-   *
-   * @tparam T $resultTParam
-   *
-   * @param explain $explainParam of the pipeline
-   * @param allowDiskUse $allowDiskUseParam
-   * @param bypassDocumentValidation $bypassParam
+   * @param bypassDocumentValidation $bypassDocumentValidationParam (default: `false`)
    * @param readConcern $readConcernParam
    * @param readPreference $readPrefParam (default: primary)
    * @param batchSize $aggBatchSizeParam
@@ -732,7 +593,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     explain: Boolean = false,
     allowDiskUse: Boolean = false,
     bypassDocumentValidation: Boolean = false,
-    readConcern: Option[ReadConcern] = None,
+    readConcern: ReadConcern = this.readConcern,
     readPreference: ReadPreference = ReadPreference.primary,
     batchSize: Option[Int] = None)(
     f: AggregationFramework => AggregationPipeline)(
@@ -749,40 +610,6 @@ trait GenericCollection[P <: SerializationPack with Singleton]
       prepared[Cursor.WithOps](CursorProducer.defaultCursorProducer[T]).cursor
 
     cp.produce(aggregateCursor)
-  }
-
-  @deprecated("Use aggregator context with optional writeConcern", "0.17.0")
-  @inline def aggregatorContext[T](firstOperator: PipelineOperator, otherOperators: List[PipelineOperator], explain: Boolean, allowDiskUse: Boolean, bypassDocumentValidation: Boolean, readConcern: Option[ReadConcern], readPreference: ReadPreference, batchSize: Option[Int])(implicit reader: pack.Reader[T]): AggregatorContext[T] = aggregatorContext[T](firstOperator, otherOperators, explain, allowDiskUse, bypassDocumentValidation, readConcern, readPreference, this.writeConcern, batchSize, CursorOptions.empty)
-
-  @deprecated("Use aggregator context with comment", "0.19.8")
-  @inline def aggregatorContext[T](
-    firstOperator: PipelineOperator,
-    otherOperators: List[PipelineOperator] = Nil,
-    explain: Boolean = false,
-    allowDiskUse: Boolean = false,
-    bypassDocumentValidation: Boolean = false,
-    readConcern: Option[ReadConcern] = None,
-    readPreference: ReadPreference = ReadPreference.primary,
-    writeConcern: WriteConcern = this.writeConcern,
-    batchSize: Option[Int] = None,
-    cursorOptions: CursorOptions = CursorOptions.empty,
-    maxTimeMS: Option[Long] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = {
-    new AggregatorContext[T](
-      firstOperator,
-      otherOperators,
-      explain,
-      allowDiskUse,
-      bypassDocumentValidation,
-      readConcern = readConcern.getOrElse(self.readConcern),
-      readPreference = readPreference,
-      writeConcern = writeConcern,
-      batchSize = batchSize,
-      cursorOptions = cursorOptions,
-      maxTime = maxTimeMS.map(FiniteDuration(_, "milliseconds")),
-      hint = None,
-      comment = None,
-      collation = None,
-      reader = reader)
   }
 
   /**
@@ -817,9 +644,9 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param firstOperator $firstOpParam
    * @param otherOperators $otherOpsParam
    * @param cursor aggregation cursor option (optional)
-   * @param explain $explainParam of the pipeline
-   * @param allowDiskUse $allowDiskUseParam
-   * @param bypassDocumentValidation $bypassParam
+   * @param explain $explainParam of the pipeline (default: `false`)
+   * @param allowDiskUse $allowDiskUseParam (default: `false`)
+   * @param bypassDocumentValidation $bypassDocumentValidationParam (default: `false`)
    * @param readConcern $readConcernParam
    * @param readPreference $readPrefParam
    * @param writeConcern $writeConcernParam
@@ -834,19 +661,19 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    */
   def aggregatorContext[T](
     firstOperator: PipelineOperator,
-    otherOperators: List[PipelineOperator],
-    explain: Boolean,
-    allowDiskUse: Boolean,
-    bypassDocumentValidation: Boolean,
-    readConcern: ReadConcern,
-    readPreference: ReadPreference,
-    writeConcern: WriteConcern,
-    batchSize: Option[Int],
-    cursorOptions: CursorOptions,
-    maxTime: Option[FiniteDuration],
-    hint: Option[Hint[pack.type]],
-    comment: Option[String],
-    collation: Option[Collation])(implicit reader: pack.Reader[T]): AggregatorContext[T] = {
+    otherOperators: List[PipelineOperator] = List.empty,
+    explain: Boolean = false,
+    allowDiskUse: Boolean = false,
+    bypassDocumentValidation: Boolean = false,
+    readConcern: ReadConcern = this.readConcern,
+    readPreference: ReadPreference = this.readPreference,
+    writeConcern: WriteConcern = this.writeConcern,
+    batchSize: Option[Int] = None,
+    cursorOptions: CursorOptions = CursorOptions.empty,
+    maxTime: Option[FiniteDuration] = None,
+    hint: Option[Hint[pack.type]] = None,
+    comment: Option[String] = None,
+    collation: Option[Collation] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = {
     new AggregatorContext[T](
       firstOperator,
       otherOperators,
@@ -863,26 +690,6 @@ trait GenericCollection[P <: SerializationPack with Singleton]
       hint,
       comment,
       collation)
-  }
-
-  /**
-   * @tparam S $selectorTParam
-   * @param writeConcern $writeConcernParam
-   * @param swriter $swriterParam
-   *
-   * @return a future [[reactivemongo.api.commands.WriteResult]] that can be used to check whether the removal was successful
-   */
-  @deprecated("Use delete().one(selector, limit)", "0.13.1")
-  def remove[S](selector: S, writeConcern: WriteConcern = writeConcern, firstMatchOnly: Boolean = false)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[WriteResult] = {
-    val metadata = db.connectionState.metadata
-
-    if (metadata.maxWireVersion >= MongoWireVersion.V26) {
-      val limit = if (firstMatchOnly) Some(1) else Option.empty[Int]
-      prepareDelete(true, writeConcern).one(selector, limit)
-    } else {
-      // Mongo < 2.6
-      Future.failed[WriteResult](unsupportedVersion(metadata))
-    }
   }
 
   /**

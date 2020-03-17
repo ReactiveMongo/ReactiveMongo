@@ -174,7 +174,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
    *   gfs.find(BSONDocument("filename" -> n)).headOption
    * }}}
    */
-  def find(selector: pack.Document)(implicit ec: ExecutionContext, cp: CursorProducer[ReadFile[pack.Value]]): cp.ProducedCursor = {
+  def find(selector: pack.Document)(implicit cp: CursorProducer[ReadFile[pack.Value]]): cp.ProducedCursor = {
     implicit def w = pack.IdentityWriter
     implicit def r = FileReader.default(pack.IsValue)
 

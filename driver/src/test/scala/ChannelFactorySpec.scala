@@ -110,9 +110,9 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
         // ---
 
         chan.isRegistered and {
-          sentRequest.future must beEqualTo(reqBytes).await(1, timeout)
+          sentRequest.future must beTypedEqualTo(reqBytes).await(1, timeout)
         } and {
-          response.future must beEqualTo(expectedResp).await(1, timeout)
+          response.future must beTypedEqualTo(expectedResp).await(1, timeout)
         }
       }
     }

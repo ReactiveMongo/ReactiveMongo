@@ -2,6 +2,8 @@ package reactivemongo.api.collections
 
 import scala.language.higherKinds
 
+import scala.concurrent.duration.FiniteDuration
+
 import reactivemongo.api.{
   ChangeStreams,
   Cursor,
@@ -46,15 +48,16 @@ trait ChangeStreamOps[P <: SerializationPack with Singleton] { collection: Gener
     resumeAfter: Option[pack.Value] = None,
     startAtOperationTime: Option[pack.Value] = None,
     pipeline: List[PipelineOperator] = Nil,
-    maxAwaitTimeMS: Option[Long] = None,
+    maxTime: Option[FiniteDuration] = None,
     fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None)(implicit reader: pack.Reader[T]): WatchBuilder[T] = {
     new WatchBuilder[T] {
       protected val context: AggregatorContext[T] = aggregatorContext[T](
-        firstOperator = new ChangeStream(resumeAfter, startAtOperationTime, fullDocumentStrategy),
+        firstOperator = new ChangeStream(
+          resumeAfter, startAtOperationTime, fullDocumentStrategy),
         otherOperators = pipeline,
-        readConcern = Some(ReadConcern.Majority),
+        readConcern = ReadConcern.Majority,
         cursorOptions = CursorOptions.empty.tailable,
-        maxTimeMS = maxAwaitTimeMS)
+        maxTime = maxTime)
     }
   }
 

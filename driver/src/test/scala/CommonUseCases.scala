@@ -89,7 +89,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
       val pjn = BSONDocument("name" -> 1, "age" -> 1, "something" -> 1)
 
       def findSpec(c: DefaultCollection, t: FiniteDuration) = {
-        def it = c.find(BSONDocument.empty, pjn).
+        def it = c.find(BSONDocument.empty, Some(pjn)).
           options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
 
         //import reactivemongo.core.protocol.{ Response, Reply }

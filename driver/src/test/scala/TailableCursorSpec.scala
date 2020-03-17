@@ -24,16 +24,17 @@ trait TailableCursorSpec { specs: CursorSpec =>
           val sched = Common.driver.system.scheduler
 
           (0 until 10).foldLeft(Future successful {}) { (f, id) =>
-            f.flatMap(_ => col.insert(BSONDocument("id" -> id)).flatMap { _ =>
-              val pause = Promise[Unit]()
+            f.flatMap(_ => col.insert.one(
+              BSONDocument("id" -> id)).flatMap { _ =>
+                val pause = Promise[Unit]()
 
-              sched.scheduleOnce(200.milliseconds) {
-                pause.trySuccess({})
-                ()
-              }
+                sched.scheduleOnce(200.milliseconds) {
+                  pause.trySuccess({})
+                  ()
+                }
 
-              pause.future
-            })
+                pause.future
+              })
           }.map(_ => info(s"All fixtures inserted in test collection '$n'"))
         }
 
