@@ -84,7 +84,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
                     c.count(Some(writeDocument(after)))
                   }.*/
                 c.count(Some(writeDocument(after))).
-                  aka("count after") must beTypedEqualTo(1).await(1, timeout)
+                  aka("count after") must beTypedEqualTo(1L).await(1, timeout)
               }
           }).await(1, timeout)
       }
@@ -95,7 +95,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
         val collection = db(colName)
 
         collection.count(Some(writeDocument(jack1))).
-          aka("count before") must beTypedEqualTo(0).await(1, timeout) and {
+          aka("count before") must beTypedEqualTo(0L).await(1, timeout) and {
             upsertAndFetch(collection, jack1, after.age, timeout) { result =>
               result.lastError.exists(_.upsertedId.isDefined) must beTrue
             }
@@ -111,7 +111,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
         slowColl.insert(ordered = true).one(before).
           map(_.n) must beTypedEqualTo(1).await(0, slowTimeout) and {
             slowColl.count(Some(writeDocument(before))).
-              aka("count before") must beTypedEqualTo(1).await(1, slowTimeout)
+              aka("count before") must beTypedEqualTo(1L).await(1, slowTimeout)
           } and eventually(2, timeout) {
             upsertAndFetch(
               slowColl, before, after.age, slowTimeout) { result =>

@@ -109,9 +109,9 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       }
 
       insert(zipCodes) must beTypedEqualTo({}).await(1, timeout) and {
-        coll.count() aka "c#1" must beTypedEqualTo(4).await(1, slowTimeout)
+        coll.count() aka "c#1" must beTypedEqualTo(4L).await(1, slowTimeout)
       } and {
-        slowZipColl.count() aka "c#2" must beEqualTo(4).await(1, slowTimeout)
+        slowZipColl.count() aka "c#2" must beEqualTo(4L).await(1, slowTimeout)
       }
     }
 

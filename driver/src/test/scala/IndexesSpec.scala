@@ -263,7 +263,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
         b <- partial.count()
       } yield a -> b
 
-      insertAndCount must beTypedEqualTo(3 -> 6).await(0, timeout)
+      insertAndCount must beTypedEqualTo(3L -> 6L).await(0, timeout)
     }
   }
 

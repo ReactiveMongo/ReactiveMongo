@@ -9,10 +9,6 @@ object BSONBatchCommands extends BatchCommands[BSONSerializationPack.type] {
 
   val pack = BSONSerializationPack
 
-  val CountCommand = BSONCountCommand
-  implicit def CountWriter = BSONCountCommandImplicits.CountWriter
-  implicit def CountResultReader = BSONCountCommandImplicits.CountResultReader
-
   val DistinctCommand = BSONDistinctCommand
   implicit def DistinctWriter = BSONDistinctCommandImplicits.DistinctWriter
   implicit def DistinctResultReader = BSONDistinctCommandImplicits.DistinctResultReader

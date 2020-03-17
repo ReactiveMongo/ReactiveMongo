@@ -15,31 +15,20 @@
  */
 package reactivemongo.api.indexes
 
-import reactivemongo.core.protocol.MongoWireVersion
-
 import reactivemongo.api.{
   DB,
   DBMetaCommands,
   Collation,
-  Collection,
-  Cursor,
-  CursorProducer,
-  FailoverStrategy,
-  QueryOpts,
   ReadPreference,
   Serialization,
-  SerializationPack,
-  WriteConcern
+  SerializationPack
 }
-import reactivemongo.api.collections.GenericQueryBuilder
 
 import reactivemongo.api.commands.{
   Command,
   CommandCodecs,
   CommandError,
   DropIndexes,
-  InsertCommand,
-  ResolvedCollectionCommand,
   WriteResult
 }
 

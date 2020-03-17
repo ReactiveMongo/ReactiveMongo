@@ -23,8 +23,7 @@ import reactivemongo.bson.{
   BSONNumberLike
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-object BSONServerStatusImplicits {
+private[reactivemongo] object BSONServerStatusImplicits {
   object BSONServerStatusWriter
     extends BSONDocumentWriter[ServerStatus.type] {
 

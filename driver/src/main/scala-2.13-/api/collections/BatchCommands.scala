@@ -6,7 +6,6 @@ import reactivemongo.api.SerializationPack
 trait BatchCommands[P <: SerializationPack] {
   import reactivemongo.api.commands.{
     AggregationFramework => AC,
-    CountCommand => CC,
     DistinctCommand => DistC,
     InsertCommand => IC,
     UpdateCommand => UC,
@@ -16,10 +15,6 @@ trait BatchCommands[P <: SerializationPack] {
   }
 
   val pack: P
-
-  val CountCommand: CC[pack.type]
-  implicit def CountWriter: pack.Writer[ResolvedCollectionCommand[CountCommand.Count]]
-  implicit def CountResultReader: pack.Reader[CountCommand.CountResult]
 
   val DistinctCommand: DistC[pack.type]
   def DistinctWriter: pack.Writer[ResolvedCollectionCommand[DistinctCommand.Distinct]]

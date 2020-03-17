@@ -102,7 +102,6 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   protected lazy val version = db.connectionState.metadata.maxWireVersion
 
   protected val BatchCommands: BatchCommands[pack.type]
-  import BatchCommands.CountCommand
 
   /**
    * Alias for type of the aggregation framework,
@@ -194,33 +193,6 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * Counts the matching documents.
    * @see $queryLink
    *
-   * @tparam H The type of hint. An implicit `H => Hint` conversion has to be in the scope.
-   *
-   * @param selector $selectorParam (default: `None` to count all)
-   * @param limit the maximum number of matching documents to count
-   * @param skip the number of matching documents to skip before counting
-   * @param hint $hintParam
-   */
-  @deprecated("Use `count` with `readConcern` parameter", "0.16.0")
-  def count[H](
-    selector: Option[pack.Document] = None,
-    limit: Int = 0,
-    skip: Int = 0,
-    hint: Option[H] = None)(implicit h: H => CountCommand.Hint, ec: ExecutionContext): Future[Int] =
-    countDocuments(selector, Some(limit), skip,
-      hint = hint.map {
-        h(_) match {
-          case CountCommand.HintString(n)   => self.hint(n)
-          case CountCommand.HintDocument(d) => self.hint(d)
-        }
-      },
-      readConcern = self.readConcern,
-      readPreference = self.readPreference).map(_.toInt)
-
-  /**
-   * Counts the matching documents.
-   * @see $queryLink
-   *
    * @param selector $selectorParam
    * @param limit the maximum number of matching documents to count
    * @param skip the number of matching documents to skip before counting
@@ -228,11 +200,11 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param readConcern $readConcernParam
    */
   def count(
-    selector: Option[pack.Document],
-    limit: Option[Int],
-    skip: Int,
-    hint: Option[Hint[pack.type]],
-    readConcern: ReadConcern)(implicit ec: ExecutionContext): Future[Long] =
+    selector: Option[pack.Document] = None,
+    limit: Option[Int] = None,
+    skip: Int = 0,
+    hint: Option[Hint[pack.type]] = None,
+    readConcern: ReadConcern = readConcern)(implicit ec: ExecutionContext): Future[Long] =
     countDocuments(selector, limit, skip, hint, readConcern, self.readPreference)
 
   /**

@@ -11,7 +11,5 @@ object BSONBatchCommands extends BatchCommands[BSONSerializationPack.type] {
 
   val AggregationFramework = BSONAggregationFramework
 
-  val CountCommand = BSONCountCommand
-
   val FindAndModifyCommand = BSONFindAndModifyCommand
 }

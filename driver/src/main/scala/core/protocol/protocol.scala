@@ -20,8 +20,6 @@ import reactivemongo.io.netty.channel.{ ChannelHandlerContext, ChannelId }
 
 import reactivemongo.core.netty.BufferSequence
 
-import reactivemongo.api.commands.GetLastError
-
 import reactivemongo.api.ReadPreference
 
 // concrete classes

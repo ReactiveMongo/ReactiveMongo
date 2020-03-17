@@ -1,10 +1,6 @@
 package reactivemongo.api.indexes
 
-import reactivemongo.bson.BSONDocument
-
 import reactivemongo.api.{ Collation, Serialization, SerializationPack }
-
-import com.github.ghik.silencer.silent
 
 /**
  * A MongoDB index (excluding the namespace).

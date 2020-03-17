@@ -6,7 +6,7 @@ object Travis {
 
   lazy val settings = Seq(
     travisEnv in Test := { // test:travisEnv from SBT CLI
-      val (mongoLower, mongoUpper) = "2_6" -> "4"
+      val (mongoLower, mongoUpper) = "3" -> "4"
       val (jdkLower, jdkUpper) = "openjdk8" -> "oraclejdk9"
 
       // Scala
@@ -19,7 +19,7 @@ object Travis {
 
       // Base specifications for the integration envs
       val integrationSpecs = List[(String, List[String])](
-        "MONGO_VER" -> List(mongoLower, "3", mongoUpper),
+        "MONGO_VER" -> List(mongoLower, mongoUpper),
         "MONGO_PROFILE" -> List(
           "default", "invalid-ssl", "mutual-ssl", "rs", "x509"),
         "AKKA_VERSION" -> List(akkaLower, akkaUpper),

@@ -8,8 +8,6 @@ import reactivemongo.io.netty.channel.ChannelId
 
 import akka.actor.ActorRef
 
-import reactivemongo.bson.{ BSONDocument, BSONElement, BSONString }
-
 import reactivemongo.core.protocol.ProtocolMetadata
 
 import reactivemongo.core.netty.ChannelFactory
