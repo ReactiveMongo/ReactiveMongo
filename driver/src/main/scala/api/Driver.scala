@@ -17,7 +17,6 @@ import akka.pattern.ask
 import reactivemongo.core.actors.{
   Close,
   Closed,
-  LegacyDBSystem,
   MongoDBSystem,
   StandardDBSystem,
   StandardDBSystemWithX509,
@@ -168,9 +167,6 @@ private[api] trait Driver {
       }
 
       lazy val dbsystem: MongoDBSystem = opts.authMode match {
-        case CrAuthentication => new LegacyDBSystem(
-          supervisorName, nm, nodes, authentications, opts)
-
         case X509Authentication => new StandardDBSystemWithX509(
           supervisorName, nm, nodes, authentications, opts)
 

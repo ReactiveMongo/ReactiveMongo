@@ -766,9 +766,6 @@ object MongoConnection {
           case ("authenticationMechanism", "x509") => unsupported -> result.
             copy(authenticationMechanism = X509Authentication)
 
-          case ("authenticationMechanism", "mongocr") => unsupported -> result.
-            copy(authenticationMechanism = CrAuthentication)
-
           case ("authenticationMechanism", "scram-sha256") =>
             unsupported -> result.copy(
               authenticationMechanism = ScramSha256Authentication)
@@ -782,13 +779,6 @@ object MongoConnection {
 
             unsupported -> result.copy(
               authenticationMechanism = X509Authentication)
-          }
-
-          case ("authMode", "mongocr") => {
-            logger.warn(s"Connection option 'authMode' is deprecated; Use option 'authenticationMechanism'")
-
-            unsupported -> result.copy(
-              authenticationMechanism = CrAuthentication)
           }
 
           case ("authMode", _) => {

@@ -120,7 +120,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
             Common.failoverStrategy)) must throwA[CommandError].like {
             case CommandError.Code(code) => code aka "error code" must_== 76
           }.await(0, timeout)
-        } tag "not_mongo26"
+        }
       } else {
         "fail with replicaSet (MongoDB 3+)" in {
           connection.database("admin").flatMap(_.runCommand(
@@ -128,28 +128,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
             Common.failoverStrategy)) must throwA[CommandError].like {
             case CommandError.Code(code) => code aka "error code" must_== 95
           }.await(0, timeout)
-        } tag "not_mongo26"
-      }
-
-      // MongoDB 2.6
-      if (!replSetOn) {
-        "fail outside replicaSet (MongoDB 2.6)" in {
-          connection.database("admin").flatMap(_.runCommand(
-            ReplSetMaintenance(true),
-            Common.failoverStrategy)) must throwA[CommandError].
-            await(0, timeout)
-        } tag "mongo2"
-      } else {
-        "fail with replicaSet (MongoDB 2.6)" in {
-          connection.database("admin").flatMap(_.runCommand(
-            ReplSetMaintenance(true),
-            Common.failoverStrategy)) must throwA[CommandError].like {
-            case CommandError.Message(msg) =>
-              msg aka "message" must beTypedEqualTo(
-                "primaries can't modify maintenance mode")
-
-          }.await(0, timeout)
-        } tag "mongo2"
+        }
       }
     }
 

@@ -49,22 +49,6 @@ final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
       } tag "unit"
     }
 
-    section("mongo2", "mongo24", "not_mongo26")
-    "fail with MongoDB < 2.6" in {
-
-      import reactivemongo.core.errors.ReactiveMongoException
-
-      Common.connection.database(Common.commonDb, failoverStrategy).
-        map(_ => {}) aka "database resolution" must (
-          throwA[ReactiveMongoException]("Unsupported MongoDB version")).
-          await(0, timeout) and {
-            Await.result(Common.connection.database(Common.commonDb), timeout).
-              aka("database") must throwA[ReactiveMongoException](
-                "Unsupported MongoDB version")
-          }
-    }
-    section("mongo2", "mongo24", "not_mongo26")
-
     sessionSpecs
 
     "admin" >> {

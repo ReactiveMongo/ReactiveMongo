@@ -100,7 +100,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
             k2.getAs[BSONNumberLike]("_ftsx").map(_.toInt) must beSome(1)
           }
       }.await(0, timeout)
-    } tag "not_mongo26"
+    }
 
     "be inserted" in {
       def insert(data: List[ZipCode]): Future[Unit] = data.headOption match {
@@ -420,7 +420,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
           BSONDocument("_id" -> 6)))
 
       } yield ()) must beTypedEqualTo({}).await(0, timeout)
-    } tag "not_mongo26"
+    }
 
     "perform a simple lookup so the joined documents are returned" in {
       // See https://docs.mongodb.com/master/reference/operator/aggregation/lookup/#examples
@@ -444,7 +444,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
           Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()).
           aka("result") must beTypedEqualTo(expected).await(0, timeout)
 
-    } tag "not_mongo26"
+    }
 
     "perform a graph lookup so the joined documents are returned" in {
       // See https://docs.mongodb.com/manual/reference/operator/aggregation/graphLookup/#examples
@@ -496,7 +496,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
             "displayType" -> "LED")))
 
       } yield ()) must beTypedEqualTo({}).await(0, timeout)
-    } tag "not_mongo26"
+    }
 
     "so the joined documents are returned" in {
       import orders.aggregationFramework.{ Lookup, Match }
@@ -532,7 +532,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
             Unwind("specs", None, Some(true)) -> afterUnwind
         }.headOption must beSome(expected).await(0, timeout)
       }
-    } tag "not_mongo26"
+    }
   }
 
   f"Aggregation result for '$$out'" should {
@@ -653,7 +653,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
        { "_id" : 1, "stdDev" : 8.04155872120988 }
        { "_id" : 2, "stdDev" : 8.04155872120988 }
        */
-    } tag "not_mongo26"
+    }
 
     "return a sum as hash per quiz" in {
       import coll.aggregationFramework.{ Group, Sum }
@@ -765,7 +765,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
       contest.insert.many(fixtures).map(_ => {}).
         aka("fixtures") must beTypedEqualTo({}).await(0, timeout)
-    } tag "not_mongo26"
+    }
 
     "return the standard deviation of user ages" in {
       // { "_id" : null, "ageStdDev" : 11.135528725660043 }
@@ -784,7 +784,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         Sample(100) -> List(Group(BSONNull)(
           "ageStdDev" -> StdDevSamp(BSONString(f"$$age"))))
       }.headOption must beSome(expected).await(0, timeout)
-    } tag "not_mongo26"
+    }
   }
 
   "Geo-indexed documents" should {

@@ -5,7 +5,6 @@ import scala.concurrent.duration._
 
 import reactivemongo.api.{
   AsyncDriver,
-  CrAuthentication,
   DefaultDB,
   FailoverStrategy,
   MongoConnection,
@@ -184,7 +183,6 @@ sealed trait CommonAuth {
 
   def authMode: Option[AuthenticationMode] =
     sys.props.get("test.authenticationMechanism").flatMap {
-      case "cr"   => Some(CrAuthentication)
       case "x509" => Some(X509Authentication)
       case _      => None
     }

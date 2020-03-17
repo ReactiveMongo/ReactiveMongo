@@ -43,7 +43,6 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
 
   // ---
 
-  section("not_mongo26")
   "Geo Indexes" should {
     {
       def spec(c: DefaultCollection, timeout: FiniteDuration) = {
@@ -288,7 +287,6 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
       mngr.ensure(textIndex) must beFalse.await(0, timeout)
     }
   }
-  section("not_mongo26")
 
   // ---
 

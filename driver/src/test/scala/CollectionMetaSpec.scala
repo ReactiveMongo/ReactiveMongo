@@ -67,18 +67,12 @@ trait CollectionMetaSpec { collSpec: CollectionSpec =>
           await(1, timeout)
       }
 
-      "with statistics (MongoDB <= 2.6)" in {
-        c.stats must beLike[CollStatsResult] {
-          case stats => stats.capped must beTrue and (stats.maxSize must beNone)
-        }.await(1, timeout)
-      } tag "mongo2"
-
-      "with statistics (MongoDB >= 3.0)" >> {
+      "with statistics (MongoDB >= 3.0)" in {
         c.stats must beLike[CollStatsResult] {
           case stats => stats.capped must beTrue and (
             stats.maxSize must beSome(cappedMaxSize))
         }.await(1, timeout)
-      } tag "not_mongo26"
+      }
     }
 
   def successfulRename(c: MongoConnection, timeout: FiniteDuration) =

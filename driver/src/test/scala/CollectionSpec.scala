@@ -159,31 +159,18 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
           }.await(1, timeout)
       }
 
-      "explain query result" >> {
-        "when MongoDB > 2.6" in {
-          findAll(collection).explain().one[BSONDocument].
-            aka("explanation") must beSome[BSONDocument].which { result =>
-              decoder.child(result, "queryPlanner").
-                aka("queryPlanner") must beSome and {
-                  decoder.child(result, "executionStats").
-                    aka("stats") must beSome
-                } and {
-                  decoder.child(result, "serverInfo").
-                    aka("serverInfo") must beSome
-                }
-            }.await(1, timeout)
-        } tag "not_mongo26"
-
-        "when MongoDB = 2.6" in {
-          findAll(collection).explain().one[BSONDocument].
-            aka("explanation") must beSome[BSONDocument].which { result =>
-              decoder.children(result, "allPlans").
-                aka("plans") must beLike[List[BSONDocument]] {
-                  case _ => decoder.string(result, "server").
-                    aka("server") must beSome[String]
-                }
-            }.await(1, timeout)
-        } tag "mongo2"
+      "explain query result" in {
+        findAll(collection).explain().one[BSONDocument].
+          aka("explanation") must beSome[BSONDocument].which { result =>
+            decoder.child(result, "queryPlanner").
+              aka("queryPlanner") must beSome and {
+                decoder.child(result, "executionStats").
+                  aka("stats") must beSome
+              } and {
+                decoder.child(result, "serverInfo").
+                  aka("serverInfo") must beSome
+              }
+          }.await(1, timeout)
       }
     }
 

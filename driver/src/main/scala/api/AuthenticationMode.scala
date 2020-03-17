@@ -12,12 +12,6 @@ private[reactivemongo] object AuthenticationMode {
   type Scram = AuthenticationMode with ScramAuthentication with Singleton
 }
 
-/** MongoDB-CR authentication */
-@deprecated("Use SCRAM or X509", "0.19.4")
-case object CrAuthentication extends AuthenticationMode {
-  val name = "CR"
-}
-
 // SCRAM
 
 private[reactivemongo] sealed trait ScramAuthentication {

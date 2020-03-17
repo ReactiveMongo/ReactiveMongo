@@ -208,7 +208,7 @@ trait Cursor1Spec { spec: CursorSpec =>
             }
         }.await(1, timeout)
       }
-    } tag "not_mongo26"
+    }
 
     // head
     "find first document when matching" in {

@@ -52,23 +52,6 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
           }).await(1, timeout)
       }
 
-      section("mongo2", "mongo24", "not_mongo26")
-      "upsert with MongoDB < 3" >> {
-        "a person with the default connection" in {
-          spec(updCol1, timeout, jack)(_.copy(age = 33))
-        }
-
-        "a person with the slow connection and Secondary preference" in {
-          val coll = slowUpdCol1.withReadPreference(
-            ReadPreference.secondaryPreferred)
-
-          coll.readPreference must_=== ReadPreference.secondaryPreferred and {
-            spec(coll, slowTimeout, jane)(_.copy(age = 33))
-          }
-        }
-      }
-      section("mongo2", "mongo24", "not_mongo26")
-
       section("gt_mongo32")
       "upsert with MongoDB 3.4+" >> {
         "a person with the default connection" in {
@@ -129,22 +112,6 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
             }
           }.await(1, timeout)
       }
-
-      section("mongo2", "mongo24", "not_mongo26")
-      "update with MongoDB < 3" >> {
-        "a person with the default connection" in {
-          val person = jack.copy(age = 33) // as after previous upsert test
-
-          spec(updCol1, timeout, person)(_.copy(age = 66))
-        }
-
-        "a person with the slow connection" in {
-          val person = jane.copy(age = 33) // as after previous upsert test
-
-          spec(slowUpdCol1, slowTimeout, person)(_.copy(age = 66))
-        }
-      }
-      section("mongo2", "mongo24", "not_mongo26")
 
       section("gt_mongo32")
       "update with MongoDB 3.4+" >> {

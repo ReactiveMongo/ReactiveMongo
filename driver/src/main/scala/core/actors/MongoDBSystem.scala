@@ -1770,18 +1770,6 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
     logger.error(s"[$lnm] $msg", cause)
 }
 
-private[reactivemongo] final class LegacyDBSystem(
-  val supervisor: String,
-  val name: String,
-  val seeds: Seq[String],
-  val initialAuthenticates: Seq[Authenticate],
-  val options: MongoConnectionOptions) extends MongoDBSystem with MongoCrAuthentication {
-
-  def newChannelFactory(effect: Unit): ChannelFactory =
-    new ChannelFactory(supervisor, name, options)
-
-}
-
 private[reactivemongo] final class StandardDBSystem(
   val supervisor: String,
   val name: String,
