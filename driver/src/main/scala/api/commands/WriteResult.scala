@@ -27,11 +27,10 @@ sealed trait WriteResult {
 }
 
 object WriteResult {
-  // TODO: private
-  def lastError(result: WriteResult): Option[LastError] = result match {
-    case error @ LastError(_, _, _, _, _, _, _, _, _, _, _, _, _, _) => Some(error)
+  private[reactivemongo] def lastError(result: WriteResult): Option[LastError] = result match {
+    case error: LastError => Some(error)
     case _ if (result.ok) => None
-    case _ => Some(LastError(
+    case _ => Some(new LastError(
       false, // ok
       result.errmsg,
       result.code,
@@ -84,8 +83,7 @@ object WriteResult {
     true, 0, Seq.empty, Option.empty, Option.empty, Option.empty)
 }
 
-// TODO: private
-class LastError private[api] (
+private[reactivemongo] final class LastError private[api] (
   val ok: Boolean,
   val errmsg: Option[String],
   val code: Option[Int],
@@ -99,7 +97,7 @@ class LastError private[api] (
   val waited: Option[Int],
   val wtime: Option[Int],
   val writeErrors: Seq[WriteError],
-  val writeConcernError: Option[WriteConcernError]) extends DatabaseException with WriteResult with NoStackTrace with Product14[Boolean, Option[String], Option[Int], Option[Long], Int, Option[String], Boolean, Option[BSONValue], Option[WriteConcern.W], Boolean, Option[Int], Option[Int], Seq[WriteError], Option[WriteConcernError]] with Serializable {
+  val writeConcernError: Option[WriteConcernError]) extends DatabaseException with WriteResult with NoStackTrace {
 
   type Document = Nothing
 
@@ -110,55 +108,7 @@ class LastError private[api] (
 
   override lazy val message = errmsg.getOrElse("<none>")
 
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _1 = ok
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _2 = errmsg
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _3 = code
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _4 = lastOp
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _5 = n
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _6 = singleShard
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _7 = updatedExisting
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _8 = upserted
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _9 = wnote
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _10 = wtimeout
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _11 = waited
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _12 = wtime
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _13 = writeErrors
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _14 = writeConcernError
-
   private[api] lazy val tupled = Tuple14(ok, errmsg, code, lastOp, n, singleShard, updatedExisting, upserted, wnote, wtimeout, waited, wtime, writeErrors, writeConcernError)
-
-  @deprecated("No longer a case class", "0.20.3")
-  def canEqual(that: Any): Boolean = that match {
-    case _: LastError => true
-    case _            => false
-  }
 
   override def equals(that: Any): Boolean = that match {
     case other: LastError =>
@@ -173,50 +123,14 @@ class LastError private[api] (
   override def toString = s"LastError${tupled.hashCode}"
 }
 
-object LastError extends scala.runtime.AbstractFunction14[Boolean, Option[String], Option[Int], Option[Long], Int, Option[String], Boolean, Option[BSONValue], Option[WriteConcern.W], Boolean, Option[Int], Option[Int], Seq[WriteError], Option[WriteConcernError], LastError] {
-  def apply(
-    ok: Boolean,
-    errmsg: Option[String],
-    code: Option[Int],
-    lastOp: Option[Long],
-    n: Int,
-    singleShard: Option[String], // string?
-    updatedExisting: Boolean,
-    upserted: Option[BSONValue],
-    wnote: Option[WriteConcern.W],
-    wtimeout: Boolean,
-    waited: Option[Int],
-    wtime: Option[Int],
-    writeErrors: Seq[WriteError] = Nil,
-    writeConcernError: Option[WriteConcernError] = None): LastError = new LastError(ok, errmsg, code, lastOp, n, singleShard, updatedExisting, upserted, wnote, wtimeout, waited, wtime, writeErrors, writeConcernError)
-
-  @deprecated("No longer a case class", "0.20.3")
-  def unapply(error: LastError) = Option(error).map(_.tupled)
-}
-
 /**
  * @param code the error code
  * @param errmsg the error message
  */
-class WriteError private[api] (
+private[reactivemongo] final class WriteError private[api] (
   val index: Int,
   val code: Int,
-  val errmsg: String) extends Product3[Int, Int, String] with Serializable {
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _1 = index
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _2 = code
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _3 = errmsg
-
-  @deprecated("No longer a case class", "0.20.3")
-  def canEqual(that: Any): Boolean = that match {
-    case _: WriteError => true
-    case _             => false
-  }
+  val errmsg: String) {
 
   @deprecated("No longer a case class", "0.20.3")
   def copy(

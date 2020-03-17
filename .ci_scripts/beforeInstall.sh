@@ -39,10 +39,6 @@ if [ "$AKKA_VERSION" = "2.5.23" ]; then
     MONGO_VER="4"
 
     echo "[WARN] Fix MongoDB version to $MONGO_MINOR (due to Akka Stream version)"
-else
-    if [ "$MONGO_VER" = "2_6" ]; then
-        MONGO_MINOR="2.6.12"
-    fi
 fi
 
 # Prepare integration env
@@ -75,11 +71,6 @@ echo "[INFO] Installing MongoDB ${MONGO_MINOR} ..."
 cd "$HOME"
 
 MONGO_ARCH="x86_64-amazon"
-
-if [ "$MONGO_VER" = "2_6" ]; then
-  MONGO_ARCH="x86_64"
-fi
-
 MONGO_HOME="$HOME/mongodb-linux-$MONGO_ARCH-$MONGO_MINOR"
 
 if [ ! -x "$MONGO_HOME/bin/mongod" ]; then

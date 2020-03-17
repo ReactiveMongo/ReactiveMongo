@@ -17,7 +17,6 @@ cache:
   - $HOME/.ivy2
   - $HOME/.sbt
   - $HOME/ssl
-  - $HOME/mongodb-linux-x86_64-2.6.12
   - $HOME/mongodb-linux-x86_64-amazon-3.2.10
   - $HOME/mongodb-linux-x86_64-amazon-4.2.1
 env:
@@ -29,13 +28,13 @@ matrix:
     language: java
     env: CI_CATEGORY=UNIT_TESTS OS_NAME=osx TRAVIS_SCALA_VERSION=2.11.12 REACTIVEMONGO_SHADED=false
   - os: linux
-    env: CI_CATEGORY=UNIT_TESTS
+    env: CI_CATEGORY=UNIT_TESTS REACTIVEMONGO_SHADED=false
     jdk: oraclejdk9
     scala: 2.12.10
   - os: linux
     jdk: openjdk8
     scala: 2.11.12
-    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.3.13 ITERATEES_VERSION=2.3.8 MONGO_PROFILE=default MONGO_VER=3 PUBLISHABLE=yes REACTIVEMONGO_SHADED=false
+    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.3.13 ITERATEES_VERSION=2.3.8 MONGO_PROFILE=default MONGO_VER=4 PUBLISHABLE=yes
   - os: linux
     jdk: oraclejdk9
     scala: 2.12.10

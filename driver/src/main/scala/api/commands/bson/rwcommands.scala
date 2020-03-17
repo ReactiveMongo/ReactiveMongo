@@ -20,7 +20,7 @@ object BSONGetLastErrorImplicits {
   }
 
   implicit object LastErrorReader extends DealingWithGenericCommandErrorsReader[LastError] {
-    def readResult(doc: BSONDocument): LastError = LastError(
+    def readResult(doc: BSONDocument): LastError = new LastError(
       ok = doc.getAs[BSONBooleanLike]("ok").map(_.toBoolean).getOrElse(false),
       errmsg = doc.getAs[String]("err"),
       code = doc.getAs[Int]("code"),
@@ -43,7 +43,10 @@ object BSONGetLastErrorImplicits {
       },
       wtimeout = doc.getAs[Boolean]("wtimeout").getOrElse(false),
       waited = doc.getAs[Int]("waited"),
-      wtime = doc.getAs[Int]("wtime"))
+      wtime = doc.getAs[Int]("wtime"),
+      writeErrors = Seq.empty,
+      writeConcernError = Option.empty)
+
   }
 }
 

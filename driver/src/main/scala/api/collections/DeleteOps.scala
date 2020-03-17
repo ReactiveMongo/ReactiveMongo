@@ -24,8 +24,7 @@ import reactivemongo.api.commands.{
 trait DeleteOps[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
 
-  @deprecated("Internal: will be made private", "0.19.0")
-  object DeleteCommand
+  private[reactivemongo] object DeleteCommand
     extends reactivemongo.api.commands.DeleteCommand[collection.pack.type] {
     val pack: collection.pack.type = collection.pack
   }
@@ -243,7 +242,7 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
       case lastError: WriteResult =>
         Future.successful(lastError)
 
-      case cause => Future.successful(LastError(
+      case cause => Future.successful(new LastError(
         ok = false,
         errmsg = Option(cause.getMessage),
         code = Option.empty,
@@ -255,7 +254,9 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
         wnote = Option.empty[WriteConcern.W],
         wtimeout = false,
         waited = Option.empty[Int],
-        wtime = Option.empty[Int]))
+        wtime = Option.empty[Int],
+        writeErrors = Seq.empty,
+        writeConcernError = Option.empty))
     }
 
   private final class UnorderedDelete(

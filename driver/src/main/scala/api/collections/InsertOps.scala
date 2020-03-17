@@ -236,7 +236,7 @@ trait InsertOps[P <: SerializationPack with Singleton] {
       case lastError: WriteResult =>
         Future.successful(lastError)
 
-      case cause => Future.successful(LastError(
+      case cause => Future.successful(new LastError(
         ok = false,
         errmsg = Option(cause.getMessage),
         code = Option.empty,
@@ -248,7 +248,9 @@ trait InsertOps[P <: SerializationPack with Singleton] {
         wnote = Option.empty[WriteConcern.W],
         wtimeout = false,
         waited = Option.empty[Int],
-        wtime = Option.empty[Int]))
+        wtime = Option.empty[Int],
+        writeErrors = Seq.empty,
+        writeConcernError = Option.empty))
     }
 
   private final class UnorderedInsert(
