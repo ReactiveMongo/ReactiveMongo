@@ -69,6 +69,13 @@ package object tests {
     }
   }
 
+  type QueryOpts = reactivemongo.api.QueryOpts
+
+  def QueryOpts(
+    skipN: Int = 0,
+    batchSizeN: Int = 0,
+    flagsN: Int = 0) = reactivemongo.api.QueryOpts(skipN, batchSizeN, flagsN)
+
   def Authenticate(
     db: String,
     user: String,
@@ -95,7 +102,7 @@ package object tests {
   type Response = reactivemongo.core.protocol.Response
 
   // Test alias
-  def _failover2[A](c: MongoConnection, s: FailoverStrategy)(p: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] = Failover2.apply(c, s)(p)(ec)
+  def _failover2[A](c: MongoConnection, s: FailoverStrategy)(p: () => Future[A])(implicit ec: ExecutionContext): Failover[A] = Failover.apply(c, s)(p)(ec)
 
   def isAvailable(con: MongoConnection, timeout: FiniteDuration)(implicit ec: ExecutionContext): Future[Boolean] = con.probe(timeout).map(_ => true).recover {
     case _ => false
@@ -245,7 +252,7 @@ package object tests {
     }, BSONIsMasterCommand.IsMaster
     import reactivemongo.api.commands.Command
 
-    val (isMaster, _) = Command.buildRequestMaker(BSONSerializationPack)(
+    val isMaster = Command.buildRequestMaker(BSONSerializationPack)(
       IsMaster,
       BSONIsMasterCommandImplicits.IsMasterWriter,
       reactivemongo.api.ReadPreference.primaryPreferred,

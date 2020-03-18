@@ -78,7 +78,7 @@ final class InsertCommandSpec extends org.specs2.mutable.Specification {
 
   private lazy val insert1 = ResolvedCollectionCommand(
     collection = "foo",
-    command = Command.Insert(
+    command = new Command.Insert(
       head = firstDoc,
       tail = otherDocs,
       ordered = false,

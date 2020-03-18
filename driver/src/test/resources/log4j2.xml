@@ -8,7 +8,7 @@
   <loggers>
     <logger name="reactivemongo.api.commands" level="ERROR" />
     <logger name="reactivemongo.api.Cursor" level="OFF" />
-    <logger name="reactivemongo.api.Failover2" level="OFF" />
+    <logger name="reactivemongo.api.Failover" level="OFF" />
     <logger name="reactivemongo.api.MongoConnection" level="OFF" />
 
     <logger name="NettyProxy" level="DEBUG" />

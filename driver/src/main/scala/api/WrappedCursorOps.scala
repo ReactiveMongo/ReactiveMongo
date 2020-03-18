@@ -16,9 +16,6 @@ trait WrappedCursorOps[T] extends CursorOps[T] { cursor: Cursor[T] =>
   private[reactivemongo] def documentIterator(response: Response): Iterator[T] =
     opsWrappee.documentIterator(response)
 
-  @deprecated("Use `killCursor`", "0.16.0")
-  def kill(cursorID: Long): Unit = opsWrappee.kill(cursorID)
-
   private[reactivemongo] def killCursor(id: Long)(implicit ec: ExecutionContext): Unit = opsWrappee.killCursor(id)
 
   def tailable: Boolean = opsWrappee.tailable

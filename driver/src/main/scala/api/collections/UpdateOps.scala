@@ -26,8 +26,7 @@ import com.github.ghik.silencer.silent
 trait UpdateOps[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
 
-  @silent(".*UpdateCommand\\ in\\ package\\ commands\\ is\\ deprecated.*")
-  object UpdateCommand
+  private[reactivemongo] object UpdateCommand
     extends reactivemongo.api.commands.UpdateCommand[collection.pack.type] {
     val pack: collection.pack.type = collection.pack
   }
@@ -82,7 +81,6 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
     final def element[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation])(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] = element(q, u, upsert, multi, collation, Seq.empty)
 
     /** Prepares an [[UpdateCommand.UpdateElement]] */
-    @silent("constructor\\ UpdateElement\\ in\\ class\\ UpdateElement\\ is\\ deprecated.*")
     final def element[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] = {
       (Try(pack.serialize(q, qw)).map { query =>
         new UpdateElement(query, pack.serialize(u, uw), upsert, multi, collation, arrayFilters)

@@ -9,7 +9,7 @@ import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.Common
 import reactivemongo.api.TestCompat._
-import reactivemongo.api.tests.{ builder, decoder }
+import reactivemongo.api.tests.{ builder, decoder, QueryOpts }
 
 final class CommonUseCases(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification

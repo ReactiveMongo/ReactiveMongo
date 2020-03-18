@@ -12,85 +12,12 @@ import reactivemongo.core.errors.ConnectionException
 import reactivemongo.core.protocol.Response
 import reactivemongo.util.LazyLogger
 
-/**
- * A helper that sends the given message to the given actor,
- * following a failover strategy.
- * This helper holds a future reference that is completed with a response,
- * after 1 or more attempts (specified in the given strategy).
- * If the all the tryouts configured by the given strategy were unsuccessful,
- * the future reference is completed with a Throwable.
- *
- * Should not be used directly for most use cases.
- *
- * @tparam T Type of the message to send.
- * @param message The message to send to the given actor. This message will be wrapped into an ExpectingResponse message by the `expectingResponseMaker` function.
- * @param connection the reference to the MongoConnection the given message will be sent to
- * @param failoverStrategy the Failover strategy
- * @param expectingResponseMaker a function that takes a message of type `T` and wraps it into an ExpectingResponse message
- */
-@deprecated("Unused, will be removed", "0.17.0")
-class Failover[T](message: T, connection: MongoConnection, @deprecatedName(Symbol("strategy")) failoverStrategy: FailoverStrategy)(expectingResponseMaker: T => ExpectingResponse)(implicit ec: ExecutionContext) {
-  import Failover2.logger
-  import reactivemongo.core.errors._
-  import reactivemongo.core.actors.Exceptions._
+private[reactivemongo] final class Failover[A](
+  producer: () => Future[A],
+  connection: MongoConnection,
+  failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext) {
 
-  private val promise = Promise[Response]()
-
-  /**
-   * A future that is completed with a response,
-   * after 1 or more attempts (specified in the given strategy).
-   */
-  val future: Future[Response] = promise.future
-
-  private def send(n: Int): Unit = {
-    val expectingResponse = expectingResponseMaker(message)
-    connection.mongosystem ! expectingResponse
-    expectingResponse.future.onComplete {
-      case Failure(e) if isRetryable(e) =>
-        if (n < failoverStrategy.retries) {
-          val `try` = n + 1
-          val delayFactor = failoverStrategy.delayFactor(`try`)
-          val delay = Duration.unapply(failoverStrategy.initialDelay * delayFactor).fold(failoverStrategy.initialDelay)(t => FiniteDuration(t._1, t._2))
-
-          logger.debug(s"Got an error, retrying... (try #${`try`} is scheduled in ${delay.toMillis} ms)", e)
-
-          connection.actorSystem.scheduler.scheduleOnce(delay)(send(`try`))
-        } else {
-          // generally that means that the primary is not available or the nodeset is unreachable
-          logger.error("Got an error, no more attempts to do. Completing with a failure...", e)
-          promise.failure(e)
-        }
-
-      case Failure(e) => {
-        logger.trace(
-          "Got an non retryable error, completing with a failure...", e)
-        promise.failure(e)
-      }
-
-      case Success(response) => {
-        logger.trace("Got a successful result, completing...")
-        promise.success(response)
-      }
-    }
-  }
-
-  private def isRetryable(throwable: Throwable): Boolean = throwable match {
-    case e: ChannelNotFound             => e.retriable
-    case _: NotAuthenticatedException   => true
-    case _: PrimaryUnavailableException => true
-    case _: NodeSetNotReachable         => true
-    case _: ConnectionException         => true
-    case _: ConnectionNotInitialized    => true
-    case e: DatabaseException           => e.isNotAPrimaryError || e.isUnauthorized
-
-    case _                              => false
-  }
-
-  send(0)
-}
-
-private[reactivemongo] class Failover2[A](producer: () => Future[A], connection: MongoConnection, @deprecatedName(Symbol("strategy")) failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext) {
-  import Failover2.logger, logger.trace
+  import Failover.logger, logger.trace
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
 
@@ -179,13 +106,12 @@ private[api] object RetryableFailure {
   }
 }
 
-@deprecated("Internal: will be made private", "0.17.0")
-object Failover2 {
-  private[api] val logger = LazyLogger("reactivemongo.api.Failover2")
+private[reactivemongo] object Failover {
+  private[api] val logger = LazyLogger("reactivemongo.api.Failover")
 
   def apply[A](
     connection: MongoConnection,
-    @deprecatedName(Symbol("strategy")) failoverStrategy: FailoverStrategy)(
-    producer: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] =
-    new Failover2(producer, connection, failoverStrategy)
+    failoverStrategy: FailoverStrategy)(
+    producer: () => Future[A])(implicit ec: ExecutionContext): Failover[A] =
+    new Failover(producer, connection, failoverStrategy)
 }

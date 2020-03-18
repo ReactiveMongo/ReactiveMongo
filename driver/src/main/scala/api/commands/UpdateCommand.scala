@@ -7,45 +7,18 @@ import reactivemongo.api.{ Session, SerializationPack }
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/update/ update]] command.
  */
-@deprecated("Use the new update operation", "0.16.0")
-trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
+private[reactivemongo] trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
   val pack: P
 
-  sealed class Update(
+  final class Update(
     val firstUpdate: UpdateElement,
     val updates: Seq[UpdateElement],
     val ordered: Boolean,
     val writeConcern: WriteConcern,
-    val bypassDocumentValidation: Boolean) extends CollectionCommand with CommandWithResult[UpdateResult] with Mongo26WriteCommand with Serializable with Product {
-    @deprecated("Use constructor with bypassDocumentValidation", "0.19.8")
-    def this(
-      updates: Seq[UpdateElement],
-      ordered: Boolean,
-      writeConcern: WriteConcern) = this(
-      updates.head, updates.tail, ordered, writeConcern, false)
+    val bypassDocumentValidation: Boolean) extends CollectionCommand with CommandWithResult[UpdateResult] {
 
-    @deprecated(message = "Use [[updates]]", since = "0.12.7")
-    def documents = updates
-
-    @deprecated("No longer a case class", "0.19.8")
-    val productArity = 3
-
-    @deprecated("No longer a case class", "0.19.8")
-    def productElement(n: Int): Any = n match {
-      case 0 => updates
-      case 1 => ordered
-      case 2 => writeConcern
-      case _ => bypassDocumentValidation
-    }
-
-    @deprecated("No longer a case class", "0.19.8")
-    def canEqual(that: Any): Boolean = that match {
-      case _: Update => true
-      case _         => false
-    }
-
-    // TODO#1.1: All fields after release
-    private[commands] lazy val tupled = Tuple3(updates, ordered, writeConcern)
+    private[commands] lazy val tupled = Tuple5(
+      firstUpdate, updates, ordered, writeConcern, bypassDocumentValidation)
 
     override def equals(that: Any): Boolean = that match {
       case other: Update => other.tupled == this.tupled
@@ -66,17 +39,13 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
    * @param collation the collation to use for the operation
    * @param arrayFilters an array of filter documents that determines which array elements to modify for an update operation on an array field
    */
-  class UpdateElement @deprecated("Internal: will be made private/internal", "0.17.0") (
+  final class UpdateElement(
     val q: pack.Document,
     val u: pack.Document,
     val upsert: Boolean,
     val multi: Boolean,
     val collation: Option[Collation],
-    val arrayFilters: Seq[pack.Document]) extends Serializable with Product4[pack.Document, pack.Document, Boolean, Boolean] {
-    @deprecated("Use `q`", "0.17.0") val _1 = q
-    @deprecated("Use `u`", "0.17.0") val _2 = u
-    @deprecated("Use `upsert`", "0.17.0") val _3 = upsert
-    @deprecated("Use `multi`", "0.17.0") val _4 = multi
+    val arrayFilters: Seq[pack.Document]) {
 
     private val data = (q, u, upsert, multi, collation, arrayFilters)
 
@@ -87,76 +56,7 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
       case _                    => false
     }
 
-    def canEqual(that: Any): Boolean = that match {
-      case _: UpdateElement => true
-      case _                => false
-    }
-
     override def toString: String = s"UpdateElement${data.toString}"
-  }
-
-  @deprecated("Internal: will be made private/internal", "0.17.0")
-  object UpdateElement {
-    def apply(q: ImplicitlyDocumentProducer, u: ImplicitlyDocumentProducer, upsert: Boolean = false, multi: Boolean = false): UpdateElement =
-      new UpdateElement(
-        q = q.produce,
-        u = u.produce,
-        upsert = upsert,
-        multi = multi,
-        collation = None,
-        arrayFilters = Seq.empty)
-
-    def unapply(that: Any): Option[(pack.Document, pack.Document, Boolean, Boolean)] = that match {
-      case other: UpdateElement =>
-        Some(Tuple4(other.q, other.u, other.upsert, other.multi))
-
-      case _ =>
-        None
-    }
-  }
-
-  object Update {
-    @deprecated("Use factory with bypassDocumentValidation", "0.19.8")
-    def apply(
-      @deprecatedName(Symbol("documents")) updates: Seq[UpdateElement],
-      ordered: Boolean,
-      writeConcern: WriteConcern): Update =
-      new Update(updates, ordered, writeConcern)
-
-    @deprecated("Use factory with bypassDocumentValidation", "0.19.8")
-    def apply(firstUpdate: UpdateElement, updates: UpdateElement*): Update =
-      new Update(
-        firstUpdate +: updates,
-        ordered = true,
-        writeConcern = WriteConcern.Default)
-
-    @deprecated("Use factory with bypassDocumentValidation", "0.19.8")
-    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.Default)(firstUpdate: UpdateElement, updates: UpdateElement*): Update =
-      new Update(
-        firstUpdate,
-        updates,
-        ordered,
-        writeConcern,
-        bypassDocumentValidation = false)
-
-    def apply(
-      ordered: Boolean,
-      writeConcern: WriteConcern,
-      bypassDocumentValidation: Boolean,
-      firstUpdate: UpdateElement,
-      updates: UpdateElement*): Update =
-      new Update(
-        firstUpdate,
-        updates,
-        ordered,
-        writeConcern,
-        bypassDocumentValidation)
-
-    @deprecated("No longer a case class", "0.19.8")
-    def unapply(that: Any): Option[(Seq[UpdateElement], Boolean, WriteConcern)] = that match {
-      case up: Update => Option(up).map(_.tupled)
-      case _          => None
-    }
   }
 }
 

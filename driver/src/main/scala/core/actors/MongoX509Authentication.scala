@@ -21,7 +21,7 @@ private[reactivemongo] trait MongoX509Authentication { system: MongoDBSystem =>
     connection: Connection,
     nextAuth: Authenticate): Connection = {
 
-    val (maker, _) = Command.buildRequestMaker(pack)(
+    val maker = Command.buildRequestMaker(pack)(
       X509Authenticate(Option(nextAuth.user)),
       writer, ReadPreference.primary, db = f"$$external")
 

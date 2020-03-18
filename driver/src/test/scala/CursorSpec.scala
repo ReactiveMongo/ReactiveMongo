@@ -11,6 +11,8 @@ import org.specs2.concurrent.ExecutionEnv
 import _root_.tests.Common
 import reactivemongo.api.TestCompat._
 
+import reactivemongo.api.tests.QueryOpts
+
 final class CursorSpec(implicit val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification with CursorSpecEnv
   with Cursor1Spec with TailableCursorSpec {

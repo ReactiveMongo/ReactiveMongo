@@ -39,7 +39,7 @@ private[reactivemongo] object ExpectingResponse {
  */
 private[reactivemongo] class RequestMakerExpectingResponse(
   val requestMaker: RequestMaker,
-  val isMongo26WriteOp: Boolean,
+  val isMongo26WriteOp: Boolean, // TODO: Remove
   private[reactivemongo] override val pinnedNode: Option[String]) extends ExpectingResponse {
 
   override def equals(that: Any): Boolean = that match {
@@ -52,7 +52,7 @@ private[reactivemongo] class RequestMakerExpectingResponse(
 
   override lazy val hashCode: Int = tupled.hashCode
 
-  private lazy val tupled = Tuple3(requestMaker, isMongo26WriteOp, pinnedNode)
+  private lazy val tupled = Tuple2(requestMaker, pinnedNode)
 }
 
 private[reactivemongo] object RequestMakerExpectingResponse {
@@ -62,7 +62,7 @@ private[reactivemongo] object RequestMakerExpectingResponse {
     isMongo26WriteOp: Boolean): RequestMakerExpectingResponse =
     new RequestMakerExpectingResponse(requestMaker, isMongo26WriteOp, None)
 
-  def unapply(m: RequestMakerExpectingResponse): Option[(RequestMaker, Boolean)] = Option(m).map { s => s.requestMaker -> s.isMongo26WriteOp }
+  def unapply(m: RequestMakerExpectingResponse): Option[(RequestMaker, Boolean)] = Option(m).map { s => s.requestMaker -> s.isMongo26WriteOp /* TODO: Remove */ }
 
 }
 

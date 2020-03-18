@@ -39,23 +39,6 @@ class AsyncDriver(
    * Creates a new MongoConnection.
    *
    * @param nodes $nodesParam
-   * @param authentications $authParam
-   * @param options $optionsParam
-   * @param name $connectionNameParam
-   */
-  @deprecated("Use `connect` without `authencations` (but possibily with `credentials` on `options`)", "0.14.0")
-  def connect(nodes: Seq[String], options: MongoConnectionOptions = MongoConnectionOptions.default, authentications: Seq[Authenticate] = Seq.empty, name: Option[String] = None): Future[MongoConnection] = {
-    val credentials = options.credentials ++ authentications.map { a =>
-      a.db -> MongoConnectionOptions.Credential(a.user, a.password)
-    }
-
-    askConnection(nodes, options.copy(credentials = credentials), name)
-  }
-
-  /**
-   * Creates a new MongoConnection.
-   *
-   * @param nodes $nodesParam
    *
    * {{{
    * import scala.concurrent.Future
@@ -243,7 +226,7 @@ class AsyncDriver(
    *   }
    * }}}
    */
-  final def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS))(implicit @deprecatedName(Symbol("executionContext")) ec: ExecutionContext): Future[Unit] = askClose(timeout)
+  final def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS))(implicit ec: ExecutionContext): Future[Unit] = askClose(timeout)
 
 }
 

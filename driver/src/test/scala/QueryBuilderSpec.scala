@@ -170,7 +170,7 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
     val explainFlag: Boolean = false,
     val snapshotFlag: Boolean = false,
     val commentString: Option[String] = None,
-    val options: QueryOpts = QueryOpts(),
+    val options: tests.QueryOpts = tests.QueryOpts(),
     val maxTimeMsOption: Option[Long] = None,
     val version: MongoWireVersion = MongoWireVersion.V34) extends GenericQueryBuilder[pack.type] {
     type Self = TestQueryBuilder
@@ -184,7 +184,7 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
       explainFlag: Boolean = explainFlag,
       snapshotFlag: Boolean = snapshotFlag,
       commentString: Option[String] = commentString,
-      options: QueryOpts = options,
+      options: tests.QueryOpts = options,
       @deprecatedName(Symbol("failover")) failoverStrategy: FailoverStrategy = failoverStrategy,
       maxTimeMsOption: Option[Long] = maxTimeMsOption): TestQueryBuilder =
       new TestQueryBuilder(failoverStrategy, queryOption, sortOption,

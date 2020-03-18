@@ -315,13 +315,13 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
     implicit def resultReader = deleteReader
 
     val deleteChunkCmd = Delete(
-      Seq(DeleteElement(
+      Seq(new DeleteElement(
         q = document(Seq(elem("files_id", id))), 1, None)),
       ordered = false,
       writeConcern = defaultWriteConcern)
 
     val deleteFileCmd = Delete(
-      Seq(DeleteElement(
+      Seq(new DeleteElement(
         q = document(Seq(elem("_id", id))), 1, None)),
       ordered = false,
       writeConcern = defaultWriteConcern)
@@ -452,11 +452,12 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
       elem("n", builder.int(n)),
       elem("data", builder.binary(bytes))))
 
-    val insertChunkCmd = InsertCommand.Insert(
-      chunkDoc,
-      Seq.empty[pack.Document],
+    val insertChunkCmd = new InsertCommand.Insert(
+      head = chunkDoc,
+      tail = Seq.empty[pack.Document],
       ordered = false,
-      writeConcern = defaultWriteConcern)
+      writeConcern = defaultWriteConcern,
+      bypassDocumentValidation = false)
 
     implicit def resultReader = insertReader
 
@@ -501,11 +502,12 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
       res <- {
         val fileDoc = document(fileProps.result())
 
-        val insertFileCmd = InsertCommand.Insert(
-          fileDoc,
-          Seq.empty[pack.Document],
+        val insertFileCmd = new InsertCommand.Insert(
+          head = fileDoc,
+          tail = Seq.empty[pack.Document],
           ordered = false,
-          writeConcern = defaultWriteConcern)
+          writeConcern = defaultWriteConcern,
+          bypassDocumentValidation = false)
 
         implicit def resultReader = insertReader
 

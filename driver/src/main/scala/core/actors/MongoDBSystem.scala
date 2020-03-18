@@ -1603,7 +1603,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
       val client: Option[ClientMetadata] =
         if (node.pingInfo.firstSent) None else Some(clientMetadata)
 
-      lazy val (isMaster, _) = Command.buildRequestMaker(BSONSerializationPack)(
+      lazy val isMaster = Command.buildRequestMaker(BSONSerializationPack)(
         IsMaster(client, id.toString),
         BSONIsMasterCommandImplicits.IsMasterWriter,
         ReadPreference.primaryPreferred,

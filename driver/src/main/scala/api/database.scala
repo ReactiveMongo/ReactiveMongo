@@ -104,8 +104,7 @@ sealed trait DB {
    */
   def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = Serialization.defaultCollectionProducer): C = producer(this, name, failoverStrategy)
 
-  @deprecated("Internal: will be made private", "0.19.4")
-  @inline def defaultReadPreference: ReadPreference =
+  protected[api] def defaultReadPreference: ReadPreference =
     connection.options.readPreference
 
   /**

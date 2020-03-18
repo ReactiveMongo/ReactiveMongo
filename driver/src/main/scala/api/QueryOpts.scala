@@ -26,8 +26,7 @@ import reactivemongo.core.protocol.QueryFlags
  * @param batchSizeN the upper limit on the number of documents to retrieve per batch (0 for unspecified)
  * @param flagsN the query flags
  */
-@deprecated("Internal: will be made private", "0.19.8")
-case class QueryOpts(
+private[reactivemongo] case class QueryOpts(
   skipN: Int = 0,
   batchSizeN: Int = 0,
   flagsN: Int = 0) extends QueryOps {
@@ -39,7 +38,7 @@ case class QueryOpts(
   /** Sets the query (raw) [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#flags flags]]. */
   def flags(n: Int) = copy(flagsN = n)
 
-  /**
+  /*
    * Sets how many documents must be skipped at the beginning of the results.
    *
    * {{{
@@ -50,7 +49,7 @@ case class QueryOpts(
    */
   def skip(n: Int) = copy(skipN = n)
 
-  /**
+  /*
    * Sets the size of result batches.
    *
    * {{{
@@ -61,7 +60,7 @@ case class QueryOpts(
    */
   def batchSize(n: Int) = copy(batchSizeN = n)
 
-  /**
+  /*
    * Makes the result [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.tailable cursor tailable]].
    *
    * {{{
@@ -72,7 +71,7 @@ case class QueryOpts(
    */
   def tailable = copy(flagsN = flagsN | QueryFlags.TailableCursor)
 
-  /**
+  /*
    * Allows querying of a replica slave ([[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.slaveOk `slaveOk`]]).
    *
    * {{{
@@ -85,7 +84,7 @@ case class QueryOpts(
 
   def oplogReplay = copy(flagsN = flagsN | QueryFlags.OplogReplay)
 
-  /**
+  /*
    * Sets the [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.noTimeout `noTimeout`]] flag.
    *
    * {{{
@@ -96,7 +95,7 @@ case class QueryOpts(
    */
   def noCursorTimeout = copy(flagsN = flagsN | QueryFlags.NoCursorTimeout)
 
-  /**
+  /*
    * Makes the result cursor [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.awaitData await data]].
    *
    * {{{
@@ -107,7 +106,7 @@ case class QueryOpts(
    */
   def awaitData = copy(flagsN = flagsN | QueryFlags.AwaitData)
 
-  /**
+  /*
    * Sets the [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.exhaust flag]] to return all data returned by the query at once rather than splitting the results into batches.
    *
    * {{{
@@ -118,7 +117,7 @@ case class QueryOpts(
    */
   def exhaust = copy(flagsN = flagsN | QueryFlags.Exhaust)
 
-  /**
+  /*
    * Sets the [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.partial flag]] to return partial data from a query against a sharded cluster in which some shards do not respond rather than throwing an error.
    *
    * {{{

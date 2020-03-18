@@ -115,8 +115,7 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
 
   protected final def sendAuthenticate(connection: Connection, nextAuth: Authenticate): Connection = {
     val start = initiate(nextAuth.user)
-
-    val (maker, _) = Command.buildRequestMaker(pack)(
+    val maker = Command.buildRequestMaker(pack)(
       start, initiateWriter, ReadPreference.primary, nextAuth.db)
 
     connection.send(maker(RequestIdGenerator.getNonce.next))
@@ -182,7 +181,7 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
                     { err => handleAuthResponse(ns, resp)(Left(err)) },
                     { sig =>
                       ns.updateConnectionByChannelId(chanId) { con =>
-                        val (maker, _) = Command.buildRequestMaker(pack)(
+                        val maker = Command.buildRequestMaker(pack)(
                           negociation, negociationWriter,
                           ReadPreference.primary, db)
 
@@ -259,7 +258,7 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
                       Left(FailedAuthentication(pack)(msg, None, None)))
 
                   } else {
-                    val (maker, _) = Command.buildRequestMaker(pack)(
+                    val maker = Command.buildRequestMaker(pack)(
                       ScramFinalNegociation(cid, payload), finalWriter,
                       ReadPreference.primary, db)
 

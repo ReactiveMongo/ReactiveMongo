@@ -100,7 +100,7 @@ trait InsertOps[P <: SerializationPack with Singleton] {
 
       val emptyCmd = ResolvedCollectionCommand(
         collection.name,
-        InsertCommand.Insert(
+        new InsertCommand.Insert(
           emptyDoc, Seq.empty[pack.Document], ordered, writeConcern, false))
 
       val doc = pack.serialize(emptyCmd, insertWriter(None))
@@ -195,7 +195,7 @@ trait InsertOps[P <: SerializationPack with Singleton] {
       documents.headOption match {
         case Some(head) => {
           if (metadata.maxWireVersion >= MongoWireVersion.V26) {
-            val cmd = InsertCommand.Insert(
+            val cmd = new InsertCommand.Insert(
               head, documents.tail, ordered, writeConcern,
               bypassDocumentValidation)
 

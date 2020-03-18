@@ -85,26 +85,30 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
 
   // ---
 
-  private lazy val elements1 = Command.UpdateElement(
+  private lazy val element1 = new Command.UpdateElement(
     q = BSONDocument("_id" -> 1),
     u = BSONDocument(f"$$set" -> BSONDocument("value" -> 1)),
     upsert = true,
-    multi = false)
+    multi = false,
+    collation = None,
+    arrayFilters = Seq.empty)
 
-  private lazy val elements2 = Command.UpdateElement(
+  private lazy val element2 = new Command.UpdateElement(
     q = BSONDocument("value" -> 2),
     u = BSONDocument(f"$$set" -> BSONDocument("label" -> "two")),
     upsert = false,
-    multi = true)
+    multi = true,
+    collation = None,
+    arrayFilters = Seq.empty)
 
   private lazy val update1 = ResolvedCollectionCommand(
     collection = "foo",
-    command = Command.Update(
+    command = new Command.Update(
       ordered = true,
       writeConcern = WC.Default,
       bypassDocumentValidation = false,
-      firstUpdate = elements1,
-      updates = elements2))
+      firstUpdate = element1,
+      updates = Seq(element2)))
 
   private object Command extends UpdateCommand[BSONSerializationPack.type] {
     val pack = BSONSerializationPack

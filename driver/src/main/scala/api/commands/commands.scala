@@ -129,7 +129,7 @@ object UnitBox extends BoxedAnyVal[Unit] {
 object Command {
   import reactivemongo.api.{
     DefaultCursor,
-    Failover2,
+    Failover,
     FailoverStrategy
   }
   import reactivemongo.core.netty.{
@@ -165,13 +165,13 @@ object Command {
     protected def defaultReadPreference = db.connection.options.readPreference
 
     def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = {
-      val (requestMaker, m26WriteCommand) =
-        buildRequestMaker(pack)(command, writer, readPreference, db.name)
+      val requestMaker = buildRequestMaker(pack)(
+        command, writer, readPreference, db.name)
 
-      Failover2(db.connection, failover) { () =>
+      Failover(db.connection, failover) { () =>
         db.connection.sendExpectingResponse(new RequestMakerExpectingResponse(
           requestMaker = requestMaker,
-          isMongo26WriteOp = m26WriteCommand,
+          isMongo26WriteOp = false,
           pinnedNode = for {
             s <- db.session
             t <- s.transaction.toOption
@@ -216,14 +216,11 @@ object Command {
       }
 
       val op = Query(flags, db.name + f".$$cmd", 0, 1)
-      val mongo26WriteCommand = command match {
-        case _: Mongo26WriteCommand => true
-        case _                      => false
-      }
+      val mongo26WriteCommand = false // TODO: Remove
 
       DefaultCursor.query(pack, op, (_: Int) /*TODO: max?*/ => bs,
-        if (mongo26WriteCommand) ReadPreference.primary else readPreference,
-        db, failover, mongo26WriteCommand, fullCollectionName, maxTimeMS)
+        readPreference, db, failover, mongo26WriteCommand,
+        fullCollectionName, maxTimeMS)
 
     }
   }
@@ -307,7 +304,7 @@ object Command {
   @deprecated("Internal: will be made private", "0.16.0")
   def run[P <: SerializationPack](pack: P, failover: FailoverStrategy): CommandWithPackRunner[pack.type] = CommandWithPackRunner(pack, failover)
 
-  private[reactivemongo] def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): (RequestMaker, Boolean) = {
+  private[reactivemongo] def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): RequestMaker = {
     val buffer = ChannelBufferWritableBuffer()
 
     pack.serializeAndWrite(buffer, command, writer)
@@ -315,12 +312,8 @@ object Command {
     val documents = BufferSequence(buffer.buffer)
     val flags = if (readPreference.slaveOk) QueryFlags.SlaveOk else 0
     val query = Query(flags, db + f".$$cmd", 0, 1)
-    val mongo26WriteCommand = command match {
-      case _: Mongo26WriteCommand => true
-      case _                      => false
-    }
 
-    RequestMaker(query, documents, readPreference) -> mongo26WriteCommand
+    RequestMaker(query, documents, readPreference)
   }
 }
 
@@ -332,6 +325,3 @@ object Command {
 final case class ResolvedCollectionCommand[C <: CollectionCommand](
   collection: String,
   command: C) extends Command
-
-@deprecated(message = "Will be removed as EOL for 2.6", since = "0.12.7")
-trait Mongo26WriteCommand

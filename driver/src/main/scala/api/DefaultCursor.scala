@@ -41,7 +41,7 @@ object DefaultCursor {
     readPreference: ReadPreference,
     mongoConnection: MongoConnection,
     failover: FailoverStrategy,
-    isMongo26WriteOp: Boolean,
+    isMongo26WriteOp: Boolean, // TODO: Remove
     collectionName: String)(implicit reader: pack.Reader[A]): Impl[A] =
     throw new UnsupportedOperationException("Use query with DefaultDB")
 
@@ -55,14 +55,14 @@ object DefaultCursor {
     readPreference: ReadPreference,
     db: DB,
     failover: FailoverStrategy,
-    isMongo26WriteOp: Boolean,
+    isMongo26WriteOp: Boolean, // TODO: Remove
     collectionName: String,
     maxTimeMS: Option[Long])(implicit reader: pack.Reader[A]): Impl[A] =
     new Impl[A] {
       val preference = readPreference
       val database = db
       val failoverStrategy = failover
-      val mongo26WriteOp = isMongo26WriteOp
+      val mongo26WriteOp = isMongo26WriteOp // TODO: Remove
       val fullCollectionName = collectionName
 
       val numberToReturn = {
@@ -86,7 +86,7 @@ object DefaultCursor {
       val makeIterator = ReplyDocumentIterator.parse(pack)(_: Response)(reader)
 
       @inline def makeRequest(maxDocs: Int)(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[Response] =
-        Failover2(connection, failoverStrategy) { () =>
+        Failover(connection, failoverStrategy) { () =>
           val ntr = toReturn(numberToReturn, maxDocs, 0)
 
           // MongoDB2.6: Int.MaxValue
@@ -94,7 +94,7 @@ object DefaultCursor {
           val req = new RequestMakerExpectingResponse(
             requestMaker = RequestMaker(
               op, requestBuffer(maxDocs), readPreference),
-            isMongo26WriteOp = isMongo26WriteOp,
+            isMongo26WriteOp = isMongo26WriteOp, // TODO: Remove
             pinnedNode = transaction.flatMap(_.pinnedNode))
 
           requester(0, maxDocs, req)(ec)
@@ -141,7 +141,7 @@ object DefaultCursor {
     _ref: Cursor.Reference,
     readPreference: ReadPreference,
     failover: FailoverStrategy,
-    isMongo26WriteOp: Boolean,
+    isMongo26WriteOp: Boolean, // TODO: Remove
     maxTimeMS: Option[Long]) extends Impl[A] {
     protected type P <: SerializationPack
     protected val _pack: P
@@ -150,7 +150,7 @@ object DefaultCursor {
     val preference = readPreference
     val database = db
     val failoverStrategy = failover
-    val mongo26WriteOp = isMongo26WriteOp
+    val mongo26WriteOp = isMongo26WriteOp // TODO: Remove
 
     @inline def fullCollectionName = _ref.collectionName
 
@@ -176,12 +176,12 @@ object DefaultCursor {
     @inline def makeRequest(maxDocs: Int)(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[Response] = {
       val pinnedNode = transaction.flatMap(_.pinnedNode)
 
-      Failover2(connection, failoverStrategy) { () =>
+      Failover(connection, failoverStrategy) { () =>
         // MongoDB2.6: Int.MaxValue
         val op = getMoreOpCmd(_ref.cursorId, maxDocs)
         val req = new RequestMakerExpectingResponse(
           requestMaker = RequestMaker(op._1, op._2, readPreference),
-          isMongo26WriteOp = isMongo26WriteOp,
+          isMongo26WriteOp = isMongo26WriteOp, // TODO: Remove
           pinnedNode = pinnedNode)
 
         requester(0, maxDocs, req)(ec)
@@ -224,18 +224,6 @@ object DefaultCursor {
     }
   }
 
-  @deprecated("No longer implemented", "0.16.0")
-  def getMore[P <: SerializationPack, A](
-    pack: P,
-    preload: => Response,
-    result: ResultCursor,
-    toReturn: Int,
-    readPreference: ReadPreference,
-    mongoConnection: MongoConnection,
-    failover: FailoverStrategy,
-    isMongo26WriteOp: Boolean)(implicit reader: pack.Reader[A]): Impl[A] =
-    throw new UnsupportedOperationException("No longer implemented")
-
   private[reactivemongo] trait Impl[A]
     extends Cursor[A] with CursorOps[A] with CursorCompat[A] {
 
@@ -251,7 +239,7 @@ object DefaultCursor {
 
     def failoverStrategy: FailoverStrategy
 
-    def mongo26WriteOp: Boolean
+    def mongo26WriteOp: Boolean // TODO: Remove
 
     def fullCollectionName: String
 
@@ -338,10 +326,10 @@ object DefaultCursor {
           requestMaker = RequestMaker(op, cmd,
             readPreference = preference,
             channelIdHint = Some(response.info.channelId)),
-          isMongo26WriteOp = mongo26WriteOp,
+          isMongo26WriteOp = mongo26WriteOp, // TODO: Remove
           pinnedNode = transaction.flatMap(_.pinnedNode))
 
-        Failover2(connection, failoverStrategy) { () =>
+        Failover(connection, failoverStrategy) { () =>
           requester(nextOffset, maxDocs, req)(ec)
         }.future.map(Some(_))
       } else {
@@ -394,7 +382,7 @@ object DefaultCursor {
             requestMaker = RequestMaker(
               KillCursors(Set(cursorID)),
               readPreference = preference),
-            isMongo26WriteOp = false,
+            isMongo26WriteOp = false, // TODO: Remove
             pinnedNode = transaction.flatMap(_.pinnedNode)))
 
         result.onComplete {

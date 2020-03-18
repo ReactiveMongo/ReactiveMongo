@@ -250,7 +250,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
     val con = md.connect(
       nodes, options = opts.copy(credentials = Map(
       Common.commonDb -> MongoConnectionOptions.Credential(
-        "test", Some("password")))), name = Some(name))
+        "test", Some("password")))), name = name)
 
     val res = con.flatMap { c =>
       actorSystem.actorSelection(s"/user/Monitor-$name").

@@ -31,8 +31,6 @@ final class CommandSpec(implicit ee: ExecutionEnv)
 
   "Raw command" should {
     "re-index test collection with command as document" >> {
-      lazy val runner = Command.run(pack, db.failoverStrategy)
-
       def reindexSpec(db: DefaultDB, coll: String, t: FiniteDuration) = {
         val reIndexDoc = BSONDocument("reIndex" -> coll)
 

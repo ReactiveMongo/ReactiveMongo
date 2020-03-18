@@ -8,7 +8,12 @@ import reactivemongo.api.bson.BSONDocument
 
 import _root_.tests.Common
 
-import reactivemongo.api.tests.{ decoder, parseResponse, reader => docReader }
+import reactivemongo.api.tests.{
+  QueryOpts,
+  decoder,
+  parseResponse,
+  reader => docReader
+}
 
 trait TailableCursorSpec { specs: CursorSpec =>
   def tailableSpec = {
