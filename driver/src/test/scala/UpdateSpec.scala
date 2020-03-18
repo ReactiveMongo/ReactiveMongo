@@ -44,10 +44,10 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
           u = BSONDocument(f"$$set" -> BSONDocument("age" -> 33)),
           upsert = true) must beLike[UpdateWriteResult]({
             case result => result.upserted.toList must beLike[List[Upserted]] {
-              case Upserted(0, id: BSONObjectID) :: Nil =>
-                c.find(
-                  selector = BSONDocument("_id" -> id),
-                  projection = Option.empty[BSONDocument]).one[T] must beSome(upd(person)).await(1, timeout)
+              case Upserted(0, id: BSONObjectID) :: Nil => c.find(
+                selector = BSONDocument("_id" -> id),
+                projection = Option.empty[BSONDocument]).
+                one[T] must beSome(upd(person)).await(1, timeout)
             }
           }).await(1, timeout)
       }

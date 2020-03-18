@@ -82,6 +82,7 @@ final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
               _ <- admin.renameCollection(db.name, c1.name, name)
             } yield {}, timeout) must throwA[Exception].like {
               case err: CommandError =>
+                // TODO: Check code
                 err.errmsg aka err.toString must beSome[String].which {
                   _.indexOf("target namespace exists") != -1
                 }

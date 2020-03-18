@@ -12,12 +12,10 @@ import reactivemongo.api.indexes.CollectionIndexesManager
  * A mixin that provides commands about this Collection itself.
  *
  * @define createDescription Creates this collection
- * @define autoIndexIdParam If true should automatically add an index on the `_id` field. By default, regular collections will have an indexed `_id` field, in contrast to capped collections. This MongoDB option is deprecated and will be removed in a future release.
  * @define cappedSizeParam the size of the collection (number of bytes)
  * @define cappedMaxParam the maximum number of documents this capped collection can contain
  */
-@deprecated("Internal: will be made private", "0.19.8")
-trait CollectionMetaCommands { self: Collection =>
+private[api] trait CollectionMetaCommands { self: Collection =>
   private implicit lazy val unitBoxReader =
     CommandCodecs.unitBoxReader(command.pack)
 
@@ -32,11 +30,11 @@ trait CollectionMetaCommands { self: Collection =>
    * {{{
    * import scala.concurrent.ExecutionContext
    *
-   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.collections.GenericCollection
    * import reactivemongo.api.commands.CommandError
    *
    * def createColl(
-   *   coll: CollectionMetaCommands)(implicit ec: ExecutionContext) =
+   *   coll: GenericCollection[_])(implicit ec: ExecutionContext) =
    *   coll.create().recover {
    *     case CommandError.Code(48) => // NamespaceExists
    *       println(s"Collection \\${coll} already exists")
@@ -51,16 +49,16 @@ trait CollectionMetaCommands { self: Collection =>
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.collections.GenericCollection
    *
-   * def createIfNotExists(coll: CollectionMetaCommands)(
+   * def createIfNotExists(coll: GenericCollection[_])(
    *   implicit ec: ExecutionContext): Future[Unit] =
    *   coll.create(failsIfExists = true)
    * }}}
    *
    * @param failsIfExists if true fails if the collection already exists (default: false)
    */
-  def create(@deprecatedName(Symbol("autoIndexId")) failsIfExists: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = create().recover {
+  def create(failsIfExists: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = create().recover {
     case CommandError.Code(48 /* already exists */ ) if !failsIfExists => ()
 
     case CommandError.Message(
@@ -93,7 +91,7 @@ trait CollectionMetaCommands { self: Collection =>
     autoIndexId: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] =
     command.unboxed(
       self,
-      Create(Some(Capped(size, maxDocuments)), autoIndexId),
+      Create(Some(new Capped(size, maxDocuments)), autoIndexId),
       ReadPreference.primary)
 
   /**
@@ -102,9 +100,8 @@ trait CollectionMetaCommands { self: Collection =>
    * The returned future will be completed with an error
    * if this collection does not exist.
    */
-  @deprecated("Use `drop(Boolean)`", "0.12.0")
   def drop()(implicit ec: ExecutionContext): Future[Unit] =
-    drop(true).map(_ => {})
+    drop(false).map(_ => {})
 
   private implicit lazy val dropWriter = DropCollection.writer(command.pack)
 
@@ -125,9 +122,9 @@ trait CollectionMetaCommands { self: Collection =>
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.collections.GenericCollection
    *
-   * def dropIfNotFound(coll: CollectionMetaCommands)(
+   * def dropIfNotFound(coll: GenericCollection[_])(
    *   implicit ec: ExecutionContext): Future[Boolean] =
    *   coll.drop(failIfNotFound = true)
    * }}}
@@ -162,21 +159,7 @@ trait CollectionMetaCommands { self: Collection =>
    * @param size $cappedSizeParam
    * @param maxDocuments $cappedMaxParam
    */
-  def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, ConvertToCapped(Capped(size, maxDocuments)), ReadPreference.primary)
-
-  /**
-   * Renames this collection.
-   *
-   * @param to the new name of this collection
-   * @param dropExisting if a collection of name `to` already exists, then drops that collection before renaming this one
-   * @return A failure if the dropExisting option is false and the target collection already exists.
-   */
-  @deprecated(message = "Use `reactivemongo.api.DBMetaCommands.renameCollection on the admin database instead.", since = "0.12.4")
-  def rename(to: String, dropExisting: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = {
-    implicit val renameWriter = RenameCollection.writer(command.pack)
-
-    command.unboxed(self.db, RenameCollection(db.name + "." + name, db.name + "." + to, dropExisting), ReadPreference.primary)
-  }
+  def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, ConvertToCapped(new Capped(size, maxDocuments)), ReadPreference.primary)
 
   private implicit lazy val statsWriter = CollStats.writer(command.pack)
 
@@ -193,8 +176,8 @@ trait CollectionMetaCommands { self: Collection =>
    *   coll.stats().map(_.capped)
    * }}}
    */
-  def stats()(implicit ec: ExecutionContext): Future[CollStatsResult] =
-    command(self, CollStats(None), ReadPreference.primary)
+  def stats()(implicit ec: ExecutionContext): Future[CollectionStats] =
+    command(self, new CollStats(None), ReadPreference.primary)
 
   /**
    * Returns various information about this collection.
@@ -209,16 +192,16 @@ trait CollectionMetaCommands { self: Collection =>
    *
    * @param scale the scale factor (for example, to get all the sizes in kilobytes)
    */
-  def stats(scale: Int)(implicit ec: ExecutionContext): Future[CollStatsResult] = command(self, CollStats(Some(scale)), ReadPreference.primary)
+  def stats(scale: Int)(implicit ec: ExecutionContext): Future[CollectionStats] = command(self, new CollStats(Some(scale)), ReadPreference.primary)
 
   /**
    * Returns an index manager for this collection.
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.collections.GenericCollection
    *
-   * def listIndexes(coll: CollectionMetaCommands)(
+   * def listIndexes(coll: GenericCollection[_])(
    *   implicit ec: ExecutionContext): Future[List[String]] =
    *   coll.indexesManager.list().map(_.flatMap { idx =>
    *     idx.name.toList

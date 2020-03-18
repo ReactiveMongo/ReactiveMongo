@@ -2,7 +2,7 @@ import scala.concurrent._, duration.FiniteDuration
 
 import reactivemongo.api.bson.BSONDocument
 
-import reactivemongo.api.{ Cursor, DefaultDB, ReadConcern, ReadPreference }
+import reactivemongo.api.{ Cursor, DB, ReadConcern, ReadPreference }
 
 import reactivemongo.api.commands.{ CommandError, WriteConcern }
 
@@ -357,7 +357,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
       import builder.{ elementProducer => elm, int }
 
       "start & end" in {
-        Common.db.startSession() must beLike[DefaultDB] {
+        Common.db.startSession() must beLike[DB] {
           case db =>
             val coll = db.collection(s"session_${System identityHashCode this}")
             val id = System.identityHashCode(db)

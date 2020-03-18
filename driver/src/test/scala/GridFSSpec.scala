@@ -5,7 +5,7 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.bson.utils.Converters
 
-import reactivemongo.api.{ Cursor, DefaultDB, WrappedCursor }
+import reactivemongo.api.{ Cursor, DB, WrappedCursor }
 
 import reactivemongo.api.tests.{ pack, newBuilder }
 
@@ -47,7 +47,7 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
   // ---
 
   def gridFsSpec(
-    db: DefaultDB,
+    db: DB,
     prefix: String,
     timeout: FiniteDuration)(implicit ev: scala.reflect.ClassTag[pack.Value]) = {
 

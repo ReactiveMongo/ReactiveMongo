@@ -431,7 +431,9 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
     val supervisorName = s"monitorspec-sup-${System identityHashCode ee}"
     val poolName = s"monitorspec-con-${System identityHashCode f}"
 
-    implicit def sys: akka.actor.ActorSystem = drv.system
+    implicit def sys: akka.actor.ActorSystem =
+      reactivemongo.api.tests.system(drv)
+
     lazy val mongosystem = TestActorRef[StandardDBSystem](
       standardDBSystem(
         supervisorName, poolName, nodes, authentications, options), poolName)
@@ -442,7 +444,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
     for {
       con <- connection
       res <- f(con, mongosystem)
-      _ <- con.askClose()(timeout).recover { case _ => () }
+      _ <- con.close()(timeout).recover { case _ => () }
     } yield res
   }
 }

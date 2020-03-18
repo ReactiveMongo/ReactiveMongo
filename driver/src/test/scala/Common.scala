@@ -5,7 +5,7 @@ import scala.concurrent.duration._
 
 import reactivemongo.api.{
   AsyncDriver,
-  DefaultDB,
+  DB,
   FailoverStrategy,
   MongoConnection,
   MongoConnectionOptions,
@@ -114,7 +114,7 @@ object Common extends CommonAuth {
   lazy val slowConnection =
     Await.result(driver.connect(List(slowPrimary), SlowOptions), slowTimeout)
 
-  def databases(name: String, con: MongoConnection, slowCon: MongoConnection): (DefaultDB, DefaultDB) = {
+  def databases(name: String, con: MongoConnection, slowCon: MongoConnection): (DB, DB) = {
     import ExecutionContext.Implicits.global
 
     val _db = for {
@@ -156,6 +156,8 @@ object Common extends CommonAuth {
   }
 
   lazy val driver = newAsyncDriver()
+
+  lazy val driverSystem = reactivemongo.api.tests.system(driver)
 
   // ---
 

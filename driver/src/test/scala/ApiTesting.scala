@@ -7,6 +7,8 @@ import scala.util.Try
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ FiniteDuration, SECONDS }
 
+import scala.collection.immutable.ListSet
+
 import akka.util.Timeout
 import akka.actor.ActorRef
 
@@ -82,12 +84,26 @@ package object tests {
     password: Option[String]) =
     reactivemongo.core.nodeset.Authenticate(db, user, password)
 
+  def maxWireVersion(db: DB) = db.connectionState.metadata.maxWireVersion
+
+  type ParsedURI = reactivemongo.api.MongoConnection.ParsedURI
+
+  def ParsedURI(
+    hosts: ListSet[(String, Int)],
+    options: MongoConnectionOptions,
+    ignoredOptions: List[String],
+    db: Option[String]) = new reactivemongo.api.MongoConnection.ParsedURI(hosts, options, ignoredOptions, db)
+
   @inline def RegisterMonitor = reactivemongo.core.actors.RegisterMonitor
 
   @inline def SimpleRing[T](capacity: Int)(implicit cls: scala.reflect.ClassTag[T]) = new reactivemongo.util.SimpleRing[T](capacity)
 
   lazy val decoder = pack.newDecoder
   lazy val builder = pack.newBuilder
+
+  def system(drv: AsyncDriver) = drv.system
+
+  def mongosystem(con: MongoConnection) = con.mongosystem
 
   def logger(category: String) = reactivemongo.util.LazyLogger(category)
 
@@ -350,7 +366,7 @@ package object tests {
 
   def preload(resp: Response)(implicit ec: ExecutionContext): Future[(Response, BSONDocument)] = reactivemongo.core.protocol.Response.preload(resp)
 
-  @inline def session(db: DefaultDB): Option[Session] = db.session
+  @inline def session(db: DB): Option[Session] = db.session
 
   @inline def indexOptions[P <: SerializationPack](i: Index.Aux[P]): i.pack.Document = i.options
 

@@ -247,7 +247,7 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
   private def delayBy[T](duration: FiniteDuration)(f: => Future[T]): Future[T] = {
     val promise = Promise[T]()
 
-    tests.Common.driver.system.scheduler.
+    tests.Common.driverSystem.scheduler.
       scheduleOnce(duration)(f.onComplete(promise.complete))
 
     promise.future

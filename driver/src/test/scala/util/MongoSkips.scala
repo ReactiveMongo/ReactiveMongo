@@ -1,8 +1,10 @@
 package util
 
-import org.specs2.execute.{ AsResult, Result }
-import reactivemongo.api.DefaultDB
+import reactivemongo.api.DB
 import reactivemongo.core.protocol.MongoWireVersion
+
+import org.specs2.execute.{ AsResult, Result }
+
 import tests.Common
 
 trait MongoSkips { this: org.specs2.mutable.Specification =>
@@ -18,8 +20,9 @@ trait MongoSkips { this: org.specs2.mutable.Specification =>
     if (Common.replSetOn) None else Some("untestable because the target mongo server is not within a Replica Set")
   }
 
-  final def isNotAtLeast(db: DefaultDB, version: MongoWireVersion): Option[String] = {
-    val mongoVersion = db.connectionState.metadata.maxWireVersion
+  final def isNotAtLeast(db: DB, version: MongoWireVersion): Option[String] = {
+    val mongoVersion = reactivemongo.api.tests.maxWireVersion(db)
+
     if (mongoVersion >= version) None
     else Some(s"untestable because the target mongo server has version $mongoVersion, which is smaller than $version required for this test")
   }

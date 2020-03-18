@@ -22,7 +22,7 @@ trait TailableCursorSpec { specs: CursorSpec =>
         val col = database(s"somecollection_captail_$n")
 
         col.createCapped(4096, Some(10)).flatMap { _ =>
-          val sched = Common.driver.system.scheduler
+          val sched = Common.driverSystem.scheduler
 
           (0 until 10).foldLeft(Future successful {}) { (f, id) =>
             f.flatMap(_ => col.insert.one(
@@ -91,7 +91,7 @@ trait TailableCursorSpec { specs: CursorSpec =>
             "specs2-test-reactivemongo", failoverStrategy)).flatMap { d =>
             tailable("foldw3", d).foldWhile(List.empty[Int])((s, i) => {
               if (i == 1) { // Force connection close
-                Await.result(con.flatMap(_.askClose()(timeout)), timeout)
+                Await.result(con.flatMap(_.close()(timeout)), timeout)
               }
 
               Cursor.Cont(i :: s)

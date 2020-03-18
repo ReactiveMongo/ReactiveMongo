@@ -18,9 +18,9 @@ trait WrappedCursorOps[T] extends CursorOps[T] { cursor: Cursor[T] =>
 
   private[reactivemongo] def killCursor(id: Long)(implicit ec: ExecutionContext): Unit = opsWrappee.killCursor(id)
 
-  def tailable: Boolean = opsWrappee.tailable
+  final def tailable: Boolean = opsWrappee.tailable
 
-  def connection: MongoConnection = opsWrappee.connection
+  final def connection: MongoConnection = opsWrappee.connection
 
-  def failoverStrategy: FailoverStrategy = opsWrappee.failoverStrategy
+  final def failoverStrategy: FailoverStrategy = opsWrappee.failoverStrategy
 }

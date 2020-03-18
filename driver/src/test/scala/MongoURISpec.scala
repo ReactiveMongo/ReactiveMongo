@@ -10,13 +10,13 @@ import reactivemongo.api.{
   ScramSha256Authentication,
   X509Authentication,
   WriteConcern
-}, MongoConnection.{ ParsedURI, URIParsingException }
+}, MongoConnection.URIParsingException
 
 import reactivemongo.core.errors.ReactiveMongoException
 
 import org.specs2.concurrent.ExecutionEnv
 
-import reactivemongo.api.tests.Authenticate
+import reactivemongo.api.tests.{ Authenticate, ParsedURI }
 
 final class MongoURISpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
@@ -35,7 +35,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         ParsedURI(
           hosts = ListSet("host1" -> 27017),
           db = None,
-          authenticate = None,
           options = MongoConnectionOptions.default,
           ignoredOptions = List.empty)).awaitFor(timeout)
     }
@@ -46,7 +45,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
       val expected = ParsedURI(
         hosts = ListSet("host1" -> 27017),
         db = None,
-        authenticate = None,
         options = MongoConnectionOptions.default,
         ignoredOptions = List("foo"))
 
@@ -63,7 +61,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         ParsedURI(
           hosts = ListSet("host1" -> 27018),
           db = None,
-          authenticate = None,
           options = MongoConnectionOptions.default,
           ignoredOptions = List.empty)).awaitFor(timeout)
     }
@@ -84,7 +81,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         ParsedURI(
           hosts = ListSet("host1" -> 27017),
           db = Some("somedb"),
-          authenticate = None,
           options = MongoConnectionOptions.default,
           ignoredOptions = List.empty)).awaitFor(timeout)
     }
@@ -95,7 +91,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         ParsedURI(
           hosts = ListSet("host1" -> 27017),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions.default.copy(credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
           ignoredOptions = List.empty)).awaitFor(timeout)
@@ -113,7 +108,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions.default.copy(
             authenticationMechanism = ScramSha1Authentication,
             credentials = Map("somedb" -> Credential(
@@ -128,7 +122,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions.default.copy(
             authenticationMechanism = ScramSha256Authentication,
             credentials = Map("somedb" -> Credential(
@@ -143,8 +136,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate(
-            "authdb", "user123", Some(";qGu:je/LX}nN\\8"))),
           options = MongoConnectionOptions.default.copy(
             authenticationDatabase = Some("authdb"),
             credentials = Map(
@@ -159,7 +150,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "", None)),
           options = MongoConnectionOptions.default.copy(
             authenticationMechanism = X509Authentication,
             credentials = Map("somedb" -> Credential("", None))),
@@ -173,7 +163,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "username@test.com,CN=127.0.0.1,OU=TEST_CLIENT,O=TEST_CLIENT,L=LONDON,ST=LONDON,C=UK", None)),
           options = MongoConnectionOptions.default.copy(
             authenticationMechanism = X509Authentication,
             credentials = Map(
@@ -187,7 +176,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
       parseURI(withWriteConcern) must beTypedEqualTo(ParsedURI(
         hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
-        authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Journaled,
           credentials = Map(
@@ -201,7 +189,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
       parseURI(withWriteConcernWMaj) must beTypedEqualTo(ParsedURI(
         hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
-        authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Default.copy(
             w = reactivemongo.api.commands.WriteConcern.Majority),
@@ -216,7 +203,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
       parseURI(withWriteConcernWTag) must beTypedEqualTo(ParsedURI(
         hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
-        authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Default.copy(
             w = reactivemongo.api.commands.WriteConcern.TagSet("anyTag")),
@@ -231,7 +217,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
       parseURI(withWriteConcernWAck) must beTypedEqualTo(ParsedURI(
         hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
         db = Some("somedb"),
-        authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
         options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Default.copy(
             w = reactivemongo.api.commands.WriteConcern.
@@ -248,7 +233,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions.default.copy(
             writeConcern = WriteConcern.Default.copy(j = true),
             credentials = Map(
@@ -263,7 +247,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions.default.copy(
             writeConcern = WriteConcern.Journaled.copy(j = false),
             credentials = Map(
@@ -278,7 +261,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         ParsedURI(
           hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
           db = Some("somedb"),
-          authenticate = Some(Authenticate("somedb", "user123", Some("passwd123"))),
           options = MongoConnectionOptions.default.copy(
             writeConcern = WriteConcern.Default.copy(wtimeout = Some(1543)),
             credentials = Map(
@@ -488,7 +470,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           ".*Unexpected record: mongo\\.domain\\.tld\\..*").awaitFor(timeout)
     }
 
-    val fullFeaturedSeedList = "mongodb+srv://user123:passwd123@service.domain.tld/somedb?foo=bar&sslEnabled=false"
+    val fullFeaturedSeedList = "mongodb+srv://user123:passwd123@service.domain.tld/somedb?foo=bar&ssl=false"
 
     s"parse $fullFeatured with success" in {
       import org.xbill.DNS.{ Name, Record, SRVRecord, Type }
@@ -510,8 +492,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           ParsedURI(
             hosts = ListSet("mongo1.domain.tld" -> 27017),
             db = Some("somedb"),
-            authenticate = Some(
-              Authenticate("admin", "user123", Some("passwd123"))),
             options = MongoConnectionOptions.default.copy(
               sslEnabled = false, // overriden from URI
               authenticationDatabase = Some("admin"),
@@ -520,7 +500,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
                 "user123", Some("passwd123")))),
             ignoredOptions = List("foo", "ignore"))).awaitFor(timeout)
 
-    } tag "wip"
+    }
 
     val validName = "validName1"
     val withValidName = s"mongodb://host1?appName=$validName"

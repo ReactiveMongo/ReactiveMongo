@@ -298,7 +298,7 @@ object Command {
    * val cmd: runner.RawCommand =
    *   runner.rawCommand(BSONDocument(f"$$count" -> "coll"))
    *
-   * def foo(db: reactivemongo.api.DefaultDB) = runner(db, cmd)
+   * def foo(db: reactivemongo.api.DB) = runner(db, cmd)
    * }}}
    */
   @deprecated("Internal: will be made private", "0.16.0")

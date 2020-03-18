@@ -79,16 +79,16 @@ private[api] case class ConnectionState(
  * @define dbName the database name
  * @define failoverStrategy the failover strategy for sending requests
  */
-class MongoConnection(
-  @deprecated("Internal: will be made private", "0.17.0") val supervisor: String,
-  @deprecated("Internal: will be made private", "0.17.0") val name: String,
-  @deprecated("Internal: will be made private", "0.14.0") val actorSystem: ActorSystem,
-  @deprecated("Internal: will be made private", "0.17.0") val mongosystem: ActorRef,
-  val options: MongoConnectionOptions) {
+final class MongoConnection private[reactivemongo] (
+  private[api] val supervisor: String,
+  private[api] val name: String,
+  private[api] val actorSystem: ActorSystem,
+  private[api] val mongosystem: ActorRef,
+  private[api] val options: MongoConnectionOptions) {
   import Exceptions._
 
   /**
-   * Returns a [[DefaultDB]] reference using this connection.
+   * Returns a [[DB]] reference using this connection.
    * The failover strategy is also used to wait for the node set to be ready,
    * before returning an valid database reference.
    *
@@ -97,20 +97,17 @@ class MongoConnection(
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.{ DefaultDB, MongoConnection }
+   * import reactivemongo.api.{ DB, MongoConnection }
    *
    * def resolveDB(con: MongoConnection, name: String)(
-   *   implicit ec: ExecutionContext): Future[DefaultDB] =
+   *   implicit ec: ExecutionContext): Future[DB] =
    *   con.database(name) // with configured failover
    * }}}
    */
-  def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit @deprecatedName(Symbol("context")) ec: ExecutionContext): Future[DefaultDB] =
+  def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit ec: ExecutionContext): Future[DB] =
     waitIsAvailable(failoverStrategy, stackTrace()).map { state =>
-      new DefaultDB(name, this, state, failoverStrategy, None)
+      new DB(name, this, state, failoverStrategy, None)
     }
-
-  @deprecated("Use `authenticate` with `failoverStrategy`", "0.14.0")
-  def authenticate(db: String, user: String, password: String): Future[SuccessfulAuthentication] = authenticate(db, user, password, options.failoverStrategy)(actorSystem.dispatcher)
 
   /**
    * Authenticates the connection on the given database.
@@ -144,9 +141,6 @@ class MongoConnection(
     mongosystem ! req
     req.future
   }
-
-  @deprecated("Use `close`", "0.19.4")
-  def askClose()(implicit timeout: FiniteDuration): Future[_] = close()
 
   /**
    * Closes this connection (closes all the channels and ends the actors).
@@ -414,13 +408,11 @@ object MongoConnection {
    * @param db the name of the database
    * @param authenticate the authenticate information (see [[MongoConnectionOptions.authenticationMechanism]])
    */
-  @com.github.ghik.silencer.silent(".*authenticate.*" /*deprecated*/ )
-  sealed class ParsedURI(
+  final class ParsedURI private[api] (
     val hosts: ListSet[(String, Int)],
     val options: MongoConnectionOptions,
     val ignoredOptions: List[String],
-    val db: Option[String],
-    val authenticate: Option[Authenticate]) {
+    val db: Option[String]) {
     // TODO: Type for URI with required DB name
 
     override def equals(that: Any): Boolean = that match {
@@ -435,31 +427,8 @@ object MongoConnection {
     override def toString = s"ParsedURI${tupled.toString}"
 
     private[api] lazy val tupled =
-      Tuple5(hosts.toList, options, ignoredOptions, db, authenticate)
+      Tuple4(hosts.toList, options, ignoredOptions, db)
 
-  }
-
-  object ParsedURI {
-    @com.github.ghik.silencer.silent(".*authenticate.*" /*deprecated*/ )
-    def apply(
-      hosts: ListSet[(String, Int)],
-      options: MongoConnectionOptions,
-      ignoredOptions: List[String],
-      db: Option[String],
-      @deprecated("Use `options.credentials`", "0.14.0") authenticate: Option[Authenticate]) = new ParsedURI(hosts, options, ignoredOptions, db, authenticate)
-
-    @deprecated("No longer a case class", "0.19.8")
-    def unapply(that: Any): Option[(List[(String, Int)], MongoConnectionOptions, List[String], Option[String], Option[Authenticate])] = that match {
-      case uri: ParsedURI => Some(uri.tupled)
-      case _              => None
-    }
-  }
-
-  @deprecated("Use fromString", "0.19.8")
-  def parseURI(uri: String): Try[ParsedURI] = {
-    implicit def ec = util.sameThreadExecutionContext
-
-    Try(Await.result(fromString(uri), FiniteDuration(10, "seconds")))
   }
 
   /**
@@ -557,9 +526,8 @@ object MongoConnection {
                   val optsWithX509 = options.copy(credentials = Map(
                     dbName -> MongoConnectionOptions.Credential("", None)))
 
-                  Future.successful(ParsedURI(
-                    hosts, optsWithX509, unsupportedKeys, db,
-                    Some(Authenticate(dbName, "", None))))
+                  Future.successful(new ParsedURI(
+                    hosts, optsWithX509, unsupportedKeys, db))
                 }
 
                 case _ =>
@@ -567,7 +535,7 @@ object MongoConnection {
               }
 
               case _ => Future.successful(
-                ParsedURI(hosts, options, unsupportedKeys, db, None))
+                new ParsedURI(hosts, options, unsupportedKeys, db))
             }
           }
         } else {
@@ -597,10 +565,9 @@ object MongoConnection {
                         authDb -> MongoConnectionOptions.Credential(
                           user, password)))
 
-                    Future.successful(ParsedURI(
+                    Future.successful(new ParsedURI(
                       hosts, optsWithCred, unsupportedKeys,
-                      Some(database),
-                      Some(Authenticate(authDb, user, password))))
+                      Some(database)))
                   }
                 }
 
@@ -729,11 +696,9 @@ object MongoConnection {
     }
   }
 
-  @deprecated("Internal: will be made private", "0.16.0")
-  val IntRe = "^([0-9]+)$".r
+  private val IntRe = "^([0-9]+)$".r
 
-  @deprecated("Internal: will be made private", "0.16.0")
-  val FailoverRe = "^([^:]+):([0-9]+)x([0-9.]+)$".r
+  private val FailoverRe = "^([^:]+):([0-9]+)x([0-9.]+)$".r
 
   private def makeOptions(
     opts: Map[String, String],
@@ -757,12 +722,6 @@ object MongoConnection {
             unsupported -> result
           }
 
-          case ("authSource", v) => {
-            logger.warn(s"Connection option 'authSource' deprecated: use option 'authenticationDatabase'")
-
-            unsupported -> result.copy(authenticationDatabase = Some(v))
-          }
-
           case ("authenticationMechanism", "x509") => unsupported -> result.
             copy(authenticationMechanism = X509Authentication)
 
@@ -773,22 +732,6 @@ object MongoConnection {
           case ("authenticationMechanism", _) => unsupported -> result.
             copy(authenticationMechanism = ScramSha1Authentication)
 
-          // deprecated
-          case ("authMode", "x509") => {
-            logger.warn(s"Connection option 'authMode' is deprecated; Use option 'authenticationMechanism'")
-
-            unsupported -> result.copy(
-              authenticationMechanism = X509Authentication)
-          }
-
-          case ("authMode", _) => {
-            logger.warn(s"Connection option 'authMode' is deprecated; Use option 'authenticationMechanism'")
-
-            unsupported -> result.copy(
-              authenticationMechanism = ScramSha1Authentication)
-          }
-          // __deprecated
-
           case ("authenticationDatabase", v) =>
             unsupported -> result.copy(authenticationDatabase = Some(v))
 
@@ -797,12 +740,6 @@ object MongoConnection {
 
           case ("maxIdleTimeMS", v) => unsupported -> result.
             copy(maxIdleTimeMS = v.toInt)
-
-          case ("sslEnabled", v) => {
-            logger.warn(
-              s"Connection option 'sslEnabled' is deprecated; Use option 'ssl'")
-            unsupported -> result.copy(sslEnabled = v.toBoolean)
-          }
 
           case ("ssl", v) =>
             unsupported -> result.copy(sslEnabled = v.toBoolean)
@@ -818,21 +755,6 @@ object MongoConnection {
 
           case ("rm.nbChannelsPerNode", v) => unsupported -> result.
             copy(nbChannelsPerNode = v.toInt)
-
-          case ("rm.reconnectDelayMS", IntRe(ms)) => {
-            logger.warn(s"Connection option 'rm.reconnectDelayMS' deprecated: use option 'heartbeatFrequencyMS'")
-
-            make("rm.reconnectDelayMS", ms, unsupported, result) {
-              val millis = ms.toInt
-
-              if (millis < 500) {
-                throw new URIParsingException(
-                  s"'rm.reconnectDelayMS' must be >= 500 milliseconds")
-              }
-
-              result.copy(heartbeatFrequencyMS = millis)
-            }
-          }
 
           case ("rm.maxInFlightRequestsPerChannel", IntRe(max)) =>
             unsupported -> result.copy(
@@ -893,21 +815,6 @@ object MongoConnection {
 
               result.copy(failoverStrategy = strategy)
             }
-
-          case ("rm.monitorRefreshMS", IntRe(ms)) => {
-            logger.warn(s"Connection option 'rm.monitorRefreshMS' deprecated: use option 'heartbeatFrequencyMS'")
-
-            make("rm.monitorRefreshMS", ms, unsupported, result) {
-              val millis = ms.toInt
-
-              if (millis < 500) {
-                throw new URIParsingException(
-                  "'rm.monitorRefreshMS' must be >= 500 milliseconds")
-              }
-
-              result.copy(heartbeatFrequencyMS = millis)
-            }
-          }
 
           case ("heartbeatFrequencyMS", IntRe(ms)) =>
             make("heartbeatFrequencyMS", ms, unsupported, result) {

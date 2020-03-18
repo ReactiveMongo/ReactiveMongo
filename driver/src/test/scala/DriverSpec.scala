@@ -5,7 +5,7 @@ import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
 
 import reactivemongo.api.{
   AuthenticationMode,
-  DefaultDB,
+  DB,
   FailoverStrategy,
   MongoConnectionOptions,
   ScramSha1Authentication,
@@ -77,7 +77,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
       con.flatMap(_.database(commonDb)).map(_.failoverStrategy).
         aka("strategy") must beTypedEqualTo(FailoverStrategy.remote).
         await(1, timeout) and {
-          con.flatMap(_.askClose()(timeout)) must not(
+          con.flatMap(_.close()(timeout)) must not(
             throwA[Exception]).await(1, timeout)
         }
     }
@@ -108,8 +108,8 @@ final class DriverSpec(implicit ee: ExecutionEnv)
           // Database is resolved (so NodeSet and Primary is reachable) ...
 
           // ... register monitors after
-          setMon ! c.mongosystem
-          priMon ! c.mongosystem
+          setMon ! reactivemongo.api.tests.mongosystem(c)
+          priMon ! reactivemongo.api.tests.mongosystem(c)
 
           Future.sequence(Seq(setAvailable.future, priAvailable.future))
         }
@@ -145,7 +145,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
                 (duration must be_>=(17000L)) and (duration must be_<(28500L))
               }
         }.await(0, 22.seconds) and {
-          con.flatMap(_.askClose()(timeout)) must not(
+          con.flatMap(_.close()(timeout)) must not(
             throwA[Exception]).await(0, timeout)
         }
       }
@@ -183,7 +183,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
           _ <- d.createUser(
             user = userName,
             pwd = Some(s"password-$id"),
-            customData = None,
+            customData = Option.empty[BSONDocument],
             roles = List(DBUserRole("readWrite", dbName)),
             digestPassword = true,
             writeConcern = WriteConcern.Default,
@@ -246,13 +246,13 @@ final class DriverSpec(implicit ee: ExecutionEnv)
             timeout)
 
           con.database(dbName, failoverStrategy).
-            aka("authed DB") must beLike[DefaultDB] {
+            aka("authed DB") must beLike[DB] {
               case rdb => rdb.collection("testcol").insert.one(
                 BSONDocument("foo" -> "bar")).map(_ => {}).
                 aka("insertion") must beTypedEqualTo({}).await(1, timeout)
 
             }.await(1, timeout) and {
-              con.askClose()(timeout).
+              con.close()(timeout).
                 aka("close") must not(throwA[Exception]).await(1, timeout)
             }
         }
@@ -265,9 +265,9 @@ final class DriverSpec(implicit ee: ExecutionEnv)
             slowTimeout)
 
           con.database(dbName, slowFailover).
-            aka("authed DB") must beAnInstanceOf[DefaultDB].
+            aka("authed DB") must beAnInstanceOf[DB].
             await(1, slowTimeout) and {
-              con.askClose()(slowTimeout) must not(throwA[Exception]).
+              con.close()(slowTimeout) must not(throwA[Exception]).
                 await(1, slowTimeout)
             }
         }
@@ -349,13 +349,13 @@ final class DriverSpec(implicit ee: ExecutionEnv)
 
       conOpts.credentials must not(beEmpty) and {
         con.database(dbName, failoverStrategy).
-          aka("authed DB") must beLike[DefaultDB] {
+          aka("authed DB") must beLike[DB] {
             case rdb => rdb.collection("testcol").insert.one(
               BSONDocument("foo" -> "bar")).map(_ => {}).
               aka("insertion") must beTypedEqualTo({}).await(1, timeout)
 
           }.await(1, timeout) and {
-            con.askClose()(timeout).
+            con.close()(timeout).
               aka("close") must not(throwA[Exception]).await(1, timeout)
           }
       }
@@ -413,7 +413,9 @@ final class DriverSpec(implicit ee: ExecutionEnv)
 
   // ---
 
-  def testMonitor[T](result: Promise[T], actorSys: ActorSystem = driver.system)(test: Any => Option[T]): ActorRef = actorSys.actorOf(Props(new Actor {
+  def testMonitor[T](
+    result: Promise[T],
+    actorSys: ActorSystem = reactivemongo.api.tests.system(driver))(test: Any => Option[T]): ActorRef = actorSys.actorOf(Props(new Actor {
     private object Msg {
       def unapply(that: Any): Option[T] = test(that)
     }

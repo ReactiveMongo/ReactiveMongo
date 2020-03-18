@@ -1,4 +1,4 @@
-import reactivemongo.api.{ DefaultDB, WriteConcern, tests => apiTests }
+import reactivemongo.api.{ DB, WriteConcern, tests => apiTests }
 import reactivemongo.api.commands.GetLastError
 
 import reactivemongo.api.bson.BSONDocument
@@ -33,12 +33,12 @@ trait DBSessionSpec { specs: DatabaseSpec =>
     }
 
     "not kill without start" in {
-      Common.db.killSession() must beAnInstanceOf[DefaultDB].await
+      Common.db.killSession() must beAnInstanceOf[DB].await
     }
 
     "start & kill" in {
       Common.db.startSession().flatMap(
-        _.killSession()) must beAnInstanceOf[DefaultDB].awaitFor(timeout)
+        _.killSession()) must beAnInstanceOf[DB].awaitFor(timeout)
 
     }
 
@@ -46,7 +46,7 @@ trait DBSessionSpec { specs: DatabaseSpec =>
       section("ge_mongo4")
       "start & abort transaction" in {
         val colName = s"tx1_${System identityHashCode this}"
-        @volatile var database = Option.empty[DefaultDB]
+        @volatile var database = Option.empty[DB]
 
         Common.db.startSession().flatMap { _db =>
           for {
@@ -62,8 +62,8 @@ trait DBSessionSpec { specs: DatabaseSpec =>
             database = Some(_db)
             database
           }
-        } must beSome[DefaultDB].awaitFor(timeout) and (
-          database must beSome[DefaultDB].which { db =>
+        } must beSome[DB].awaitFor(timeout) and (
+          database must beSome[DB].which { db =>
             lazy val coll = db.collection(colName)
 
             def find() = coll.find(
@@ -161,7 +161,7 @@ trait DBSessionSpec { specs: DatabaseSpec =>
 
       "start & commit transaction" in {
         val colName = s"tx2_${System identityHashCode this}"
-        @volatile var database = Option.empty[DefaultDB]
+        @volatile var database = Option.empty[DB]
 
         Common.db.startSession().flatMap { _db =>
           _db.startTransaction(Some(WriteConcern.Default.copy(
@@ -170,8 +170,8 @@ trait DBSessionSpec { specs: DatabaseSpec =>
               database = Some(_db); database
             }
           }
-        } must beSome[DefaultDB].awaitFor(timeout) and (
-          database must beSome[DefaultDB].which { db =>
+        } must beSome[DB].awaitFor(timeout) and (
+          database must beSome[DB].which { db =>
             lazy val coll = db.collection(colName)
 
             def find() = coll.find(
@@ -199,7 +199,7 @@ trait DBSessionSpec { specs: DatabaseSpec =>
               coll.count() must beTypedEqualTo(3).awaitFor(timeout)
             } and {
               db.commitTransaction().
-                aka("commited") must beAnInstanceOf[DefaultDB].awaitFor(timeout)
+                aka("commited") must beAnInstanceOf[DB].awaitFor(timeout)
 
             } and {
               // 1 document found outside transaction after commit

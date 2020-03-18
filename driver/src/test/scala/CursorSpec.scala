@@ -108,7 +108,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             QueryOpts(batchSizeN = 64)).cursor()
 
           // Close connection to make the related cursor erroneous
-          con21.flatMap(_.askClose()(timeout)).map(_ => {}) must beEqualTo({}).
+          con21.flatMap(_.close()(timeout)).map(_ => {}) must beEqualTo({}).
             await(1, timeout) and {
               cursor.foldBulks({}, 128)(
                 { (_, _) => Cursor.Cont({}) },
@@ -168,7 +168,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             val cursor = c.find(matchAll("cursorspec27")).cursor()
 
             // Close connection to make the related cursor erroneous
-            con27.flatMap(_.askClose()(timeout)).
+            con27.flatMap(_.close()(timeout)).
               map(_ => {}) must beEqualTo({}).await(1, timeout) and {
                 cursor.foldWhile({}, 128)(
                   (_, _) => Cursor.Cont({}),
@@ -280,7 +280,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             QueryOpts(batchSizeN = 64)).cursor()
 
           // Close connection to make the related cursor erroneous
-          con40.flatMap(_.askClose()(timeout)).map(_ => {}) must beEqualTo({}).
+          con40.flatMap(_.close()(timeout)).map(_ => {}) must beEqualTo({}).
             await(1, timeout) and {
               cursor.foldBulks({}, 128)(
                 { (_, _) => Cursor.Cont({}) },
@@ -342,7 +342,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             val cursor = c.find(matchAll("cursorspec46")).cursor()
 
             // Close connection to make the related cursor erroneous
-            con46.flatMap(_.askClose()(timeout)).
+            con46.flatMap(_.close()(timeout)).
               map(_ => {}) must beEqualTo({}).await(1, timeout) and {
                 cursor.foldWhileM({}, 64)(
                   (_, _) => Future.successful(Cursor.Cont({})),

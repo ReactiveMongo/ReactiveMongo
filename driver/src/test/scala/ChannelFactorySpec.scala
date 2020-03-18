@@ -42,7 +42,7 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
     Response
   }
   import Common.timeout
-  implicit def actorSys = Common.driver.system
+  implicit def actorSys = Common.driverSystem
 
   val factory = channelFactory("sup-1", "con-2", Common.DefaultOptions)
 

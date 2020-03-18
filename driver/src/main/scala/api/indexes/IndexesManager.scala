@@ -54,10 +54,10 @@ sealed trait IndexesManager {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    * import reactivemongo.api.indexes.NSIndex
    *
-   * def listIndexes(db: DefaultDB)(
+   * def listIndexes(db: DB)(
    *   implicit ec: ExecutionContext): Future[List[String]] =
    *   db.indexesManager.list().map(_.flatMap { ni: NSIndex =>
    *     ni.index.name.toList
@@ -76,11 +76,11 @@ sealed trait IndexesManager {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    * import reactivemongo.api.indexes.NSIndex
    *
    * def ensureIndexes(
-   *   db: DefaultDB, is: Seq[NSIndex.Default])(
+   *   db: DB, is: Seq[NSIndex.Default])(
    *   implicit ec: ExecutionContext): Future[Unit] =
    *   Future.sequence(
    *     is.map(idx => db.indexesManager.ensure(idx))).map(_ => {})
@@ -101,11 +101,11 @@ sealed trait IndexesManager {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    * import reactivemongo.api.indexes.NSIndex
    *
    * def createIndexes(
-   *   db: DefaultDB, is: Seq[NSIndex.Default])(
+   *   db: DB, is: Seq[NSIndex.Default])(
    *   implicit ec: ExecutionContext): Future[Unit] =
    *   Future.sequence(
    *     is.map(idx => db.indexesManager.create(idx))).map(_ => {})
@@ -125,10 +125,10 @@ sealed trait IndexesManager {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    * import reactivemongo.api.indexes.NSIndex
    *
-   * def dropIndex(db: DefaultDB, idx: NSIndex.Default)(
+   * def dropIndex(db: DB, idx: NSIndex.Default)(
    *   implicit ec: ExecutionContext): Future[Int] =
    *   db.indexesManager.drop(idx)
    * }}}
@@ -143,9 +143,9 @@ sealed trait IndexesManager {
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    *
-   * def dropIndex(db: DefaultDB, name: String)(
+   * def dropIndex(db: DB, name: String)(
    *   implicit ec: ExecutionContext): Future[Int] =
    *   db.indexesManager.drop("myColl", name)
    * }}}
@@ -161,9 +161,9 @@ sealed trait IndexesManager {
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    *
-   * def dropAllIndexes(db: DefaultDB)(
+   * def dropAllIndexes(db: DB)(
    *   implicit ec: ExecutionContext): Future[Int] =
    *   db.indexesManager.dropAll("myColl")
    * }}}
@@ -178,9 +178,9 @@ sealed trait IndexesManager {
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    *
-   * def countCollIndexes(db: DefaultDB, collName: String)(
+   * def countCollIndexes(db: DB, collName: String)(
    *   implicit ec: ExecutionContext): Future[Int] =
    *   db.indexesManager.onCollection(collName).list().map(_.size)
    * }}}
@@ -317,9 +317,9 @@ sealed trait CollectionIndexesManager {
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.collections.GenericCollection
    *
-   * def listIndexes(coll: CollectionMetaCommands)(
+   * def listIndexes(coll: GenericCollection[_])(
    *   implicit ec: ExecutionContext): Future[List[String]] =
    *   coll.indexesManager.list().map(_.flatMap { idx =>
    *     idx.name.toList
@@ -338,11 +338,11 @@ sealed trait CollectionIndexesManager {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.collections.GenericCollection
    * import reactivemongo.api.indexes.Index
    *
    * def ensureIndexes(
-   *   coll: CollectionMetaCommands, is: Seq[Index.Default])(
+   *   coll: GenericCollection[_], is: Seq[Index.Default])(
    *   implicit ec: ExecutionContext): Future[Unit] =
    *   Future.sequence(
    *     is.map(idx => coll.indexesManager.ensure(idx))).map(_ => {})
@@ -364,11 +364,11 @@ sealed trait CollectionIndexesManager {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.collections.GenericCollection
    * import reactivemongo.api.indexes.Index
    *
    * def createIndexes(
-   *   coll: CollectionMetaCommands, is: Seq[Index.Default])(
+   *   coll: GenericCollection[_], is: Seq[Index.Default])(
    *   implicit ec: ExecutionContext): Future[Unit] =
    *   Future.sequence(
    *     is.map(idx => coll.indexesManager.create(idx))).map(_ => {})
@@ -388,9 +388,9 @@ sealed trait CollectionIndexesManager {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.collections.GenericCollection
    *
-   * def dropIndex(coll: CollectionMetaCommands, name: String)(
+   * def dropIndex(coll: GenericCollection[_], name: String)(
    *   implicit ec: ExecutionContext): Future[Int] =
    *   coll.indexesManager.drop(name)
    * }}}
@@ -405,9 +405,9 @@ sealed trait CollectionIndexesManager {
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.collections.GenericCollection
    *
-   * def dropAllIndexes(coll: CollectionMetaCommands)(
+   * def dropAllIndexes(coll: GenericCollection[_])(
    *   implicit ec: ExecutionContext): Future[Int] =
    *   coll.indexesManager.dropAll()
    * }}}

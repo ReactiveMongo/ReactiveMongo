@@ -31,7 +31,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
   import reactivemongo.api.tests._
 
   private val usd = Common.newAsyncDriver()
-  @inline private def usSys = usd.system
+  @inline private def usSys = system(usd)
 
   // ---
 

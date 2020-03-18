@@ -5,10 +5,10 @@ package reactivemongo.api
  *
  * {{{
  * import scala.concurrent.ExecutionContext
- * import reactivemongo.api.{ DefaultDB, WriteConcern }
+ * import reactivemongo.api.{ DB, WriteConcern }
  * import reactivemongo.api.bson.BSONDocument
  *
- * def foo(db: DefaultDB)(implicit ec: ExecutionContext) =
+ * def foo(db: DB)(implicit ec: ExecutionContext) =
  *   db.collection("myColl").
  *     insert(ordered = false, WriteConcern.Acknowledged).
  *     one(BSONDocument("foo" -> "bar"))

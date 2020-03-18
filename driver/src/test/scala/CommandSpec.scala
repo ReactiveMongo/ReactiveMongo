@@ -1,6 +1,6 @@
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.api.{ DefaultDB, ReadPreference }
+import reactivemongo.api.{ DB, ReadPreference }
 import reactivemongo.api.bson.BSONDocument
 
 import reactivemongo.api.commands.{
@@ -31,7 +31,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
 
   "Raw command" should {
     "re-index test collection with command as document" >> {
-      def reindexSpec(db: DefaultDB, coll: String, t: FiniteDuration) = {
+      def reindexSpec(db: DB, coll: String, t: FiniteDuration) = {
         val reIndexDoc = BSONDocument("reIndex" -> coll)
 
         db(coll).create() must beEqualTo({}).await(0, t) and {
@@ -81,27 +81,16 @@ final class CommandSpec(implicit ee: ExecutionEnv)
       }
     }
 
-    "expose serverStatus" >> {
+    "expose serverStatus" in {
       import commands.{ serverStatusReader, serverStatusWriter }
 
-      "using raw command" in {
-        db.runCommand(ServerStatus, Common.failoverStrategy).
-          aka("result") must beLike[ServerStatusResult]({
-            case ServerStatusResult(_, _, MongodProcess,
-              _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-              //println(s"Server status: $status")
-              ok
-          }).await(0, timeout)
-      }
-
-      "using operation" in {
-        db.serverStatus must beLike[ServerStatusResult]({
+      db.runCommand(ServerStatus, Common.failoverStrategy).
+        aka("result") must beLike[ServerStatusResult]({
           case ServerStatusResult(_, _, MongodProcess,
             _, _, _, _, _, _, _, _, _, _, _, _, _) =>
             //println(s"Server status: $status")
             ok
         }).await(0, timeout)
-      }
     }
 
     "execute ReplSetMaintenance" in {
