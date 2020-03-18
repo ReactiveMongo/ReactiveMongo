@@ -15,7 +15,6 @@
  */
 package reactivemongo.api
 
-import scala.util.Try
 import scala.util.control.{ NonFatal, NoStackTrace }
 
 import scala.collection.immutable.ListSet

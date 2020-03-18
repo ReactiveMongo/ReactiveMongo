@@ -26,8 +26,6 @@ import reactivemongo.core.actors.{
   RequestMakerExpectingResponse
 }
 
-import reactivemongo.api.commands.ResultCursor
-
 private[reactivemongo] object DefaultCursor {
   import Cursor.{ State, Cont, Fail, logger }
   import CursorOps.Unrecoverable
@@ -402,7 +400,7 @@ private[reactivemongo] object DefaultCursor {
 
     @inline private def syncSuccess[T, U](f: (T, U) => State[T])(implicit ec: ExecutionContext): (T, U) => Future[State[T]] = { (a: T, b: U) => Future(f(a, b)) }
 
-    private def foldResponsesM[T](z: => T, maxDocs: Int = -1)(suc: (T, Response) => Future[State[T]], err: (T, Throwable) => State[T])(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[T] = FoldResponses(z, makeRequest(maxDocs)(_: ExecutionContext),
+    private def foldResponsesM[T](z: => T, maxDocs: Int)(suc: (T, Response) => Future[State[T]], err: (T, Throwable) => State[T])(implicit ec: ExecutionContext): Future[T] = FoldResponses(z, makeRequest(maxDocs)(_: ExecutionContext),
       nextResponse(maxDocs), killCursors _, suc, err, maxDocs)(
         connection.actorSystem, ec)
 

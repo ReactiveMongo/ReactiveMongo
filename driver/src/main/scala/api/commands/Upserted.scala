@@ -4,24 +4,12 @@ import reactivemongo.bson.BSONValue
 
 import reactivemongo.api.SerializationPack
 
-abstract class Upserted extends Product with Serializable {
+sealed trait Upserted {
   type Pack <: SerializationPack
 
-  def index: Int = throw new UnsupportedOperationException
+  def index: Int
 
-  def _id: Pack#Value = throw new UnsupportedOperationException
-
-  val productArity = 2
-
-  def productElement(n: Int): Any = n match {
-    case 0 => index
-    case _ => _id
-  }
-
-  def canEqual(that: Any): Boolean = that match {
-    case _: Upserted => true
-    case _           => false
-  }
+  def _id: Pack#Value
 
   override def equals(that: Any): Boolean = that match {
     case other: Upserted =>
@@ -38,14 +26,8 @@ abstract class Upserted extends Product with Serializable {
   private[commands] lazy val tupled = index -> _id
 }
 
-object Upserted
-  extends scala.runtime.AbstractFunction2[Int, BSONValue, Upserted] {
-
+object Upserted {
   private[reactivemongo] type Aux[P] = Upserted { type Pack = P }
-
-  @deprecated("Use with serialization pack type parameter", "0.19.0")
-  def apply(index: Int, _id: BSONValue): Upserted =
-    init[reactivemongo.api.BSONSerializationPack.type](index, _id)
 
   private[reactivemongo] def init[P <: SerializationPack](
     _index: Int,
@@ -55,6 +37,6 @@ object Upserted
     override val _id = id
   }
 
-  @deprecated("No longer a ReactiveMongo case class", "0.19.0")
-  def unapply(that: Upserted): Option[(Int, Any)] = Option(that).map(_.tupled)
+  def unapply(upserted: Upserted): Option[(Int, Any)] =
+    Option(upserted).map { u => u.index -> u._id }
 }

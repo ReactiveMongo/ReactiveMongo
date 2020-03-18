@@ -16,8 +16,6 @@ import reactivemongo.api.commands.{
   WriteResult
 }
 
-import com.github.ghik.silencer.silent
-
 /**
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.update/#perform-an-unordered-update ordered]] behaviour

@@ -27,12 +27,9 @@ import reactivemongo.api.commands.{
   FindAndModifyCommand => FNM,
   ImplicitCommandHelpers,
   UnitBox,
-  UpdateWriteResult,
-  WriteConcern,
-  WriteResult
+  WriteConcern
 }
 
-import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.{
   ConnectionNotInitialized,
   GenericDriverException

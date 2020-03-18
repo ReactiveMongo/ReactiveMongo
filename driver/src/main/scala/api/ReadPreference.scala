@@ -56,18 +56,9 @@ object ReadPreference {
   }
 
   /** Reads from the primary if it is available, or secondaries if it is not. */
-  class PrimaryPreferred private[api] (val tags: List[Map[String, String]])
-    extends ReadPreference with Taggable
-    with Product1[List[Map[String, String]]] with Serializable {
-
-    @deprecated("No longer case class", "0.20.3")
-    @inline def _1 = tags
-
-    @deprecated("No longer case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: PrimaryPreferred => false
-      case _                   => false
-    }
+  final class PrimaryPreferred private[api] (
+    val tags: List[Map[String, String]])
+    extends ReadPreference with Taggable {
 
     override def equals(that: Any): Boolean = that match {
       case other: PrimaryPreferred =>
@@ -91,18 +82,8 @@ object ReadPreference {
   }
 
   /** Reads only from any secondary. */
-  class Secondary private[api] (val tags: List[Map[String, String]])
-    extends ReadPreference with Taggable
-    with Product1[List[Map[String, String]]] with Serializable {
-
-    @deprecated("No longer case class", "0.20.3")
-    @inline def _1 = tags
-
-    @deprecated("No longer case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: Secondary => false
-      case _            => false
-    }
+  final class Secondary private[api] (val tags: List[Map[String, String]])
+    extends ReadPreference with Taggable {
 
     override def equals(that: Any): Boolean = that match {
       case other: Secondary =>
@@ -117,7 +98,7 @@ object ReadPreference {
     override val toString = s"""Secondary(${tags mkString ", "})"""
   }
 
-  object Secondary extends scala.runtime.AbstractFunction1[List[Map[String, String]], Secondary] {
+  object Secondary {
     def apply(tags: List[Map[String, String]]): Secondary =
       new Secondary(tags)
 
@@ -129,18 +110,9 @@ object ReadPreference {
    * Reads from any secondary,
    * or from the primary if they are not available.
    */
-  class SecondaryPreferred private[api] (val tags: List[Map[String, String]])
-    extends ReadPreference with Taggable
-    with Product1[List[Map[String, String]]] with Serializable {
-
-    @deprecated("No longer case class", "0.20.3")
-    @inline def _1 = tags
-
-    @deprecated("No longer case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: SecondaryPreferred => false
-      case _                     => false
-    }
+  final class SecondaryPreferred private[api] (
+    val tags: List[Map[String, String]])
+    extends ReadPreference with Taggable {
 
     override def equals(that: Any): Boolean = that match {
       case other: SecondaryPreferred =>
@@ -155,7 +127,7 @@ object ReadPreference {
     override val toString = s"""SecondaryPreferred(${tags mkString ", "})"""
   }
 
-  object SecondaryPreferred extends scala.runtime.AbstractFunction1[List[Map[String, String]], SecondaryPreferred] {
+  object SecondaryPreferred {
     def apply(tags: List[Map[String, String]]): SecondaryPreferred =
       new SecondaryPreferred(tags)
 
@@ -167,18 +139,8 @@ object ReadPreference {
    * Reads from the faster node (e.g. the node which replies faster than
    * all others), regardless its status (primary or secondary).
    */
-  class Nearest private[api] (val tags: List[Map[String, String]])
-    extends ReadPreference with Taggable
-    with Product1[List[Map[String, String]]] with Serializable {
-
-    @deprecated("No longer case class", "0.20.3")
-    @inline def _1 = tags
-
-    @deprecated("No longer case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: Nearest => false
-      case _          => false
-    }
+  final class Nearest private[api] (val tags: List[Map[String, String]])
+    extends ReadPreference with Taggable {
 
     override def equals(that: Any): Boolean = that match {
       case other: Nearest =>
@@ -193,7 +155,7 @@ object ReadPreference {
     override val toString = s"""Nearest(${tags mkString ", "})"""
   }
 
-  object Nearest extends scala.runtime.AbstractFunction1[List[Map[String, String]], Nearest] {
+  object Nearest {
     def apply(tags: List[Map[String, String]]): Nearest = new Nearest(tags)
 
     def unapply(pref: Nearest): Option[List[Map[String, String]]] =

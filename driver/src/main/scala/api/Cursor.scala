@@ -21,8 +21,6 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.util.LazyLogger
 
-import reactivemongo.core.protocol.Response
-
 /**
  * Cursor over results from MongoDB.
  *

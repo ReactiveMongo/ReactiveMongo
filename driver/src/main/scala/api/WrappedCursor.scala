@@ -2,8 +2,6 @@ package reactivemongo.api
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.core.protocol.Response
-
 /**
  * Cursor wrapper, to help to define custom cursor classes.
  * @see CursorProducer
