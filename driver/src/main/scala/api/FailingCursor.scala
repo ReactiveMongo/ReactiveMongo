@@ -15,8 +15,6 @@ private[api] final class FailingCursor[T](
 
   private[reactivemongo] def documentIterator(response: Response): Iterator[T] = Iterator.empty
 
-  def kill(cursorID: Long): Unit = ()
-
   private[reactivemongo] def killCursor(id: Long)(implicit ec: ExecutionContext): Unit = ()
 
   private[reactivemongo] def makeRequest(maxDocs: Int)(implicit ec: ExecutionContext): Future[Response] = failure
@@ -28,10 +26,6 @@ private[api] final class FailingCursor[T](
   def foldBulks[A](z: => A, maxDocs: Int)(suc: (A, Iterator[T]) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ec: ExecutionContext): Future[A] = failure
 
   def foldBulksM[A](z: => A, maxDocs: Int)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ec: ExecutionContext): Future[A] = failure
-
-  def foldResponses[A](z: => A, maxDocs: Int)(suc: (A, Response) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ec: ExecutionContext): Future[A] = failure
-
-  def foldResponsesM[A](z: => A, maxDocs: Int)(suc: (A, Response) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ec: ExecutionContext): Future[A] = failure
 
   def foldWhile[A](z: => A, maxDocs: Int)(suc: (A, T) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ec: ExecutionContext): Future[A] = failure
 

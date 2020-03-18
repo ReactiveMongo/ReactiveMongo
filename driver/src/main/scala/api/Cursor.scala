@@ -55,7 +55,6 @@ import reactivemongo.core.protocol.Response
  * @define getHead Returns the first document matching the query
  * @define resultTParam the result type of the binary operator
  * @define sucRespParam The binary operator to be applied when the next response is successfully read
- * @define foldResp Applies a binary operator to a start value and all responses handled by this cursor, going first to last.
  * @define sucSafeWarning This must be safe, and any error must be returned as `Future.failed[State[A]]`
  * @define foldBulks Applies a binary operator to a start value and all bulks of documents retrieved by this cursor, going first to last.
  * @define foldWhile Applies a binary operator to a start value and all elements retrieved by this cursor, going first to last.
@@ -63,30 +62,6 @@ import reactivemongo.core.protocol.Response
  */
 trait Cursor[T] extends CursorCompatAPI[T] {
   import Cursor.{ ErrorHandler, FailOnError }
-
-  /**
-   * $foldResp
-   *
-   * @param z $zeroParam
-   * @param maxDocs $maxDocsParam. $maxDocsWarning.
-   * @param suc $sucRespParam.
-   * @param err $errorHandlerParam
-   * @tparam A $resultTParam
-   */
-  @deprecated("Internal: will be made private", "0.19.4")
-  def foldResponses[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
-
-  /**
-   * $foldResp
-   *
-   * @param z $zeroParam
-   * @param maxDocs $maxDocsParam. $maxDocsWarning.
-   * @param suc $sucRespParam. $sucSafeWarning.
-   * @param err $errorHandlerParam
-   * @tparam A $resultTParam
-   */
-  @deprecated("Internal: will be made private", "0.19.4")
-  def foldResponsesM[A](z: => A, maxDocs: Int = -1)(suc: (A, Response) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
 
   /**
    * $foldBulks

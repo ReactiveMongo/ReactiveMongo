@@ -333,40 +333,6 @@ trait Cursor1Spec { spec: CursorSpec =>
           }
         }
       }
-
-      { // .foldResponse
-        "fold the responses for all the documents" in {
-          c.find(matchAll("cursorspec8a")).
-            batchSize(2096).cursor().foldResponses(0)({ (st, resp) =>
-              debug(s"foldResponses: $st")
-              Cursor.Cont(st + resp.reply.numberReturned)
-            }) aka "result size" must beEqualTo(16517).await(1, timeout)
-        }
-
-        "fold the responses for 1024 documents" in {
-          c.find(matchAll("cursorspec9a")).
-            batchSize(2056).cursor().foldResponses(0, 1024)(
-              (st, resp) => Cursor.Cont(st + resp.reply.numberReturned)).
-              aka("result size") must beEqualTo(1024).await(1, timeout)
-        }
-
-        "fold the responses with async function" >> {
-          "for all the documents" in {
-            coll.find(matchAll("cursorspec8b")).
-              batchSize(2096).cursor().foldResponsesM(0)((st, resp) =>
-                Future.successful(Cursor.Cont(st + resp.reply.numberReturned))).
-              aka("result size") must beEqualTo(16517).await(1, timeout)
-          }
-
-          "for 1024 documents" in {
-            coll.find(matchAll("cursorspec9b")).batchSize(256).cursor().
-              foldResponsesM(0, 1024)(
-                (st, resp) => Future.successful(
-                  Cursor.Cont(st + resp.reply.numberReturned))).
-                aka("result size") must beEqualTo(1024).await(1, timeout)
-          }
-        }
-      }
     }
 
     "with the default connection" >> {
@@ -375,22 +341,6 @@ trait Cursor1Spec { spec: CursorSpec =>
 
     "with the slow connection" >> {
       foldSpec1(slowColl, slowTimeout * 2L)
-    }
-
-    "fold the responses with async function" >> {
-      "for all the documents" in {
-        coll.find(matchAll("cursorspec8")).
-          batchSize(2096).cursor().foldResponsesM(0)((st, resp) =>
-            Future.successful(Cursor.Cont(st + resp.reply.numberReturned))).
-          aka("result size") must beEqualTo(16517).await(1, timeout)
-      }
-
-      "for 1024 documents" in {
-        coll.find(matchAll("cursorspec9")).batchSize(256).cursor().
-          foldResponsesM(0, 1024)((st, resp) =>
-            Future.successful(Cursor.Cont(st + resp.reply.numberReturned))).
-          aka("result size") must beEqualTo(1024).await(1, timeout)
-      }
     }
 
     "produce a custom cursor for the results" in {

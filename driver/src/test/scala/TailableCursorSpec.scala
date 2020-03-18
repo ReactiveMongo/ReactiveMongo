@@ -17,10 +17,6 @@ import reactivemongo.api.tests.{
 
 trait TailableCursorSpec { specs: CursorSpec =>
   def tailableSpec = {
-    lazy val legacyIdReader = reactivemongo.bson.BSONDocumentReader[Int] {
-      _.getAs[Int]("id").get
-    }
-
     "read from capped collection" >> {
       def collection(n: String, database: DB) = {
         val col = database(s"somecollection_captail_$n")
@@ -54,25 +50,6 @@ trait TailableCursorSpec { specs: CursorSpec =>
       }
 
       "using tailable" >> {
-        "to fold responses" in {
-          implicit val reader = legacyIdReader
-
-          tailable("foldr0").foldResponses(List.empty[Int], 6) { (s, resp) =>
-            val bulk = parseResponse(resp).flatMap(_.asOpt[Int].toList)
-
-            Cursor.Cont(s ++ bulk)
-          } must beEqualTo(List(0, 1, 2, 3, 4, 5)).await(1, timeout)
-        }
-
-        "to fold responses with async function" in {
-          implicit val reader = legacyIdReader
-          tailable("foldr0").foldResponsesM(List.empty[Int], 6) { (s, resp) =>
-            val bulk = parseResponse(resp).flatMap(_.asOpt[Int].toList)
-
-            Future.successful(Cursor.Cont(s ++ bulk))
-          } must beEqualTo(List(0, 1, 2, 3, 4, 5)).await(1, timeout)
-        }
-
         "to fold bulks" in {
           tailable("foldw0a").foldBulks(List.empty[Int], 6)(
             (s, bulk) => Cursor.Cont(s ++ bulk)) must beEqualTo(List(
