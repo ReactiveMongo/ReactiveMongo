@@ -27,8 +27,8 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
    * import reactivemongo.api.bson.collection.BSONCollection
    *
    * def foo(coll: BSONCollection)(implicit ec: ExecutionContext) = {
-   *   import coll.aggregationFramework
-   *   import aggregationFramework.{ Group, Match, SumField }
+   *   import coll.AggregationFramework
+   *   import AggregationFramework.{ Group, Match, SumField }
    *
    *   // See http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-states-with-populations-above-10-million
    *

@@ -11,7 +11,7 @@ private[commands] trait AggregationPipeline[P <: SerializationPack] {
    * and clients should not have custom operators.
    */
   trait PipelineOperator {
-    def makePipe: pack.Value
+    protected[reactivemongo] def makePipe: pack.Document
   }
 
   /**
@@ -37,9 +37,12 @@ private[commands] trait AggregationPipeline[P <: SerializationPack] {
    * }}}
    */
   object PipelineOperator {
-    def apply(pipe: => pack.Value): PipelineOperator = new PipelineOperator {
+    def apply(pipe: => pack.Document): PipelineOperator = new PipelineOperator {
       val makePipe = pipe
     }
+
+    implicit def writer[Op <: PipelineOperator]: pack.Writer[Op] =
+      pack.writer[Op](_.makePipe)
   }
 
   /**

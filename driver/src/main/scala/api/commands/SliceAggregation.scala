@@ -20,7 +20,7 @@ private[commands] trait SliceAggregation[P <: SerializationPack] {
 
     import builder.{ document, elementProducer => element }
 
-    val makePipe: pack.Document = {
+    protected[reactivemongo] val makePipe: pack.Document = {
       val els = Seq.newBuilder[pack.Value]
 
       position.foreach { els += _ }
@@ -47,7 +47,7 @@ private[commands] trait SliceAggregation[P <: SerializationPack] {
    *       "name" -> 1,
    *       "favorites" -> Slice(
    *         array = BSONString(f"$$favorites"),
-   *         n = BSONInteger(3)).makePipe)) -> List.empty
+   *         n = BSONInteger(3)))) -> List.empty
    *   }
    * }
    * }}}

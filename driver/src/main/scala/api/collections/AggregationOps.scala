@@ -24,15 +24,28 @@ import reactivemongo.api.commands.{
 }
 import reactivemongo.core.protocol.MongoWireVersion
 
-private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
+private[collections] trait AggregationOps[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] with HintFactory[P] =>
+
+  /** The [[https://docs.mongodb.com/manual/core/aggregation-pipeline/ aggregation framework]] for this collection */
+  object AggregationFramework extends reactivemongo.api.commands.AggregationFramework[collection.pack.type] {
+    val pack: collection.pack.type = collection.pack
+  }
+
+  /** Aggregation framework */
+  type AggregationFramework = AggregationFramework.type
+
+  /**
+   * Aggregation pipeline operator/stage
+   */
+  type PipelineOperator = AggregationFramework.PipelineOperator
 
   // ---
 
   /**
    * @see [[reactivemongo.api.commands.AggregationFramework.PipelineOperator]]
    */
-  final class AggregatorContext[T](
+  final class AggregatorContext[T] private[reactivemongo] (
     val firstOperator: PipelineOperator,
     val otherOperators: List[PipelineOperator],
     val explain: Boolean,
@@ -49,16 +62,13 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
     val comment: Option[String],
     val collation: Option[Collation]) {
 
-    @deprecated("Use `maxTime`", "0.19.8")
-    val maxTimeMS: Option[Long] = maxTime.map(_.toMillis)
-
     def prepared[AC[_] <: Cursor.WithOps[_]](
       implicit
       cp: CursorProducer.Aux[T, AC]): Aggregator[T, AC] =
       new Aggregator[T, AC](this, cp)
   }
 
-  final class Aggregator[T, AC[_] <: Cursor[_]](
+  private[api] final class Aggregator[T, AC[_] <: Cursor[_]] private[reactivemongo] (
     val context: AggregatorContext[T],
     val cp: CursorProducer.Aux[T, AC]) {
 
@@ -78,7 +88,7 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
 
       val cursor = runner.cursor[T, Aggregate[T]](
         collection, cmd, context.cursorOptions,
-        context.readPreference, context.maxTimeMS)
+        context.readPreference, context.maxTime.map(_.toMillis))
 
       cp.produce(cursor)
     }
@@ -127,8 +137,8 @@ private[collections] trait Aggregator[P <: SerializationPack with Singleton] {
         cmd.pipeline.map(_.makePipe))
 
       lazy val isOut: Boolean = cmd.pipeline.lastOption.exists {
-        case BatchCommands.AggregationFramework.Out(_) => true
-        case _                                         => false
+        case AggregationFramework.Out(_) => true
+        case _                           => false
       }
 
       val writeReadConcern =

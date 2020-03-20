@@ -24,7 +24,6 @@ import scala.concurrent.duration.FiniteDuration
 import reactivemongo.api._
 import reactivemongo.api.commands.{
   CommandCodecs,
-  FindAndModifyCommand => FNM,
   ImplicitCommandHelpers,
   UnitBox,
   WriteConcern
@@ -90,7 +89,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   with UpdateOps[P] with DeleteOps[P] with CountOp[P] with DistinctOp[P]
   with GenericCollectionWithDistinctOps[P]
   with FindAndModifyOps[P] with ChangeStreamOps[P]
-  with Aggregator[P] with GenericCollectionMetaCommands[P]
+  with AggregationOps[P] with GenericCollectionMetaCommands[P]
   with GenericCollectionWithQueryBuilder[P] with HintFactory[P] { self =>
 
   val pack: P
@@ -98,25 +97,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   /** Upper MongoDB version (used for version checks) */
   protected lazy val version = db.connectionState.metadata.maxWireVersion
 
-  protected val BatchCommands: BatchCommands[pack.type]
-
-  /**
-   * Alias for type of the aggregation framework,
-   * depending on the type of the collection.
-   *
-   * @see [[reactivemongo.api.commands.AggregationFramework]]
-   */
-  type AggregationFramework = BatchCommands.AggregationFramework.type
-
-  lazy val aggregationFramework: AggregationFramework =
-    BatchCommands.AggregationFramework
-
-  import aggregationFramework.{ Pipeline => AggregationPipeline }
-
-  /**
-   * Alias for [[reactivemongo.api.commands.AggregationFramework.PipelineOperator]]
-   */
-  type PipelineOperator = BatchCommands.AggregationFramework.PipelineOperator
+  import AggregationFramework.{ Pipeline => AggregationPipeline }
 
   private[reactivemongo] implicit def PackIdentityReader: pack.Reader[pack.Document] = pack.IdentityReader
 
@@ -597,7 +578,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     reader: pack.Reader[T],
     cp: CursorProducer[T]): cp.ProducedCursor = {
 
-    val (firstOp, otherOps) = f(BatchCommands.AggregationFramework)
+    val (firstOp, otherOps) = f(AggregationFramework)
 
     val aggregateCursor: Cursor.WithOps[T] = aggregatorContext[T](
       firstOp, otherOps, explain, allowDiskUse,
@@ -620,8 +601,8 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * import reactivemongo.api.bson.collection.BSONCollection
    *
    * def populatedStates(cities: BSONCollection): Future[List[BSONDocument]] = {
-   *   import cities.aggregationFramework
-   *   import aggregationFramework.{ Group, Match, SumField }
+   *   import cities.AggregationFramework
+   *   import AggregationFramework.{ Group, Match, SumField }
    *
    *   cities.aggregatorContext[BSONDocument](
    *     Group(BSONString(f"$$state"))(

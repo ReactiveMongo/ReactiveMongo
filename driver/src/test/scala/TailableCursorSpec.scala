@@ -3,7 +3,7 @@ import scala.concurrent.duration._
 
 import reactivemongo.core.protocol.Response
 
-import reactivemongo.api.{ Cursor, DB, QueryOpts }
+import reactivemongo.api.{ Cursor, DB }
 import reactivemongo.api.bson.BSONDocument
 
 import _root_.tests.Common

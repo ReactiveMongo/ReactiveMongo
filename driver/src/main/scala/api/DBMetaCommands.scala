@@ -4,35 +4,25 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.commands.{
   AuthenticationRestriction,
+  CommandCodecs,
   RenameCollection
 }
 
 import reactivemongo.api.indexes.IndexesManager
-import reactivemongo.bson.{ BSONDocument => LegacyDoc, BSONDocumentWriter }
 
 import reactivemongo.api.gridfs.GridFS
 
 /** A mixin that provides commands about this database itself. */
 private[api] trait DBMetaCommands { self: DB =>
-  import reactivemongo.core.protocol.MongoWireVersion
   import reactivemongo.api.commands.{
     Command,
     CreateUserCommand,
     DropDatabase,
     ListCollectionNames,
     PingCommand,
-    ServerStatus,
-    ServerStatusResult,
     UserRole,
     WriteConcern => WC
   }
-  import reactivemongo.api.commands.bson.{
-    CommonImplicits,
-    BSONCreateUserCommand,
-    BSONPingCommandImplicits
-  }
-  import CommonImplicits._
-  import BSONPingCommandImplicits._
   import Serialization.{ Pack, internalSerializationPack, unitBoxReader }
 
   private implicit lazy val dropWriter =
@@ -237,6 +227,17 @@ private[api] trait DBMetaCommands { self: DB =>
       self, command, ReadPreference.primary).map(_ => {})
   }
 
+  private implicit lazy val pingWriter: pack.Writer[PingCommand.type] = {
+    val builder = internalSerializationPack.newBuilder
+    val cmd = builder.document(Seq(builder.elementProducer(
+      "ping", builder.double(1.0D))))
+
+    pack.writer[PingCommand.type] { _ => cmd }
+  }
+
+  private implicit lazy val pingReader: pack.Reader[Boolean] =
+    CommandCodecs.dealingWithGenericCommandErrorsReader[Pack, Boolean](internalSerializationPack) { _ => true }
+
   /**
    * Tests if the server, resolved according to the given read preference, responds to commands.
    *
@@ -254,7 +255,7 @@ private[api] trait DBMetaCommands { self: DB =>
    * @return true if successful (even if the server is write locked)
    */
   def ping(readPreference: ReadPreference = ReadPreference.nearest)(implicit ec: ExecutionContext): Future[Boolean] = {
-    Command.run(BSONSerializationPack, failoverStrategy).
+    Command.run(internalSerializationPack, failoverStrategy).
       apply(self, PingCommand, readPreference)
   }
 }

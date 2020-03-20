@@ -15,7 +15,7 @@ import reactivemongo.api.{
 
 trait ChangeStreamOps[P <: SerializationPack with Singleton] { collection: GenericCollection[P] =>
 
-  import collection.BatchCommands.AggregationFramework.ChangeStream
+  import collection.AggregationFramework.ChangeStream
 
   /**
    * Prepares a builder for watching the [[https://docs.mongodb.com/manual/changeStreams change stream]] of this collection.

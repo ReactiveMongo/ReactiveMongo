@@ -1,7 +1,7 @@
 import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 
-import reactivemongo.api.{ Cursor, QueryOpts }
+import reactivemongo.api.Cursor
 
 import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.bson.collection.BSONCollection

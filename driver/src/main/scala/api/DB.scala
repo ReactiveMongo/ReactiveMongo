@@ -105,7 +105,7 @@ final class DB(
    * import scala.concurrent.ExecutionContext
    * import reactivemongo.api.DB
    *
-   * def resoleColl(db: DB)(implicit ec: ExecutionContext) =
+   * def resolveColl(db: DB)(implicit ec: ExecutionContext) =
    *   db.collection("acoll")
    * }}}
    */

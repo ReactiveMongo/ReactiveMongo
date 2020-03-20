@@ -2,6 +2,7 @@ import sbt._
 import sbt.Keys._
 
 object Compiler {
+  // TODO: Remove Scala 2.10
   private val silencerVersion = Def.setting[String] {
     if (scalaBinaryVersion.value == "2.11") "1.4.4"
     else "1.6.0"

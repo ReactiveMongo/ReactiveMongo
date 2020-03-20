@@ -41,7 +41,6 @@ final class BSONCollection @deprecated("Internal: will be made private", "0.17.0
   with scala.Serializable with java.io.Serializable {
 
   @transient val pack = BSONSerializationPack
-  @transient val BatchCommands = BSONBatchCommands
 
   override lazy val toString =
     s"BSONCollection('${db.name}'.'$name', $failoverStrategy)"
