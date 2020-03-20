@@ -397,11 +397,10 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param fetchNewObject the command result must be the new object instead of the old one.
    * @param upsert $upsertParam
    */
-  def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): BatchCommands.FindAndModifyCommand.Update = BatchCommands.FindAndModifyCommand.Update(update, fetchNewObject, upsert)
+  def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): FindAndUpdate = new FindAndModifyCommand.Update(pack.serialize(update, updateWriter), fetchNewObject, upsert)
 
   /** Returns a removal modifier, to be used with `findAndModify`. */
-  @transient lazy val removeModifier =
-    BatchCommands.FindAndModifyCommand.Remove
+  @transient lazy val removeModifier: FindAndRemove = FindAndRemove
 
   /**
    * Applies a [[http://docs.mongodb.org/manual/reference/command/findAndModify/ findAndModify]] operation. See `findAndUpdate` and `findAndRemove` convenient functions.
@@ -444,14 +443,14 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    */
   def findAndModify[S](
     selector: S,
-    modifier: BatchCommands.FindAndModifyCommand.Modify,
+    modifier: FindAndModifyOp,
     sort: Option[pack.Document] = None,
     fields: Option[pack.Document] = None,
     bypassDocumentValidation: Boolean = false,
     writeConcern: WriteConcern = this.writeConcern,
     maxTime: Option[FiniteDuration] = None,
     collation: Option[Collation] = None,
-    arrayFilters: Seq[pack.Document] = Seq.empty)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[FNM.Result[pack.type]] = {
+    arrayFilters: Seq[pack.Document] = Seq.empty)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[FindAndModifyResult] = {
 
     val op = prepareFindAndModify(
       selector = selector,
@@ -516,7 +515,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     implicit
     swriter: pack.Writer[S],
     writer: pack.Writer[T],
-    ec: ExecutionContext): Future[FNM.Result[pack.type]] = {
+    ec: ExecutionContext): Future[FindAndModifyResult] = {
     val updateOp = updateModifier(update, fetchNewObject, upsert)
 
     findAndModify(selector, updateOp, sort, fields,
@@ -564,7 +563,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     writeConcern: WriteConcern = this.writeConcern,
     maxTime: Option[FiniteDuration] = None,
     collation: Option[Collation] = None,
-    arrayFilters: Seq[pack.Document] = Seq.empty)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[FNM.Result[pack.type]] = findAndModify[S](
+    arrayFilters: Seq[pack.Document] = Seq.empty)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[FindAndModifyResult] = findAndModify[S](
     selector, removeModifier, sort, fields,
     bypassDocumentValidation = false,
     writeConcern = writeConcern,

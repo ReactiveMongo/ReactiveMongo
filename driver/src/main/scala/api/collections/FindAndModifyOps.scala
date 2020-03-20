@@ -14,7 +14,7 @@ import reactivemongo.api.commands.{
 /**
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  */
-private[api] trait FindAndModifyOps[P <: SerializationPack with Singleton] {
+trait FindAndModifyOps[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
 
   private[reactivemongo] object FindAndModifyCommand
@@ -22,7 +22,20 @@ private[api] trait FindAndModifyOps[P <: SerializationPack with Singleton] {
     val pack: collection.pack.type = collection.pack
   }
 
-  private type FindAndModifyResult = FNM.Result[pack.type]
+  /** Find-and-update operation type */
+  final type FindAndUpdate = FindAndModifyCommand.Update
+
+  /** Find-and-remove operation type */
+  final type FindAndRemove = FindAndModifyCommand.Remove.type
+
+  /** Find-and-remove operation */
+  @inline final def FindAndRemove: FindAndRemove = FindAndModifyCommand.Remove
+
+  /** Modifier type for [[FindAndUpdate]] */
+  final type FindAndModifyOp = FindAndModifyCommand.Modify
+
+  /** Result type for find-and-modify operations */
+  final type FindAndModifyResult = FNM.Result[pack.type]
 
   /**
    * @param writeConcern writeConcernParam
@@ -91,11 +104,11 @@ private[api] trait FindAndModifyOps[P <: SerializationPack with Singleton] {
 
       implicit def selectorWriter = swriter
 
-      val cmd = FindAndModify(
-        query = implicitly[DP](selector),
-        modify = modifier,
-        sort = sort.map(implicitly[DP](_)),
-        fields = fields.map(implicitly[DP](_)),
+      val cmd = new FindAndModify(
+        query = implicitly[DP](selector).produce,
+        modifier = modifier,
+        sort = sort.map(implicitly[DP](_).produce),
+        fields = fields.map(implicitly[DP](_).produce),
         bypassDocumentValidation = bypassDocumentValidation,
         writeConcern = writeConcern,
         maxTimeMS = maxTime.flatMap { t =>
@@ -108,7 +121,7 @@ private[api] trait FindAndModifyOps[P <: SerializationPack with Singleton] {
           }
         },
         collation = collation,
-        arrayFilters = arrayFilters.map(implicitly[DP](_)))
+        arrayFilters = arrayFilters.map(implicitly[DP](_).produce))
 
       runCommand(cmd, writePreference)
     }

@@ -9,10 +9,6 @@ object BSONBatchCommands extends BatchCommands[BSONSerializationPack.type] {
 
   val pack = BSONSerializationPack
 
-  val DistinctCommand = BSONDistinctCommand
-  implicit def DistinctWriter = BSONDistinctCommandImplicits.DistinctWriter
-  implicit def DistinctResultReader = BSONDistinctCommandImplicits.DistinctResultReader
-
   val InsertCommand = BSONInsertCommand
   implicit def InsertWriter = BSONInsertCommandImplicits.InsertWriter
 
@@ -23,10 +19,6 @@ object BSONBatchCommands extends BatchCommands[BSONSerializationPack.type] {
   val DeleteCommand = BSONDeleteCommand
   implicit def DeleteWriter = BSONDeleteCommandImplicits.DeleteWriter
   implicit def DefaultWriteResultReader = BSONCommonWriteCommandsImplicits.DefaultWriteResultReader
-
-  val FindAndModifyCommand = BSONFindAndModifyCommand
-  implicit def FindAndModifyWriter = ???
-  implicit def FindAndModifyReader = ???
 
   val AggregationFramework = BSONAggregationFramework
   implicit def AggregateWriter = BSONAggregationImplicits.AggregateWriter

@@ -30,7 +30,7 @@ import reactivemongo.api.commands.{
 /**
  * A Collection that interacts with the BSON library.
  */
-private[reactivemongo] final class CollectionImpl(
+private[reactivemongo] final class CollectionImpl( // TODO: Remove
   val db: DB,
   val name: String,
   val failoverStrategy: FailoverStrategy,
@@ -103,24 +103,7 @@ private[reactivemongo] final class CollectionImpl(
     }
 
     import reactivemongo.api.commands.{
-      AggregationFramework => AggFramework,
-      FindAndModifyCommand => FindAndModifyCmd
-    }
-
-    object FindAndModifyCommand
-      extends FindAndModifyCmd[pack.type] {
-      val pack = commands.pack
-    }
-
-    @deprecated("FindAndModify", "0.18.0")
-    object FindAndModifyWriter extends BSONDocumentWriter[ResolvedCollectionCommand[FindAndModifyCommand.FindAndModify]] {
-      def writeTry(cmd: ResolvedCollectionCommand[FindAndModifyCommand.FindAndModify]) = deprecated
-    }
-
-    @deprecated("FindAndModifyResult", "0.18.0")
-    object FindAndModifyReader
-      extends BSONDocumentReader[FindAndModifyCommand.FindAndModifyResult] {
-      def readDocument(doc: BSONDocument) = deprecated
+      AggregationFramework => AggFramework
     }
 
     object AggregationFramework extends AggFramework[pack.type] {

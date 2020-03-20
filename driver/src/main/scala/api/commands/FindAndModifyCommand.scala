@@ -4,11 +4,10 @@ import reactivemongo.api.{ Serialization, SerializationPack, Session }
 
 import reactivemongo.core.protocol.MongoWireVersion
 
-@deprecated("Internal: will be made private", "0.16.0")
-trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] { self =>
+private[api] trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] { self =>
   import pack._
 
-  class FindAndModify(
+  private[reactivemongo] final class FindAndModify(
     val query: Document,
     val modifier: FindAndModifyCommand.ModifyOp,
     val sort: Option[Document],
@@ -19,104 +18,9 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
     val collation: Option[Collation],
     val arrayFilters: Seq[Document]) extends CollectionCommand
     with CommandWithPack[P]
-    with CommandWithResult[FindAndModifyCommand.Result[pack.type]]
-    with Product with Serializable {
+    with CommandWithResult[FindAndModifyCommand.Result[pack.type]] {
 
-    def upsert = modify.upsert
-
-    @deprecated("Use `modifier`", "0.18.0")
-    lazy val modify: Modify = {
-      type UpdateOp = FindAndModifyCommand.UpdateOp[pack.type]
-
-      modifier match {
-        case u: UpdateOp => Update(
-          update = u.update,
-          fetchNewObject = u.fetchNewObject,
-          upsert = u.upsert)
-
-        case _ =>
-          Remove
-      }
-    }
-
-    def canEqual(that: Any): Boolean = that match {
-      case _: FindAndModify => true
-      case _                => false
-    }
-
-    @deprecated("Will no longer be a product", "0.18.0")
-    val productArity = 9
-
-    @deprecated("Will no longer be a product", "0.18.0")
-    def productElement(n: Int): Any = (n: @annotation.switch) match {
-      case 0 => query
-      case 1 => modifier
-      case 2 => sort
-      case 3 => fields
-      case 4 => bypassDocumentValidation
-      case 5 => writeConcern
-      case 6 => maxTimeMS
-      case 7 => collation
-      case _ => arrayFilters
-    }
-  }
-
-  object FindAndModify {
-    @deprecated("Use other `apply`", "0.14.0")
-    def apply(query: ImplicitlyDocumentProducer, modify: Modify, sort: Option[ImplicitlyDocumentProducer] = None, fields: Option[ImplicitlyDocumentProducer] = None): FindAndModify =
-      new FindAndModify(
-        query.produce,
-        modify,
-        sort.map(_.produce),
-        fields.map(_.produce),
-        bypassDocumentValidation = false,
-        writeConcern = GetLastError.Default,
-        maxTimeMS = Option.empty,
-        collation = Option.empty,
-        arrayFilters = Seq.empty)
-
-    @deprecated("Use other `apply`", "0.18.0")
-    def apply(
-      query: ImplicitlyDocumentProducer,
-      modify: Modify,
-      sort: Option[ImplicitlyDocumentProducer],
-      fields: Option[ImplicitlyDocumentProducer],
-      bypassDocumentValidation: Boolean,
-      writeConcern: WriteConcern,
-      maxTimeMS: Option[Int],
-      collation: Option[Collation],
-      arrayFilters: Seq[ImplicitlyDocumentProducer]): FindAndModify =
-      new FindAndModify(
-        query.produce,
-        modify,
-        sort.map(_.produce),
-        fields.map(_.produce),
-        bypassDocumentValidation,
-        writeConcern,
-        maxTimeMS,
-        collation,
-        arrayFilters.map(_.produce))
-
-    def apply(
-      query: ImplicitlyDocumentProducer,
-      modify: FindAndModifyCommand.ModifyOp,
-      sort: Option[ImplicitlyDocumentProducer],
-      fields: Option[ImplicitlyDocumentProducer],
-      bypassDocumentValidation: Boolean,
-      writeConcern: WriteConcern,
-      maxTimeMS: Option[Int],
-      collation: Option[Collation],
-      arrayFilters: Seq[ImplicitlyDocumentProducer]): FindAndModify =
-      new FindAndModify(
-        query.produce,
-        modify,
-        sort.map(_.produce),
-        fields.map(_.produce),
-        bypassDocumentValidation,
-        writeConcern,
-        maxTimeMS,
-        collation,
-        arrayFilters.map(_.produce))
+    @inline def upsert = modifier.upsert
   }
 
   /** A modify operation, part of a FindAndModify command */
@@ -132,28 +36,14 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
    * @param fetchNewObject the command result must be the new object instead of the old one.
    * @param upsert if true, creates a new document if no document matches the query, or if documents match the query, findAndModify performs an update
    */
-  class Update private[api] (
+  final class Update private[api] (
     val update: Document,
     val fetchNewObject: Boolean,
-    override val upsert: Boolean) extends Modify with FindAndModifyCommand.UpdateOp[pack.type] with Product3[Document, Boolean, Boolean] with Serializable {
+    override val upsert: Boolean)
+    extends Modify with FindAndModifyCommand.UpdateOp[pack.type] {
     val pack: self.pack.type = self.pack
 
-    @deprecated("No longer a case class", "0.20.3")
-    @inline def _1 = update
-
-    @deprecated("No longer a case class", "0.20.3")
-    @inline def _2 = fetchNewObject
-
-    @deprecated("No longer a case class", "0.20.3")
-    @inline def _3 = upsert
-
     private[api] lazy val tupled = Tuple3(update, fetchNewObject, upsert)
-
-    @deprecated("No longer a case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: Update => true
-      case _         => false
-    }
 
     override def equals(that: Any): Boolean = that match {
       case other: Update =>
@@ -168,32 +58,13 @@ trait FindAndModifyCommand[P <: SerializationPack] extends ImplicitCommandHelper
     override def toString = s"Update${tupled.toString}"
   }
 
-  object Update {
-    def apply(
-      update: Document,
-      fetchNewObject: Boolean,
-      upsert: Boolean): Update = new Update(update, fetchNewObject, upsert)
-
-    def apply(update: ImplicitlyDocumentProducer, fetchNewObject: Boolean = false, upsert: Boolean = false): Update = Update(update.produce, fetchNewObject, upsert)
-
-    @deprecated("No longer a case class", "0.20.3")
-    def unapply(update: Update): Option[(Document, Boolean, Boolean)] =
-      Option(update).map(_.tupled)
+  private[api] object Update {
+    def unapply(update: Update): Option[(Document, Boolean, Boolean)] = Option(update).map(_.tupled)
   }
 
   /** Remove (part of a FindAndModify command). */
   object Remove extends Modify with FindAndModifyCommand.RemoveOp {
     override val upsert = false
-  }
-
-  @deprecated("Use `FindAndModifyCommand.UpdateLastError`", "0.18.0")
-  type UpdateLastError = FindAndModifyCommand.UpdateLastError
-
-  @deprecated("Use `FindAndModifyCommand.FindAndModifyResult`", "0.18.0")
-  case class FindAndModifyResult(
-    lastError: Option[UpdateLastError],
-    value: Option[pack.Document]) extends FindAndModifyCommand.Result[pack.type] {
-    val pack: self.pack.type = self.pack
   }
 }
 
@@ -211,7 +82,7 @@ object FindAndModifyCommand {
    * @param fetchNewObject the command result must be the new object instead of the old one.
    * @param upsert if true, creates a new document if no document matches the query, or if documents match the query, findAndModify performs an update
    */
-  trait UpdateOp[P <: SerializationPack with Singleton] extends ModifyOp {
+  sealed trait UpdateOp[P <: SerializationPack with Singleton] extends ModifyOp {
     val pack: P
 
     def update: pack.Document
@@ -220,11 +91,11 @@ object FindAndModifyCommand {
   }
 
   /** Remove (part of a FindAndModify command). */
-  trait RemoveOp extends ModifyOp {
+  sealed trait RemoveOp extends ModifyOp {
     val upsert = false
   }
 
-  sealed abstract class UpdateLastError extends Serializable with Product {
+  sealed abstract class UpdateLastError {
     private[api] type Pack <: SerializationPack
     private[api] val pack: Pack
 
@@ -236,23 +107,6 @@ object FindAndModifyCommand {
 
     /** Value of the upserted ID */
     private[api] def upserted: Option[pack.Value] = None
-
-    @deprecated("No longer a case class", "0.19.8")
-    def canEqual(that: Any): Boolean = that match {
-      case _: UpdateLastError => true
-      case _                  => false
-    }
-
-    @deprecated("No longer a case class", "0.19.8")
-    val productArity = 4
-
-    @deprecated("No longer a case class", "0.19.8")
-    def productElement(n: Int): Any = n match {
-      case 0 => updatedExisting
-      case 1 => upsertedId
-      case 2 => n
-      case _ => err
-    }
 
     // TODO#1.1: All fields after release
     override def equals(that: Any): Boolean = that match {
@@ -267,29 +121,8 @@ object FindAndModifyCommand {
       Tuple4(updatedExisting, upsertedId, n, err)
   }
 
-  object UpdateLastError extends scala.runtime.AbstractFunction4[Boolean, Option[Any], Int, Option[String], UpdateLastError] {
+  object UpdateLastError {
     private[api] type Aux[P] = UpdateLastError { type Pack = P }
-
-    @deprecated("Use constructor with serialization pack", "0.19.8")
-    def apply(
-      updatedExisting: Boolean,
-      upsertedId: Option[Any],
-      n: Int,
-      err: Option[String]): UpdateLastError = {
-      def ue = updatedExisting
-      def ui = upsertedId
-      def _n = n
-      def e = err
-
-      new UpdateLastError {
-        type Pack = Serialization.Pack
-        override val pack = Serialization.internalSerializationPack
-        override val updatedExisting = ue
-        override lazy val upsertedId = ui
-        override val n = _n
-        override val err = e
-      }
-    }
 
     def apply[P <: SerializationPack](_pack: P)(
       updatedExisting: Boolean,
@@ -310,23 +143,16 @@ object FindAndModifyCommand {
         override val err = e
       }
     }
-
-    @deprecated("No longer a case class", "0.19.8")
-    def unapply(that: Any): Option[(Boolean, Any, Int, Option[String])] =
-      that match {
-        case other: UpdateLastError => Option(other).map(_.tupled)
-        case _                      => None
-      }
   }
 
-  trait Result[P <: SerializationPack with Singleton] extends Serializable {
+  sealed trait Result[P <: SerializationPack with Singleton] {
     val pack: P
 
     def lastError: Option[UpdateLastError]
 
     def value: Option[pack.Document]
 
-    def result[T](implicit reader: pack.Reader[T]): Option[T] =
+    final def result[T](implicit reader: pack.Reader[T]): Option[T] =
       value.map(pack.deserialize(_, reader))
 
     private type R = Result[pack.type]
@@ -344,7 +170,7 @@ object FindAndModifyCommand {
   import reactivemongo.bson.BSONDocument
   import reactivemongo.api.BSONSerializationPack
 
-  private[reactivemongo] object Result extends scala.runtime.AbstractFunction2[Option[UpdateLastError], Option[BSONDocument], Result[BSONSerializationPack.type]] {
+  private[reactivemongo] object Result {
 
     def apply[P <: SerializationPack with Singleton](_pack: P)(
       _lastError: Option[UpdateLastError],
@@ -354,13 +180,6 @@ object FindAndModifyCommand {
         val lastError = _lastError
         val value = _value
       }
-
-    @deprecated("Will be removed", "0.18.0")
-    @inline def apply(
-      lastError: Option[UpdateLastError],
-      value: Option[BSONDocument]): Result[BSONSerializationPack.type] =
-      apply(BSONSerializationPack)(lastError, value)
-
   }
 
   private[reactivemongo] def writer[P <: SerializationPack with Singleton](pack: P)(
@@ -410,7 +229,7 @@ object FindAndModifyCommand {
           elements += element("arrayFilters", array(f, command.arrayFilters.tail))
         }
 
-        command.modify match {
+        command.modifier match {
           case context.Update(document, fetchNewObject, upsert) =>
             elements ++= Seq(
               element("upsert", boolean(upsert)),
