@@ -1,3 +1,5 @@
+package reactivemongo
+
 import scala.concurrent.Promise
 
 import akka.actor.Actor

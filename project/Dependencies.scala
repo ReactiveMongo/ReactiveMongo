@@ -8,7 +8,7 @@ object Dependencies {
   val shaded = Def.setting[Seq[ModuleID]] {
     val v = (version in ThisBuild).value
 
-    if (Common.useShaded.value || scalaBinaryVersion.value == "2.10") {
+    if (Common.useShaded.value) {
       Seq(organization.value % "reactivemongo-shaded" % v)
     } else {
       Seq(
@@ -32,17 +32,13 @@ object Dependencies {
   }
 
   val playIteratees = Def.setting[ModuleID] {
-    val ver = sys.env.get("ITERATEES_VERSION").getOrElse {
-      if (scalaBinaryVersion.value == "2.10") "2.3.9"
-      else "2.6.1"
-    }
+    val ver = sys.env.get("ITERATEES_VERSION").getOrElse("2.6.1")
 
     "com.typesafe.play" %% "play-iteratees" % ver
   }
 
   val specsVer = Def.setting[String] {
-    if (scalaBinaryVersion.value == "2.10") "3.10.0" // 4.0.1 not avail
-    else "4.5.1"/*"4.3.5"*/ // due to discipline 0.11 not compat with scala 2.10
+    "4.5.1"/*"4.3.5"*/
   }
 
   val specs = Def.setting[ModuleID] {

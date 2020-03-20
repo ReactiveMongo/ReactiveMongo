@@ -1,7 +1,5 @@
 package reactivemongo.api.commands
 
-import reactivemongo.bson.BSONValue
-
 import reactivemongo.api.SerializationPack
 
 sealed trait Upserted {

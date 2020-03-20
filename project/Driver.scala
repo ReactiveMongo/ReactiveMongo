@@ -92,7 +92,8 @@ object Version {
           commonsCodec,
           shapelessTest % Test, specs.value) ++ logApi,
         findbugsAnalyzedPath += target.value / "external",
-        mimaBinaryIssueFilters ++= {
+      mimaBinaryIssueFilters ++= {
+        // TODO: Empty
           import com.typesafe.tools.mima.core._, ProblemFilters.{ exclude => x }
 
           @inline def mmp(s: String) = x[MissingMethodProblem](s)
@@ -441,10 +442,6 @@ object Version {
         //mappings in (Compile, packageDoc) ~= driverFilter,
         mappings in (Compile, packageSrc) ~= driverFilter,
         apiMappings ++= Documentation.mappings("com.typesafe.akka", "http://doc.akka.io/api/akka/%s/")("akka-actor").value ++ Documentation.mappings("com.typesafe.play", "http://playframework.com/documentation/%s/api/scala/index.html", _.replaceAll("[\\d]$", "x"))("play-iteratees").value,
-      Common.pomTransformer := {
-        if (scalaBinaryVersion.value == "2.10") Some(skipScala210)
-        else None
-      }
     )).configure { p =>
       sys.props.get("test.nettyNativeArch") match {
         case Some("osx") => p.settings(Seq(
@@ -489,12 +486,4 @@ object Version {
   } andThen Common.filter
 
   private val driverCleanup = taskKey[Unit]("Driver compilation cleanup")
-
-  // ---
-
-  private lazy val skipScala210: XmlElem => Option[XmlElem] = { dep =>
-    if ((dep \ "artifactId").text startsWith "reactivemongo-bson-compat") {
-      None
-    } else Some(dep)
-  }
 }

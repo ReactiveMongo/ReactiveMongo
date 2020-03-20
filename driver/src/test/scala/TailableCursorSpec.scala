@@ -1,19 +1,12 @@
 import scala.concurrent.{ Await, Future, Promise }
 import scala.concurrent.duration._
 
-import reactivemongo.core.protocol.Response
-
 import reactivemongo.api.{ Cursor, DB }
 import reactivemongo.api.bson.BSONDocument
 
 import _root_.tests.Common
 
-import reactivemongo.api.tests.{
-  QueryOpts,
-  decoder,
-  parseResponse,
-  reader => docReader
-}
+import reactivemongo.api.tests.{ QueryOpts, decoder, reader => docReader }
 
 trait TailableCursorSpec { specs: CursorSpec =>
   def tailableSpec = {

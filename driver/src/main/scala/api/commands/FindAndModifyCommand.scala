@@ -1,6 +1,6 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ Serialization, SerializationPack, Session }
+import reactivemongo.api.{ SerializationPack, Session }
 
 import reactivemongo.core.protocol.MongoWireVersion
 
@@ -166,9 +166,6 @@ object FindAndModifyCommand {
 
     override def hashCode: Int = (lastError -> value).hashCode
   }
-
-  import reactivemongo.bson.BSONDocument
-  import reactivemongo.api.BSONSerializationPack
 
   private[reactivemongo] object Result {
 

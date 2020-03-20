@@ -7,13 +7,12 @@ import reactivemongo.core.ClientMetadata
 import reactivemongo.api.BSONSerializationPack
 import reactivemongo.api.commands._
 
-import reactivemongo.bson._
+import reactivemongo.bson._ // TODO: Update
 
-@deprecated("Internal: will be made private", "0.16.0")
-object BSONIsMasterCommand extends IsMasterCommand[BSONSerializationPack.type]
+private[reactivemongo] object BSONIsMasterCommand
+  extends IsMasterCommand[BSONSerializationPack.type]
 
-@deprecated("Internal: will be made private", "0.16.0")
-object BSONIsMasterCommandImplicits {
+private[reactivemongo] object BSONIsMasterCommandImplicits {
   import BSONIsMasterCommand._
 
   private val serializeClientMeta: ClientMetadata => Option[BSONDocument] =

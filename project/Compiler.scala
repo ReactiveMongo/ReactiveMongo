@@ -2,11 +2,7 @@ import sbt._
 import sbt.Keys._
 
 object Compiler {
-  // TODO: Remove Scala 2.10
-  private val silencerVersion = Def.setting[String] {
-    if (scalaBinaryVersion.value == "2.11") "1.4.4"
-    else "1.6.0"
-  }
+  private val silencerVersion = Def.setting[String]("1.4.4")
 
   private def unmanaged(ver: String, base: File): Seq[File] =
     CrossVersion.partialVersion(ver) match {
@@ -54,21 +50,19 @@ object Compiler {
         "-Yopt:_"
       )
     },
-    libraryDependencies ++= {
-      if (scalaBinaryVersion.value == "2.10") Nil
-      else Seq(
-        compilerPlugin(
-          ("com.github.ghik" %% "silencer-plugin" % silencerVersion.value).
-            cross(CrossVersion.full)),
-        ("com.github.ghik" %% "silencer-lib" % silencerVersion.
-          value % Provided).cross(CrossVersion.full))
-    },
+    libraryDependencies ++= Seq(
+      compilerPlugin(
+        ("com.github.ghik" %% "silencer-plugin" % silencerVersion.value).
+          cross(CrossVersion.full)),
+      ("com.github.ghik" %% "silencer-lib" % silencerVersion.
+        value % Provided).cross(CrossVersion.full)),
     scalacOptions in Compile ++= {
       val v = scalaBinaryVersion.value
 
-      if (v == "2.10" || v == "2.13") {
+      if (v == "2.13") {
         Nil
       } else {
+        // TODO: Remove
         val m26 = "MongoDB\\ 2\\.6\\ EOL\\ reached\\ by\\ Oct\\ 2016"
         val m3 = "MongoDB\\ 3\\.0\\ EOL\\ reached\\ by\\ Feb\\ 2018"
 
@@ -108,14 +102,6 @@ object Compiler {
       _.filterNot(excludeOpt)
     },
     scalacOptions in (Test, console) += "-Yrepl-class-based",
-    scalacOptions in Compile := {
-      val opts = (scalacOptions in Compile).value
-
-      if (scalaBinaryVersion.value != "2.10") opts
-      else {
-        opts.filter(_ != "-Ywarn-unused-import")
-      }
-    }
   )
 
   private lazy val excludeOpt: String => Boolean = { opt =>

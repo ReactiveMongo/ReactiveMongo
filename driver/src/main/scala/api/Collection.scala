@@ -22,8 +22,6 @@ package reactivemongo.api
  * ([[reactivemongo.api.collections.GenericCollection]]).
  */
 trait Collection {
-  import collections.bson.BSONCollectionProducer
-
   /** The database which this collection belongs to. */
   def db: DB
 

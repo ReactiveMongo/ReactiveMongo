@@ -17,8 +17,7 @@ package reactivemongo.api
 
 import scala.util.{ Failure, Success }
 
-import scala.concurrent.{ Await, ExecutionContext, Future }
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.core.protocol.MongoWireVersion
 

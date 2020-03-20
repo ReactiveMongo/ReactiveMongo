@@ -41,9 +41,8 @@ object Common extends AutoPlugin {
     "Optional XML node transformer")
 
   def foo = Defaults.coreDefaultSettings ++ baseSettings ++ Seq(
-    scalaVersion := "2.12.10",
-    crossScalaVersions := Seq(
-      "2.10.7", scala211, scalaVersion.value, "2.13.1"),
+    scalaVersion := "2.12.11",
+    crossScalaVersions := Seq(scala211, scalaVersion.value, "2.13.1"),
     crossVersion := CrossVersion.binary,
     useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
     target := {
@@ -85,8 +84,7 @@ object Common extends AutoPlugin {
 
   override def projectSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
     scalaVersion := "2.12.11",
-    crossScalaVersions := Seq(
-      scala211, scalaVersion.value, "2.13.1"),
+    crossScalaVersions := Seq(scala211, scalaVersion.value, "2.13.1"),
     crossVersion := CrossVersion.binary,
     useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
     target := {

@@ -174,7 +174,7 @@ object Travis {
                 flags.contains("MONGO_PROFILE" -> "invalid-ssl") ||
                 flags.contains("MONGO_PROFILE" -> "mutual-ssl"))) {
             List(
-              "    - scala: 2.10.7",
+              "    - scala: 2.11.12",
               s"      env: ${integrationVars(flags)}",
               "    - jdk: openjdk8",
               s"      env: ${integrationVars(flags)}"

@@ -18,11 +18,6 @@ lazy val `ReactiveMongo-BSON-Compat` = project.in(file("bson-compat")).
   settings(Seq(
     //name := s"${baseArtifact}-compat",
     description := "Compatibility library between legacy & new BSON APIs",
-    sourceDirectory := {
-      if (scalaBinaryVersion.value == "2.10") new java.io.File("/no/sources")
-      else sourceDirectory.value
-    },
-    publishArtifact := (scalaBinaryVersion.value != "2.10"),
     publish := (Def.taskDyn {
       val ver = scalaBinaryVersion.value
       val go = publish.value
@@ -34,38 +29,22 @@ lazy val `ReactiveMongo-BSON-Compat` = project.in(file("bson-compat")).
       }
     }).value,
     fork in Test := true,
-    libraryDependencies ++= {
-      if (scalaBinaryVersion.value != "2.10") {
-        Dependencies.shaded.value ++ Seq(
-          organization.value %% "reactivemongo-bson-api" % version.value % Provided,
-          Dependencies.specs.value)
-
-      } else {
-        Seq.empty[ModuleID]
-      }
-    }
+    libraryDependencies ++= Dependencies.shaded.value ++ Seq(
+      organization.value %% "reactivemongo-bson-api" % version.value % Provided,
+      Dependencies.specs.value)
   )).dependsOn(`ReactiveMongo-BSON`)
 
 lazy val `ReactiveMongo-Core` = project.in(file("core")).
   dependsOn(`ReactiveMongo-BSON` % Provided).
   settings(
     Findbugs.settings ++ Seq(
-      sourceDirectories in Compile ++= {
-        if (scalaBinaryVersion.value != "2.10") {
-          Seq((sourceDirectory in Compile).value / "scala-2.11+")
-        } else {
-          Seq.empty
-        }
-      },
+      sourceDirectories in Compile ++= Seq(
+        (sourceDirectory in Compile).value / "scala-2.11+"),
       libraryDependencies ++= {
         val deps = Dependencies.shaded.value
 
-        if (scalaBinaryVersion.value != "2.10") {
-          ("org.reactivemongo" %% "reactivemongo-bson-api" % version.
-            value) +: deps
-        } else {
-          deps
-        }
+        ("org.reactivemongo" %% "reactivemongo-bson-api" % version.
+          value) +: deps
       }
     ))
 

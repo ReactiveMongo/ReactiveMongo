@@ -171,8 +171,6 @@ sealed abstract class Index {
 }
 
 object Index {
-  import reactivemongo.api.BSONSerializationPack
-
   type Aux[P] = Index { type Pack = P }
 
   type Default = Aux[Serialization.Pack]
