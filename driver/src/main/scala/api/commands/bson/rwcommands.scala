@@ -6,18 +6,6 @@ import reactivemongo.bson._
 
 @deprecated("Internally use CommandCodecs", "0.16.0")
 object BSONGetLastErrorImplicits {
-  implicit object GetLastErrorWriter extends BSONDocumentWriter[GetLastError] {
-    private val underlying =
-      CommandCodecs.writeGetLastErrorWWriter(BSONSerializationPack.newBuilder)
-
-    def write(wc: GetLastError): BSONDocument = {
-      BSONDocument(
-        "getlasterror" -> 1,
-        "w" -> underlying(wc.w),
-        "j" -> (if (wc.j) Some(true) else None),
-        "wtimeout" -> wc.wtimeout)
-    }
-  }
 
   implicit object LastErrorReader extends DealingWithGenericCommandErrorsReader[LastError] {
     def readResult(doc: BSONDocument): LastError = new LastError(

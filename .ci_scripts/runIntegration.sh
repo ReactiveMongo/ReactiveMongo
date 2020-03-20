@@ -19,13 +19,12 @@ elif [ "$MONGO_VER" = "4" ]; then
     TEST_OPTS="exclude unit"
 else
     TEST_OPTS="exclude gt_mongo32,ge_mongo4,unit"
-    SBT_OPTS="$SBT_OPTS -Dtest.authenticationMechanism=cr"
 fi
 
 if [ ! "$MONGO_PROFILE" = "x509" ]; then
     TEST_OPTS="$TEST_OPTS,x509" # exclude x509 tests for all other profiles
 else
-    TEST_OPTS="$TEST_OPTS,scram_auth,cr_auth" # exclude other auth types for x509 tests
+    TEST_OPTS="$TEST_OPTS,scram_auth" # exclude other auth types for x509 tests
 
     # See outputs from {full|self}SslCert.sh
     if [ "x${CLIENT_CERT_SUBJECT}" = "x" ]; then

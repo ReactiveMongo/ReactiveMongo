@@ -117,14 +117,5 @@ private[reactivemongo] case class QueryOpts(
    */
   def exhaust = copy(flagsN = flagsN | QueryFlags.Exhaust)
 
-  /*
-   * Sets the [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.partial flag]] to return partial data from a query against a sharded cluster in which some shards do not respond rather than throwing an error.
-   *
-   * {{{
-   * import reactivemongo.api.QueryOpts
-   *
-   * val opts: QueryOpts = QueryOpts().partial
-   * }}}
-   */
-  def partial = copy(flagsN = flagsN | QueryFlags.Partial)
+  def allowPartialResults = copy(flagsN = flagsN | QueryFlags.Partial)
 }

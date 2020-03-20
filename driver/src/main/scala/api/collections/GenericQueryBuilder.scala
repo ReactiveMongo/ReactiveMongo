@@ -407,6 +407,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    */
   def maxTimeMs(p: Long): Self = copy(maxTimeMsOption = Some(p))
 
+  // TODO: Review
   def options(options: QueryOpts): Self = copy(options = options)
 
   /**
@@ -547,10 +548,6 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
     upd
   }
 
-  @deprecated("Use `options` or the separate query ops", "0.12.4")
-  def updateOptions(update: QueryOpts => QueryOpts): Self =
-    copy(options = update(options))
-
   // QueryOps
   def awaitData = options(options.awaitData)
   def batchSize(n: Int) = options(options.batchSize(n))
@@ -558,15 +555,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def noCursorTimeout = options(options.noCursorTimeout)
   def oplogReplay = options(options.oplogReplay)
 
-  @deprecated("Use `allowPartialResults`", "0.19.8")
-  def partial = options(options.partial)
-
-  /**
-   * For queries against a sharded collection,
-   * returns partial results from the mongos if some shards are unavailable
-   * instead of throwing an error.
-   */
-  def allowPartialResults = options(options.partial)
+  def allowPartialResults = options(options.allowPartialResults)
 
   /**
    * Sets the number of documents to skip at the beginning of the results.

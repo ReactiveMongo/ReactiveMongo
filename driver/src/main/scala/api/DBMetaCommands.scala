@@ -111,18 +111,6 @@ private[api] trait DBMetaCommands { self: DB =>
 
   private[api] def indexesManager[P <: SerializationPack with Singleton](pack: P)(implicit ec: ExecutionContext): IndexesManager.Aux[P] = IndexesManager[P](pack, self)
 
-  private lazy val collectionNameReader = {
-    val prefixLength = name.size + 1
-    val dec = internalSerializationPack.newDecoder
-
-    internalSerializationPack.reader { doc =>
-      dec.string(doc, "name").collect {
-        case value => value.substring(prefixLength)
-      }.getOrElse(throw new Exception(
-        "name is expected on system.namespaces query"))
-    }
-  }
-
   private implicit lazy val colNamesWriter =
     ListCollectionNames.writer(internalSerializationPack)
 
@@ -182,7 +170,7 @@ private[api] trait DBMetaCommands { self: DB =>
   private object InternalCreateUser extends CreateUserCommand[Pack] {
     val pack: Pack = internalSerializationPack
 
-    implicit val writer =
+    implicit lazy val writer =
       CreateUserCommand.writer[Pack](InternalCreateUser.pack: Pack)
   }
 

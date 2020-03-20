@@ -31,6 +31,15 @@ trait QueryOps {
   /** Toggles Exhaust */
   def exhaust: Self
 
-  /** Toggles Partial: The response can be partial - if a shard is down, no error will be thrown. */
-  def partial: Self
+  /**
+   * Sets the [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.partial flag]] to return partial data from a query against a sharded cluster in which some shards do not respond rather than throwing an error.
+   *
+   * {{{
+   * import reactivemongo.api.QueryOps
+   *
+   * def partial[T <: QueryOps](ops: QueryOps): ops.Self =
+   *   ops.allowPartialResults
+   * }}}
+   */
+  def allowPartialResults: Self
 }
