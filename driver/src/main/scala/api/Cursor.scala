@@ -82,7 +82,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    *     { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
    * }}}
    */
-  def foldBulks[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
+  def foldBulks[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ec: ExecutionContext): Future[A]
 
   /**
    * $foldBulks
@@ -110,7 +110,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    *     })
    * }}}
    */
-  def foldBulksM[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
+  def foldBulksM[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ec: ExecutionContext): Future[A]
 
   /**
    * $foldWhile
@@ -132,7 +132,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    *     { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
    * }}}
    */
-  def foldWhile[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
+  def foldWhile[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ec: ExecutionContext): Future[A]
 
   /**
    * $foldWhile
@@ -158,7 +158,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    *     })
    * }}}
    */
-  def foldWhileM[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A]
+  def foldWhileM[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ec: ExecutionContext): Future[A]
 
   /**
    * $foldWhile
@@ -180,7 +180,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    *     { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
    * }}}
    */
-  def fold[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => A)(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[A] = foldWhile[A](z, maxDocs)(
+  def fold[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => A)(implicit ec: ExecutionContext): Future[A] = foldWhile[A](z, maxDocs)(
     { (st, v) => Cursor.Cont[A](suc(st, v)) }, FailOnError[A]())
 
   /**
@@ -200,7 +200,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * }
    * }}}
    */
-  def head(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[T]
+  def head(implicit ec: ExecutionContext): Future[T]
 
   /**
    * $getHead, if any.
@@ -220,7 +220,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * }
    * }}}
    */
-  def headOption(implicit @deprecatedName(Symbol("ctx")) ec: ExecutionContext): Future[Option[T]]
+  def headOption(implicit ec: ExecutionContext): Future[Option[T]]
 }
 
 /** Cursor companion object */
@@ -286,20 +286,8 @@ object Cursor {
   }
 
   /** Continue with given value */
-  class Cont[T] private[api] (val value: T)
-    extends State[T] with Product1[T] with Serializable {
-
+  final class Cont[T] private[api] (val value: T) extends State[T] {
     def map[U](f: T => U): State[U] = Cont(f(value))
-
-    @deprecated("No longer a case class", "0.20.3")
-    @inline def _1 = value
-
-    @deprecated("No longer a case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: Cont[T] => true
-      case _          => false
-    }
-
   }
 
   object Cont {
@@ -309,20 +297,8 @@ object Cursor {
   }
 
   /** Successfully stop processing with given value */
-  class Done[T] private[api] (val value: T)
-    extends State[T] with Product1[T] with Serializable {
-
+  final class Done[T] private[api] (val value: T) extends State[T] {
     def map[U](f: T => U): State[U] = Done(f(value))
-
-    @deprecated("No longer a case class", "0.20.3")
-    @inline def _1 = value
-
-    @deprecated("No longer a case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: Done[T] => true
-      case _          => false
-    }
-
   }
 
   object Done {
@@ -332,19 +308,8 @@ object Cursor {
   }
 
   /** Ends processing due to failure of given `cause` */
-  class Fail[T] private[api] (val cause: Throwable)
-    extends State[T] with Product1[Throwable] with Serializable {
-
+  final class Fail[T] private[api] (val cause: Throwable) extends State[T] {
     def map[U](f: T => U): State[U] = Fail[U](cause)
-
-    @deprecated("No longer a case class", "0.20.3")
-    @inline def _1 = cause
-
-    @deprecated("No longer a case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: Fail[T] => true
-      case _          => false
-    }
   }
 
   object Fail {

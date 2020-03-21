@@ -185,7 +185,7 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
       snapshotFlag: Boolean = snapshotFlag,
       commentString: Option[String] = commentString,
       options: tests.QueryOpts = options,
-      @deprecatedName(Symbol("failover")) failoverStrategy: FailoverStrategy = failoverStrategy,
+      failoverStrategy: FailoverStrategy = failoverStrategy,
       maxTimeMsOption: Option[Long] = maxTimeMsOption): TestQueryBuilder =
       new TestQueryBuilder(failoverStrategy, queryOption, sortOption,
         projectionOption, hintOption, explainFlag, snapshotFlag, commentString,
