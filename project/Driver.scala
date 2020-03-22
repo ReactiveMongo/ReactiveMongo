@@ -16,8 +16,7 @@ import com.github.sbt.findbugs.FindbugsKeys.findbugsAnalyzedPath
 final class Driver(
   bson: Project,
   bsonmacros: Project,
-  core: Project,
-  bsonCompat: Project
+  core: Project
 ) {
   import Dependencies._
   import XmlUtil._
@@ -454,7 +453,7 @@ object Version {
 
         case _ => p
       }
-    }.dependsOn(bson, core, bsonCompat, bsonmacros % Test)
+    }.dependsOn(bson, core, bsonmacros % Test)
 
   // ---
 

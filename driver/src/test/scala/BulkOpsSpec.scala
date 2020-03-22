@@ -2,11 +2,13 @@ package reactivemongo
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import org.specs2.concurrent.ExecutionEnv
+// TODO: Bison
 import reactivemongo.bson.{ BSONArray, BSONDocument, BSONElementSet }
 import reactivemongo.api.collections.BulkOps._
 
-class BulkOpsSpec(implicit ee: ExecutionEnv)
+import org.specs2.concurrent.ExecutionEnv
+
+final class BulkOpsSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
   "Bulk operations" title
@@ -91,6 +93,7 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
     "take into account the fact that keys increase in size in a larger array" in {
       val ExpectedFirstBulk = List.fill(10)(doc1)
       val ExpectedSecondBulk = List(doc1)
+
       bulks[BSONDocument](
         documents = Seq.fill(11)(doc1),
         maxBsonSize = (doc1.byteSize + 1 + BSONElementSet.docElementByteOverhead) * 11,

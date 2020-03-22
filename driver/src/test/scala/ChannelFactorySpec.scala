@@ -12,11 +12,9 @@ import reactivemongo.io.netty.channel.{
   ChannelFutureListener
 }
 
-import reactivemongo.api.BSONSerializationPack
-import reactivemongo.api.commands.bson.{
-  BSONIsMasterCommand,
-  BSONIsMasterCommandImplicits
-}, BSONIsMasterCommandImplicits.IsMasterResultReader
+import reactivemongo.api.bson.collection.BSONSerializationPack
+
+import reactivemongo.api.commands.bson.BSONIsMasterCommand
 import BSONIsMasterCommand.IsMasterResult
 
 import org.specs2.specification.AfterAll
@@ -154,6 +152,7 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
       val chanConnected = Promise[Unit]()
 
       def actor = new Actor {
+        val isMasterReader = BSONIsMasterCommand.reader(BSONSerializationPack)
         val receive: Receive = {
           case msg if (msg.toString startsWith "ChannelConnected(") =>
             chanConnected.success(Common.logger.info(s"NIO $msg")); ()
@@ -163,7 +162,7 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
               val bson = BSONSerializationPack.readAndDeserialize(
                 resp, BSONSerializationPack.IdentityReader)
 
-              IsMasterResultReader.read(bson)
+              BSONSerializationPack.deserialize(bson, isMasterReader)
             })
 
             Common.logger.info(s"NIO isMasterResponse: $resp")
@@ -187,6 +186,7 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
               result.future must beLike[IsMasterResult] {
                 case IsMasterResult(true, 16777216, 48000000, _,
                   Some(_), min, max, _, _) => min must be_<(max)
+
               }.await(1, timeout) and {
                 if (!chan.closeFuture.isDone) {
                   chan.close()

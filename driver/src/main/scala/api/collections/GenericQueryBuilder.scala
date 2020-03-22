@@ -17,8 +17,10 @@ package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
 
+import reactivemongo.api.bson.buffer.WritableBuffer
+
 import reactivemongo.core.protocol.{ Query, QueryFlags, MongoWireVersion }
-import reactivemongo.core.netty.{ BufferSequence, ChannelBufferWritableBuffer }
+import reactivemongo.core.netty.BufferSequence
 
 import reactivemongo.api.{
   Collation,
@@ -62,8 +64,8 @@ import reactivemongo.api.commands.CommandCodecs
  * @define filterFunction Sets the query predicate; If unspecified, then all documents in the collection will match the predicate
  * @define projectionFunction Sets the [[https://docs.mongodb.com/manual/tutorial/project-fields-from-query-results/#projections projection specification]] to determine which fields to include in the returned documents
  */
-@deprecated("Internal: will be made private", "0.16.0")
 trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
+  // TODO: Review
   val pack: P
 
   type Self <: GenericQueryBuilder[pack.type]
@@ -78,9 +80,9 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def commentString: Option[String]
   def options: QueryOpts
 
-  @deprecatedName(Symbol("failover")) def failoverStrategy: FailoverStrategy
+  def failoverStrategy: FailoverStrategy
 
-  def collection: Collection = ???
+  private[reactivemongo] def collection: Collection = ???
 
   def maxTimeMsOption: Option[Long]
 
@@ -164,11 +166,10 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    *
    * @tparam T $resultTParam
    */
-  def cursor[T](readPreference: ReadPreference = readPreference, isMongo26WriteOp: Boolean = false)(implicit reader: pack.Reader[T], cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp))
+  def cursor[T](readPreference: ReadPreference = readPreference)(implicit reader: pack.Reader[T], cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp = false /* TODO: Remove */ ))
 
   /** The default [[ReadPreference]] */
-  @deprecated("Internal: will be made private", "0.16.0")
-  @inline def readPreference: ReadPreference = ReadPreference.primary
+  @inline private[reactivemongo] def readPreference: ReadPreference = ReadPreference.primary
 
   protected def version: MongoWireVersion
 
@@ -567,8 +568,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
   def slaveOk = options(options.slaveOk)
   def tailable = options(options.tailable)
 
-  @deprecated("Internal: will be made private", "0.16.0")
-  def copy(
+  private[reactivemongo] def copy(
     queryOption: Option[pack.Document] = queryOption,
     sortOption: Option[pack.Document] = sortOption,
     projectionOption: Option[pack.Document] = projectionOption,
@@ -773,18 +773,19 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
     val body = {
       if (version.compareTo(MongoWireVersion.V32) < 0) { _: Int =>
-        val buffer = write(
-          merge(readPreference, Int.MaxValue),
-          ChannelBufferWritableBuffer())
+        val buffer = pack.writeToBuffer(
+          WritableBuffer.empty,
+          merge(readPreference, Int.MaxValue))
 
         BufferSequence(
-          projectionOption.fold(buffer) { write(_, buffer) }.buffer)
+          projectionOption.fold(buffer) { pack.writeToBuffer(buffer, _) }.
+            buffer)
 
       } else { maxDocs: Int =>
         // if MongoDB 3.2+, projection is managed in merge
-        def prepared = write(
-          merge(readPreference, maxDocs),
-          ChannelBufferWritableBuffer())
+        def prepared = pack.writeToBuffer(
+          WritableBuffer.empty,
+          merge(readPreference, maxDocs))
 
         BufferSequence(prepared.buffer)
       }
@@ -808,11 +809,6 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
     DefaultCursor.query(pack, op, body, readPreference,
       collection.db, failoverStrategy, isMongo26WriteOp,
       collection.fullCollectionName, maxTimeMsOption)(reader)
-  }
-
-  private def write(document: pack.Document, buffer: ChannelBufferWritableBuffer): ChannelBufferWritableBuffer = {
-    pack.writeToBuffer(buffer, document)
-    buffer
   }
 
   private lazy val logger = reactivemongo.util.LazyLogger(getClass.getName)

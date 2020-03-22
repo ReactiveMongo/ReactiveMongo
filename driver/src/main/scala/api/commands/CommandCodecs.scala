@@ -26,10 +26,10 @@ private[reactivemongo] object CommandCodecs {
           readResult(doc)
         }
 
-        case _ => throw CommandError(pack)(
-          code = decoder.int(doc, "code"),
-          errmsg = decoder.string(doc, "errmsg"),
-          originalDocument = doc)
+        case _ => throw reactivemongo.core.errors.CommandError(pack)(
+          _message = decoder.string(doc, "errmsg").getOrElse(""),
+          _originalDocument = Some(doc),
+          _code = decoder.int(doc, "code"))
       }
     }
   }

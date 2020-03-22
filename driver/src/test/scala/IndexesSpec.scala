@@ -1,8 +1,6 @@
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.bson.{ BSONDocument => LegacyDoc }
-
 import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.{
   Hashed,
   Geo2D,
@@ -64,7 +62,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
       def spec(c: DefaultCollection, timeout: FiniteDuration) =
         c.indexesManager.ensure(index(
           List("loc" -> Geo2D),
-          options = LegacyDoc("min" -> -95, "max" -> 95, "bits" -> 28))).
+          options = BSONDocument("min" -> -95, "max" -> 95, "bits" -> 28))).
           aka("index") must beTrue.await(1, timeout * 2)
 
       "be created with the default connection" in {
@@ -225,9 +223,10 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
         unique = true)
 
       val mngr = partial.indexesManager
-      def spec[T](test: => Future[T]) = test must throwA[CommandError].like {
-        case CommandError.Code(11000) => ok
-      }.awaitFor(timeout)
+      def spec[T](test: => Future[T]) =
+        test must throwA[DatabaseException].like {
+          case CommandError.Code(11000) => ok
+        }.awaitFor(timeout)
 
       spec(mngr.ensure(idx)) and spec(mngr.create(idx))
     }
@@ -236,8 +235,8 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
       partial.indexesManager.create(index(
         key = Seq("username" -> IndexType.Ascending),
         unique = true,
-        partialFilter = Some(LegacyDoc(
-          "age" -> LegacyDoc(f"$$gte" -> 21))))).
+        partialFilter = Some(BSONDocument(
+          "age" -> BSONDocument(f"$$gte" -> 21))))).
         map(_.ok) must beTrue.awaitFor(timeout)
     }
 

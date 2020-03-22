@@ -1,6 +1,12 @@
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.api.commands._
+import reactivemongo.core.errors.DatabaseException
+
+import reactivemongo.api.commands.{
+  CommandError,
+  FindAndModifyCommand,
+  WriteConcern
+}
 
 import reactivemongo.api.bson.BSONDocument
 
@@ -235,9 +241,9 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
       }
 
       future.map(_ => Option.empty[Int]).recover {
-        case e: CommandError =>
+        case CommandError.Code(c) =>
           //e.printStackTrace
-          e.code
+          Some(c)
       } must beSome( /*code = */ 9).await(1, timeout)
     }
   }

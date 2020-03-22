@@ -5,9 +5,10 @@ import org.specs2.concurrent.ExecutionEnv
 import org.specs2.execute.AsResult
 import org.specs2.matcher.Matcher
 
-import reactivemongo.api.collections.bson.BSONCollection
 import reactivemongo.api.{ ChangeStreams, Cursor }
-import reactivemongo.bson.BSONDocument
+import reactivemongo.api.bson.BSONDocument
+import reactivemongo.api.bson.collection.BSONCollection
+
 import reactivemongo.core.protocol.MongoWireVersion
 
 import tests.Common.timeout

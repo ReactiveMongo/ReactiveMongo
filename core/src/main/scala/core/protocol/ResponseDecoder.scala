@@ -7,15 +7,9 @@ import scala.util.{ Failure, Success, Try }
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 import reactivemongo.io.netty.channel.ChannelHandlerContext
 
-import reactivemongo.api.BSONSerializationPack
+import reactivemongo.api.bson.BSONDocument
+import reactivemongo.api.bson.collection.BSONSerializationPack
 
-import reactivemongo.bson.{
-  BSONBooleanLike,
-  BSONDocument => LegacyDoc,
-  BSONNumberLike
-}
-
-import reactivemongo.core.netty.ChannelBufferReadableBuffer
 import reactivemongo.core.errors.DatabaseException
 
 private[reactivemongo] class ResponseDecoder
@@ -80,27 +74,26 @@ private[reactivemongo] class ResponseDecoder
         }
 
         case Success(doc) => {
-          val ok = doc.getAs[BSONBooleanLike]("ok")
+          val ok = doc.booleanLike("ok") getOrElse false
 
-          @com.github.ghik.silencer.silent(".*BSONSerializationPack\\ in\\ package\\ api\\ is\\ deprecated.*")
           def failed = {
             val r = {
               if (reply.inError) reply
               else reply.copy(flags = reply.flags | 0x02)
             }
 
-            // TODO
             Response.CommandError(
               header, r, info, DatabaseException(BSONSerializationPack)(doc))
           }
 
-          doc.getAs[LegacyDoc]("cursor") match {
-            case Some(cursor) if ok.exists(_.toBoolean) => {
+          doc.getAsOpt[BSONDocument]("cursor") match {
+            case Some(cursor) if ok => {
               val withCursor: Option[Response] = for {
-                id <- cursor.getAs[BSONNumberLike]("id").map(_.toLong)
-                ns <- cursor.getAs[String]("ns")
-                batch <- cursor.getAs[Seq[LegacyDoc]]("firstBatch").orElse(
-                  cursor.getAs[Seq[LegacyDoc]]("nextBatch"))
+                id <- cursor.long("id")
+                ns <- cursor.string("ns")
+
+                batch <- cursor.getAsOpt[Seq[BSONDocument]]("firstBatch").
+                  orElse(cursor.getAsOpt[Seq[BSONDocument]]("nextBatch"))
               } yield {
                 val r = reply.copy(cursorID = id, numberReturned = batch.size)
 
@@ -117,7 +110,7 @@ private[reactivemongo] class ResponseDecoder
             case _ => {
               docs.resetReaderIndex()
 
-              if (ok.forall(_.toBoolean)) {
+              if (ok) {
                 Response(header, reply, docs, info)
               } else { // !ok
                 failed
@@ -146,7 +139,7 @@ private[reactivemongo] class ResponseDecoder
 }
 
 private[reactivemongo] object ResponseDecoder {
-  @inline def first(buf: ByteBuf) = Try[LegacyDoc] {
+  @inline def first(buf: ByteBuf) = Try[BSONDocument] {
     val sz = buf.getIntLE(buf.readerIndex)
     val bytes = Array.ofDim[Byte](sz)
 
@@ -154,8 +147,9 @@ private[reactivemongo] object ResponseDecoder {
     // (which would require to manage its release)
     buf.readBytes(bytes)
 
-    val docBuf = ChannelBufferReadableBuffer(Unpooled wrappedBuffer bytes)
+    val docBuf = reactivemongo.api.bson.buffer.ReadableBuffer(bytes)
 
-    reactivemongo.api.BSONSerializationPack.readFromBuffer(docBuf)
+    reactivemongo.api.bson.collection.
+      BSONSerializationPack.readFromBuffer(docBuf)
   }
 }

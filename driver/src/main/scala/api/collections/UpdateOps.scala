@@ -204,7 +204,7 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
         arrayFilters = Seq.empty)
 
       // Command envelope to compute accurate BSON size limit
-      val emptyCmd = ResolvedCollectionCommand(
+      val emptyCmd = new ResolvedCollectionCommand(
         collection.name,
         new UpdateCommand.Update(
           emptyElm, Seq.empty, ordered, writeConcern, false))

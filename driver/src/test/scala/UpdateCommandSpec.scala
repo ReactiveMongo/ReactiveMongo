@@ -1,15 +1,11 @@
 package reactivemongo
 
-import reactivemongo.bson.{ BSONArray, BSONBinary, BSONDocument }
+import reactivemongo.api.bson.{ BSONArray, BSONBinary, BSONDocument }
+import reactivemongo.api.bson.collection.BSONSerializationPack
 
 import reactivemongo.core.protocol.MongoWireVersion
 
-import reactivemongo.api.{
-  BSONSerializationPack,
-  NodeSetSession,
-  SessionTransaction,
-  WriteConcern
-}
+import reactivemongo.api.{ NodeSetSession, SessionTransaction, WriteConcern }
 
 import reactivemongo.api.commands.{
   UpdateCommand,
@@ -101,7 +97,7 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
     collation = None,
     arrayFilters = Seq.empty)
 
-  private lazy val update1 = ResolvedCollectionCommand(
+  private lazy val update1 = new ResolvedCollectionCommand(
     collection = "foo",
     command = new Command.Update(
       ordered = true,

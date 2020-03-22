@@ -105,9 +105,6 @@ private[api] trait CollectionMetaCommands { self: Collection =>
 
   private implicit lazy val dropWriter = DropCollection.writer(command.pack)
 
-  private implicit lazy val dropReader =
-    DropCollectionResult.reader(command.pack)
-
   /**
    * Drops this collection.
    *
@@ -131,16 +128,13 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *
    * @param failIfNotFound the flag to request whether it should fail
    */
-  @com.github.ghik.silencer.silent(".*DropCollectionResult.*" /*internal*/ )
   def drop(failIfNotFound: Boolean)(implicit ec: ExecutionContext): Future[Boolean] = {
-    command(self, DropCollection, ReadPreference.primary).flatMap {
-      case DropCollectionResult(false) if failIfNotFound =>
-        Future.failed[Boolean](new GenericDatabaseException(
-          s"fails to drop collection: $name", Some(26)))
+    command(self, DropCollection, ReadPreference.primary).
+      map(_ => true).recoverWith {
+        case CommandError.Code(26) if !failIfNotFound =>
+          Future.successful(false)
 
-      case DropCollectionResult(dropped) =>
-        Future.successful(dropped)
-    }
+      }
   }
 
   private implicit lazy val convertWriter = ConvertToCapped.writer(command.pack)

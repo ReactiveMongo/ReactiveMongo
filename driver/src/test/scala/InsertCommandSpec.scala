@@ -1,13 +1,9 @@
 package reactivemongo
 
-import reactivemongo.bson.{ BSONBinary, BSONDocument }
+import reactivemongo.api.bson.{ BSONBinary, BSONDocument }
+import reactivemongo.api.bson.collection.BSONSerializationPack
 
-import reactivemongo.api.{
-  BSONSerializationPack,
-  NodeSetSession,
-  SessionTransaction,
-  WriteConcern
-}
+import reactivemongo.api.{ NodeSetSession, SessionTransaction, WriteConcern }
 
 import reactivemongo.api.commands.{
   InsertCommand,
@@ -76,7 +72,7 @@ final class InsertCommandSpec extends org.specs2.mutable.Specification {
     BSONDocument("_id" -> 2, "value" -> "bar"),
     BSONDocument("_id" -> 3, "value" -> "lorem"))
 
-  private lazy val insert1 = ResolvedCollectionCommand(
+  private lazy val insert1 = new ResolvedCollectionCommand(
     collection = "foo",
     command = new Command.Insert(
       head = firstDoc,

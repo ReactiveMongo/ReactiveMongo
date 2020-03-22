@@ -657,9 +657,7 @@ object IndexesManager {
       child(doc, "key").fold[Index.Aux[P]](
         throw new Exception("the key must be defined")) { k =>
           val ks = decoder.names(k).flatMap { nme =>
-            decoder.get(k, nme).map { v =>
-              nme -> IndexType(pack.bsonValue(v))
-            }
+            IndexType.read(pack)(k, nme).map(nme -> _)
           }
 
           val key = child(doc, "weights").fold(ks) { w =>

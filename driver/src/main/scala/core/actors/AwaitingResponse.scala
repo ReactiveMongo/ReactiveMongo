@@ -11,7 +11,7 @@ private[actors] class AwaitingResponse(
   val channelID: ChannelId,
   val promise: Promise[Response],
   val isGetLastError: Boolean,
-  val isMongo26WriteOp: Boolean,
+  val isMongo26WriteOp: Boolean, // TODO: Remove
   val pinnedNode: Option[String]) {
 
   @inline def requestID: Int = request.requestID

@@ -1,16 +1,17 @@
 package reactivemongo.core.commands
 
-import reactivemongo.api.{ BSONSerializationPack, SerializationPack }
+import reactivemongo.api.SerializationPack
 
-import reactivemongo.bson.{
+import reactivemongo.api.bson.{
   BSONDocument,
   BSONInteger,
   BSONNumberLike,
   BSONString
 }
+import reactivemongo.api.bson.collection.BSONSerializationPack
 
 import reactivemongo.core.protocol.Response
-import reactivemongo.core.errors.{ CommandError, BSONCommandError }
+import reactivemongo.core.errors.CommandError
 
 private[core] case class X509Authenticate(user: Option[String])
   extends Command[SuccessfulAuthentication] {
@@ -32,8 +33,8 @@ private[core] object X509Authenticate extends BSONCommandResultMaker[SuccessfulA
   def apply(document: BSONDocument) = {
     CommandError.checkOk(document, Some("authenticate"), (doc, _) => {
       FailedAuthentication(BSONSerializationPack)(
-        doc.getAs[BSONString]("errmsg").map(_.value).getOrElse(""),
-        doc.getAs[BSONNumberLike]("code").map(_.toInt),
+        doc.string("errmsg").getOrElse(""),
+        doc.int("code"),
         Some(doc))
 
     }).toLeft(SilentSuccessfulAuthentication)
@@ -67,26 +68,10 @@ private[reactivemongo] case class VerboseSuccessfulAuthentication(
  * A failed authentication result
  */
 sealed abstract class FailedAuthentication
-  extends BSONCommandError with AuthenticationResult {
-
-  private[core] type Pack <: SerializationPack
-
-  private[core] val pack: Pack
+  extends CommandError with AuthenticationResult {
 
   /** The explanation of the error */
   def message: String = "<error>"
-
-  private[reactivemongo] def response: Option[pack.Document]
-
-  @deprecated("Use `response`", "0.19.1")
-  private[reactivemongo] lazy val originalDocument: Option[BSONDocument] =
-    response.map(pack.bsonValue(_)).collect {
-      case doc: BSONDocument => doc
-    }
-
-  private[reactivemongo] lazy val tupled = message -> response
-
-  override def hashCode: Int = tupled.hashCode
 
   override def equals(that: Any): Boolean = that match {
     case other: FailedAuthentication =>
@@ -98,17 +83,13 @@ sealed abstract class FailedAuthentication
 }
 
 private[reactivemongo] object FailedAuthentication {
-  type Aux[P <: SerializationPack] = FailedAuthentication { type Pack = P }
-
   def apply[P <: SerializationPack](_pack: P)(
     msg: String,
     c: Option[Int],
-    doc: Option[_pack.Document]): Aux[_pack.type] = new FailedAuthentication {
-    type Pack = _pack.type
-    val pack: _pack.type = _pack
+    doc: Option[_pack.Document]) = new FailedAuthentication {
     val code = c
     override val message = msg
-    val response = doc
+    lazy val originalDocument = doc.map(_pack.pretty)
   }
 }
 

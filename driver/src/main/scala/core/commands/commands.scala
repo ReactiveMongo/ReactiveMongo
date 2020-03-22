@@ -15,13 +15,11 @@
  */
 package reactivemongo.core.commands
 
-import reactivemongo.api.{
-  BSONSerializationPack,
-  ReadPreference,
-  SerializationPack
-}
+import reactivemongo.api.{ ReadPreference, SerializationPack }
 
-import reactivemongo.bson.BSONDocument
+import reactivemongo.api.bson.BSONDocument
+import reactivemongo.api.bson.collection.BSONSerializationPack
+
 import reactivemongo.core.errors.CommandError
 import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
 import reactivemongo.core.netty._
@@ -81,9 +79,6 @@ trait CommandResultMaker[Result] {
           case pack.IsDocument(doc) =>
             doc
 
-          case Some(doc: reactivemongo.bson.BSONDocument) =>
-            pack.document(doc) // TODO#1.1: Remove after release 1.0
-
           case _ => throw cause
         }
 
@@ -98,7 +93,7 @@ trait CommandResultMaker[Result] {
       case e: Throwable =>
         val error = CommandError(pack)(
           _message = "exception while deserializing this command's result!",
-          originalDocument = Some(document),
+          _originalDocument = Some(document),
           _code = None)
 
         error.initCause(e)

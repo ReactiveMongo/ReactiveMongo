@@ -232,7 +232,8 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
         "skiping failure using foldWhile" in {
           cursor.foldWhile(0)(
             (i, _) => Cursor.Cont(i + 1),
-            (_, _) => Cursor.Cont(-3)) must beEqualTo(-2).await(1, timeout)
+            (_, _) => Cursor.Cont(-3)) must beTypedEqualTo(-2).
+            await(1, timeout)
         }
       }
 

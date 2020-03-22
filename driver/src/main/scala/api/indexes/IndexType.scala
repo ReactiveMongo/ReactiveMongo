@@ -2,14 +2,6 @@ package reactivemongo.api.indexes
 
 import reactivemongo.api.SerializationPack
 
-import reactivemongo.bson.{
-  BSONDouble,
-  BSONInteger,
-  BSONLong,
-  BSONString,
-  BSONValue
-}
-
 /** Type of Index */
 sealed trait IndexType {
   protected[indexes] def valueStr: String
@@ -52,26 +44,20 @@ object IndexType {
     @inline override def toString = valueStr
   }
 
-  private[reactivemongo] def unapply(value: BSONValue): Option[IndexType] =
-    value match {
-      case BSONInteger(i) if i > 0             => Some(Ascending)
-      case BSONInteger(i) if i < 0             => Some(Descending)
-      case BSONDouble(i) if i > 0              => Some(Ascending)
-      case BSONDouble(i) if i < 0              => Some(Descending)
-      case BSONLong(i) if i > 0                => Some(Ascending)
-      case BSONLong(i) if i < 0                => Some(Descending)
-      case BSONString(Geo2D.valueStr)          => Some(Geo2D)
-      case BSONString(Geo2DSpherical.valueStr) => Some(Geo2DSpherical)
-      case BSONString(GeoHaystack.valueStr)    => Some(GeoHaystack)
-      case BSONString(Hashed.valueStr)         => Some(Hashed)
-      case BSONString(Text.valueStr)           => Some(Text)
-      case _                                   => None
-    }
+  private[reactivemongo] def read[P <: SerializationPack](pack: P)(key: pack.Document, name: String): Option[IndexType] = {
+    val decoder = pack.newDecoder
 
-  private[reactivemongo] def apply(value: BSONValue): IndexType = value match {
-    case IndexType(tpe) => tpe
-    case _ =>
-      throw new IllegalArgumentException("unsupported index type")
+    decoder.int(key, name).map { i =>
+      if (i > 0) Ascending
+      else Descending
+    }.orElse(decoder.string(key, name).flatMap {
+      case Geo2D.valueStr          => Some(Geo2D)
+      case Geo2DSpherical.valueStr => Some(Geo2DSpherical)
+      case GeoHaystack.valueStr    => Some(GeoHaystack)
+      case Hashed.valueStr         => Some(Hashed)
+      case Text.valueStr           => Some(Text)
+      case _                       => None
+    })
   }
 
   private[api] def write[P <: SerializationPack](pack: P)(builder: SerializationPack.Builder[pack.type]): IndexType => pack.Value = {

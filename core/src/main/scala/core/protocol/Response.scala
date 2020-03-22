@@ -6,7 +6,8 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
-import reactivemongo.core.errors._
+import reactivemongo.core.errors.{ DatabaseException, GenericDriverException }
+import reactivemongo.api.bson.collection.BSONSerializationPack
 
 /**
  * A Mongo Wire Protocol Response messages.
@@ -27,8 +28,9 @@ private[reactivemongo] sealed abstract class Response(
     if (reply.inError) {
       val bson = Response.parse(this)
 
-      if (bson.hasNext) Some(new DetailedDatabaseException(bson.next))
-      else None
+      if (bson.hasNext) {
+        Some(DatabaseException(BSONSerializationPack)(bson.next))
+      } else None
     } else None
   }
 
@@ -40,8 +42,8 @@ private[reactivemongo] sealed abstract class Response(
 }
 
 private[reactivemongo] object Response {
-  import reactivemongo.api.{ BSONSerializationPack, SerializationPack }
-  import reactivemongo.bson.BSONDocument
+  import reactivemongo.api.SerializationPack
+  import reactivemongo.api.bson.BSONDocument
 
   def apply(
     header: MessageHeader,

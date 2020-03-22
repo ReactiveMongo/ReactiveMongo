@@ -1,7 +1,11 @@
+package reactivemongo
+
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.api.{ DB, ReadPreference }
+import reactivemongo.api.{ DB, FailoverStrategy, ReadPreference }
 import reactivemongo.api.bson.BSONDocument
+
+import reactivemongo.core.errors.DatabaseException
 
 import reactivemongo.api.commands.{
   Command,
@@ -53,21 +57,6 @@ final class CommandSpec(implicit ee: ExecutionEnv)
           slowTimeout)
       }
     }
-
-    "check isMaster" in {
-      val runner = Command.run(pack, db.failoverStrategy)
-      implicit val dr = dateReader
-
-      val isMaster = new IsMasterCommand[pack.type] {}
-      import isMaster._
-
-      import scala.language.reflectiveCalls
-      implicit val w = commands.isMasterWriter(isMaster).get[IsMaster.type]
-      implicit val r = commands.isMasterReader(isMaster).get
-
-      runner(db, IsMaster, ReadPreference.primary).
-        map(_ => {}) must beEqualTo({}).await(1, timeout)
-    }
   }
 
   "Admin" should {
@@ -77,14 +66,15 @@ final class CommandSpec(implicit ee: ExecutionEnv)
           case ReplSetStatus(_, _, _, _ :: Nil) => ok
         }.await(0, timeout)
       } else {
-        replSetGetStatusTest must throwA[CommandError].await(0, timeout)
+        replSetGetStatusTest must throwA[DatabaseException].await(0, timeout)
       }
     }
 
     "expose serverStatus" in {
       import commands.{ serverStatusReader, serverStatusWriter }
 
-      db.runCommand(ServerStatus, Common.failoverStrategy).
+      db.runCommand[ServerStatusResult, ServerStatus.type](
+        ServerStatus, Common.failoverStrategy).
         aka("result") must beLike[ServerStatusResult]({
           case ServerStatusResult(_, _, MongodProcess,
             _, _, _, _, _, _, _, _, _, _, _, _, _) =>
@@ -104,7 +94,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
         "fail outside replicaSet (MongoDB 3+)" in {
           connection.database("admin").flatMap(_.runCommand(
             ReplSetMaintenance(true),
-            Common.failoverStrategy)) must throwA[CommandError].like {
+            Common.failoverStrategy)) must throwA[DatabaseException].like {
             case CommandError.Code(code) => code aka "error code" must_== 76
           }.await(0, timeout)
         }
@@ -112,7 +102,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
         "fail with replicaSet (MongoDB 3+)" in {
           connection.database("admin").flatMap(_.runCommand(
             ReplSetMaintenance(true),
-            Common.failoverStrategy)) must throwA[CommandError].like {
+            Common.failoverStrategy)) must throwA[DatabaseException].like {
             case CommandError.Code(code) => code aka "error code" must_== 95
           }.await(0, timeout)
         }

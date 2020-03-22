@@ -1,6 +1,8 @@
 import scala.concurrent.Await
 import scala.concurrent.duration.FiniteDuration
 
+import reactivemongo.core.errors.DatabaseException
+
 import reactivemongo.api.{ FailoverStrategy, MongoConnection }
 
 import reactivemongo.api.commands.CommandError
@@ -80,12 +82,10 @@ final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
             Await.result(for {
               admin <- connection.database("admin", failoverStrategy)
               _ <- admin.renameCollection(db.name, c1.name, name)
-            } yield {}, timeout) must throwA[Exception].like {
-              case err: CommandError =>
-                // TODO: Check code
-                err.errmsg aka err.toString must beSome[String].which {
-                  _.indexOf("target namespace exists") != -1
-                }
+            } yield {}, timeout) must throwA[DatabaseException].like {
+              case err @ CommandError.Code(48) =>
+                err.getMessage.indexOf(
+                  "target namespace exists") must not(beEqualTo(-1))
             }
           }
         }.await(0, timeout)

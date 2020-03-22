@@ -35,62 +35,6 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * @since MongoDB 3.2
-   * @param pipeline the sequence of MongoDB aggregation operations
-   * @param explain specifies to return the information on the processing of the pipeline
-   * @param allowDiskUse enables writing to temporary files
-   * @param cursor the cursor object for aggregation
-   * @param bypassDocumentValidation available only if you specify the \$out aggregation operator
-   * @param readConcern the read concern
-   */
-  protected final case class Aggregate(
-    pipeline: Seq[PipelineOperator],
-    explain: Boolean = false,
-    allowDiskUse: Boolean,
-    cursor: Option[Cursor],
-    wireVersion: MongoWireVersion,
-    bypassDocumentValidation: Boolean,
-    readConcern: Option[ReadConcern]) extends CollectionCommand with CommandWithPack[pack.type]
-    with CommandWithResult[AggregationResult]
-
-  /**
-   * @param firstBatch the documents of the first batch
-   * @param cursor the cursor from the result, if any
-   * @see [[Cursor]]
-   */
-  final class AggregationResult(
-    val firstBatch: List[pack.Document],
-    val cursor: Option[ResultCursor]) {
-
-    /**
-     * Returns the first batch as a list, using the given `reader`.
-     */
-    def head[T](implicit reader: pack.Reader[T]): List[T] =
-      firstBatch.map(pack.deserialize(_, reader))
-
-    private lazy val tupled = firstBatch -> cursor
-
-    override def hashCode: Int = tupled.hashCode
-
-    override def equals(that: Any): Boolean = that match {
-      case other: AggregationResult =>
-        other.tupled == this.tupled
-
-      case _ =>
-        false
-    }
-
-    override def toString = s"AggregationResult${tupled.toString}"
-  }
-
-  object AggregationResult {
-    def apply(
-      firstBatch: List[pack.Document],
-      cursor: Option[ResultCursor] = None): AggregationResult =
-      new AggregationResult(firstBatch, cursor)
-  }
-
-  /**
    * [[https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/ \$addFields]] stage.
    *
    * @since MongoDB 3.4

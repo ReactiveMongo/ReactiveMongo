@@ -43,7 +43,8 @@ import reactivemongo.core.actors, actors.{
   StandardDBSystem
 }
 
-import reactivemongo.bson.BSONDocument
+import reactivemongo.api.bson.BSONDocument
+import reactivemongo.api.bson.collection.BSONSerializationPack
 
 import reactivemongo.api.collections.{ GenericQueryBuilder, QueryCodecs }
 
@@ -104,6 +105,11 @@ package object tests {
   def system(drv: AsyncDriver) = drv.system
 
   def mongosystem(con: MongoConnection) = con.mongosystem
+
+  @inline def md5Hex(bytes: Array[Byte]): String = {
+    import reactivemongo.api.bson.Digest
+    Digest.hex2Str(Digest.md5(bytes))
+  }
 
   def logger(category: String) = reactivemongo.util.LazyLogger(category)
 
@@ -169,11 +175,14 @@ package object tests {
   def nextResponse[T](cursor: Cursor[T], maxDocs: Int) =
     cursor.asInstanceOf[CursorOps[T]].nextResponse(maxDocs)
 
-  @inline def channelBuffer(doc: BSONDocument) =
-    reactivemongo.core.netty.ChannelBufferWritableBuffer.single(doc)
+  @inline def channelBuffer(doc: BSONDocument) = {
+    val buf = reactivemongo.api.bson.buffer.WritableBuffer.empty
+
+    BSONSerializationPack.writeToBuffer(buf, doc)
+  }
 
   @inline def bufferSeq(doc: BSONDocument) =
-    reactivemongo.core.netty.BufferSequence.single(doc)
+    reactivemongo.core.netty.BufferSequence.single(BSONSerializationPack)(doc)
 
   def fakeResponse(
     doc: BSONDocument,
@@ -267,16 +276,15 @@ package object tests {
     f.release(clb)
 
   @inline def isMasterRequest(reqId: Int = RequestIdGenerator.isMaster.next): Request = {
-    import reactivemongo.api.BSONSerializationPack
-    import reactivemongo.api.commands.bson.{
-      BSONIsMasterCommandImplicits,
-      BSONIsMasterCommand
-    }, BSONIsMasterCommand.IsMaster
     import reactivemongo.api.commands.Command
+    import reactivemongo.api.commands.bson.BSONIsMasterCommand.{
+      IsMaster,
+      writer => mw
+    }
 
     val isMaster = Command.buildRequestMaker(BSONSerializationPack)(
-      IsMaster,
-      BSONIsMasterCommandImplicits.IsMasterWriter,
+      new IsMaster(None, None),
+      mw(BSONSerializationPack),
       reactivemongo.api.ReadPreference.primaryPreferred,
       "admin") // only "admin" DB for the admin command
 

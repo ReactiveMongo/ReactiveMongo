@@ -17,7 +17,8 @@ package reactivemongo.core.netty
 
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
-import reactivemongo.bson.{ BSONDocument => LegacyDoc }
+import reactivemongo.api.SerializationPack
+import reactivemongo.api.bson.buffer.{ DefaultBufferHandler, WritableBuffer }
 
 private[reactivemongo] case class BufferSequence(
   private val head: ByteBuf,
@@ -29,11 +30,15 @@ private[reactivemongo] case class BufferSequence(
     Unpooled.wrappedBuffer((head +: tail): _*)
 }
 
-private[reactivemongo] object BufferSequence extends BufferSequenceCompat {
+private[reactivemongo] object BufferSequence {
   /** Returns an empty buffer sequence. */
   val empty: BufferSequence = BufferSequence(Unpooled.EMPTY_BUFFER)
 
-  /** Returns a new channel buffer with the give `document` written on. */
-  def single(document: LegacyDoc): BufferSequence = // TODO: Remove
-    BufferSequence(ChannelBufferWritableBuffer single document)
+  def single[P <: SerializationPack](pack: P)(document: pack.Document): BufferSequence = {
+    val head = WritableBuffer.empty
+
+    pack.writeToBuffer(head, document)
+
+    BufferSequence(head.buffer)
+  }
 }

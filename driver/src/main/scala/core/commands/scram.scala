@@ -3,20 +3,21 @@ package reactivemongo.core.commands
 import javax.crypto.SecretKeyFactory
 
 import reactivemongo.api.{
-  BSONSerializationPack => pack,
   AuthenticationMode,
   ScramSha1Authentication,
   ScramSha256Authentication
 }
 import reactivemongo.api.commands.SaslPrep
 
-import reactivemongo.bson.{
+import reactivemongo.api.bson.{
   BSONBinary,
   BSONDocument,
   BSONNumberLike,
   BSONString,
   Subtype
 }
+import reactivemongo.api.bson.collection.{ BSONSerializationPack => pack }
+
 import reactivemongo.util
 
 import reactivemongo.core.protocol.Response
@@ -60,7 +61,7 @@ private[core] sealed trait ScramInitiate[M <: AuthenticationMode.Scram] extends 
   val randomPrefix = ScramInitiate.randomPrefix(this.hashCode)
 
   import akka.util.ByteString
-  import reactivemongo.bson.buffer.ArrayReadableBuffer
+  import reactivemongo.api.bson.buffer.ReadableBuffer
 
   /** Initial SCRAM message */
   val message: String = {
@@ -74,7 +75,7 @@ private[core] sealed trait ScramInitiate[M <: AuthenticationMode.Scram] extends 
     "saslStart" -> 1,
     "mechanism" -> mechanism.name,
     "payload" -> BSONBinary(
-      ArrayReadableBuffer(ByteString(message).toArray[Byte]),
+      ByteString(message).toArray[Byte],
       Subtype.GenericBinarySubtype))
 
   val ResultMaker: BSONCommandResultMaker[ScramChallenge[M]]
@@ -86,7 +87,7 @@ private[core] case class ScramSha1Initiate(
   val ResultMaker = ScramSha1Initiate
 }
 
-private[core] object ScramSha1Initiate extends BSONCommandResultMaker[ScramChallenge[ScramSha1Authentication.type]] { // TODO: private
+private[core] object ScramSha1Initiate extends BSONCommandResultMaker[ScramChallenge[ScramSha1Authentication.type]] {
   def parseResponse(response: Response): Either[CommandError, ScramChallenge[ScramSha1Authentication.type]] = apply(response)
 
   def apply(bson: BSONDocument) = ScramInitiate.parseResponse(ScramSha1Authentication, bson)(ScramSha1Challenge.apply)
@@ -112,13 +113,13 @@ private[core] object ScramInitiate {
   def parseResponse[M <: AuthenticationMode.Scram](mechanism: M, bson: BSONDocument)(f: (Int, Array[Byte]) => ScramChallenge[M]): Either[CommandError, ScramChallenge[M]] = {
     CommandError.checkOk(bson, Some("authenticate"), (doc, _) => {
       FailedAuthentication(pack)(
-        doc.getAs[BSONString]("errmsg").fold("")(_.value),
-        doc.getAs[BSONNumberLike]("code").map(_.toInt),
+        doc.string("errmsg").getOrElse(""),
+        doc.int("code"),
         Some(doc))
     }).fold({
       (for {
-        cid <- bson.getAs[BSONNumberLike]("conversationId").map(_.toInt)
-        pay <- bson.getAs[Array[Byte]]("payload")
+        cid <- bson.int("conversationId")
+        pay <- bson.getAsOpt[Array[Byte]]("payload")
       } yield (cid, pay)).fold[Either[CommandError, ScramChallenge[M]]](
         Left(FailedAuthentication(pack)(
           s"invalid $mechanism challenge response: ${BSONDocument pretty bson}",
@@ -221,7 +222,7 @@ private[core] sealed trait ScramStartNegociation[M <: AuthenticationMode.Scram]
   import javax.crypto.spec.PBEKeySpec
   import org.apache.commons.codec.binary.Base64
   import akka.util.ByteString
-  import reactivemongo.bson.buffer.ArrayReadableBuffer
+  import reactivemongo.api.bson.buffer.ReadableBuffer
 
   val data: Either[CommandError, ScramNegociation] = {
     val challenge = new String(payload, "UTF-8")
@@ -269,7 +270,7 @@ private[core] sealed trait ScramStartNegociation[M <: AuthenticationMode.Scram]
             "saslContinue" -> 1,
             "conversationId" -> conversationId,
             "payload" -> BSONBinary(
-              ArrayReadableBuffer(ByteString(message).toArray[Byte]),
+              ByteString(message).toArray[Byte],
               Subtype.GenericBinarySubtype)))).right
 
       } catch {
@@ -408,13 +409,13 @@ private[core] object ScramStartNegociation {
   def parseResponse[M <: AuthenticationMode.Scram](
     mechanism: M, bson: BSONDocument): ResType = {
 
-    if (!bson.getAs[BSONBooleanLike]("ok").fold(false)(_.toBoolean)) {
-      Left(CommandError(bson.getAs[String]("errmsg").
+    if (!bson.booleanLike("ok").getOrElse(false)) {
+      Left(CommandError(bson.getAsOpt[String]("errmsg").
         getOrElse(s"${mechanism} authentication failure")))
 
-    } else if (bson.getAs[BSONBooleanLike]("done").fold(false)(_.toBoolean)) {
+    } else if (bson.booleanLike("done").getOrElse(false)) {
       Right(Left(SilentSuccessfulAuthentication))
-    } else bson.getAs[Array[Byte]]("payload").fold[ResType](
+    } else bson.getAsOpt[Array[Byte]]("payload").fold[ResType](
       Left(CommandError(s"missing ${mechanism} payload")))(
         bytes => Right(Right(bytes)))
   }
@@ -428,13 +429,12 @@ private[core] sealed trait ScramFinalNegociation
 
   def payload: Array[Byte]
 
-  import reactivemongo.bson.buffer.ArrayReadableBuffer
+  import reactivemongo.api.bson.buffer.ReadableBuffer
 
   override def makeDocuments = BSONDocument(
     "saslContinue" -> 1,
     "conversationId" -> conversationId,
-    "payload" -> BSONBinary(
-      ArrayReadableBuffer(payload), Subtype.GenericBinarySubtype))
+    "payload" -> BSONBinary(payload, Subtype.GenericBinarySubtype))
 
   val ResultMaker = ScramFinalNegociation
 

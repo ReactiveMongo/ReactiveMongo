@@ -6,8 +6,7 @@ import reactivemongo.api.SerializationPack
 
 import reactivemongo.core.errors.GenericDriverException
 
-@deprecated("Internal: will be made private", "0.16.0")
-object DropDatabase extends Command with CommandWithResult[UnitBox.type] {
+private[reactivemongo] object DropDatabase extends Command with CommandWithResult[UnitBox.type] {
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[DropDatabase.type] = {
     val builder = pack.newBuilder
     val cmd = builder.document(Seq(
@@ -17,73 +16,8 @@ object DropDatabase extends Command with CommandWithResult[UnitBox.type] {
   }
 }
 
-/**
- * @param dropped true if the collection existed and was dropped
- */
-@deprecated("Internal: will be made private", "0.16.0")
-class DropCollectionResult(val dropped: Boolean)
-  extends Product with Serializable {
-
-  val productArity = 1
-
-  def productElement(n: Int) = dropped
-
-  def canEqual(that: Any): Boolean = that match {
-    case _: DropCollectionResult => true
-    case _                       => false
-  }
-
-  override def equals(that: Any): Boolean = that match {
-    case other: DropCollectionResult =>
-      this.dropped == other.dropped
-
-    case _ =>
-      false
-  }
-
-  override def hashCode: Int = dropped.hashCode
-
-  override def toString = s"DropCollectionResult($dropped)"
-}
-
-object DropCollectionResult extends scala.runtime.AbstractFunction1[Boolean, DropCollectionResult] {
-  @inline def apply(dropped: Boolean): DropCollectionResult = new DropCollectionResult(dropped)
-
-  @deprecated("", "0.19.0")
-  def unapply(that: Any): Option[Boolean] = that match {
-    case other: DropCollectionResult =>
-      Option(other).map(_.dropped)
-
-    case _ => None
-  }
-
-  private[api] def reader[P <: SerializationPack](pack: P): pack.Reader[DropCollectionResult] = {
-    val decoder = pack.newDecoder
-    val unitBoxReader = CommandCodecs.unitBoxReader[pack.type](pack)
-
-    pack.reader[DropCollectionResult] { doc =>
-      try {
-        pack.deserialize(doc, unitBoxReader)
-
-        DropCollectionResult(true)
-      } catch {
-        case NonFatal(cause) =>
-          def code = decoder.int(doc, "code")
-          def msg = decoder.string(doc, "errmsg")
-
-          if (code.exists(_ == 26) || msg.exists(_ startsWith "ns not found")) {
-            DropCollectionResult(false)
-          } else {
-            throw cause
-          }
-      }
-    }
-  }
-}
-
-@deprecated("Internal: will be made private", "0.16.0")
-object DropCollection extends CollectionCommand
-  with CommandWithResult[DropCollectionResult] {
+private[reactivemongo] object DropCollection extends CollectionCommand
+  with CommandWithResult[UnitBox.type] {
 
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[DropCollection.type]] = {
     val builder = pack.newBuilder
@@ -95,17 +29,15 @@ object DropCollection extends CollectionCommand
   }
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-object EmptyCapped extends CollectionCommand
-  with CommandWithResult[UnitBox.type]
+//private[reactivemongo] object EmptyCapped extends CollectionCommand
+//with CommandWithResult[UnitBox.type]
 
-@deprecated("Internal: will be made private", "0.16.0")
-case class RenameCollection(
+private[reactivemongo] case class RenameCollection(
   fullyQualifiedCollectionName: String,
   fullyQualifiedTargetName: String,
   dropTarget: Boolean = false) extends Command with CommandWithResult[UnitBox.type]
 
-private[api] object RenameCollection extends scala.runtime.AbstractFunction3[String, String, Boolean, RenameCollection] {
+private[api] object RenameCollection {
   def writer[P <: SerializationPack with Singleton](pack: P): pack.Writer[RenameCollection] = {
     val builder = pack.newBuilder
 
@@ -517,19 +449,8 @@ object Resync extends Command with CommandWithResult[ResyncResult.type]
  *
  * @param enable if true the the member enters the `RECOVERING` state
  */
-@deprecated("Internal: will be made private", "0.16.0")
-class ReplSetMaintenance(val enable: Boolean = true)
-  extends Product with Serializable
-  with Command with CommandWithResult[UnitBox.type] {
-  val productArity = 1
-
-  def productElement(n: Int) = enable
-
-  def canEqual(that: Any): Boolean = that match {
-    case _: DropCollectionResult => true
-    case _                       => false
-  }
-
+private[reactivemongo] final class ReplSetMaintenance(
+  val enable: Boolean = true) extends Command with CommandWithResult[UnitBox.type] {
   override def equals(that: Any): Boolean = that match {
     case other: ReplSetMaintenance =>
       this.enable == other.enable
@@ -543,9 +464,8 @@ class ReplSetMaintenance(val enable: Boolean = true)
   override def toString = s"ReplSetMaintenance($enable)"
 }
 
-@deprecated("Internal: will be made private", "0.19.0")
-object ReplSetMaintenance
-  extends scala.runtime.AbstractFunction1[Boolean, ReplSetMaintenance] {
+// TODO: Remove
+private[reactivemongo] object ReplSetMaintenance {
 
   @inline def apply(enable: Boolean): ReplSetMaintenance =
     new ReplSetMaintenance(enable)
@@ -571,5 +491,5 @@ object ReplSetMaintenance
 /**
  * The [[https://docs.mongodb.com/manual/reference/command/ping/ ping]] command.
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case object PingCommand extends Command with CommandWithResult[Boolean]
+private[reactivemongo] object PingCommand
+  extends Command with CommandWithResult[Boolean]

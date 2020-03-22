@@ -98,7 +98,7 @@ trait InsertOps[P <: SerializationPack with Singleton] {
       // Command envelope to compute accurate BSON size limit
       val emptyDoc: pack.Document = pack.newBuilder.document(Seq.empty)
 
-      val emptyCmd = ResolvedCollectionCommand(
+      val emptyCmd = new ResolvedCollectionCommand(
         collection.name,
         new InsertCommand.Insert(
           emptyDoc, Seq.empty[pack.Document], ordered, writeConcern, false))

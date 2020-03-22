@@ -189,8 +189,8 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.bson.BSONDocument
-   * import reactivemongo.api.collections.bson.BSONCollection
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
    *
    * def first(query: BSONDocument)(collection: BSONCollection)(
    *   implicit ec: ExecutionContext): Future[BSONDocument] = {

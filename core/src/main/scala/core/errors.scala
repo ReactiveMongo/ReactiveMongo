@@ -19,8 +19,8 @@ import reactivemongo.api.SerializationPack
 
 import scala.util.control.NoStackTrace
 
-import reactivemongo.bson.{ BSONDocument, BSONInteger, BSONNumberLike }
-import reactivemongo.bson.DefaultBSONHandlers._
+import reactivemongo.api.bson.{ BSONDocument, BSONNumberLike }
+import reactivemongo.api.bson.collection.BSONSerializationPack
 
 /** An error that can come from a MongoDB node or not. */
 sealed trait ReactiveMongoException extends Exception {
@@ -32,13 +32,13 @@ sealed trait ReactiveMongoException extends Exception {
 
 /** An error thrown by a MongoDB node. */
 trait DatabaseException extends ReactiveMongoException {
-  /** original document of this error */
-  private[reactivemongo] def originalDocument: Option[BSONDocument]
+  /** Representation of the original document of this error */
+  private[reactivemongo] def originalDocument: Option[String]
 
   /** error code */
   def code: Option[Int]
 
-  final override def getMessage: String = s"DatabaseException['$message'" + code.map(c => s" (code = $c)").getOrElse("") + "]"
+  override def getMessage: String = s"DatabaseException['$message'" + code.map(c => s" (code = $c)").getOrElse("") + "]"
 
   /** Tells if this error is due to a write on a secondary node. */
   private[reactivemongo] final def isNotAPrimaryError: Boolean = code.map {
@@ -64,7 +64,7 @@ trait DatabaseException extends ReactiveMongoException {
 
   override def toString: String = getMessage
 
-  private lazy val tupled = originalDocument -> code
+  protected lazy val tupled: Product = originalDocument -> code
 }
 
 private[reactivemongo] object DatabaseException {
@@ -73,16 +73,12 @@ private[reactivemongo] object DatabaseException {
   def apply[P <: SerializationPack](pack: P)(doc: pack.Document): DatabaseException = new DatabaseException {
     private lazy val decoder = pack.newDecoder
 
-    val originalDocument = Some(pack bsonValue doc).collect {
-      case doc: BSONDocument => doc
-    }
+    lazy val originalDocument = Option(doc).map(pack.pretty(_))
 
-    lazy val message = {
-      decoder.string(doc, f"$$err").orElse {
-        decoder.string(doc, "errmsg")
-      }.getOrElse(
-        s"message is not present, unknown error: ${pack pretty doc}")
-    }
+    lazy val message = decoder.string(doc, f"$$err").orElse {
+      decoder.string(doc, "errmsg")
+    }.getOrElse(
+      s"message is not present, unknown error: ${pack pretty doc}")
 
     lazy val code = decoder.int(doc, "code")
   }
@@ -90,8 +86,6 @@ private[reactivemongo] object DatabaseException {
   // ---
 
   private final class Default(val cause: Throwable) extends DatabaseException {
-    type Document = Nothing
-
     val originalDocument = Option.empty[Nothing]
     val code = Option.empty[Int]
     val message = s"${cause.getClass.getName}: ${cause.getMessage}"
@@ -160,7 +154,7 @@ private[reactivemongo] final class GenericDatabaseException(
 
   val originalDocument = None
 
-  private[core] lazy val tupled = message -> code
+  override protected lazy val tupled = message -> code
 
   override def equals(that: Any): Boolean = that match {
     case other: GenericDatabaseException =>
@@ -169,30 +163,10 @@ private[reactivemongo] final class GenericDatabaseException(
     case _ =>
       false
   }
-
-  override def hashCode: Int = tupled.hashCode
-
-  override def toString = s"GenericDatabaseException($message)"
-}
-
-/** An error thrown by a MongoDB node (containing the original document of the error). */
-private[reactivemongo] class DetailedDatabaseException(
-  doc: BSONDocument) extends DatabaseException with NoStackTrace {
-
-  type Document = BSONDocument
-
-  val originalDocument = Some(doc)
-
-  lazy val message = doc.getAs[String]("$err").orElse {
-    doc.getAs[String]("errmsg")
-  }.getOrElse(
-    s"message is not present, unknown error: ${BSONDocument pretty doc}")
-
-  lazy val code = doc.getAs[BSONInteger]("code").map(_.value)
 }
 
 /** A generic command error. TODO: Remove */
-private[reactivemongo] trait CommandError extends ReactiveMongoException {
+private[reactivemongo] trait CommandError extends DatabaseException {
   /** error code */
   val code: Option[Int]
 
@@ -200,27 +174,24 @@ private[reactivemongo] trait CommandError extends ReactiveMongoException {
 }
 
 private[reactivemongo] object CommandError {
-  /**
-   * Makes a 'DefaultCommandError'.
-   *
-   * @param message The error message.
-   * @param originalDocument The original document contained in the response.
-   * @param code The code of the error, if any.
-   */
-  def apply(message: String, originalDocument: Option[BSONDocument] = None, code: Option[Int] = None): DefaultCommandError =
-    new DefaultCommandError(message, code, originalDocument)
+  @inline def apply(
+    message: String,
+    originalDocument: Option[BSONDocument] = None,
+    code: Option[Int] = None): CommandError =
+    CommandError(BSONSerializationPack)(message, originalDocument, code)
 
-  private[reactivemongo] def apply[P <: SerializationPack](pack: P)(
+  def apply[P <: SerializationPack](pack: P)(
     _message: String,
-    originalDocument: Option[pack.Document],
+    _originalDocument: Option[pack.Document],
     _code: Option[Int]): CommandError =
     new CommandError {
+      lazy val originalDocument = _originalDocument.map(pack.pretty)
       val code = _code
       val message = _message
 
       override def getMessage: String =
-        s"CommandError['$message'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]" +
-          originalDocument.map(doc => " with original doc " + pack.pretty(doc)).getOrElse("")
+        s"CommandError['$message'" + code.fold("")(c => " (code = " + c + ")") + "]" +
+          originalDocument.fold("")(repr => " with original document " + repr)
     }
 
   /**
@@ -233,30 +204,9 @@ private[reactivemongo] object CommandError {
   def checkOk(
     doc: BSONDocument, name: Option[String],
     error: (BSONDocument, Option[String]) => CommandError = (doc, name) => CommandError("command " + name.map(_ + " ").getOrElse("") + "failed because the 'ok' field is missing or equals 0", Some(doc))): Option[CommandError] = {
-    doc.getAs[BSONNumberLike]("ok").map(_.toInt).orElse(Some(0)).flatMap {
+    doc.getAsOpt[BSONNumberLike]("ok").map(_.toInt).orElse(Some(0)).flatMap {
       case 1 => None
       case _ => Some(error(doc, name))
     }
   }
-}
-
-/**
- * A default command error, which may contain the original BSONDocument of the response.
- *
- * @param message The error message.
- * @param code The optional error code.
- * @param originalDocument The original BSONDocument of this error.
- */
-private[reactivemongo] final class DefaultCommandError( // TODO: Remove
-  val message: String,
-  val code: Option[Int],
-  val originalDocument: Option[BSONDocument]) extends BSONCommandError
-
-/** A command error that optionally holds the original TraversableBSONDocument; TODO: Remove */
-private[reactivemongo] trait BSONCommandError extends CommandError {
-  private[reactivemongo] val originalDocument: Option[BSONDocument]
-
-  override def getMessage: String =
-    s"BSONCommandError['$message'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]" +
-      originalDocument.map(doc => " with original doc " + BSONDocument.pretty(doc)).getOrElse("")
 }

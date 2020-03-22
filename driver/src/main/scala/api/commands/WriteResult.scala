@@ -2,7 +2,7 @@ package reactivemongo.api.commands
 
 import scala.util.control.NoStackTrace
 
-import reactivemongo.bson.BSONValue
+import reactivemongo.api.bson.BSONValue
 
 import reactivemongo.core.errors.DatabaseException
 
@@ -83,7 +83,7 @@ object WriteResult {
     true, 0, Seq.empty, Option.empty, Option.empty, Option.empty)
 }
 
-private[reactivemongo] final class LastError private[api] (
+private[reactivemongo] final class LastError(
   val ok: Boolean,
   val errmsg: Option[String],
   val code: Option[Int],
@@ -103,12 +103,11 @@ private[reactivemongo] final class LastError private[api] (
 
   override def inError: Boolean = !ok || errmsg.isDefined
 
-  @deprecated("Use the detailed properties (e.g. `code`)", "0.12.0")
-  override def originalDocument = Option.empty[reactivemongo.bson.BSONDocument]
+  private[reactivemongo] def originalDocument = Option.empty[Nothing]
 
   override lazy val message = errmsg.getOrElse("<none>")
 
-  private[api] lazy val tupled = Tuple14(ok, errmsg, code, lastOp, n, singleShard, updatedExisting, upserted, wnote, wtimeout, waited, wtime, writeErrors, writeConcernError)
+  override protected lazy val tupled = Tuple14(ok, errmsg, code, lastOp, n, singleShard, updatedExisting, upserted, wnote, wtimeout, waited, wtime, writeErrors, writeConcernError)
 
   override def equals(that: Any): Boolean = that match {
     case other: LastError =>
@@ -117,8 +116,6 @@ private[reactivemongo] final class LastError private[api] (
     case _ =>
       false
   }
-
-  override def hashCode: Int = tupled.hashCode
 
   override def toString = s"LastError${tupled.hashCode}"
 }

@@ -3,8 +3,7 @@ import scala.collection.immutable.{ ListSet, Set }
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
-// TODO: bison
-import reactivemongo.bson.{
+import reactivemongo.api.bson.{
   BSONArray,
   BSONDocument,
   BSONDocumentHandler,
@@ -28,7 +27,7 @@ import reactivemongo.api.{
 }
 import reactivemongo.api.indexes._, IndexType._
 
-import reactivemongo.api.collections.bson.BSONCollection
+import reactivemongo.api.bson.collection.BSONCollection
 
 import reactivemongo.api.tests.{ builder, pack }
 
@@ -95,8 +94,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
           sys.error(s"--> ${BSONDocument pretty k2}")
 
         case Some(IndexStatsResult("city_text_state_text", k2, _, _)) =>
-          k2.getAs[String]("_fts") must beSome("text") and {
-            k2.getAs[BSONNumberLike]("_ftsx").map(_.toInt) must beSome(1)
+          k2.string("_fts") must beSome("text") and {
+            k2.int("_ftsx") must beSome(1)
           }
       }.await(0, timeout)
     }
@@ -189,7 +188,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       }.headOption
 
       result aka "results" must beLike[Option[BSONDocument]] {
-        case Some(explainResult) => explainResult.getAs[BSONArray]("stages") must beSome
+        case Some(explainResult) =>
+          explainResult.getAsOpt[BSONArray]("stages") must beSome
       }.await(1, timeout)
     }
 
@@ -852,8 +852,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       implicit val pointReader: BSONDocumentReader[GeoPoint] = Macros.reader[GeoPoint]
       implicit val distanceReader: BSONDocumentReader[GeoDistance] = BSONDocumentReader[GeoDistance] { doc =>
         (for {
-          calc <- doc.getAsTry[BSONNumberLike]("calculated").map(_.toInt)
-          loc <- doc.getAsTry[GeoPoint]("loc")
+          calc <- doc.double("calculated").map(_.toInt)
+          loc <- doc.getAsOpt[GeoPoint]("loc")
         } yield GeoDistance(calc, loc)).get
       }
       implicit val placeReader: BSONDocumentReader[GeoPlace] = Macros.reader[GeoPlace]

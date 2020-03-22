@@ -3,7 +3,7 @@ import java.io.ByteArrayInputStream
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.bson.utils.Converters
+import reactivemongo.api.bson.Digest
 
 import reactivemongo.api.{ Cursor, DB, WrappedCursor }
 
@@ -138,7 +138,7 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
         }
       } and {
         find(filename2) aka "file #2" must beSome[GFile].which { actual =>
-          def expectedMd5 = Converters.hex2Str(Converters.md5(content2))
+          def expectedMd5 = reactivemongo.api.tests.md5Hex(content2)
 
           matchFile(actual, file2, content2) and {
             actual.md5 must beSome[String].which {

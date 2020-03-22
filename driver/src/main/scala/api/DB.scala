@@ -64,6 +64,7 @@ import reactivemongo.api.commands.{
  * @define commandTParam the [[reactivemongo.api.commands.Command]] type
  * @define commandParam the command to be executed on the current database
  * @define failoverStrategyParam the failover strategy to override the default one
+ * @define readPrefParam the read preference for the result
  * @define writerParam the writer for the command
  * @define readerParam the reader for the result of command execution
  * @define resultType the result type
@@ -468,11 +469,12 @@ final class DB(
    * @tparam C $commandTParam
    * @param command $commandParam
    * @param failoverStrategy $failoverStrategyParam
+   * @param readPreference $readPrefParam
    * @param writer $writerParam
    * @param reader $readerParam
    * @return $singleResult
    */
-  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R], failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = Command.run(pack, failoverStrategy).apply(this, command, this.defaultReadPreference)
+  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R], failoverStrategy: FailoverStrategy = FailoverStrategy.default, readPreference: ReadPreference = this.defaultReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = Command.run(pack, failoverStrategy).apply(this, command, readPreference)
 
   /**
    * @tparam C $commandTParam
@@ -514,11 +516,12 @@ final class DB(
    * @tparam C $commandTParam
    * @param command $commandParam
    * @param failoverStrategy $failoverStrategyParam
+   * @param readPreference $readPrefParam
    * @param writer $writerParam
    * @param reader $readerParam
    * @return $singleResult
    */
-  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]], failoverStrategy: FailoverStrategy, readPreference: ReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = Command.run(pack, failoverStrategy).unboxed(this, command, readPreference)
+  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]], failoverStrategy: FailoverStrategy = FailoverStrategy.default, readPreference: ReadPreference = this.defaultReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = Command.run(pack, failoverStrategy).unboxed(this, command, readPreference)
 
   @inline private def defaultWriteConcern: WriteConcern = connection.options.writeConcern
 

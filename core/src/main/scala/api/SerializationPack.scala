@@ -8,16 +8,11 @@ import scala.reflect.ClassTag
 
 import scala.util.Try
 
-import reactivemongo.bson.{ BSONDocument, BSONValue }
-import reactivemongo.bson.buffer.{
-  ReadableBuffer,
-  WritableBuffer => LegacyWritable
-}
+import reactivemongo.api.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
 import reactivemongo.core.protocol.Response
-import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
-trait SerializationPack extends SerializationPackCompat { self: Singleton =>
+trait SerializationPack { self: Singleton =>
   type Value
   type ElementProducer
   type Document <: Value
@@ -32,23 +27,25 @@ trait SerializationPack extends SerializationPackCompat { self: Singleton =>
   def IdentityWriter: Writer[Document]
   def IdentityReader: Reader[Document]
 
-  private[reactivemongo] def serialize[A](a: A, writer: Writer[A]): Document
+  def serialize[A](a: A, writer: Writer[A]): Document
 
-  private[reactivemongo] def deserialize[A](document: Document, reader: Reader[A]): A
+  def deserialize[A](document: Document, reader: Reader[A]): A
 
-  private[reactivemongo] def writeToBuffer(buffer: LegacyWritable, document: Document): LegacyWritable
+  private[reactivemongo] def writeToBuffer(
+    buffer: WritableBuffer,
+    document: Document): WritableBuffer
 
   private[reactivemongo] def readFromBuffer(buffer: ReadableBuffer): Document
 
-  private[reactivemongo] def serializeAndWrite[A](buffer: LegacyWritable, document: A, writer: Writer[A]): LegacyWritable = writeToBuffer(buffer, serialize(document, writer))
-
-  private[reactivemongo] def readAndDeserialize[A](buffer: ReadableBuffer, reader: Reader[A]): A =
-    deserialize(readFromBuffer(buffer), reader)
+  private[reactivemongo] final def readAndDeserialize[A](buffer: ReadableBuffer, reader: Reader[A]): A = deserialize(readFromBuffer(buffer), reader)
 
   private[reactivemongo] def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
-    val channelBuf = ChannelBufferReadableBuffer(response.documents)
+    val channelBuf = ReadableBuffer(response.documents)
+
     readAndDeserialize(channelBuf, reader)
   }
+
+  private[reactivemongo] final def serializeAndWrite[A](buffer: WritableBuffer, document: A, writer: Writer[A]): WritableBuffer = writeToBuffer(buffer, serialize(document, writer))
 
   /** Prepares a writer from the given serialization function. */
   def writer[A](f: A => Document): Writer[A]
@@ -62,12 +59,6 @@ trait SerializationPack extends SerializationPackCompat { self: Singleton =>
 
   // Returns a Reader from a function
   private[reactivemongo] def reader[A](f: Document => A): Reader[A]
-
-  // Returns a deserialized document as a BSON one (for internal intercompat)
-  private[reactivemongo] def document(doc: BSONDocument): Document
-
-  // Returns a BSON value
-  private[reactivemongo] def bsonValue(value: Value): BSONValue
 
   private[reactivemongo] def narrowIdentityReader: NarrowValueReader[Value]
 

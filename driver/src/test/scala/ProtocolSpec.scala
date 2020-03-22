@@ -1,6 +1,6 @@
 import reactivemongo.io.netty.buffer.Unpooled
 
-import reactivemongo.bson.BSONDocument
+import reactivemongo.api.bson.BSONDocument
 
 import org.specs2.specification.core.Fragments
 import org.specs2.concurrent.ExecutionEnv
@@ -121,7 +121,7 @@ final class ProtocolSpec(implicit ee: ExecutionEnv)
             } and {
               resp.info must_=== info
             } and {
-              doc.getAs[Boolean]("ismaster") must beSome(true)
+              doc.getAsOpt[Boolean]("ismaster") must beSome(true)
             } and {
               getBytes(resp.documents, docsSize) must_=== expectedBytes
             }

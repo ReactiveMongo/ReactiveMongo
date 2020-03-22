@@ -1,93 +1,93 @@
-package reactivemongo.api
+package reactivemongo.api.bson.collection
 
 import java.util.UUID
 
-import scala.util.Try
+import scala.util.{ Failure, Success, Try }
 
 import scala.reflect.ClassTag
 
-import reactivemongo.bson.buffer.{
+import reactivemongo.api.bson.buffer.{
+  DefaultBufferHandler,
   ReadableBuffer,
-  WritableBuffer => LegacyWritable
+  WritableBuffer
 }
 
 import reactivemongo.core.protocol.Response
-import reactivemongo.core.netty.ChannelBufferReadableBuffer
+
+import reactivemongo.api.SerializationPack
+
+import reactivemongo.api.bson._
 
 /** The default serialization pack. */
-@deprecated("Will be replaced by `reactivemongo.api.bson.collection.BSONSerializationPack`", "0.19.0")
-object BSONSerializationPack
-  extends SerializationPack with BSONSerializationPackCompat { self =>
-
-  import reactivemongo.bson._, buffer.DefaultBufferHandler
+object BSONSerializationPack extends SerializationPack { self =>
 
   type Value = BSONValue
-  type ElementProducer = Producer[BSONElement]
+  type ElementProducer = reactivemongo.api.bson.ElementProducer
   type Document = BSONDocument
   type Writer[A] = BSONDocumentWriter[A]
   type Reader[A] = BSONDocumentReader[A]
-  type NarrowValueReader[A] = BSONReader[_ <: BSONValue, A]
-  private[reactivemongo] type WidenValueReader[A] = UnsafeBSONReader[A]
+  type NarrowValueReader[A] = BSONReader[A]
+  private[reactivemongo] type WidenValueReader[A] = BSONReader[A]
 
   private[reactivemongo] val IsDocument = implicitly[ClassTag[BSONDocument]]
   private[reactivemongo] val IsValue = implicitly[ClassTag[BSONValue]]
 
-  object IdentityReader extends Reader[Document] {
-    def read(document: Document): Document = document
+  lazy val IdentityReader: Reader[Document] = bsonDocumentReader
+  lazy val IdentityWriter: Writer[Document] = bsonDocumentWriter
+
+  def serialize[A](a: A, writer: Writer[A]): Document =
+    writer.writeTry(a) match {
+      case Success(doc)   => doc
+      case Failure(cause) => throw cause
+    }
+
+  def deserialize[A](
+    document: Document,
+    reader: Reader[A]): A = reader.readTry(document) match {
+    case Success(a) => a
+
+    case Failure(cause) =>
+      throw cause
   }
 
-  object IdentityWriter extends Writer[Document] {
-    def write(document: Document): Document = document
-  }
+  private[reactivemongo] def writeToBuffer(
+    buffer: WritableBuffer,
+    document: Document): WritableBuffer =
+    DefaultBufferHandler.writeDocument(document, buffer)
 
-  def serialize[A](a: A, writer: Writer[A]): Document = writer.write(a)
+  private[reactivemongo] def readFromBuffer(buffer: ReadableBuffer): Document =
+    DefaultBufferHandler.readDocument(buffer)
 
-  def deserialize[A](document: Document, reader: Reader[A]): A =
-    reader.read(document)
-
-  def writeToBuffer(buffer: LegacyWritable, document: Document): LegacyWritable = DefaultBufferHandler.writeDocument(document, buffer)
-
-  def readFromBuffer(buffer: ReadableBuffer): Document =
-    DefaultBufferHandler.readDocument(buffer).get
-
-  override final def readAndDeserialize[A](response: Response, reader: Reader[A]): A = response match {
+  override def readAndDeserialize[A](response: Response, reader: Reader[A]): A = response match {
     case s @ Response.Successful(_, _, docs, _) => s.first match {
-      case Some(preloaded) =>
-        deserialize[A](preloaded, reader) // optimization
+      case Some(preloaded) => // optimization
+        deserialize[A](preloaded, reader)
 
-      case _ => {
-        val channelBuf = ChannelBufferReadableBuffer(docs)
-        readAndDeserialize(channelBuf, reader)
-      }
+      case _ =>
+        readAndDeserialize(ReadableBuffer(docs), reader)
     }
 
-    case _ => {
-      val channelBuf = ChannelBufferReadableBuffer(response.documents)
-      readAndDeserialize(channelBuf, reader)
-    }
+    case _ =>
+      readAndDeserialize(ReadableBuffer(response.documents), reader)
   }
 
   def writer[A](f: A => Document): Writer[A] = BSONDocumentWriter[A](f)
 
   def isEmpty(document: Document) = document.isEmpty
 
-  def widenReader[T](r: NarrowValueReader[T]): WidenValueReader[T] =
-    r.widenReader
+  def widenReader[T](r: NarrowValueReader[T]): WidenValueReader[T] = r
 
-  def readValue[A](value: Value, reader: WidenValueReader[A]): Try[A] =
-    reader.readTry(value)
+  private[reactivemongo] def readValue[A](value: Value, reader: WidenValueReader[A]): Try[A] = reader.readTry(value)
 
   private[reactivemongo] def reader[A](f: Document => A): Reader[A] =
     BSONDocumentReader(f)
 
+  private[reactivemongo] def afterReader[A, B](r: Reader[A])(f: A => B): Reader[B] = r.afterRead(f)
+
   override private[reactivemongo] def bsonSize(value: Value): Int =
     value.byteSize
 
-  private[reactivemongo] def document(doc: BSONDocument): Document = doc
-
-  private[reactivemongo] def bsonValue(value: BSONValue): BSONValue = value
-
-  private[reactivemongo] val narrowIdentityReader: NarrowValueReader[BSONValue] = BSONReader[BSONValue, BSONValue](identity)
+  private[reactivemongo] val narrowIdentityReader: NarrowValueReader[BSONValue] = BSONReader[BSONValue](identity)
 
   override private[reactivemongo] val newBuilder: SerializationPack.Builder[BSONSerializationPack.type] = Builder
 
@@ -131,7 +131,8 @@ object BSONSerializationPack
 
     def dateTime(time: Long): Value = BSONDateTime(time)
 
-    def regex(pattern: String, options: String) = BSONRegex(pattern, options)
+    def regex(pattern: String, options: String): Value =
+      BSONRegex(pattern, options)
 
     def generateObjectId() = BSONObjectID.generate()
   }
@@ -145,46 +146,46 @@ object BSONSerializationPack
       case _                 => None
     }
 
+    def names(document: BSONDocument): Set[String] =
+      document.elements.map(_.name).toSet
+
     def binary(document: BSONDocument, name: String): Option[Array[Byte]] =
       document.get(name).collect {
         case bin: BSONBinary => bin.byteArray
       }
 
-    def names(document: BSONDocument): Set[String] =
-      document.elements.map(_.name).toSet
-
     def get(document: BSONDocument, name: String): Option[BSONValue] =
       document.get(name)
 
     def array(document: pack.Document, name: String): Option[Seq[BSONValue]] =
-      document.getAs[BSONArray](name).map(_.elements.map(_.value))
+      document.getAsOpt[BSONArray](name).map(_.values)
 
     def booleanLike(document: BSONDocument, name: String): Option[Boolean] =
-      document.getAs[BSONBooleanLike](name).map(_.toBoolean)
+      document.booleanLike(name)
 
     def child(document: BSONDocument, name: String): Option[BSONDocument] =
-      document.getAs[BSONDocument](name)
+      document.getAsOpt[BSONDocument](name)
 
     def children(document: BSONDocument, name: String): List[BSONDocument] = {
-      document.getAs[List[BSONDocument]](name).
+      document.getAsOpt[List[BSONDocument]](name).
         getOrElse(List.empty[BSONDocument])
     }
 
     def double(document: BSONDocument, name: String): Option[Double] =
-      document.getAs[BSONNumberLike](name).map(_.toDouble)
+      document.getAsOpt[Double](name)
 
     def int(document: BSONDocument, name: String): Option[Int] =
-      document.getAs[Int](name)
+      document.getAsOpt[Int](name)
 
     def long(document: BSONDocument, name: String): Option[Long] =
-      document.getAs[BSONNumberLike](name).map(_.toLong)
+      document.getAsOpt[BSONNumberLike](name).flatMap { _.toLong.toOption }
 
     def string(document: BSONDocument, name: String): Option[String] =
-      document.getAs[String](name)
+      document.getAsOpt[String](name)
 
     def uuid(document: BSONDocument, name: String): Option[UUID] =
-      document.getAs[BSONBinary](name).collect {
-        case bin @ BSONBinary(_, Subtype.UuidSubtype) =>
+      document.getAsOpt[BSONBinary](name).collect {
+        case bin @ BSONBinary(Subtype.UuidSubtype) =>
           UUID.nameUUIDFromBytes(bin.byteArray)
       }
   }

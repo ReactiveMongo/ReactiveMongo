@@ -8,7 +8,9 @@ import akka.testkit.TestActorRef
 
 import org.specs2.matcher.MatchResult
 
-import reactivemongo.bson.BSONDocument
+import reactivemongo.api.bson.BSONDocument
+import reactivemongo.api.bson.buffer.ReadableBuffer
+import reactivemongo.api.bson.collection.BSONSerializationPack
 
 import reactivemongo.api.MongoConnectionOptions
 
@@ -21,7 +23,6 @@ import reactivemongo.core.nodeset.{
 }
 import reactivemongo.core.protocol.Request
 import reactivemongo.core.actors.StandardDBSystem
-import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
 import reactivemongo.io.netty.channel.{ Channel, DefaultChannelId }
 
@@ -184,11 +185,11 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
 
   private def nettyHandler(ref: TestActorRef[StandardDBSystem])(isMasterResp: Boolean => Option[BSONDocument]): (Channel, Object) => Unit = {
     case (chan, req: Request) => {
-      val bson = ChannelBufferReadableBuffer.document(
-        req.documents.merged)
+      val bson = BSONSerializationPack.readFromBuffer(
+        ReadableBuffer(req.documents.merged))
 
-      bson.getAs[reactivemongo.bson.BSONNumberLike]("ismaster") match {
-        case Some(num) if (num.toInt == 1) => {
+      bson.int("ismaster") match {
+        case Some(1) => {
           isMasterResp(secAvail).foreach { resp =>
             ref ! fakeResponse(
               resp,

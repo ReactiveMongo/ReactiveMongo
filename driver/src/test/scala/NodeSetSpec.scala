@@ -158,7 +158,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
     unresponsiveSecondarySpec
 
     "discover node2 and create signaling channels" in {
-      def isPrim = reactivemongo.bson.BSONDocument(
+      def isPrim = reactivemongo.api.bson.BSONDocument(
         "ok" -> 1,
         "ismaster" -> true,
         "minWireVersion" -> 4,

@@ -42,7 +42,10 @@ import reactivemongo.util.{ LazyLogger, SimpleRing }
 
 import reactivemongo.api.Serialization
 
-import reactivemongo.core.netty.{ ChannelBufferReadableBuffer, ChannelFactory }
+import reactivemongo.api.bson.BSONDocumentReader
+import reactivemongo.api.bson.collection.BSONSerializationPack
+
+import reactivemongo.core.netty.ChannelFactory
 
 import reactivemongo.core.ClientMetadata
 import reactivemongo.core.errors.{ CommandError, GenericDriverException }
@@ -73,7 +76,9 @@ import reactivemongo.core.nodeset.{
   PingInfo
 }
 import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
-import reactivemongo.api.commands.LastError
+
+import reactivemongo.api.commands.{ GetLastError, LastError }
+
 import external.reactivemongo.ConnectionListener
 
 /** Main actor that processes the requests. */
@@ -485,11 +490,38 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
     res
   }
 
-  private def lastError(response: Response): Either[Throwable, LastError] = {
-    import reactivemongo.api.commands.bson.
-      BSONGetLastErrorImplicits.LastErrorReader
+  private val lastError: Response => Either[Throwable, LastError] = {
+    val reader: BSONDocumentReader[LastError] =
+      BSONDocumentReader[LastError] { doc =>
+        new LastError(
+          ok = doc.booleanLike("ok").getOrElse(false),
+          errmsg = doc.string("err"),
+          code = doc.int("code"),
+          lastOp = doc.long("lastOp"),
+          n = doc.int("n").getOrElse(0),
+          singleShard = doc.string("singleShard"),
+          updatedExisting = doc.booleanLike("updatedExisting").getOrElse(false),
+          upserted = doc.get("upserted"),
+          wnote = doc.get("wnote").flatMap {
+            case reactivemongo.api.bson.BSONString("majority") =>
+              Some(GetLastError.Majority)
 
-    Response.parse(response).next().asTry[LastError] match {
+            case reactivemongo.api.bson.BSONString(tagSet) =>
+              Some(GetLastError.TagSet(tagSet))
+
+            case reactivemongo.api.bson.BSONInteger(acks) =>
+              Some(GetLastError.WaitForAcknowledgments(acks))
+
+            case _ => Option.empty
+          },
+          wtimeout = doc.booleanLike("wtimeout").getOrElse(false),
+          waited = doc.int("waited"),
+          wtime = doc.int("wtime"),
+          writeErrors = Seq.empty,
+          writeConcernError = Option.empty)
+      }
+
+    Response.parse(_: Response).next().asTry[LastError](reader) match {
       case Failure(err) => Left(err)
       case Success(err) => Right(err)
     }
@@ -633,7 +665,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
               resps.put(reqId, new AwaitingResponse(
                 request, chanId, req.promise,
                 isGetLastError = false,
-                isMongo26WriteOp = req.isMongo26WriteOp,
+                isMongo26WriteOp = req.isMongo26WriteOp, // TODO: Remove
                 pinnedNode = None))
 
               val countBefore = chans.getOrElse(chanId, 0)
@@ -785,7 +817,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
       requestTracker.withAwaiting { (resps, chans) =>
         resps.get(response.header.responseTo) match {
           case Some(AwaitingResponse(
-            _, chanId, promise, isGetLastError, isMongo26WriteOp)) => {
+            _, chanId, promise, isGetLastError, _ /*isMongo26WriteOp*/ )) => {
 
             trace(s"Got a response from ${response.info.channelId} to ${response.header.responseTo}! Will give back message=$response to promise ${System.identityHashCode(promise)}")
 
@@ -847,10 +879,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
                   ()
                 }
 
-                case _ if isMongo26WriteOp =>
-                  onMongo26Write(response, promise)
-
                 case _ => {
+                  // TODO: Update logging
                   trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
 
                   promise.success(response)
@@ -977,62 +1007,6 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
 
       ()
     }
-
-  // TODO#1.1: Remove with MongoDB 2.6 end of support
-  private def onMongo26Write(
-    response: Response, promise: Promise[Response]): Unit = {
-
-    // MongoDB 26 Write Protocol errors
-    trace(s"Received a response to a MongoDB2.6 Write Op")
-
-    import reactivemongo.bson.lowlevel._
-
-    val fields = {
-      val reader = new LowLevelBsonDocReader(
-        new ChannelBufferReadableBuffer(response.documents))
-
-      reader.fieldStream
-    }
-    val okField = fields.find(_.name == "ok")
-
-    trace(s"{${response.header.responseTo}} ok field is: $okField")
-
-    val processedOk = okField.collect {
-      case BooleanField(_, v) => v
-      case IntField(_, v)     => v != 0
-      case DoubleField(_, v)  => v != 0
-    }.getOrElse(false)
-
-    if (processedOk) {
-      trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
-      promise.success(response)
-    } else {
-      debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] processedOk is false! sending an error")
-
-      val notAPrimary = fields.find(_.name == "errmsg").exists {
-        case errmsg @ LazyField(0x02, _, buf) => {
-          debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg!")
-          buf.readString == "not a primary"
-        }
-
-        case errmsg => {
-          debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] errmsg is $errmsg but not interesting!")
-          false
-        }
-      }
-
-      if (notAPrimary) {
-        debug(s"{${response.header.responseTo}} [MongoDB26 Write Op response] not a primary error!")
-
-        onPrimaryUnavailable(new GenericDriverException("Not a primary"))
-      }
-
-      promise.failure(new PrimaryUnavailableException(
-        supervisor, name, internalState()))
-    }
-
-    ()
-  }
 
   private def onDisconnect(chanId: ChannelId, nodeSet: NodeSet): NodeSet = {
     trace(s"Channel #$chanId is unavailable")
@@ -1592,11 +1566,10 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
 
   private def requestIsMaster(context: String, node: Node): IsMasterRequest =
     node.signaling.fold(new IsMasterRequest(node)) { con =>
-      import reactivemongo.api.BSONSerializationPack
-      import reactivemongo.api.commands.bson.{
-        BSONIsMasterCommandImplicits,
-        BSONIsMasterCommand
-      }, BSONIsMasterCommand.IsMaster
+      import reactivemongo.api.commands.bson.BSONIsMasterCommand.{
+        IsMaster,
+        writer
+      }
       import reactivemongo.api.commands.Command
 
       lazy val id = RequestIdGenerator.isMaster.next
@@ -1604,8 +1577,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
         if (node.pingInfo.firstSent) None else Some(clientMetadata)
 
       lazy val isMaster = Command.buildRequestMaker(BSONSerializationPack)(
-        IsMaster(client, id.toString),
-        BSONIsMasterCommandImplicits.IsMasterWriter,
+        new IsMaster(client, Some(id.toString)),
+        writer(BSONSerializationPack),
         ReadPreference.primaryPreferred,
         "admin") // only "admin" DB for the admin command
 

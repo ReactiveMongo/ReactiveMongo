@@ -176,7 +176,7 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     /** The max BSON size, including the size of command envelope */
     private def maxBsonSize = {
       // Command envelope to compute accurate BSON size limit
-      val emptyCmd = ResolvedCollectionCommand(
+      val emptyCmd = new ResolvedCollectionCommand(
         collection.name, Delete(Seq.empty, ordered, writeConcern))
 
       val doc = pack.serialize(emptyCmd, deleteWriter(None))

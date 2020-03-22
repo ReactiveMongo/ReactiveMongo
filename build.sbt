@@ -51,8 +51,7 @@ lazy val `ReactiveMongo-Core` = project.in(file("core")).
 lazy val `ReactiveMongo` = new Driver(
   `ReactiveMongo-BSON`,
   `ReactiveMongo-BSON-Macros`,
-  `ReactiveMongo-Core`,
-  `ReactiveMongo-BSON-Compat`
+  `ReactiveMongo-Core`
 ).module
 
 // ---
