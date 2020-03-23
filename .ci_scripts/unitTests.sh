@@ -27,7 +27,7 @@ EOF
     sbt ++$SCALA_VERSION ";error ;mimaReportBinaryIssues" || exit 3
     exit
 
-    sbt ++$SCALA_VERSION ";project ReactiveMongo-BSON ;findbugs ;project ReactiveMongo-BSON-Macros ;findbugs ;project ReactiveMongo ;findbugs" || exit 4
+    sbt ++$SCALA_VERSION ";project ReactiveMongo ;findbugs" || exit 4
 fi
 
 perl -pe "s|resolvers |resolvers += Resolver.sonatypeRepo(\"staging\"),\r\n    resolvers |" < "project/Common.scala" > /tmp/Common.scala && mv /tmp/Common.scala "project/Common.scala"
@@ -46,8 +46,6 @@ EOF
 
 export JVM_OPTS
 
-TEST_ARGS=";project ReactiveMongo-BSON ;testQuick"
-
 TEST_ARGS="$TEST_ARGS ;project ReactiveMongo; testQuick"
 TEST_ARGS="$TEST_ARGS reactivemongo.BsonSpec"
 TEST_ARGS="$TEST_ARGS reactivemongo.BulkOpsSpec"
@@ -63,8 +61,6 @@ TEST_ARGS="$TEST_ARGS BSONObjectIDSpec"
 TEST_ARGS="$TEST_ARGS reactivemongo.InsertCommandSpec"
 TEST_ARGS="$TEST_ARGS reactivemongo.UpdateCommandSpec"
 TEST_ARGS="$TEST_ARGS -- include unit"
-
-TEST_ARGS="$TEST_ARGS ;project ReactiveMongo-BSON-Macros ;testQuick ;doc"
 
 sed -e 's/"-deprecation", //' < project/Driver.scala > .tmp && mv .tmp project/Driver.scala
 

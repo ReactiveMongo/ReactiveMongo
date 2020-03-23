@@ -11,7 +11,6 @@ import reactivemongo.api.bson.{
   BSONInteger,
   BSONLong,
   BSONNull,
-  BSONNumberLike,
   BSONString,
   Macros,
   array,

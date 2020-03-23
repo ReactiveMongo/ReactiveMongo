@@ -9,13 +9,7 @@ import reactivemongo.api.{
 }
 import reactivemongo.api.commands.SaslPrep
 
-import reactivemongo.api.bson.{
-  BSONBinary,
-  BSONDocument,
-  BSONNumberLike,
-  BSONString,
-  Subtype
-}
+import reactivemongo.api.bson.{ BSONBinary, BSONDocument, Subtype }
 import reactivemongo.api.bson.collection.{ BSONSerializationPack => pack }
 
 import reactivemongo.util
@@ -61,7 +55,6 @@ private[core] sealed trait ScramInitiate[M <: AuthenticationMode.Scram] extends 
   val randomPrefix = ScramInitiate.randomPrefix(this.hashCode)
 
   import akka.util.ByteString
-  import reactivemongo.api.bson.buffer.ReadableBuffer
 
   /** Initial SCRAM message */
   val message: String = {
@@ -222,7 +215,6 @@ private[core] sealed trait ScramStartNegociation[M <: AuthenticationMode.Scram]
   import javax.crypto.spec.PBEKeySpec
   import org.apache.commons.codec.binary.Base64
   import akka.util.ByteString
-  import reactivemongo.api.bson.buffer.ReadableBuffer
 
   val data: Either[CommandError, ScramNegociation] = {
     val challenge = new String(payload, "UTF-8")
@@ -402,8 +394,6 @@ private[core] object ScramNegociation {
 }
 
 private[core] object ScramStartNegociation {
-  import reactivemongo.bson.BSONBooleanLike
-
   type ResType = Either[CommandError, Either[SuccessfulAuthentication, Array[Byte]]]
 
   def parseResponse[M <: AuthenticationMode.Scram](

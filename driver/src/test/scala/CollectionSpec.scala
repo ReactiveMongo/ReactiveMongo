@@ -184,7 +184,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
       cursor.foldWhile(Nil: Seq[Person])({ (s, p) =>
         if (p.name == "John") Cursor.Done(s :+ p)
         else Cursor.Cont(s :+ p)
-      }, (_, e) => Cursor.Fail(e)) must beEqualTo(persons).await(1, timeout)
+      }, (_, e) => Cursor.Fail(e)) must beTypedEqualTo(persons).await(1, timeout)
     }
 
     "read a document with error" in {
@@ -213,7 +213,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
             }
 
           collect aka "first collect" must not(throwA[Exception]).
-            await(1, timeout) and (collect must beEqualTo(-1).await(1, timeout))
+            await(1, timeout) and (collect must beTypedEqualTo(-1).await(1, timeout))
         }
 
         "using foldWhile" in {
@@ -226,7 +226,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
         "fallbacking to final value using foldWhile" in {
           cursor.foldWhile(0)(
             (i, _) => Cursor.Cont(i + 1),
-            (_, _) => Cursor.Done(-1)) must beEqualTo(-1).await(1, timeout)
+            (_, _) => Cursor.Done(-1)) must beTypedEqualTo(-1).await(1, timeout)
         }
 
         "skiping failure using foldWhile" in {
@@ -275,7 +275,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
           case e =>
             e.printStackTrace()
             -2
-        } aka "write result" must beEqualTo(-1).await(1, timeout)
+        } aka "write result" must beTypedEqualTo(-1).await(1, timeout)
 
       "with the default connection" in {
         writeSpec(collection, timeout)
@@ -405,7 +405,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
                 awaitFor(timeout)
 
             } and {
-              db.endSession().map(_ => {}) must beEqualTo({}).awaitFor(timeout)
+              db.endSession().map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
             }
         }.awaitFor(timeout)
       }
@@ -493,7 +493,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
           val docs = Stream.empty[BSONDocument]
 
           coll.insert(ordered = true).many(docs).
-            map(_.n) must beEqualTo(0).await(1, timeout)
+            map(_.n) must beTypedEqualTo(0).await(1, timeout)
         }
 
         "to update" in {
@@ -511,7 +511,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
               upsert = false,
               multi = true))).flatMap(builder.many(_)).map { r =>
             (r.n, r.nModified, r.upserted.size)
-          } must beEqualTo((2, 0, 1)).await(0, timeout)
+          } must beTypedEqualTo((2, 0, 1)).await(0, timeout)
         }
       }
     }

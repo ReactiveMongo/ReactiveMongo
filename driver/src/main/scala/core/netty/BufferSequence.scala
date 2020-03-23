@@ -18,7 +18,7 @@ package reactivemongo.core.netty
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
 import reactivemongo.api.SerializationPack
-import reactivemongo.api.bson.buffer.{ DefaultBufferHandler, WritableBuffer }
+import reactivemongo.api.bson.buffer.WritableBuffer
 
 private[reactivemongo] case class BufferSequence(
   private val head: ByteBuf,

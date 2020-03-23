@@ -16,7 +16,7 @@ import reactivemongo.core.errors.ReactiveMongoException
 
 import org.specs2.concurrent.ExecutionEnv
 
-import reactivemongo.api.tests.{ Authenticate, ParsedURI }
+import reactivemongo.api.tests.ParsedURI
 
 final class MongoURISpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {

@@ -2,8 +2,7 @@ package reactivemongo
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-// TODO: Bison
-import reactivemongo.bson.{ BSONArray, BSONDocument, BSONElementSet }
+import reactivemongo.api.bson.{ BSONArray, BSONDocument }
 import reactivemongo.api.collections.BulkOps._
 
 import org.specs2.concurrent.ExecutionEnv
@@ -96,7 +95,7 @@ final class BulkOpsSpec(implicit ee: ExecutionEnv)
 
       bulks[BSONDocument](
         documents = Seq.fill(11)(doc1),
-        maxBsonSize = (doc1.byteSize + 1 + BSONElementSet.docElementByteOverhead) * 11,
+        maxBsonSize = (doc1.byteSize + 1 + 2 /*docElementByteOverhead*/ ) * 11,
         maxBulkSize = 11)(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
           case prod1 =>
             prod1() must beRight.like {

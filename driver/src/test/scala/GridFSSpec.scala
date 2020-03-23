@@ -3,8 +3,6 @@ import java.io.ByteArrayInputStream
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.api.bson.Digest
-
 import reactivemongo.api.{ Cursor, DB, WrappedCursor }
 
 import reactivemongo.api.tests.{ pack, newBuilder }

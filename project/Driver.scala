@@ -13,11 +13,7 @@ import com.typesafe.tools.mima.plugin.MimaKeys.mimaBinaryIssueFilters
 
 import com.github.sbt.findbugs.FindbugsKeys.findbugsAnalyzedPath
 
-final class Driver(
-  bson: Project,
-  bsonmacros: Project,
-  core: Project
-) {
+final class Driver(core: Project) {
   import Dependencies._
   import XmlUtil._
 
@@ -72,13 +68,6 @@ object Version {
           IO.move(listenerClass, extDir / classFile)
         },
         driverCleanup := driverCleanup.triggeredBy(compile in Compile).value,
-        libraryDependencies ++= {
-          if (scalaBinaryVersion.value != "2.13") {
-            Seq(playIteratees.value)
-          } else {
-            Seq.empty
-          }
-        },
         libraryDependencies ++= {
           if (!Common.useShaded.value) {
             Seq(Dependencies.netty % Provided)
@@ -453,7 +442,7 @@ object Version {
 
         case _ => p
       }
-    }.dependsOn(bson, core, bsonmacros % Test)
+    }.dependsOn(core)
 
   // ---
 

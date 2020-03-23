@@ -3,7 +3,6 @@ import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.api.{
   Collation,
   FailoverStrategy,
-  QueryOpts,
   ReadPreference
 }
 import reactivemongo.api.collections.GenericQueryBuilder

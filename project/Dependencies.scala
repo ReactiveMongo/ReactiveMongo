@@ -31,12 +31,6 @@ object Dependencies {
       "com.typesafe.akka" %% "akka-slf4j" % ver % Test)
   }
 
-  val playIteratees = Def.setting[ModuleID] {
-    val ver = sys.env.get("ITERATEES_VERSION").getOrElse("2.6.1")
-
-    "com.typesafe.play" %% "play-iteratees" % ver
-  }
-
   val specsVer = Def.setting[String] {
     "4.5.1"/*"4.3.5"*/
   }

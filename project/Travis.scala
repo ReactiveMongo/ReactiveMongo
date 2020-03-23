@@ -22,8 +22,7 @@ object Travis {
         "MONGO_VER" -> List(mongoLower, mongoUpper),
         "MONGO_PROFILE" -> List(
           "default", "invalid-ssl", "mutual-ssl", "rs", "x509"),
-        "AKKA_VERSION" -> List(akkaLower, akkaUpper),
-        "ITERATEES_VERSION" -> List(playLower, playUpper)
+        "AKKA_VERSION" -> List(akkaLower, akkaUpper)
       )
 
       // Base specifications about JDK/Scala
@@ -51,14 +50,6 @@ object Travis {
         case (key, values) => values.map(key -> _)
       }.combinations(integrationSpecs.size).filterNot { flags =>
         /* chrono-compat exclusions */
-        (flags.contains("AKKA_VERSION" -> akkaLower) && flags.
-          contains("ITERATEES_VERSION" -> playUpper)) ||
-        (flags.contains("AKKA_VERSION" -> akkaUpper) && flags.
-          contains("ITERATEES_VERSION" -> playLower)) ||
-        (flags.contains("MONGO_VER" -> mongoLower) && flags.
-          contains("ITERATEES_VERSION" -> playUpper)) ||
-        (!flags.contains("MONGO_VER" -> mongoLower) && flags.
-          contains("ITERATEES_VERSION" -> playLower)) ||
         (flags.contains("MONGO_VER" -> mongoUpper) && flags.
           contains("AKKA_VERSION" -> akkaLower)) ||
         (flags.contains("AKKA_VERSION" -> akkaLower) && flags.
@@ -71,8 +62,7 @@ object Travis {
         (!flags.contains("MONGO_VER" -> mongoUpper) && flags.
           contains("MONGO_PROFILE" -> "x509")) ||
         (flags.contains("MONGO_VER" -> mongoLower) && flags.
-          contains("MONGO_PROFILE" -> "rs") && flags.
-          contains("ITERATEES_VERSION" -> playLower))
+          contains("MONGO_PROFILE" -> "rs"))
       }.collect {
         case flags if (flags.map(_._1).toSet.size == integrationSpecs.size) =>
           flags.sortBy(_._1)
@@ -167,7 +157,6 @@ object Travis {
         integrationEnv.flatMap { flags =>
           if (flags.contains("CI_CATEGORY" -> "INTEGRATION_TESTS") &&
             (/* time-compat exclusions: */
-              flags.contains("ITERATEES_VERSION" -> playUpper) ||
                 flags.contains("AKKA_VERSION" -> akkaUpper) ||
                 flags.contains("MONGO_VER" -> mongoUpper) ||
                 /* profile priority exclusions: */
@@ -181,7 +170,6 @@ object Travis {
             )
           } else if (flags.contains("CI_CATEGORY" -> "INTEGRATION_TESTS") &&
             (/* time-compat exclusions: */
-              flags.contains("ITERATEES_VERSION" -> playLower) ||
                 flags.contains("AKKA_VERSION" -> akkaLower) ||
                 flags.contains("MONGO_VER" -> mongoLower)
             )) {

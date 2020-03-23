@@ -1,7 +1,5 @@
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.core.errors.DatabaseException
-
 import reactivemongo.api.commands.{
   CommandError,
   FindAndModifyCommand,
