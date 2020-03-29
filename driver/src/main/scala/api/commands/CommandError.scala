@@ -1,9 +1,5 @@
 package reactivemongo.api.commands
 
-import scala.util.control.NoStackTrace
-
-import reactivemongo.api.SerializationPack
-
 /** Error extractor for command results */
 object CommandError {
   import reactivemongo.core.errors.DatabaseException

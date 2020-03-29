@@ -82,7 +82,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
 
   def failoverStrategy: FailoverStrategy
 
-  private[reactivemongo] def collection: Collection = ???
+  private[reactivemongo] def collection: Collection = ??? // TODO: Remove impl
 
   def maxTimeMsOption: Option[Long]
 
@@ -577,7 +577,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
     snapshotFlag: Boolean = snapshotFlag,
     commentString: Option[String] = commentString,
     options: QueryOpts = options,
-    @deprecatedName(Symbol("failover")) failoverStrategy: FailoverStrategy = failoverStrategy,
+    failoverStrategy: FailoverStrategy = failoverStrategy,
     maxTimeMsOption: Option[Long] = maxTimeMsOption): Self
 
   // ---

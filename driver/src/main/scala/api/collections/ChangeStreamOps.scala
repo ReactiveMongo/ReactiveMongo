@@ -24,14 +24,11 @@ trait ChangeStreamOps[P <: SerializationPack with Singleton] { collection: Gener
    * (even in the case of a single node deployement).
    *
    * {{{
-   * import scala.concurrent.{ ExecutionContext, Future }
-   *
    * import reactivemongo.api.Cursor
    * import reactivemongo.api.bson.BSONDocument
    * import reactivemongo.api.bson.collection.BSONCollection
    *
-   * def events(coll: BSONCollection)(
-   *   implicit ec: ExecutionContext): Cursor[BSONDocument] =
+   * def events(coll: BSONCollection): Cursor[BSONDocument] =
    *   coll.watch[BSONDocument]().cursor
    * }}}
    *

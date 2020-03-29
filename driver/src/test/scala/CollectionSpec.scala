@@ -2,9 +2,15 @@ import scala.concurrent._, duration.FiniteDuration
 
 import reactivemongo.api.bson.BSONDocument
 
-import reactivemongo.api.{ Cursor, DB, ReadConcern, ReadPreference }
+import reactivemongo.api.{
+  Cursor,
+  DB,
+  ReadConcern,
+  ReadPreference,
+  WriteConcern
+}
 
-import reactivemongo.api.commands.{ CommandError, WriteConcern }
+import reactivemongo.api.commands.CommandError
 
 import reactivemongo.api.collections.Hint
 

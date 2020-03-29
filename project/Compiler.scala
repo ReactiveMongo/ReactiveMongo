@@ -2,7 +2,10 @@ import sbt._
 import sbt.Keys._
 
 object Compiler {
-  private val silencerVersion = Def.setting[String]("1.4.4")
+  private val silencerVersion = Def.setting[String] {
+    if (scalaBinaryVersion.value == "2.11") "1.4.4"
+    else "1.6.0"
+  }
 
   private def unmanaged(ver: String, base: File): Seq[File] =
     CrossVersion.partialVersion(ver) match {

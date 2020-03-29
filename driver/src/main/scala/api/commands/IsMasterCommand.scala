@@ -149,20 +149,6 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
     val replicaSet: Option[ReplicaSet], // flattened in the result
     val msg: Option[String] // Contains the value isdbgrid when isMaster returns from a mongos instance.
   ) {
-
-    @deprecated("Use the complete constructor", "0.18.5")
-    def this(
-      isMaster: Boolean,
-      maxBsonObjectSize: Int,
-      maxMessageSizeBytes: Int,
-      maxWriteBatchSize: Int,
-      localTime: Option[Long],
-      minWireVersion: Int,
-      maxWireVersion: Int,
-      replicaSet: Option[ReplicaSet],
-      msg: Option[String]) = this(
-      isMaster, maxBsonObjectSize, maxMessageSizeBytes, maxWriteBatchSize, localTime, None, minWireVersion, maxWireVersion, None, List.empty, List.empty, replicaSet, msg)
-
     def isMongos: Boolean = msg.exists(_ == "isdbgrid")
 
     def status: NodeStatus = {
@@ -172,8 +158,8 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
     }
 
     override def equals(that: Any): Boolean = that match {
-      case other: IsMasterResult => other.tupled == tupled
-      case _                     => false
+      case other: this.type => other.tupled == tupled
+      case _                => false
     }
 
     override def hashCode: Int = tupled.hashCode

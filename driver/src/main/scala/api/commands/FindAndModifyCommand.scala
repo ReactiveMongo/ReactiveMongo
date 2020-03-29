@@ -1,6 +1,6 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ SerializationPack, Session }
+import reactivemongo.api.{ Collation, SerializationPack, Session, WriteConcern }
 
 import reactivemongo.core.protocol.MongoWireVersion
 

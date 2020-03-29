@@ -167,7 +167,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
    *
    * import reactivemongo.api.gridfs.GridFS
    *
-   * import reactivemongo.api.bson.{ BSONDocument, BSONValue }
+   * import reactivemongo.api.bson.BSONDocument
    * import reactivemongo.api.bson.collection.{ BSONSerializationPack => Pack }
    *
    * def foo(gfs: GridFS[Pack.type], n: String)(implicit ec: ExecutionContext) =

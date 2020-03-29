@@ -11,7 +11,8 @@ import reactivemongo.api.{
   CursorProducer,
   ReadConcern,
   ReadPreference,
-  SerializationPack
+  SerializationPack,
+  WriteConcern
 }
 
 import reactivemongo.api.commands.{
@@ -19,8 +20,7 @@ import reactivemongo.api.commands.{
   CommandCodecs,
   CommandWithPack,
   CommandWithResult,
-  ResolvedCollectionCommand,
-  WriteConcern
+  ResolvedCollectionCommand
 }
 import reactivemongo.core.protocol.MongoWireVersion
 

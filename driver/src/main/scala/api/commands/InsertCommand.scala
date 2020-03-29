@@ -1,6 +1,6 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ SerializationPack, Session }
+import reactivemongo.api.{ SerializationPack, Session, WriteConcern }
 
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/insert/ insert]] command.

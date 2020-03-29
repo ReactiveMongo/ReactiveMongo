@@ -2,8 +2,6 @@ package reactivemongo.api
 
 import java.net.URI
 
-import reactivemongo.api.commands.{ WriteConcern => WC }
-
 /**
  * Options for [[MongoConnection]] (see [[http://reactivemongo.org/releases/0.1x/documentation/tutorial/connect-database.html#connection-options more documentation]]).
  *
@@ -42,7 +40,7 @@ class MongoConnectionOptions private[reactivemongo] (
   val maxInFlightRequestsPerChannel: Option[Int] = Some(200),
 
   // read and write preferences
-  val writeConcern: WC = WC.Default,
+  val writeConcern: WriteConcern = WriteConcern.Default,
   val readPreference: ReadPreference = ReadPreference.primary,
 
   val failoverStrategy: FailoverStrategy = FailoverStrategy.default,
@@ -82,7 +80,7 @@ class MongoConnectionOptions private[reactivemongo] (
     keepAlive: Boolean,
     nbChannelsPerNode: Int,
     @deprecated("Unused, see heartbeatFrequencyMS", "0.16.4") reconnectDelayMS: Int,
-    writeConcern: WC,
+    writeConcern: WriteConcern,
     readPreference: ReadPreference,
     failoverStrategy: FailoverStrategy,
     @deprecatedName(Symbol("monitorRefreshMS")) heartbeatFrequencyMS: Int,
@@ -112,7 +110,7 @@ class MongoConnectionOptions private[reactivemongo] (
     keepAlive: Boolean = this.keepAlive,
     nbChannelsPerNode: Int = this.nbChannelsPerNode,
     maxInFlightRequestsPerChannel: Option[Int] = this.maxInFlightRequestsPerChannel,
-    writeConcern: WC = this.writeConcern,
+    writeConcern: WriteConcern = this.writeConcern,
     readPreference: ReadPreference = this.readPreference,
     failoverStrategy: FailoverStrategy = this.failoverStrategy,
     heartbeatFrequencyMS: Int = this.heartbeatFrequencyMS,
@@ -243,7 +241,7 @@ object MongoConnectionOptions {
     keepAlive: Boolean = false,
     nbChannelsPerNode: Int = 10,
     @deprecated("Unused, see heartbeatFrequencyMS", "0.16.4") reconnectDelayMS: Int = 1000,
-    writeConcern: WC = WC.Default,
+    writeConcern: WriteConcern = WriteConcern.Default,
     readPreference: ReadPreference = ReadPreference.primary,
     failoverStrategy: FailoverStrategy = FailoverStrategy.default,
     @deprecatedName(Symbol("monitorRefreshMS")) heartbeatFrequencyMS: Int = 10000,

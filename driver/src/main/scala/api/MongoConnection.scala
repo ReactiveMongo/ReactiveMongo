@@ -44,7 +44,6 @@ import reactivemongo.core.actors.{
 }
 import reactivemongo.core.nodeset.Authenticate
 import reactivemongo.core.commands.SuccessfulAuthentication
-import reactivemongo.api.commands.{ WriteConcern => WC }
 
 import reactivemongo.util, util.{ LazyLogger, SRVRecordResolver, TXTResolver }
 
@@ -760,16 +759,16 @@ object MongoConnection {
               maxInFlightRequestsPerChannel = Some(max.toInt))
 
           case ("writeConcern", "unacknowledged") => unsupported -> result.
-            copy(writeConcern = WC.Unacknowledged)
+            copy(writeConcern = WriteConcern.Unacknowledged)
 
           case ("writeConcern", "acknowledged") => unsupported -> result.
-            copy(writeConcern = WC.Acknowledged)
+            copy(writeConcern = WriteConcern.Acknowledged)
 
           case ("writeConcern", "journaled") => unsupported -> result.
-            copy(writeConcern = WC.Journaled)
+            copy(writeConcern = WriteConcern.Journaled)
 
           case ("writeConcern", "default") => unsupported -> result.
-            copy(writeConcern = WC.Default)
+            copy(writeConcern = WriteConcern.Default)
 
           case ("readPreference", "primary") => unsupported -> result.
             copy(readPreference = ReadPreference.primary)
@@ -854,15 +853,15 @@ object MongoConnection {
       case ((unsupported, result), kv) => kv match {
         case ("writeConcernW", "majority") => unsupported -> result.
           copy(writeConcern = result.writeConcern.
-            copy(w = WC.Majority))
+            copy(w = WriteConcern.Majority))
 
         case ("writeConcernW", IntRe(str)) => unsupported -> result.
           copy(writeConcern = result.writeConcern.
-            copy(w = WC.WaitForAcknowledgments(str.toInt)))
+            copy(w = WriteConcern.WaitForAcknowledgments(str.toInt)))
 
         case ("writeConcernW", tag) => unsupported -> result.
           copy(writeConcern = result.writeConcern.
-            copy(w = WC.TagSet(tag)))
+            copy(w = WriteConcern.TagSet(tag)))
 
         case ("writeConcernJ", journaled) => unsupported -> result.
           copy(writeConcern = result.writeConcern.

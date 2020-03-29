@@ -1,9 +1,9 @@
 import scala.concurrent.duration.FiniteDuration
 
+import reactivemongo.api.WriteConcern
 import reactivemongo.api.commands.{
   CommandError,
-  FindAndModifyCommand,
-  WriteConcern
+  FindAndModifyCommand
 }
 
 import reactivemongo.api.bson.BSONDocument

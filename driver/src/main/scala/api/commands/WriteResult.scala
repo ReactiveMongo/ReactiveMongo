@@ -2,6 +2,7 @@ package reactivemongo.api.commands
 
 import scala.util.control.NoStackTrace
 
+import reactivemongo.api.WriteConcern
 import reactivemongo.api.bson.BSONValue
 
 import reactivemongo.core.errors.DatabaseException
@@ -91,7 +92,7 @@ private[reactivemongo] final class LastError(
   val n: Int,
   val singleShard: Option[String], // string?
   val updatedExisting: Boolean,
-  val upserted: Option[BSONValue],
+  val upserted: Option[BSONValue], // TODO: Remove
   val wnote: Option[WriteConcern.W],
   val wtimeout: Boolean,
   val waited: Option[Int],

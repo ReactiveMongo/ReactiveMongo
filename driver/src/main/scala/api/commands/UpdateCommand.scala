@@ -2,7 +2,7 @@ package reactivemongo.api.commands
 
 import reactivemongo.core.protocol.MongoWireVersion
 
-import reactivemongo.api.{ Session, SerializationPack }
+import reactivemongo.api.{ Collation, Session, SerializationPack, WriteConcern }
 
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/update/ update]] command.

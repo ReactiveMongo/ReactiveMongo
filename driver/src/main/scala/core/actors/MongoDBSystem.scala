@@ -40,7 +40,7 @@ import reactivemongo.io.netty.channel.group.{
 
 import reactivemongo.util.{ LazyLogger, SimpleRing }
 
-import reactivemongo.api.Serialization
+import reactivemongo.api.{ Serialization, WriteConcern }
 
 import reactivemongo.api.bson.BSONDocumentReader
 import reactivemongo.api.bson.collection.BSONSerializationPack
@@ -75,9 +75,13 @@ import reactivemongo.core.nodeset.{
   NodeStatus,
   PingInfo
 }
-import reactivemongo.api.{ MongoConnectionOptions, ReadPreference }
+import reactivemongo.api.{
+  MongoConnectionOptions,
+  ReadPreference,
+  WriteConcern
+}
 
-import reactivemongo.api.commands.{ GetLastError, LastError }
+import reactivemongo.api.commands.LastError
 
 import external.reactivemongo.ConnectionListener
 
@@ -504,13 +508,13 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
           upserted = doc.get("upserted"),
           wnote = doc.get("wnote").flatMap {
             case reactivemongo.api.bson.BSONString("majority") =>
-              Some(GetLastError.Majority)
+              Some(WriteConcern.Majority)
 
             case reactivemongo.api.bson.BSONString(tagSet) =>
-              Some(GetLastError.TagSet(tagSet))
+              Some(WriteConcern.TagSet(tagSet))
 
             case reactivemongo.api.bson.BSONInteger(acks) =>
-              Some(GetLastError.WaitForAcknowledgments(acks))
+              Some(WriteConcern.WaitForAcknowledgments(acks))
 
             case _ => Option.empty
           },

@@ -2,12 +2,7 @@ package reactivemongo.core.commands
 
 import reactivemongo.api.SerializationPack
 
-import reactivemongo.api.bson.{
-  BSONDocument,
-  BSONInteger,
-  BSONNumberLike,
-  BSONString
-}
+import reactivemongo.api.bson.{ BSONDocument, BSONInteger, BSONString }
 import reactivemongo.api.bson.collection.BSONSerializationPack
 
 import reactivemongo.core.protocol.Response

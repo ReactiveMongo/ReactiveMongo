@@ -9,8 +9,7 @@ import reactivemongo.api.{ NodeSetSession, SessionTransaction, WriteConcern }
 
 import reactivemongo.api.commands.{
   UpdateCommand,
-  ResolvedCollectionCommand,
-  WriteConcern => WC
+  ResolvedCollectionCommand
 }
 
 final class UpdateCommandSpec extends org.specs2.mutable.Specification {
@@ -50,12 +49,12 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
       // ---
 
       "without session" in {
-        writer(None, MongoWireVersion.V26)(
+        writer(None, MongoWireVersion.V30)(
           update1) must_=== (base ++ writeConcern)
       }
 
       "with session" in {
-        val write = writer(Some(session), MongoWireVersion.V26)
+        val write = writer(Some(session), MongoWireVersion.V30)
 
         // w/o transaction started
         write(update1) must_=== (base ++ lsid ++ writeConcern) and {
@@ -101,7 +100,7 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
     collection = "foo",
     command = new Command.Update(
       ordered = true,
-      writeConcern = WC.Default,
+      writeConcern = WriteConcern.Default,
       bypassDocumentValidation = false,
       firstUpdate = element1,
       updates = Seq(element2)))

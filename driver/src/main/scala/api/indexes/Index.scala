@@ -9,7 +9,6 @@ import reactivemongo.api.{ Collation, Serialization, SerializationPack }
  *
  * {{{
  * import reactivemongo.api.bson.BSONDocument
- * import reactivemongo.api.bson.collection.BSONSerializationPack
  * import reactivemongo.api.indexes.{ Index, IndexType }
  *
  * val bsonIndex = Index(
@@ -44,7 +43,7 @@ sealed abstract class Index {
    * The index key (it can be composed of multiple fields).
    * This list should not be empty!
    */
-  def key: Seq[(String, IndexType)] = Seq.empty // TODO#1.1: Remove impl
+  def key: Seq[(String, IndexType)]
 
   /**
    * The name of this index (default: `None`).
@@ -279,7 +278,6 @@ object Index {
   /**
    * {{{
    * import reactivemongo.api.bson.BSONDocument
-   * import reactivemongo.api.bson.collection.BSONSerializationPack
    * import reactivemongo.api.indexes.{ Index, IndexType }
    *
    * val bsonIndex = Index(

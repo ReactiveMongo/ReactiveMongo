@@ -1,5 +1,4 @@
 import reactivemongo.api.{ DB, WriteConcern, tests => apiTests }
-import reactivemongo.api.commands.GetLastError
 
 import reactivemongo.api.bson.BSONDocument
 
@@ -165,7 +164,7 @@ trait DBSessionSpec { specs: DatabaseSpec =>
 
         Common.db.startSession().flatMap { _db =>
           _db.startTransaction(Some(WriteConcern.Default.copy(
-            w = GetLastError.Majority))).flatMap { _ =>
+            w = WriteConcern.Majority))).flatMap { _ =>
             _db.collection(colName).create().map { _ =>
               database = Some(_db); database
             }

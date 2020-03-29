@@ -62,13 +62,11 @@ trait SerializationPack { self: Singleton =>
 
   private[reactivemongo] def narrowIdentityReader: NarrowValueReader[Value]
 
-  @com.github.ghik.silencer.silent
-  private[reactivemongo] def bsonSize(value: Value): Int = -1
-  // TODO#1.1: Remove the default value after release
+  private[reactivemongo] def bsonSize(value: Value): Int
 
-  private[reactivemongo] def newBuilder: SerializationPack.Builder[self.type] = null // TODO#1.1: Remove the default value after release
+  private[reactivemongo] def newBuilder: SerializationPack.Builder[self.type]
 
-  private[reactivemongo] def newDecoder: SerializationPack.Decoder[self.type] = null // TODO#1.1: Remove the default value after release
+  private[reactivemongo] def newDecoder: SerializationPack.Decoder[self.type]
 
   private[reactivemongo] def pretty(doc: Document): String = doc.toString
 }

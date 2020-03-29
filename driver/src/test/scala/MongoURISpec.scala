@@ -191,7 +191,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         db = Some("somedb"),
         options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Default.copy(
-            w = reactivemongo.api.commands.WriteConcern.Majority),
+            w = WriteConcern.Majority),
           credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
         ignoredOptions = Nil)).awaitFor(timeout)
@@ -205,7 +205,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         db = Some("somedb"),
         options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Default.copy(
-            w = reactivemongo.api.commands.WriteConcern.TagSet("anyTag")),
+            w = WriteConcern.TagSet("anyTag")),
           credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),
         ignoredOptions = Nil)).awaitFor(timeout)
@@ -219,7 +219,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         db = Some("somedb"),
         options = MongoConnectionOptions.default.copy(
           writeConcern = WriteConcern.Default.copy(
-            w = reactivemongo.api.commands.WriteConcern.
+            w = WriteConcern.
               WaitForAcknowledgments(5)),
           credentials = Map(
             "somedb" -> Credential("user123", Some("passwd123")))),

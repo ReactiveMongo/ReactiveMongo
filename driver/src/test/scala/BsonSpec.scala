@@ -28,7 +28,6 @@ final class BsonSpec extends org.specs2.mutable.Specification {
 
   section("unit")
 
-  /*
   "Codec" should {
     "produce a simple document" in {
       val doc = BSONDocument("hello" -> BSONString("world"))
@@ -193,7 +192,6 @@ final class BsonSpec extends org.specs2.mutable.Specification {
       ser.readAndDeserialize(resp, ser.IdentityReader) must_=== doc
     }
   }
-   */
 
   section("unit")
 

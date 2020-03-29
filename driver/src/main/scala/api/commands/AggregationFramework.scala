@@ -1,7 +1,6 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ ChangeStreams, ReadConcern, SerializationPack }
-import reactivemongo.core.protocol.MongoWireVersion
+import reactivemongo.api.{ ChangeStreams, SerializationPack }
 
 /**
  * Implements the [[http://docs.mongodb.org/manual/applications/aggregation/ Aggregation Framework]].

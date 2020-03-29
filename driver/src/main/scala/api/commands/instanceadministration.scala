@@ -1,7 +1,5 @@
 package reactivemongo.api.commands
 
-import scala.util.control.NonFatal
-
 import reactivemongo.api.SerializationPack
 
 import reactivemongo.core.errors.GenericDriverException
@@ -56,8 +54,7 @@ private[api] object RenameCollection {
   }
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-case class Create(
+private[api] case class Create(
   capped: Option[Capped] = None, // if set, "capped" -> true, size -> <int>, max -> <int>
   autoIndexId: Boolean = true, // optional
   flags: Int = 1 // defaults to 1
@@ -138,15 +135,13 @@ object ConvertToCapped
   }
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-case class CollectionNames(names: List[String])
+private[api] case class CollectionNames(names: List[String])
 
 /** List the names of DB collections. */
-@deprecated("Internal: will be made private", "0.16.0")
-object ListCollectionNames
+private[api] object ListCollectionNames
   extends Command with CommandWithResult[CollectionNames] {
 
-  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ListCollectionNames.type] = {
+  def writer[P <: SerializationPack](pack: P): pack.Writer[ListCollectionNames.type] = {
     val builder = pack.newBuilder
 
     val cmd = builder.document(Seq(
@@ -155,7 +150,7 @@ object ListCollectionNames
     pack.writer[ListCollectionNames.type](_ => cmd)
   }
 
-  private[api] def reader[P <: SerializationPack](pack: P): pack.Reader[CollectionNames] = {
+  def reader[P <: SerializationPack](pack: P): pack.Reader[CollectionNames] = {
     val decoder = pack.newDecoder
 
     CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, CollectionNames](pack) { doc =>

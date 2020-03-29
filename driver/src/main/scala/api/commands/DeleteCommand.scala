@@ -1,6 +1,6 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ Collation, SerializationPack, WriteConcern }
 
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/delete/ delete]] command.

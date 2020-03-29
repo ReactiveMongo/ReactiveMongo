@@ -419,8 +419,6 @@ private[core] sealed trait ScramFinalNegociation
 
   def payload: Array[Byte]
 
-  import reactivemongo.api.bson.buffer.ReadableBuffer
-
   override def makeDocuments = BSONDocument(
     "saslContinue" -> 1,
     "conversationId" -> conversationId,

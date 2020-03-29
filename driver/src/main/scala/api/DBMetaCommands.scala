@@ -20,8 +20,7 @@ private[api] trait DBMetaCommands { self: DB =>
     DropDatabase,
     ListCollectionNames,
     PingCommand,
-    UserRole,
-    WriteConcern => WC
+    UserRole
   }
   import Serialization.{ Pack, internalSerializationPack, unitBoxReader }
 
@@ -47,8 +46,6 @@ private[api] trait DBMetaCommands { self: DB =>
    * The GridFS with the default serialization and collection prefix.
    *
    * {{{
-   * import scala.concurrent.ExecutionContext
-   *
    * import scala.reflect.ClassTag
    *
    * import reactivemongo.api.DB
@@ -207,7 +204,7 @@ private[api] trait DBMetaCommands { self: DB =>
     customData: Option[T] = Option.empty[Pack#Document],
     roles: List[UserRole] = List.empty,
     digestPassword: Boolean = true,
-    writeConcern: WC = connection.options.writeConcern,
+    writeConcern: WriteConcern = connection.options.writeConcern,
     restrictions: List[AuthenticationRestriction] = List.empty,
     mechanisms: List[AuthenticationMode] = List.empty)(implicit ec: ExecutionContext, w: DBMetaWriter[T]): Future[Unit] = {
     val command: CreateUserCommand[Pack]#CreateUser =

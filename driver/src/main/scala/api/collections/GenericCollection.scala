@@ -25,8 +25,7 @@ import reactivemongo.api._
 import reactivemongo.api.commands.{
   CommandCodecs,
   ImplicitCommandHelpers,
-  UnitBox,
-  WriteConcern
+  UnitBox
 }
 
 import reactivemongo.core.errors.{
@@ -318,7 +317,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * {{{
    * import scala.concurrent.ExecutionContext
    *
-   * import reactivemongo.api.commands.WriteConcern
+   * import reactivemongo.api.WriteConcern
    * import reactivemongo.api.bson.BSONDocument
    * import reactivemongo.api.bson.collection.BSONCollection
    *
@@ -345,7 +344,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * {{{
    * import scala.concurrent.ExecutionContext
    *
-   * import reactivemongo.api.commands.WriteConcern
+   * import reactivemongo.api.WriteConcern
    * import reactivemongo.api.bson.BSONDocument
    * import reactivemongo.api.bson.collection.BSONCollection
    *

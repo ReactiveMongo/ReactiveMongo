@@ -15,7 +15,7 @@
  */
 package reactivemongo.util
 
-import scala.language.implicitConversions
+//import scala.language.implicitConversions
 
 import scala.concurrent.{
   Future,

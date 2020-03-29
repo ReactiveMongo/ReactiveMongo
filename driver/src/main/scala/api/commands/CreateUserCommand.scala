@@ -1,6 +1,6 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ AuthenticationMode, SerializationPack }
+import reactivemongo.api.{ AuthenticationMode, SerializationPack, WriteConcern }
 
 /**
  * [[https://docs.mongodb.com/manual/reference/command/createUser/#roles User role]]
@@ -12,22 +12,9 @@ class UserRole(val name: String)
 /**
  * @param db the name of the database
  */
-class DBUserRole private[api] (
+final class DBUserRole private[api] (
   override val name: String,
-  val db: String) extends UserRole(name)
-  with Product2[String, String] with Serializable {
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _1 = name
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _2 = db
-
-  @deprecated("No longer a case class", "0.20.3")
-  def canEqual(that: Any): Boolean = that match {
-    case _: DBUserRole => true
-    case _             => false
-  }
+  val db: String) extends UserRole(name) {
 
   private[api] lazy val tupled = name -> db
 
@@ -44,20 +31,18 @@ class DBUserRole private[api] (
   override def toString = s"DBUserRole${tupled.toString}"
 }
 
-object DBUserRole extends scala.runtime.AbstractFunction2[String, String, DBUserRole] {
-
+object DBUserRole {
   def apply(name: String, db: String): DBUserRole =
     new DBUserRole(name, db)
 
-  @deprecated("No longer a case class", "0.20.3")
-  def unapply(role: DBUserRole) = Option(role).map(_.tupled)
+  private[api] def unapply(role: DBUserRole) = Option(role).map(_.tupled)
 }
 
 /** User role extractor */
 object UserRole {
   def apply(name: String): UserRole = new UserRole(name)
 
-  def unapply(role: UserRole): Option[String] = Some(role.name)
+  private[reactivemongo] def unapply(role: UserRole): Option[String] = Some(role.name)
 }
 
 /**

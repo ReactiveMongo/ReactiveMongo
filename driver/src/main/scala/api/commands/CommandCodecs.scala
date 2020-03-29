@@ -6,7 +6,7 @@ import reactivemongo.api.{
   ReadConcern,
   Session,
   SerializationPack,
-  WriteConcern => WC
+  WriteConcern
 }
 
 private[reactivemongo] object CommandCodecs {
@@ -110,21 +110,20 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
-  @inline def writeWriteConcern[P <: SerializationPack with Singleton](pack: P): WC => pack.Document = writeWriteConcern[pack.type](pack.newBuilder)
+  @inline def writeWriteConcern[P <: SerializationPack with Singleton](pack: P): WriteConcern => pack.Document = writeWriteConcern[pack.type](pack.newBuilder)
 
-  def writeGetLastErrorWWriter[P <: SerializationPack with Singleton](
-    builder: SerializationPack.Builder[P]): WC.W => builder.pack.Value = {
-    case GetLastError.TagSet(tagSet)            => builder.string(tagSet)
-    case GetLastError.WaitForAcknowledgments(n) => builder.int(n)
-    case GetLastError.WaitForAknowledgments(n)  => builder.int(n)
+  def writeWriteConcernWWriter[P <: SerializationPack with Singleton](
+    builder: SerializationPack.Builder[P]): WriteConcern.W => builder.pack.Value = {
+    case WriteConcern.TagSet(tagSet)            => builder.string(tagSet)
+    case WriteConcern.WaitForAcknowledgments(n) => builder.int(n)
     case _                                      => builder.string("majority")
   }
 
   def writeWriteConcern[P <: SerializationPack with Singleton](
-    builder: SerializationPack.Builder[P]): WC => builder.pack.Document = {
-    val writeGLEW = writeGetLastErrorWWriter(builder)
+    builder: SerializationPack.Builder[P]): WriteConcern => builder.pack.Document = {
+    val writeGLEW = writeWriteConcernWWriter(builder)
 
-    { writeConcern: WC =>
+    { writeConcern: WriteConcern =>
       import builder.{ elementProducer => element, int }
 
       val elements = Seq.newBuilder[builder.pack.ElementProducer]

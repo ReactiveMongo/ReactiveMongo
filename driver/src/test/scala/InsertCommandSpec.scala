@@ -7,8 +7,7 @@ import reactivemongo.api.{ NodeSetSession, SessionTransaction, WriteConcern }
 
 import reactivemongo.api.commands.{
   InsertCommand,
-  ResolvedCollectionCommand,
-  WriteConcern => WC
+  ResolvedCollectionCommand
 }
 
 final class InsertCommandSpec extends org.specs2.mutable.Specification {
@@ -78,7 +77,7 @@ final class InsertCommandSpec extends org.specs2.mutable.Specification {
       head = firstDoc,
       tail = otherDocs,
       ordered = false,
-      writeConcern = WC.Default,
+      writeConcern = WriteConcern.Default,
       bypassDocumentValidation = false))
 
   private object Command extends InsertCommand[BSONSerializationPack.type] {

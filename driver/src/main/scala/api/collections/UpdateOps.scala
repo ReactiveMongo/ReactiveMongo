@@ -7,12 +7,11 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.{ Collation, SerializationPack, Session }
+import reactivemongo.api.{ Collation, SerializationPack, Session, WriteConcern }
 import reactivemongo.api.commands.{
   MultiBulkWriteResult,
   ResolvedCollectionCommand,
   UpdateWriteResult,
-  WriteConcern,
   WriteResult
 }
 
@@ -123,7 +122,7 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
      */
     final def many(firstUpdate: UpdateElement, updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
       val bulkProducer = BulkOps.bulks(
-        Seq(firstUpdate) ++: updates, maxBsonSize, metadata.maxBulkSize) { up =>
+        Seq(firstUpdate) ++ updates, maxBsonSize, metadata.maxBulkSize) { up =>
           elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(up.u)
         }
 
@@ -221,7 +220,7 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
 
       import builder.{ elementProducer => elmt }
 
-      val elements = Seq.newBuilder[pack.ElementProducer] += (
+      val elements = Seq.newBuilder[pack.ElementProducer] ++= Seq(
         elmt("q", emptyDoc), elmt("u", emptyDoc),
         elmt("upsert", sfalse), elmt("multi", sfalse))
 
@@ -248,23 +247,19 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
       implicit
       ec: ExecutionContext): Future[UpdateWriteResult] = {
 
-      if (metadata.maxWireVersion >= MongoWireVersion.V26) {
-        val cmd = new UpdateCommand.Update(
-          firstUpdate, updates, ordered, writeConcern, bypassDocumentValidation)
+      val cmd = new UpdateCommand.Update(
+        firstUpdate, updates, ordered, writeConcern, bypassDocumentValidation)
 
-        runCommand(cmd, writePreference).flatMap { wr =>
-          val flattened = wr.flatten
+      runCommand(cmd, writePreference).flatMap { wr =>
+        val flattened = wr.flatten
 
-          if (!flattened.ok) {
-            // was ordered, with one doc => fail if has an error
-            Future.failed(WriteResult.lastError(flattened).
-              getOrElse[Exception](new GenericDriverException(
-                s"fails to update: $updates")))
+        if (!flattened.ok) {
+          // was ordered, with one doc => fail if has an error
+          Future.failed(WriteResult.lastError(flattened).
+            getOrElse[Exception](new GenericDriverException(
+              s"fails to update: $updates")))
 
-          } else Future.successful(wr)
-        }
-      } else { // Mongo < 2.6
-        Future.failed[UpdateWriteResult](unsupportedVersion(metadata))
+        } else Future.successful(wr)
       }
     }
   }

@@ -102,11 +102,9 @@ final class DB(
    * @param failoverStrategy $failoverStrategyParam
    *
    * {{{
-   * import scala.concurrent.ExecutionContext
    * import reactivemongo.api.DB
    *
-   * def resolveColl(db: DB)(implicit ec: ExecutionContext) =
-   *   db.collection("acoll")
+   * def resolveColl(db: DB) = db.collection("acoll")
    * }}}
    */
   def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = Serialization.defaultCollectionProducer): C = producer(this, name, failoverStrategy)

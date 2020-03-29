@@ -4,16 +4,14 @@ import scala.util.{ Failure, Success, Try }
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.{ Collation, SerializationPack, Session }
+import reactivemongo.api.{ Collation, SerializationPack, Session, WriteConcern }
 import reactivemongo.api.commands.{
   CommandCodecs,
   LastError,
   MultiBulkWriteResult,
   ResolvedCollectionCommand,
-  WriteConcern,
   WriteResult
 }
 
@@ -204,24 +202,20 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     private final def execute(deletes: Seq[DeleteElement])(
       implicit
       ec: ExecutionContext): Future[WriteResult] = {
-      if (metadata.maxWireVersion >= MongoWireVersion.V26) {
-        val cmd = Delete(deletes, ordered, writeConcern)
+      val cmd = Delete(deletes, ordered, writeConcern)
 
-        Future.successful(cmd).flatMap(
-          runCommand(_, writePreference).flatMap { wr =>
-            val flattened = wr.flatten
+      Future.successful(cmd).flatMap(
+        runCommand(_, writePreference).flatMap { wr =>
+          val flattened = wr.flatten
 
-            if (!flattened.ok) {
-              // was ordered, with one doc => fail if has an error
-              Future.failed(WriteResult.lastError(flattened).
-                getOrElse[Exception](new GenericDriverException(
-                  s"fails to delete: $deletes")))
+          if (!flattened.ok) {
+            // was ordered, with one doc => fail if has an error
+            Future.failed(WriteResult.lastError(flattened).
+              getOrElse[Exception](new GenericDriverException(
+                s"fails to delete: $deletes")))
 
-            } else Future.successful(wr)
-          })
-      } else { // Mongo < 2.6
-        Future.failed[WriteResult](unsupportedVersion(metadata))
-      }
+          } else Future.successful(wr)
+        })
     }
   }
 

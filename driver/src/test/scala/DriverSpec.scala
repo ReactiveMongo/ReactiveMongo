@@ -10,6 +10,7 @@ import reactivemongo.api.{
   MongoConnectionOptions,
   ScramSha1Authentication,
   ScramSha256Authentication,
+  WriteConcern,
   X509Authentication
 }
 
@@ -26,7 +27,7 @@ import reactivemongo.core.commands.{
   SuccessfulAuthentication
 }
 
-import reactivemongo.api.commands.{ DBUserRole, WriteConcern }
+import reactivemongo.api.commands.DBUserRole
 
 import org.specs2.concurrent.ExecutionEnv
 

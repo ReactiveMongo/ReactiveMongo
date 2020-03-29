@@ -19,7 +19,7 @@ import reactivemongo.api.SerializationPack
 
 import scala.util.control.NoStackTrace
 
-import reactivemongo.api.bson.{ BSONDocument, BSONNumberLike }
+import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.bson.collection.BSONSerializationPack
 
 /** An error that can come from a MongoDB node or not. */
@@ -38,19 +38,20 @@ trait DatabaseException extends ReactiveMongoException {
   /** error code */
   def code: Option[Int]
 
-  override def getMessage: String = s"DatabaseException['$message'" + code.map(c => s" (code = $c)").getOrElse("") + "]"
+  override def getMessage: String = s"DatabaseException['$message'" + code.fold("")(c => s" (code = $c)") + "]"
 
   /** Tells if this error is due to a write on a secondary node. */
-  private[reactivemongo] final def isNotAPrimaryError: Boolean = code.map {
-    case 10054 | 10056 | 10058 | 10107 | 13435 | 13436 => true
-    case _ => false
-  }.getOrElse(false)
+  private[reactivemongo] final def isNotAPrimaryError: Boolean =
+    code.fold(false) {
+      case 10054 | 10056 | 10058 | 10107 | 13435 | 13436 => true
+      case _ => false
+    }
 
   /** Tells if this error is related to authentication issues. */
-  private[reactivemongo] final def isUnauthorized: Boolean = code.map {
+  private[reactivemongo] final def isUnauthorized: Boolean = code.fold(false) {
     case 10057 | 15845 | 16550 => true
     case _                     => false
-  }.getOrElse(false)
+  }
 
   override def equals(that: Any): Boolean = that match {
     case other: DatabaseException =>
@@ -165,12 +166,12 @@ private[reactivemongo] final class GenericDatabaseException(
   }
 }
 
-/** A generic command error. TODO: Remove */
+/** A generic command error. */
 private[reactivemongo] trait CommandError extends DatabaseException {
   /** error code */
   val code: Option[Int]
 
-  override def getMessage: String = s"CommandError['$message'" + code.map(c => " (code = " + c + ")").getOrElse("") + "]"
+  override def getMessage: String = s"CommandError['$message'" + code.fold("")(c => " (code = " + c + ")") + "]"
 }
 
 private[reactivemongo] object CommandError {
@@ -203,10 +204,8 @@ private[reactivemongo] object CommandError {
    */
   def checkOk(
     doc: BSONDocument, name: Option[String],
-    error: (BSONDocument, Option[String]) => CommandError = (doc, name) => CommandError("command " + name.map(_ + " ").getOrElse("") + "failed because the 'ok' field is missing or equals 0", Some(doc))): Option[CommandError] = {
-    doc.getAsOpt[BSONNumberLike]("ok").map(_.toInt).orElse(Some(0)).flatMap {
-      case 1 => None
-      case _ => Some(error(doc, name))
+    error: (BSONDocument, Option[String]) => CommandError = (doc, name) => CommandError("command " + name.fold("")(_ + " ") + "failed because the 'ok' field is missing or equals 0", Some(doc))): Option[CommandError] =
+    doc.booleanLike("ok").orElse(Some(false)).collect {
+      case false => error(doc, name)
     }
-  }
 }

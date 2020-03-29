@@ -4,16 +4,14 @@ import scala.util.{ Failure, Success, Try }
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.{ SerializationPack, Session }
+import reactivemongo.api.{ SerializationPack, Session, WriteConcern }
 import reactivemongo.api.commands.{
   CommandCodecs,
   LastError,
   MultiBulkWriteResult,
   ResolvedCollectionCommand,
-  WriteConcern,
   WriteResult
 }
 
@@ -189,34 +187,27 @@ trait InsertOps[P <: SerializationPack with Singleton] {
     implicit private lazy val writer: pack.Writer[InsertCmd] =
       insertWriter(collection.db.session)
 
-    private final def execute(documents: Seq[pack.Document])(
-      implicit
-      ec: ExecutionContext): Future[WriteResult] =
-      documents.headOption match {
-        case Some(head) => {
-          if (metadata.maxWireVersion >= MongoWireVersion.V26) {
-            val cmd = new InsertCommand.Insert(
-              head, documents.tail, ordered, writeConcern,
-              bypassDocumentValidation)
+    private final def execute(documents: Seq[pack.Document])(implicit ec: ExecutionContext): Future[WriteResult] = documents.headOption match {
+      case Some(head) => {
+        val cmd = new InsertCommand.Insert(
+          head, documents.tail, ordered, writeConcern,
+          bypassDocumentValidation)
 
-            runCommand(cmd, writePreference).flatMap { wr =>
-              val flattened = wr.flatten
+        runCommand(cmd, writePreference).flatMap { wr =>
+          val flattened = wr.flatten
 
-              if (!flattened.ok) {
-                // was ordered, with one doc => fail if has an error
-                Future.failed(WriteResult.lastError(flattened).
-                  getOrElse[Exception](new GenericDriverException(
-                    s"fails to insert: $documents")))
+          if (!flattened.ok) {
+            // was ordered, with one doc => fail if has an error
+            Future.failed(WriteResult.lastError(flattened).
+              getOrElse[Exception](new GenericDriverException(
+                s"fails to insert: $documents")))
 
-              } else Future.successful(wr)
-            }
-          } else { // Mongo < 2.6
-            Future.failed[WriteResult](unsupportedVersion(metadata))
-          }
+          } else Future.successful(wr)
         }
-
-        case _ => Future.successful(WriteResult.empty) // No doc to insert
       }
+
+      case _ => Future.successful(WriteResult.empty) // No doc to insert
+    }
   }
 
   // ---
