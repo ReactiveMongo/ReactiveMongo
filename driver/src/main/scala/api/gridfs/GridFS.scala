@@ -26,6 +26,7 @@ import scala.reflect.ClassTag
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{
+  Collation,
   Collection,
   Cursor,
   CursorProducer,
@@ -33,7 +34,8 @@ import reactivemongo.api.{
   DBMetaCommands,
   FailingCursor,
   FailoverStrategy,
-  QueryOpts,
+  PackSupport,
+  ReadConcern,
   ReadPreference,
   SerializationPack
 }
@@ -49,7 +51,7 @@ import reactivemongo.api.commands.{
 
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.collections.GenericQueryBuilder
+import reactivemongo.api.collections.QueryBuilderFactory
 
 import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.Ascending
 
@@ -63,7 +65,8 @@ import reactivemongo.api.gridfs.{ FileToSave => SF, ReadFile => RF }
  * @define readFileParam the file to be read
  * @define fileReader fileReader a file reader automatically resolved if `Id` is a valid value
  */ // TODO: Remove 'with Singleton'
-sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
+sealed trait GridFS[P <: SerializationPack with Singleton]
+  extends PackSupport[P] with QueryBuilderFactory[P] { self =>
 
   /* The database where this store is located. */
   protected def db: DB with DBMetaCommands
@@ -74,8 +77,6 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
    * named `\${prefix}.files` and `\${prefix}.chunks`.
    */
   protected def prefix: String
-
-  private[reactivemongo] val pack: P
 
   /* The `files` collection */
   private lazy val fileColl = new Collection {
@@ -90,6 +91,18 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
     val name = s"${self.prefix}.chunks"
     val failoverStrategy = db.failoverStrategy
   }
+
+  private lazy val fileQueryBuilder = new QueryBuilder(
+    collection = fileColl,
+    failoverStrategy = db.failoverStrategy,
+    readConcern = db.connection.options.readConcern,
+    readPreference = db.defaultReadPreference)
+
+  private lazy val chunkQueryBuilder = new QueryBuilder(
+    collection = chunkColl,
+    failoverStrategy = db.failoverStrategy,
+    readConcern = db.connection.options.readConcern,
+    readPreference = db.defaultReadPreference)
 
   private lazy val runner = Command.run[pack.type](pack, db.failoverStrategy)
 
@@ -146,7 +159,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
    */
   def find[S, Id <: pack.Value](selector: S)(implicit w: pack.Writer[S], r: FileReader[Id], cp: CursorProducer[ReadFile[Id]]): cp.ProducedCursor = try {
     val q = pack.serialize(selector, w)
-    val query = new QueryBuilder(fileColl, db.failoverStrategy, Some(q), None)
+    val query = fileQueryBuilder.filter(q)
 
     import r.reader
 
@@ -194,8 +207,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
     val sortOpts = document(Seq(elem("n", builder.int(1))))
     implicit def reader = chunkReader
 
-    val query = new QueryBuilder(
-      chunkColl, db.failoverStrategy, Some(selectorOpts), Some(sortOpts))
+    val query = chunkQueryBuilder.filter(selectorOpts).sort(sortOpts)
 
     query.cursor[Array[Byte]](readPreference)
   }
@@ -208,8 +220,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
   def readToOutputStream[Id <: pack.Value](file: ReadFile[Id], out: OutputStream, readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[Unit] = {
     val selectorOpts = chunkSelector(file)
     val sortOpts = document(Seq(elem("n", builder.int(1))))
-    val query = new QueryBuilder(
-      chunkColl, db.failoverStrategy, Some(selectorOpts), Some(sortOpts))
+    val query = chunkQueryBuilder.filter(selectorOpts).sort(sortOpts)
 
     implicit def r: pack.Reader[pack.Document] = pack.IdentityReader
 
@@ -611,31 +622,6 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
 
   private lazy val deleteReader: pack.Reader[DeleteCommand.DeleteResult] =
     CommandCodecs.defaultWriteResultReader(pack)
-
-  // ---
-
-  private final class QueryBuilder(
-    override val collection: Collection,
-    val failoverStrategy: FailoverStrategy,
-    val queryOption: Option[pack.Document],
-    val sortOption: Option[pack.Document]) extends GenericQueryBuilder[pack.type] {
-    type Self = QueryBuilder
-    val pack: self.pack.type = self.pack
-
-    protected lazy val version =
-      collection.db.connectionState.metadata.maxWireVersion
-
-    val projectionOption = Option.empty[pack.Document]
-    val hintOption = Option.empty[pack.Document]
-    val explainFlag = false
-    val snapshotFlag = false
-    val commentString = Option.empty[String]
-    val maxTimeMsOption = Option.empty[Long]
-
-    def options = QueryOpts()
-
-    def copy(queryOption: Option[pack.Document], sortOption: Option[pack.Document], projectionOption: Option[pack.Document], hintOption: Option[pack.Document], explainFlag: Boolean, snapshotFlag: Boolean, commentString: Option[String], options: QueryOpts, failoverStrategy: FailoverStrategy, maxTimeMsOption: Option[Long]) = new QueryBuilder(this.collection, failoverStrategy, queryOption, sortOption)
-  }
 
   // ---
 

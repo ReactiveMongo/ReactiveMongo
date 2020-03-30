@@ -6,8 +6,6 @@ package reactivemongo.api
  * from replica sets.
  *
  * {{{
- * import scala.concurrent.ExecutionContext
- *
  * import reactivemongo.api.ReadConcern
  * import reactivemongo.api.bson.BSONDocument
  * import reactivemongo.api.bson.collection.BSONCollection

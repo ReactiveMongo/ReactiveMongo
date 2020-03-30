@@ -83,15 +83,13 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
  * @define maxTimeParam the time limit for processing operations on a cursor (`maxTimeMS`)
  */
 trait GenericCollection[P <: SerializationPack with Singleton]
-  extends Collection with GenericCollectionWithCommands[P]
+  extends Collection with PackSupport[P] with GenericCollectionWithCommands[P]
   with CollectionMetaCommands with ImplicitCommandHelpers[P] with InsertOps[P]
   with UpdateOps[P] with DeleteOps[P] with CountOp[P] with DistinctOp[P]
   with GenericCollectionWithDistinctOps[P]
   with FindAndModifyOps[P] with ChangeStreamOps[P]
   with AggregationOps[P] with GenericCollectionMetaCommands[P]
-  with GenericCollectionWithQueryBuilder[P] with HintFactory[P] { self =>
-
-  val pack: P
+  with QueryBuilderFactory[P] { self =>
 
   /** Upper MongoDB version (used for version checks) */
   protected lazy val version = db.connectionState.metadata.maxWireVersion
@@ -106,7 +104,11 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     CommandCodecs.unitBoxReader[pack.type](pack)
 
   /** Builder used to prepare queries */
-  private[reactivemongo] lazy val genericQueryBuilder: GenericQueryBuilder[pack.type] = new CollectionQueryBuilder(failoverStrategy)
+  private[reactivemongo] lazy val genericQueryBuilder = new QueryBuilder(
+    collection = this,
+    failoverStrategy = this.failoverStrategy,
+    readConcern = this.readConcern,
+    readPreference = this.readPreference)
 
   /**
    * Returns a new reference to the same collection,
@@ -126,7 +128,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param pwriter the writer for the projection
    * @return $returnQueryBuilder
    */
-  def find[S](selector: S)(implicit swriter: pack.Writer[S]): GenericQueryBuilder[pack.type] = find(selector, Option.empty[pack.Document])
+  def find[S](selector: S)(implicit swriter: pack.Writer[S]): QueryBuilder = find(selector, Option.empty[pack.Document])
 
   /**
    * $findDescription, with the projection applied.
@@ -141,10 +143,8 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param pwriter the writer for the projection
    * @return $returnQueryBuilder
    */
-  def find[S, J](selector: S, projection: Option[J])(implicit swriter: pack.Writer[S], pwriter: pack.Writer[J]): GenericQueryBuilder[pack.type] = {
-    @com.github.ghik.silencer.silent(".*filter\\ predicate.*")
-    val queryBuilder: GenericQueryBuilder[pack.type] =
-      genericQueryBuilder.filter(selector)
+  def find[S, J](selector: S, projection: Option[J])(implicit swriter: pack.Writer[S], pwriter: pack.Writer[J]): QueryBuilder = {
+    val queryBuilder = genericQueryBuilder.filter(selector)
 
     projection.fold(queryBuilder) { queryBuilder.projection(_) }
   }
@@ -164,7 +164,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     selector: Option[pack.Document] = None,
     limit: Option[Int] = None,
     skip: Int = 0,
-    hint: Option[Hint[pack.type]] = None,
+    hint: Option[Hint] = None,
     readConcern: ReadConcern = this.readConcern,
     readPreference: ReadPreference = this.readPreference)(implicit ec: ExecutionContext): Future[Long] = countDocuments(selector, limit, skip, hint, readConcern, readPreference)
 
@@ -405,6 +405,8 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    *   val removedPerson: Future[Option[Person]] = coll.findAndModify(
    *     BSONDocument("name" -> "Jack"), coll.removeModifier).
    *     map(_.result[Person])
+   *
+   *   val _ = List(personBeforeUpdate, removedPerson)
    * }
    * }}}
    *
@@ -647,7 +649,7 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     batchSize: Option[Int] = None,
     cursorOptions: CursorOptions = CursorOptions.empty,
     maxTime: Option[FiniteDuration] = None,
-    hint: Option[Hint[pack.type]] = None,
+    hint: Option[Hint] = None,
     comment: Option[String] = None,
     collation: Option[Collation] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = {
     new AggregatorContext[T](

@@ -11,8 +11,6 @@ import org.specs2.concurrent.ExecutionEnv
 import _root_.tests.Common
 import reactivemongo.api.TestCompat._
 
-import reactivemongo.api.tests.QueryOpts
-
 final class CursorSpec(implicit val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification with CursorSpecEnv
   with Cursor1Spec with TailableCursorSpec {
@@ -48,8 +46,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             count = count + 1
           }
           val c = defaultColl
-          val cursor = c.find(matchAll("cursorspec18")).options(
-            QueryOpts(batchSizeN = 64)).cursor()
+          val cursor = c.find(matchAll("cursorspec18")).batchSize(64).cursor()
 
           cursor.foldBulksM({}, 128)(
             { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #18")) },
@@ -65,8 +62,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             count = count + 1
           }
           val c = cursorDb(System.identityHashCode(onError).toString)
-          val cursor = c.find(matchAll("cursorspec19")).options(
-            QueryOpts(batchSizeN = 64)).cursor()
+          val cursor = c.find(matchAll("cursorspec19")).batchSize(64).cursor()
 
           cursor.foldBulks({}, 128)(
             { (_, _) => sys.error("Foo #19"): Cursor.State[Unit] },
@@ -81,8 +77,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             count = count + 1
           }
           val c = cursorDb(System.identityHashCode(onError).toString)
-          val cursor = c.find(matchAll("cursorspec20")).options(
-            QueryOpts(batchSizeN = 64)).cursor()
+          val cursor = c.find(matchAll("cursorspec20")).batchSize(64).cursor()
 
           cursor.foldBulksM[Unit](sys.error("Foo #20"), 128)(
             (_, _) => Future.successful(Cursor.Cont({})),
@@ -104,8 +99,8 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             con21.flatMap(_.database("dbspec21")), timeout)
 
           lazy val c = db21(collName)
-          lazy val cursor = c.find(matchAll("cursorspec21")).options(
-            QueryOpts(batchSizeN = 64)).cursor()
+          lazy val cursor = c.find(matchAll("cursorspec21")).
+            batchSize(64).cursor()
 
           // Close connection to make the related cursor erroneous
           con21.flatMap(_.close()(timeout)).map(_ => {}) must beEqualTo({}).
@@ -220,7 +215,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             count = count + 1
           }
           val cursor = defaultColl.find(matchAll("cursorspec37")).
-            options(QueryOpts(batchSizeN = 64)).cursor()
+            batchSize(64).cursor()
 
           cursor.foldBulks({}, 128)(
             { (_, _) => sys.error("Foo #37"): Cursor.State[Unit] },
@@ -236,8 +231,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             count = count + 1
           }
           val c = cursorDb(s"emptycoll_${System identityHashCode onError}")
-          val cursor = c.find(matchAll("cursorspec38")).options(
-            QueryOpts(batchSizeN = 64)).cursor()
+          val cursor = c.find(matchAll("cursorspec38")).batchSize(64).cursor()
 
           cursor.foldBulksM({}, 64)(
             { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #38")) },
@@ -254,8 +248,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             count = count + 1
           }
           val c = cursorDb(System.identityHashCode(onError).toString)
-          val cursor = c.find(matchAll("cursorspec39")).options(
-            QueryOpts(batchSizeN = 64)).cursor()
+          val cursor = c.find(matchAll("cursorspec39")).batchSize(64).cursor()
 
           cursor.foldBulks[Unit](sys.error("Foo #39"), 128)(
             (_, _) => Cursor.Cont({}), Cursor.ContOnError[Unit](onError)).
@@ -276,8 +269,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             con40.flatMap(_.database("dbspec40")), timeout)
 
           lazy val c = db40(collName)
-          val cursor = c.find(matchAll("cursorspec40")).options(
-            QueryOpts(batchSizeN = 64)).cursor()
+          val cursor = c.find(matchAll("cursorspec40")).batchSize(64).cursor()
 
           // Close connection to make the related cursor erroneous
           con40.flatMap(_.close()(timeout)).map(_ => {}) must beEqualTo({}).

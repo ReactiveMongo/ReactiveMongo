@@ -137,7 +137,7 @@ package object util extends UtilCompat {
 
           lookup.setResolver {
             val r = Lookup.getDefaultResolver
-            r.setTimeout(timeout.toSeconds.toInt)
+            r.setTimeout(java.time.Duration ofSeconds timeout.toSeconds)
             r
           }
 
@@ -160,7 +160,7 @@ package object util extends UtilCompat {
 
     lookup.setResolver {
       val r = Lookup.getDefaultResolver
-      r.setTimeout(timeout.toSeconds.toInt)
+      r.setTimeout(java.time.Duration ofSeconds timeout.toSeconds)
       r
     }
 

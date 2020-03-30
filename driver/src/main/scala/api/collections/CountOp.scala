@@ -23,7 +23,7 @@ private[api] trait CountOp[P <: SerializationPack with Singleton] {
     query: Option[pack.Document],
     limit: Option[Int],
     skip: Int,
-    hint: Option[Hint[pack.type]],
+    hint: Option[Hint],
     readConcern: ReadConcern,
     readPreference: ReadPreference)(
     implicit
@@ -35,7 +35,7 @@ private[api] trait CountOp[P <: SerializationPack with Singleton] {
     val query: Option[pack.Document],
     val limit: Option[Int],
     val skip: Int,
-    val hint: Option[Hint[pack.type]],
+    val hint: Option[Hint],
     val readConcern: ReadConcern)
     extends CollectionCommand with CommandWithResult[Long]
 

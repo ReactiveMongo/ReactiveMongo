@@ -25,7 +25,7 @@ import reactivemongo.api.commands.{
 import reactivemongo.core.protocol.MongoWireVersion
 
 private[collections] trait AggregationOps[P <: SerializationPack with Singleton] {
-  collection: GenericCollection[P] with HintFactory[P] =>
+  collection: GenericCollection[P] =>
 
   /** The [[https://docs.mongodb.com/manual/core/aggregation-pipeline/ aggregation framework]] for this collection */
   object AggregationFramework extends reactivemongo.api.commands.AggregationFramework[collection.pack.type] {
@@ -58,7 +58,7 @@ private[collections] trait AggregationOps[P <: SerializationPack with Singleton]
     val cursorOptions: CursorOptions,
     val maxTime: Option[FiniteDuration],
     val reader: pack.Reader[T],
-    val hint: Option[Hint[pack.type]],
+    val hint: Option[Hint],
     val comment: Option[String],
     val collation: Option[Collation]) {
 
@@ -112,7 +112,7 @@ private[collections] trait AggregationOps[P <: SerializationPack with Singleton]
     val bypassDocumentValidation: Boolean,
     val readConcern: ReadConcern,
     val writeConcern: WriteConcern,
-    val hint: Option[Hint[pack.type]],
+    val hint: Option[Hint],
     val comment: Option[String],
     val collation: Option[Collation]) extends CollectionCommand
     with CommandWithPack[pack.type]

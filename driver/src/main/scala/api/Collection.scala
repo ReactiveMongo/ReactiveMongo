@@ -32,7 +32,7 @@ trait Collection {
   private[reactivemongo] def failoverStrategy: FailoverStrategy
 
   /** Gets the full qualified name of this collection. */
-  @inline private[reactivemongo] final def fullCollectionName =
+  @inline final private[reactivemongo] def fullCollectionName =
     db.name + "." + name
 
 }

@@ -6,7 +6,7 @@ import reactivemongo.api.bson.BSONDocument
 
 import _root_.tests.Common
 
-import reactivemongo.api.tests.{ QueryOpts, decoder, reader => docReader }
+import reactivemongo.api.tests.{ decoder, reader => docReader }
 
 trait TailableCursorSpec { specs: CursorSpec =>
   def tailableSpec = {
@@ -38,8 +38,8 @@ trait TailableCursorSpec { specs: CursorSpec =>
       @inline def tailable(n: String, database: DB = db) = {
         implicit val reader = docReader[Int] { decoder.int(_, "id").get }
 
-        collection(n, database).find(matchAll("cursorspec50")).options(
-          QueryOpts().tailable).batchSize(512).cursor[Int]()
+        collection(n, database).find(matchAll("cursorspec50")).
+          tailable.batchSize(512).cursor[Int]()
       }
 
       "using tailable" >> {

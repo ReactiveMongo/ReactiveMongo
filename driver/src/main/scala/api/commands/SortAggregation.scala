@@ -30,7 +30,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
   /** Ascending sort order */
   final class Ascending private[api] (val field: String) extends SortOrder {
     override def equals(that: Any): Boolean = that match {
-      case other: Ascending =>
+      case other: this.type =>
         (this.field == null && other.field == null) || (
           this.field != null && this.field.equals(other.field))
 
@@ -54,7 +54,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
   /** Descending sort order */
   final class Descending private[api] (val field: String) extends SortOrder {
     override def equals(that: Any): Boolean = that match {
-      case other: Descending =>
+      case other: this.type =>
         (this.field == null && other.field == null) || (
           this.field != null && this.field.equals(other.field))
 
@@ -87,7 +87,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
     private[api] lazy val tupled = field -> keyword
 
     override def equals(that: Any): Boolean = that match {
-      case other: MetadataSort =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ => false

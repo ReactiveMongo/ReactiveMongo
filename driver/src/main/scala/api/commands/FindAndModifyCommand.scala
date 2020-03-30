@@ -46,7 +46,7 @@ private[api] trait FindAndModifyCommand[P <: SerializationPack] extends Implicit
     private[api] lazy val tupled = Tuple3(update, fetchNewObject, upsert)
 
     override def equals(that: Any): Boolean = that match {
-      case other: Update =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ =>
@@ -82,7 +82,9 @@ object FindAndModifyCommand {
    * @param fetchNewObject the command result must be the new object instead of the old one.
    * @param upsert if true, creates a new document if no document matches the query, or if documents match the query, findAndModify performs an update
    */
-  sealed trait UpdateOp[P <: SerializationPack with Singleton] extends ModifyOp {
+  sealed trait UpdateOp[P <: SerializationPack with Singleton]
+    extends ModifyOp {
+
     val pack: P
 
     def update: pack.Document
@@ -110,8 +112,8 @@ object FindAndModifyCommand {
 
     // TODO#1.1: All fields after release
     override def equals(that: Any): Boolean = that match {
-      case other: UpdateLastError => other.tupled == tupled
-      case _                      => false
+      case other: this.type => other.tupled == tupled
+      case _                => false
     }
 
     // TODO#1.1: All fields after release
@@ -227,11 +229,11 @@ object FindAndModifyCommand {
         }
 
         command.modifier match {
-          case context.Update(document, fetchNewObject, upsert) =>
+          case op: UpdateOp[pack.type] @unchecked =>
             elements ++= Seq(
-              element("upsert", boolean(upsert)),
-              element("update", document),
-              element("new", boolean(fetchNewObject)))
+              element("upsert", boolean(op.upsert)),
+              element("update", op.update),
+              element("new", boolean(op.fetchNewObject)))
 
           case _ =>
             elements += element("remove", boolean(true))

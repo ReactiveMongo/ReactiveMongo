@@ -9,7 +9,7 @@ import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.Common
 import reactivemongo.api.TestCompat._
-import reactivemongo.api.tests.{ builder, decoder, QueryOpts }
+import reactivemongo.api.tests.{ builder, decoder }
 
 final class CommonUseCases(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
@@ -53,7 +53,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
     "find them" in {
       // batchSize (>1) allows us to test cursors ;)
       val it = collection.find(BSONDocument()).
-        options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
+        batchSize(2).cursor[BSONDocument]()
 
       //import reactivemongo.core.protocol.{ Response, Reply }
       //import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
@@ -90,7 +90,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
 
       def findSpec(c: DefaultCollection, t: FiniteDuration) = {
         def it = c.find(BSONDocument.empty, Some(pjn)).
-          options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
+          batchSize(2).cursor[BSONDocument]()
 
         //import reactivemongo.core.protocol.{ Response, Reply }
         //import reactivemongo.api.tests.{ makeRequest => req, nextResponse }

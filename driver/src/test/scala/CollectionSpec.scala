@@ -12,8 +12,6 @@ import reactivemongo.api.{
 
 import reactivemongo.api.commands.CommandError
 
-import reactivemongo.api.collections.Hint
-
 import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.Common
@@ -114,7 +112,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
         selector: Option[BSONDocument] = None,
         limit: Option[Int] = None,
         skip: Int = 0,
-        hint: Option[Hint[pack.type]] = None,
+        hint: Option[collection.Hint] = None,
         readConcern: ReadConcern = ReadConcern.Local) =
         collection.count(selector, limit, skip, hint, readConcern)
 

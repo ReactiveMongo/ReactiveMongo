@@ -21,7 +21,7 @@ trait AggregationFramework[P <: SerializationPack]
    */
   protected class Cursor private[api] (val batchSize: Int) {
     override def equals(that: Any): Boolean = that match {
-      case other: Cursor =>
+      case other: this.type =>
         this.batchSize == other.batchSize
 
       case _ =>
@@ -46,7 +46,7 @@ trait AggregationFramework[P <: SerializationPack]
     protected[reactivemongo] val makePipe = pipe(f"$$addFields", specifications)
 
     override def equals(that: Any): Boolean = that match {
-      case other: AddFields =>
+      case other: this.type =>
         (this.specifications == null && other.specifications == null) || (
           this.specifications != null && this.specifications.
           equals(other.specifications))
@@ -99,7 +99,7 @@ trait AggregationFramework[P <: SerializationPack]
       Tuple4(groupBy, boundaries, default, output)
 
     override def equals(that: Any): Boolean = that match {
-      case other: Bucket =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ =>
@@ -163,7 +163,7 @@ trait AggregationFramework[P <: SerializationPack]
       Tuple4(groupBy, buckets, granularity, output)
 
     override def equals(that: Any): Boolean = that match {
-      case other: BucketAuto =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ =>
@@ -220,7 +220,7 @@ trait AggregationFramework[P <: SerializationPack]
       Tuple3(latencyStatsHistograms, storageStatsScale, count)
 
     override def equals(that: Any): Boolean = that match {
-      case other: CollStats =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ =>
@@ -254,7 +254,7 @@ trait AggregationFramework[P <: SerializationPack]
     protected[reactivemongo] val makePipe: pack.Document = pipe(f"$$count", builder.string(outputName))
 
     override def equals(that: Any): Boolean = that match {
-      case other: Count =>
+      case other: this.type =>
         (this.outputName == null && other.outputName == null) || (
           this.outputName != null && this.outputName.
           equals(other.outputName))
@@ -303,7 +303,7 @@ trait AggregationFramework[P <: SerializationPack]
       Tuple5(allUsers, idleConnections, idleCursors, idleSessions, localOps)
 
     override def equals(that: Any): Boolean = that match {
-      case other: CurrentOp =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ =>
@@ -354,7 +354,7 @@ trait AggregationFramework[P <: SerializationPack]
     }
 
     override def equals(that: Any): Boolean = that match {
-      case other: Facet =>
+      case other: this.type =>
         (this.specifications == null && other.specifications == null) || (
           this.specifications != null && this.specifications.
           equals(other.specifications))
@@ -426,8 +426,8 @@ trait AggregationFramework[P <: SerializationPack]
           element("includeLocs", string(s)))).flatten))
 
     override def equals(that: Any): Boolean = that match {
-      case other: GeoNear => tupled == other.tupled
-      case _              => false
+      case other: this.type => tupled == other.tupled
+      case _                => false
     }
 
     override def hashCode: Int = tupled.hashCode
@@ -474,7 +474,7 @@ trait AggregationFramework[P <: SerializationPack]
     private[api] lazy val tupled = identifiers -> ops
 
     override def equals(that: Any): Boolean = that match {
-      case other: Group =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ => false
@@ -508,7 +508,7 @@ trait AggregationFramework[P <: SerializationPack]
     private[api] lazy val tupled = idField -> ops
 
     override def equals(that: Any): Boolean = that match {
-      case other: GroupField =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ => false
@@ -546,7 +546,7 @@ trait AggregationFramework[P <: SerializationPack]
     private[api] lazy val tupled = idFields -> ops
 
     override def equals(that: Any): Boolean = that match {
-      case other: GroupMulti =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ => false
@@ -585,7 +585,7 @@ trait AggregationFramework[P <: SerializationPack]
     private[api] lazy val tupled = ops -> since
 
     override def equals(that: Any): Boolean = that match {
-      case other: IndexStatAccesses =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ => false
@@ -612,7 +612,7 @@ trait AggregationFramework[P <: SerializationPack]
       Tuple4(name, key, host, accesses)
 
     override def equals(that: Any): Boolean = that match {
-      case other: IndexStatsResult =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ =>
@@ -660,7 +660,7 @@ trait AggregationFramework[P <: SerializationPack]
     protected[reactivemongo] val makePipe: pack.Document = pipe(f"$$limit", builder.int(limit))
 
     override def equals(that: Any): Boolean = that match {
-      case other: Limit =>
+      case other: this.type =>
         this.limit == other.limit
 
       case _ =>
@@ -689,7 +689,7 @@ trait AggregationFramework[P <: SerializationPack]
     def makePipe: pack.Document = pipe(f"$$listLocalSessions", expression)
 
     override def equals(that: Any): Boolean = that match {
-      case other: ListLocalSessions =>
+      case other: this.type =>
         (this.expression == null && other.expression == null) || (
           this.expression != null && this.expression.
           equals(other.expression))
@@ -723,7 +723,7 @@ trait AggregationFramework[P <: SerializationPack]
     def makePipe: pack.Document = pipe(f"$$listSessions", expression)
 
     override def equals(that: Any): Boolean = that match {
-      case other: ListSessions =>
+      case other: this.type =>
         (this.expression == null && other.expression == null) || (
           this.expression != null && this.expression.
           equals(other.expression))
@@ -800,7 +800,7 @@ trait AggregationFramework[P <: SerializationPack]
     private[api] lazy val tupled = Tuple8(from, startWith, connectFromField, connectToField, as, maxDepth, depthField, restrictSearchWithMatch)
 
     override def equals(that: Any): Boolean = that match {
-      case other: GraphLookup =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ =>
@@ -855,7 +855,7 @@ trait AggregationFramework[P <: SerializationPack]
       Tuple4(from, localField, foreignField, as)
 
     override def equals(that: Any): Boolean = that match {
-      case other: Lookup =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ =>
@@ -889,7 +889,7 @@ trait AggregationFramework[P <: SerializationPack]
     protected[reactivemongo] val makePipe: pack.Document = pipe(f"$$match", predicate)
 
     override def equals(that: Any): Boolean = that match {
-      case other: Match =>
+      case other: this.type =>
         (this.predicate == null && other.predicate == null) || (
           this.predicate != null && this.predicate.
           equals(other.predicate))
@@ -955,7 +955,7 @@ trait AggregationFramework[P <: SerializationPack]
     private[api] lazy val tupled = Tuple6(intoDb, intoCollection, on, whenMatched, let, whenNotMatched)
 
     override def equals(that: Any): Boolean = that match {
-      case other: Merge =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ => false
@@ -990,7 +990,7 @@ trait AggregationFramework[P <: SerializationPack]
     def makePipe: pack.Document = pipe(f"$$out", builder.string(collection))
 
     override def equals(that: Any): Boolean = that match {
-      case other: Out =>
+      case other: this.type =>
         (this.collection == null && other.collection == null) || (
           this.collection != null && this.collection.
           equals(other.collection))
@@ -1033,7 +1033,7 @@ trait AggregationFramework[P <: SerializationPack]
     protected[reactivemongo] val makePipe: pack.Document = pipe(f"$$project", specifications)
 
     override def equals(that: Any): Boolean = that match {
-      case other: Project =>
+      case other: this.type =>
         (this.specifications == null && other.specifications == null) || (
           this.specifications != null && this.specifications.
           equals(other.specifications))
@@ -1067,7 +1067,7 @@ trait AggregationFramework[P <: SerializationPack]
     protected[reactivemongo] val makePipe: pack.Document = pipe(f"$$redact", expression)
 
     override def equals(that: Any): Boolean = that match {
-      case other: Redact =>
+      case other: this.type =>
         (this.expression == null && other.expression == null) || (
           this.expression != null && this.expression.
           equals(other.expression))
@@ -1103,7 +1103,7 @@ trait AggregationFramework[P <: SerializationPack]
       pipe(f"$$replaceRoot", pipe("newRoot", builder.string("$" + newRoot)))
 
     override def equals(that: Any): Boolean = that match {
-      case other: ReplaceRootField =>
+      case other: this.type =>
         (this.newRoot == null && other.newRoot == null) || (
           this.newRoot != null && this.newRoot.
           equals(other.newRoot))
@@ -1139,7 +1139,7 @@ trait AggregationFramework[P <: SerializationPack]
       pipe(f"$$replaceRoot", pipe("newRoot", newRoot))
 
     override def equals(that: Any): Boolean = that match {
-      case other: ReplaceRoot =>
+      case other: this.type =>
         (this.newRoot == null && other.newRoot == null) || (
           this.newRoot != null && this.newRoot.
           equals(other.newRoot))
@@ -1174,7 +1174,7 @@ trait AggregationFramework[P <: SerializationPack]
     def makePipe: pack.Document = pipe(f"$$replaceWith", replacementDocument)
 
     override def equals(that: Any): Boolean = that match {
-      case other: ReplaceWith =>
+      case other: this.type =>
         (this.replacementDocument == null &&
           other.replacementDocument == null) || (
             this.replacementDocument != null && this.replacementDocument.
@@ -1209,7 +1209,7 @@ trait AggregationFramework[P <: SerializationPack]
       pipe(f"$$sample", pipe("size", builder.int(size)))
 
     override def equals(that: Any): Boolean = that match {
-      case other: Sample =>
+      case other: this.type =>
         this.size == other.size
 
       case _ =>
@@ -1236,7 +1236,7 @@ trait AggregationFramework[P <: SerializationPack]
     def makePipe: pack.Document = pipe(f"$$set", expression)
 
     override def equals(that: Any): Boolean = that match {
-      case other: Set =>
+      case other: this.type =>
         (this.expression == null && other.expression == null) || (
           this.expression != null && this.expression.
           equals(other.expression))
@@ -1270,7 +1270,7 @@ trait AggregationFramework[P <: SerializationPack]
       builder.elementProducer(f"$$skip", builder.int(skip))))
 
     override def equals(that: Any): Boolean = that match {
-      case other: Skip =>
+      case other: this.type =>
         this.skip == other.skip
 
       case _ =>
@@ -1312,7 +1312,7 @@ trait AggregationFramework[P <: SerializationPack]
       }))))
 
     override def equals(that: Any): Boolean = that match {
-      case other: Sort =>
+      case other: this.type =>
         (this.fields == null && other.fields == null) || (
           this.fields != null && this.fields.equals(other.fields))
 
@@ -1344,7 +1344,7 @@ trait AggregationFramework[P <: SerializationPack]
     def makePipe: pack.Document = pipe(f"$$sortByCount", expression)
 
     override def equals(that: Any): Boolean = that match {
-      case other: SortByCount =>
+      case other: this.type =>
         (this.expression == null && other.expression == null) || (
           this.expression != null && this.expression.
           equals(other.expression))
@@ -1380,7 +1380,7 @@ trait AggregationFramework[P <: SerializationPack]
       pipe(f"$$sortByCount", builder.string("$" + field))
 
     override def equals(that: Any): Boolean = that match {
-      case other: SortByFieldCount =>
+      case other: this.type =>
         (this.field == null && other.field == null) || (
           this.field != null && this.field.
           equals(other.field))
@@ -1420,7 +1420,7 @@ trait AggregationFramework[P <: SerializationPack]
     private[api] lazy val tupled = field -> otherFields
 
     override def equals(that: Any): Boolean = that match {
-      case other: Unset =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ => false
@@ -1452,7 +1452,7 @@ trait AggregationFramework[P <: SerializationPack]
     protected[reactivemongo] val makePipe = pipe(f"$$unwind", builder.string("$" + field))
 
     override def equals(that: Any): Boolean = that match {
-      case other: UnwindField =>
+      case other: this.type =>
         (this.field == null && other.field == null) || (
           this.field != null && this.field.
           equals(other.field))
@@ -1549,7 +1549,7 @@ trait AggregationFramework[P <: SerializationPack]
     override def hashCode: Int = tupled.hashCode
 
     override def equals(that: Any): Boolean = that match {
-      case other: Filter =>
+      case other: this.type =>
         other.tupled == this.tupled
 
       case _ => false

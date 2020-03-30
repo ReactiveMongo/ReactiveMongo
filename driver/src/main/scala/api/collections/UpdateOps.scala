@@ -109,7 +109,7 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
      *   })
      *
      *   for {
-     *     first <- update.element(
+     *     _ <- update.element(
      *       q = BSONDocument("update" -> "selector"),
      *       u = BSONDocument(f"$$set" -> first),
      *       upsert = true,

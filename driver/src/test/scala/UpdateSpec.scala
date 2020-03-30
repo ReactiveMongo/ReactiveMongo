@@ -26,14 +26,9 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
     s"slowup2${System identityHashCode slowDb}")
 
   def updateSpecs = {
-    implicit val personReader = PersonReader
-    implicit val personWriter = PersonWriter
-
     // with fixtures ...
     val jack3 = Person3("Jack", "London", 27, BigDecimal("12.345"))
-    val jack = Person("Jack London", 27)
     val jane3 = Person3("Jane", "London", 18, BigDecimal("3.45"))
-    val jane = Person("Jack London", 18)
 
     {
       def spec[T](c: DefaultCollection, timeout: FiniteDuration, f: => T)(upd: T => T)(implicit w: pack.Writer[T], r: pack.Reader[T]) = {

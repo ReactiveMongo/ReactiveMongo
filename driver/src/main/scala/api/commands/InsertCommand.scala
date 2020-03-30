@@ -21,7 +21,7 @@ private[reactivemongo] trait InsertCommand[P <: SerializationPack] extends Impli
       Tuple5(head, tail, ordered, writeConcern, bypassDocumentValidation)
 
     override def equals(that: Any): Boolean = that match {
-      case other: Insert =>
+      case other: this.type =>
         other.tupled == this.tupled
 
       case _ => false

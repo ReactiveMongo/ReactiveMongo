@@ -21,8 +21,8 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] extends Impli
       firstUpdate, updates, ordered, writeConcern, bypassDocumentValidation)
 
     override def equals(that: Any): Boolean = that match {
-      case other: Update => other.tupled == this.tupled
-      case _             => false
+      case other: this.type => other.tupled == this.tupled
+      case _                => false
     }
 
     @inline override def hashCode: Int = tupled.hashCode
@@ -52,8 +52,8 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] extends Impli
     override def hashCode: Int = data.hashCode
 
     override def equals(that: Any): Boolean = that match {
-      case other: UpdateElement => data == other.data
-      case _                    => false
+      case other: this.type => data == other.data
+      case _                => false
     }
 
     override def toString: String = s"UpdateElement${data.toString}"

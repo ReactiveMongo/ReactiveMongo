@@ -51,9 +51,7 @@ private[api] trait DBMetaCommands { self: DB =>
    * import reactivemongo.api.DB
    * import reactivemongo.api.bson.{ BSONDocument, BSONValue }
    *
-   * def findFile(db: DB, query: BSONDocument)(
-   *   implicit it: ClassTag[BSONValue]) =
-   *   db.gridfs.find(query)
+   * def findFile(db: DB, query: BSONDocument) = db.gridfs.find(query)
    * }}}
    */
   @inline def gridfs: GridFS[Serialization.Pack] = gridfs("fs")

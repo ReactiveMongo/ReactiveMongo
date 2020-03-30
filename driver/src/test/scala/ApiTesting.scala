@@ -46,7 +46,7 @@ import reactivemongo.core.actors, actors.{
 import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.bson.collection.BSONSerializationPack
 
-import reactivemongo.api.collections.{ GenericQueryBuilder, QueryCodecs }
+import reactivemongo.api.collections.{ QueryBuilderFactory, QueryCodecs }
 
 import reactivemongo.api.indexes.Index
 
@@ -71,13 +71,6 @@ package object tests {
       case _ => None
     }
   }
-
-  type QueryOpts = reactivemongo.api.QueryOpts
-
-  def QueryOpts(
-    skipN: Int = 0,
-    batchSizeN: Int = 0,
-    flagsN: Int = 0) = reactivemongo.api.QueryOpts(skipN, batchSizeN, flagsN)
 
   def Authenticate(
     db: String,
@@ -158,11 +151,6 @@ package object tests {
       case (time: Long, event: String) => time -> event
     }
   }
-
-  def merge[P <: SerializationPack](
-    qb: GenericQueryBuilder[P],
-    pref: ReadPreference,
-    maxDocs: Int) = qb.merge(pref, maxDocs)
 
   def nodeSet(sys: MongoDBSystem): NodeSet = sys.getNodeSet
 

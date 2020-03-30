@@ -182,11 +182,10 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
   }
 
   object IsMasterResult {
-    @deprecated("Use complete extractor", "0.18.5")
-    def unapply(res: IsMasterResult): Option[(Boolean, Int, Int, Int, Option[Long], Int, Int, Option[ReplicaSet], Option[String])] = Some(Tuple9(res.isMaster, res.maxBsonObjectSize, res.maxMessageSizeBytes, res.maxWriteBatchSize, res.localTime, res.minWireVersion, res.maxWireVersion, res.replicaSet, res.msg))
+    def unapply(res: IsMasterResult) = Option(res).map(_.tupled)
   }
 
-  private[reactivemongo] def writer[T <: IsMaster](pack: P): pack.Writer[T] = {
+  def writer[T <: IsMaster](pack: P): pack.Writer[T] = {
     val builder = pack.newBuilder
     import builder.{ elementProducer => element }
 
@@ -210,7 +209,7 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
     }
   }
 
-  private[reactivemongo] def reader(pack: P)(implicit sr: pack.NarrowValueReader[String]): pack.Reader[IsMasterResult] = {
+  def reader(pack: P)(implicit sr: pack.NarrowValueReader[String]): pack.Reader[IsMasterResult] = {
     val decoder = pack.newDecoder
 
     import decoder.{ booleanLike, int, long, string, values }

@@ -83,7 +83,7 @@ final class DB(
 
   val pack: Serialization.Pack = internalSerializationPack
 
-  val defaultReadPreference = connection.options.readPreference
+  private[api] val defaultReadPreference = connection.options.readPreference
 
   /**
    * $resolveDescription (alias for the [[collection]] method).
