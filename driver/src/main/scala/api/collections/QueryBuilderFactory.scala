@@ -370,7 +370,6 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack with Sin
      * Makes the result cursor [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.awaitData await data]].
      *
      * {{{
-     * import reactivemongo.api.SerializationPack
      * import reactivemongo.api.bson.BSONDocument
      * import reactivemongo.api.bson.collection.BSONCollection
      *
@@ -385,7 +384,6 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack with Sin
      * Sets the size of result batches.
      *
      * {{{
-     * import reactivemongo.api.SerializationPack
      * import reactivemongo.api.bson.BSONDocument
      * import reactivemongo.api.bson.collection.BSONCollection
      *
@@ -399,7 +397,6 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack with Sin
      * Sets the [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.exhaust flag]] to return all data returned by the query at once rather than splitting the results into batches.
      *
      * {{{
-     * import reactivemongo.api.SerializationPack
      * import reactivemongo.api.bson.BSONDocument
      * import reactivemongo.api.bson.collection.BSONCollection
      *
@@ -413,7 +410,6 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack with Sin
      * Sets the [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.noTimeout `noTimeout`]] flag.
      *
      * {{{
-     * import reactivemongo.api.SerializationPack
      * import reactivemongo.api.bson.BSONDocument
      * import reactivemongo.api.bson.collection.BSONCollection
      *
@@ -431,7 +427,6 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack with Sin
      * Sets the [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.partial `partial`]] flag.
      *
      * {{{
-     * import reactivemongo.api.SerializationPack
      * import reactivemongo.api.bson.BSONDocument
      * import reactivemongo.api.bson.collection.BSONCollection
      *
@@ -446,7 +441,6 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack with Sin
      * Sets how many documents must be skipped at the beginning of the results.
      *
      * {{{
-     * import reactivemongo.api.SerializationPack
      * import reactivemongo.api.bson.BSONDocument
      * import reactivemongo.api.bson.collection.BSONCollection
      *
@@ -460,7 +454,6 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack with Sin
      * Allows querying of a replica slave ([[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.slaveOk `slaveOk`]]).
      *
      * {{{
-     * import reactivemongo.api.SerializationPack
      * import reactivemongo.api.bson.BSONDocument
      * import reactivemongo.api.bson.collection.BSONCollection
      *
@@ -474,7 +467,6 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack with Sin
      * Makes the result [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.tailable cursor tailable]].
      *
      * {{{
-     * import reactivemongo.api.SerializationPack
      * import reactivemongo.api.bson.BSONDocument
      * import reactivemongo.api.bson.collection.BSONCollection
      *
@@ -510,7 +502,7 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack with Sin
      *
      * @tparam T $resultTParam
      */
-    final def cursor[T](readPreference: ReadPreference = readPreference)(implicit reader: pack.Reader[T], cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference, isMongo26WriteOp = false /* TODO: Remove */ ))
+    final def cursor[T](readPreference: ReadPreference = readPreference)(implicit reader: pack.Reader[T], cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference))
 
     /**
      * $oneFunction (using the default [[reactivemongo.api.ReadPreference]]).
@@ -833,8 +825,7 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack with Sin
     private[reactivemongo] lazy val merge: Function2[ReadPreference, Int, pack.Document] = if (version.compareTo(MongoWireVersion.V32) < 0) mergeLt32 else merge32
 
     private def defaultCursor[T](
-      readPreference: ReadPreference,
-      isMongo26WriteOp: Boolean = false)(
+      readPreference: ReadPreference)(
       implicit
       reader: pack.Reader[T]): Cursor.WithOps[T] = {
 
@@ -874,7 +865,7 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack with Sin
       val op = Query(flags, name, skip, batchSize)
 
       DefaultCursor.query(pack, op, body, readPreference,
-        collection.db, failoverStrategy, isMongo26WriteOp,
+        collection.db, failoverStrategy,
         collection.fullCollectionName, maxTimeMs)(reader)
     }
   }

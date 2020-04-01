@@ -1,7 +1,5 @@
 package reactivemongo.core.nodeset
 
-import scala.language.higherKinds
-
 import scala.collection.generic.CanBuildFrom
 
 package object utils {

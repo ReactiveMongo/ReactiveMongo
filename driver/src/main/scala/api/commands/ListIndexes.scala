@@ -11,19 +11,8 @@ import reactivemongo.api.indexes.Index
  *
  * @param db the database name
  */
-@deprecated("Internal: will be made private", "0.16.0")
-class ListIndexes(val db: String) // TODO: Remove
-  extends Product with Serializable
-  with CollectionCommand with CommandWithResult[List[Index]] {
-
-  val productArity = 1
-
-  def productElement(n: Int): Any = db
-
-  def canEqual(that: Any): Boolean = that match {
-    case _: ListIndexes => true
-    case _              => false
-  }
+private[reactivemongo] class ListIndexes(val db: String)
+  extends CollectionCommand with CommandWithResult[List[Index]] {
 
   override def equals(that: Any): Boolean = that match {
     case other: ListIndexes =>
@@ -38,13 +27,7 @@ class ListIndexes(val db: String) // TODO: Remove
   override def toString: String = s"ListIndexes($db)"
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-object ListIndexes
-  extends scala.runtime.AbstractFunction1[String, ListIndexes] {
-
-  // TODO: Remove
-  @inline def apply(db: String): ListIndexes = new ListIndexes(db)
-
+private[reactivemongo] object ListIndexes {
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[Command[P]]] = {
     val builder = pack.newBuilder
 

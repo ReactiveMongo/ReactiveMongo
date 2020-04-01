@@ -1,7 +1,5 @@
 package reactivemongo.api.collections
 
-import scala.language.higherKinds
-
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.{

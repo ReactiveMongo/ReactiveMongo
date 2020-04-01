@@ -10,40 +10,20 @@ import reactivemongo.io.netty.channel.ChannelId
 import reactivemongo.core.protocol.{ RequestMaker, Response, ProtocolMetadata }
 
 /**
- * A message expecting a response from database.
- * It holds a promise that will be completed by the MongoDBSystem actor.
- * The future can be used to get the error or the successful response.
- */
-private[reactivemongo] sealed trait ExpectingResponse { // TODO#1.1: Merge with RequestMakerExpectingResponse once CheckedWriteRequestExpectingResponse is removed
-  // TODO#1.1: final
-  private[actors] val promise: Promise[Response] = Promise()
-
-  /** The future response of this request. */
-  val future: Future[Response] = promise.future // TODO#1.1: final
-
-  private[reactivemongo] def pinnedNode: Option[String] = None
-}
-
-private[reactivemongo] object ExpectingResponse {
-  def unapply(that: Any): Option[Promise[Response]] = that match {
-    case req @ RequestMakerExpectingResponse(_, _) => Some(req.promise)
-    case _                                         => None
-  }
-}
-
-/**
  * A request expecting a response.
  *
  * @param requestMaker the request maker
- * @param isMongo26WriteOp true if the operation is a MongoDB 2.6 write one
  */
-private[reactivemongo] class RequestMakerExpectingResponse(
+private[reactivemongo] final class ExpectingResponse(
   val requestMaker: RequestMaker,
-  val isMongo26WriteOp: Boolean, // TODO: Remove
-  private[reactivemongo] override val pinnedNode: Option[String]) extends ExpectingResponse {
+  private[reactivemongo] val pinnedNode: Option[String]) {
+  private[actors] val promise: Promise[Response] = Promise()
+
+  /** The future response of this request. */
+  val future: Future[Response] = promise.future
 
   override def equals(that: Any): Boolean = that match {
-    case other: RequestMakerExpectingResponse =>
+    case other: ExpectingResponse =>
       tupled == other.tupled
 
     case _ =>
@@ -52,18 +32,7 @@ private[reactivemongo] class RequestMakerExpectingResponse(
 
   override lazy val hashCode: Int = tupled.hashCode
 
-  private lazy val tupled = Tuple2(requestMaker, pinnedNode)
-}
-
-private[reactivemongo] object RequestMakerExpectingResponse {
-
-  def apply( // TODO: Remove
-    requestMaker: RequestMaker,
-    isMongo26WriteOp: Boolean): RequestMakerExpectingResponse =
-    new RequestMakerExpectingResponse(requestMaker, isMongo26WriteOp, None)
-
-  def unapply(m: RequestMakerExpectingResponse): Option[(RequestMaker, Boolean)] = Option(m).map { s => s.requestMaker -> s.isMongo26WriteOp /* TODO: Remove */ }
-
+  private lazy val tupled = requestMaker -> pinnedNode
 }
 
 private[reactivemongo] sealed class Close {

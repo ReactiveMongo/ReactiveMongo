@@ -14,13 +14,7 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
   final class IsMaster(
     val client: Option[ClientMetadata],
     val comment: Option[String]) extends Command
-    with CommandWithResult[IsMasterResult] with CommandWithPack[P] {
-
-    @deprecated("Use new constructor", "0.18.2")
-    def this(comment: Option[String]) = this(
-      client = None,
-      comment = comment)
-  }
+    with CommandWithResult[IsMasterResult] with CommandWithPack[P]
 
   final class LastWrite(
     val opTime: Long,
@@ -61,61 +55,6 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
     val electionId: Int,
     val lastWrite: Option[LastWrite]) {
 
-    @deprecated("Use the constructor with tag map", "0.19.1")
-    def this(
-      setName: String,
-      setVersion: Int,
-      me: String,
-      primary: Option[String],
-      hosts: Seq[String],
-      passives: Seq[String],
-      arbiters: Seq[String],
-      isSecondary: Boolean,
-      isArbiterOnly: Boolean,
-      isPassive: Boolean,
-      isHidden: Boolean,
-      tags: Option[P#Document],
-      electionId: Int,
-      lastWrite: Option[LastWrite]) =
-      this(setName, setVersion, me, primary, hosts, passives, arbiters,
-        isSecondary, isArbiterOnly, isPassive, isHidden,
-        Map.empty[String, String],
-        electionId, lastWrite)
-
-    @deprecated("Use the constructor with lastWrite", "0.18.5")
-    def this(
-      setName: String,
-      setVersion: Int,
-      me: String,
-      primary: Option[String],
-      hosts: Seq[String],
-      passives: Seq[String],
-      arbiters: Seq[String],
-      isSecondary: Boolean, // `secondary`
-      isArbiterOnly: Boolean, // `arbiterOnly`
-      isPassive: Boolean, // `passive`
-      isHidden: Boolean, // `hidden`
-      tags: Option[P#Document],
-      electionId: Int) = this(setName, setVersion, me,
-      primary, hosts, passives, arbiters, isSecondary, isArbiterOnly,
-      isPassive, isHidden, tags, electionId, None)
-
-    @deprecated("No longer a ReactiveMongo case class", "0.19.1")
-    def copy(
-      setName: String = this.setName,
-      me: String = this.me,
-      primary: Option[String] = this.primary,
-      hosts: Seq[String] = this.hosts,
-      passives: Seq[String] = this.passives,
-      arbiters: Seq[String] = this.arbiters,
-      isSecondary: Boolean = this.isSecondary,
-      isArbiterOnly: Boolean = this.isArbiterOnly,
-      isPassive: Boolean = this.isPassive,
-      isHidden: Boolean = this.isHidden,
-      tags: Option[P#Document] = None): ReplicaSet = new ReplicaSet(
-      setName, -1, me, primary, hosts, passives, arbiters, isSecondary,
-      isArbiterOnly, isPassive, isHidden, Map.empty[String, String], -1, None)
-
     // setVersion
     override lazy val toString = s"""ReplicaSet($setName, primary = $primary, me = $me, hosts = ${hosts.mkString("[", ",", "]")}, lastWrite = $lastWrite)"""
 
@@ -127,11 +66,6 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
       case rs: ReplicaSet => tupled == rs.tupled
       case _              => false
     }
-  }
-
-  object ReplicaSet {
-    @deprecated("No longer a ReactiveMongo case class", "0.19.1")
-    def unapply(rs: ReplicaSet): Option[(String, String, Option[String], Seq[String], Seq[String], Seq[String], Boolean, Boolean, Boolean, Boolean, Option[P#Document])] = Some((rs.setName, rs.me, rs.primary, rs.hosts, rs.passives, rs.arbiters, rs.isSecondary, rs.isArbiterOnly, rs.isPassive, rs.isHidden, None))
   }
 
   final class IsMasterResult private[commands] (

@@ -42,7 +42,7 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
    *
    *   // Then the view can be resolved as any collection
    *   // (but won't be writeable)
-   *   val view: BSONCollection = coll.db("myview")
+   *   val _: BSONCollection = coll.db[BSONCollection]("myview")
    * }
    * }}}
    *

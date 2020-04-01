@@ -1,7 +1,5 @@
 package reactivemongo.api.commands
 
-import scala.language.higherKinds
-
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{
@@ -16,7 +14,7 @@ import reactivemongo.api.{
 import reactivemongo.api.bson.buffer.WritableBuffer
 
 import reactivemongo.core.protocol.{ Reply, Response }
-import reactivemongo.core.actors.RequestMakerExpectingResponse
+import reactivemongo.core.actors.ExpectingResponse
 import reactivemongo.core.errors.GenericDriverException
 
 trait Command
@@ -27,6 +25,18 @@ trait CommandWithPack[P <: SerializationPack] { self: Command => }
 
 trait BoxedAnyVal[A <: AnyVal] {
   def value: A
+
+  override def equals(that: Any): Boolean = that match {
+    case other: BoxedAnyVal[A] =>
+      this.value == other.value
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = value.hashCode
+
+  override def toString = s"BoxedAnyVal($value)"
 }
 
 /**
@@ -55,7 +65,7 @@ sealed trait CursorFetcher[P <: SerializationPack, +C[_] <: Cursor[_]] {
   protected def defaultReadPreference: ReadPreference
 }
 
-private[reactivemongo] trait ImplicitCommandHelpers[P <: SerializationPack] { // TODO: Remove
+private[reactivemongo] trait ImplicitCommandHelpers[P <: SerializationPack] { //w TODO: Remove
   import scala.language.implicitConversions
 
   val pack: P
@@ -114,9 +124,8 @@ object Command {
         command, writer, readPreference, db.name)
 
       Failover(db.connection, failover) { () =>
-        db.connection.sendExpectingResponse(new RequestMakerExpectingResponse(
+        db.connection.sendExpectingResponse(new ExpectingResponse(
           requestMaker = requestMaker,
-          isMongo26WriteOp = false,
           pinnedNode = for {
             s <- db.session
             t <- s.transaction.toOption
@@ -158,17 +167,14 @@ object Command {
       }
 
       val op = Query(flags, db.name + f".$$cmd", 0, 1)
-      val mongo26WriteCommand = false // TODO: Remove
 
       DefaultCursor.query(pack, op, (_: Int) /*TODO: max?*/ => bs,
-        readPreference, db, failover, mongo26WriteCommand,
-        fullCollectionName, maxTimeMS)
+        readPreference, db, failover, fullCollectionName, maxTimeMS)
 
     }
   }
 
-  // TODO: final class
-  private[reactivemongo] case class CommandWithPackRunner[P <: SerializationPack](pack: P, failover: FailoverStrategy = FailoverStrategy()) {
+  private[reactivemongo] final class CommandWithPackRunner[P <: SerializationPack](val pack: P, failover: FailoverStrategy = FailoverStrategy()) {
     def apply[R, C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R], rp: ReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = defaultCursorFetcher(db, pack, command, failover).one[R](rp)
 
     def apply[C <: Command](db: DB, command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = defaultCursorFetcher(db, pack, command, failover)
@@ -243,7 +249,7 @@ object Command {
    * def foo(db: reactivemongo.api.DB) = runner(db, cmd)
    * }}}
    */
-  private[reactivemongo] def run[P <: SerializationPack](pack: P, failover: FailoverStrategy): CommandWithPackRunner[pack.type] = CommandWithPackRunner(pack, failover)
+  private[reactivemongo] def run[P <: SerializationPack](pack: P, failover: FailoverStrategy): CommandWithPackRunner[pack.type] = new CommandWithPackRunner(pack, failover)
 
   private[reactivemongo] def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): RequestMaker = {
     val buffer = WritableBuffer.empty

@@ -1,7 +1,5 @@
 package reactivemongo.api.collections
 
-import scala.language.higherKinds
-
 import scala.collection.generic.CanBuildFrom
 
 import scala.concurrent.{ ExecutionContext, Future }

@@ -1,7 +1,5 @@
 package reactivemongo
 
-import reactivemongo.core.protocol.MongoWireVersion
-
 import reactivemongo.api.{
   Collation,
   Collection,
@@ -16,10 +14,6 @@ import reactivemongo.api.bson.BSONDocument
 
 import reactivemongo.api.tests, tests.Pack
 
-import org.specs2.specification.core.Fragments
-import org.specs2.matcher.MatchResult
-
-// TODO: More exhaustive tests
 final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
   "Query builder" title
 

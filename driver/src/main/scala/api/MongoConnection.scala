@@ -38,7 +38,7 @@ import reactivemongo.core.actors.{
   PrimaryAvailable,
   PrimaryUnavailable,
   RegisterMonitor,
-  RequestMakerExpectingResponse,
+  ExpectingResponse,
   SetAvailable,
   SetUnavailable
 }
@@ -66,7 +66,7 @@ private[api] case class ConnectionState(
  * def foo(driver: AsyncDriver)(implicit ec: ExecutionContext) = {
  *   val con = driver.connect(List("localhost"))
  *   val db = con.flatMap(_.database("plugin"))
- *   val collection = db.map(_("acoll"))
+ *   val _ = db.map(_("acoll")) // Collection reference
  * }
  * }}}
  *
@@ -207,7 +207,7 @@ final class MongoConnection private[reactivemongo] (
   }
 
   private[api] def sendExpectingResponse(
-    expectingResponse: RequestMakerExpectingResponse): Future[Response] =
+    expectingResponse: ExpectingResponse): Future[Response] =
     whenActive {
       mongosystem ! expectingResponse
       expectingResponse.future

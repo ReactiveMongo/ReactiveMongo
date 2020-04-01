@@ -12,8 +12,7 @@ import reactivemongo.api.SerializationPack
  * @param user the number of user assertions
  * @param rollovers the number of times that the rollovers counters have rolled over since the last time the MongoDB process started
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case class ServerStatusAsserts(
+private[reactivemongo] case class ServerStatusAsserts(
   regular: Int,
   warning: Int,
   msg: Int,
@@ -31,8 +30,7 @@ case class ServerStatusAsserts(
  * @param lastMs the amount of time, in milliseconds, that the last flush operation took to complete
  * @param lastFinished the timestamp of the last completed flush operation
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case class ServerStatusBackgroundFlushing(
+private[reactivemongo] case class ServerStatusBackgroundFlushing(
   flushes: Int,
   totalMs: Long,
   averageMs: Long,
@@ -47,8 +45,7 @@ case class ServerStatusBackgroundFlushing(
  * @param available the number of unused incoming connections available
  * @param totalCreated the count of all incoming connections created to the server.
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case class ServerStatusConnections(
+private[reactivemongo] case class ServerStatusConnections(
   current: Int,
   available: Int,
   totalCreated: Long)
@@ -67,8 +64,7 @@ case class ServerStatusConnections(
  * @param commits the amount of time in milliseconds spent for commits
  * @param commitsInWriteLock the amount of time, in milliseconds, spent for commits that occurred while a write lock was held
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case class ServerStatusJournalingTime(
+private[reactivemongo] case class ServerStatusJournalingTime(
   dt: Long,
   prepLogBuffer: Long,
   writeToJournal: Long,
@@ -89,8 +85,7 @@ case class ServerStatusJournalingTime(
  * @param commitsInWriteLock the count of the commits that occurred while a write lock was held
  * @param earlyCommits the number of times MongoDB requested a commit
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case class ServerStatusJournaling(
+private[reactivemongo] case class ServerStatusJournaling(
   commits: Int,
   journaledMB: Double,
   writeToDataFilesMB: Double,
@@ -106,8 +101,7 @@ case class ServerStatusJournaling(
  * @param heapUsageBytes the total size in bytes of heap space used by the database process
  * @param pageFaults the total number of page faults
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case class ServerStatusExtraInfo(
+private[reactivemongo] case class ServerStatusExtraInfo(
   heapUsageBytes: Int,
   pageFaults: Int)
 
@@ -119,8 +113,7 @@ case class ServerStatusExtraInfo(
  * @param readers the number of operations that are currently queued and waiting for the read lock
  * @param writers the number of operations that are currently queued and waiting for the write lock
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case class ServerStatusLock(
+private[reactivemongo] case class ServerStatusLock(
   total: Int,
   readers: Int,
   writers: Int)
@@ -133,8 +126,7 @@ case class ServerStatusLock(
  * @param currentQueue the information concerning the number of operations queued because of a lock
  * @param activeClients the information about the number of connected clients
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case class ServerStatusGlobalLock(
+private[reactivemongo] case class ServerStatusGlobalLock(
   totalTime: Int,
   currentQueue: ServerStatusLock,
   activeClients: ServerStatusLock)
@@ -147,8 +139,7 @@ case class ServerStatusGlobalLock(
  * @param bytesOut the number of bytes that reflects the amount of network traffic sent from this database
  * @param numRequests the total number of distinct requests that the server has received
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case class ServerStatusNetwork(
+private[reactivemongo] case class ServerStatusNetwork(
   bytesIn: Int,
   bytesOut: Int,
   numRequests: Int)
@@ -173,8 +164,7 @@ case class ServerStatusNetwork(
  * @param globalLock the report about the database lock state
  * @param network the report about the MongoDB network use
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case class ServerStatusResult(
+private[reactivemongo] case class ServerStatusResult(
   host: String,
   version: String,
   process: ServerProcess,
@@ -193,8 +183,7 @@ case class ServerStatusResult(
   network: ServerStatusNetwork)
 
 /** Server [[http://docs.mongodb.org/manual/reference/server-status/ status]] */
-@deprecated("Internal: will be made private", "0.16.0")
-case object ServerStatus
+private[reactivemongo] case object ServerStatus
   extends Command with CommandWithResult[ServerStatusResult] {
 
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ServerStatus.type] = {

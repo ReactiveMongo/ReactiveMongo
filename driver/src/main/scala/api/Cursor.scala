@@ -15,8 +15,6 @@
  */
 package reactivemongo.api
 
-import scala.language.higherKinds
-
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.util.LazyLogger

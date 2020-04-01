@@ -23,7 +23,7 @@ import reactivemongo.core.protocol.{
 
 import reactivemongo.core.actors.{
   Exceptions,
-  RequestMakerExpectingResponse
+  ExpectingResponse
 }
 
 private[reactivemongo] object DefaultCursor {
@@ -40,14 +40,12 @@ private[reactivemongo] object DefaultCursor {
     readPreference: ReadPreference,
     db: DB,
     failover: FailoverStrategy,
-    isMongo26WriteOp: Boolean, // TODO: Remove
     collectionName: String,
     maxTimeMS: Option[Long])(implicit reader: pack.Reader[A]): Impl[A] =
     new Impl[A] {
       val preference = readPreference
       val database = db
       val failoverStrategy = failover
-      val mongo26WriteOp = isMongo26WriteOp // TODO: Remove
       val fullCollectionName = collectionName
 
       val numberToReturn = {
@@ -76,10 +74,9 @@ private[reactivemongo] object DefaultCursor {
 
           // MongoDB2.6: Int.MaxValue
           val op = query.copy(numberToReturn = ntr)
-          val req = new RequestMakerExpectingResponse(
+          val req = new ExpectingResponse(
             requestMaker = RequestMaker(
               op, requestBuffer(maxDocs), readPreference),
-            isMongo26WriteOp = isMongo26WriteOp, // TODO: Remove
             pinnedNode = transaction.flatMap(_.pinnedNode))
 
           requester(0, maxDocs, req)(ec)
@@ -126,7 +123,6 @@ private[reactivemongo] object DefaultCursor {
     _ref: Cursor.Reference,
     readPreference: ReadPreference,
     failover: FailoverStrategy,
-    isMongo26WriteOp: Boolean, // TODO: Remove
     maxTimeMS: Option[Long]) extends Impl[A] {
     protected type P <: SerializationPack
     protected val _pack: P
@@ -135,7 +131,6 @@ private[reactivemongo] object DefaultCursor {
     val preference = readPreference
     val database = db
     val failoverStrategy = failover
-    val mongo26WriteOp = isMongo26WriteOp // TODO: Remove
 
     @inline def fullCollectionName = _ref.collectionName
 
@@ -164,9 +159,8 @@ private[reactivemongo] object DefaultCursor {
       Failover(connection, failoverStrategy) { () =>
         // MongoDB2.6: Int.MaxValue
         val op = getMoreOpCmd(_ref.cursorId, maxDocs)
-        val req = new RequestMakerExpectingResponse(
+        val req = new ExpectingResponse(
           requestMaker = RequestMaker(op._1, op._2, readPreference),
-          isMongo26WriteOp = isMongo26WriteOp, // TODO: Remove
           pinnedNode = pinnedNode)
 
         requester(0, maxDocs, req)(ec)
@@ -224,8 +218,6 @@ private[reactivemongo] object DefaultCursor {
 
     def failoverStrategy: FailoverStrategy
 
-    def mongo26WriteOp: Boolean // TODO: Remove
-
     def fullCollectionName: String
 
     def numberToReturn: Int
@@ -243,22 +235,22 @@ private[reactivemongo] object DefaultCursor {
     @inline protected def lessThenV32: Boolean =
       version.compareTo(MongoWireVersion.V32) < 0
 
-    protected lazy val requester: (Int, Int, RequestMakerExpectingResponse) => ExecutionContext => Future[Response] = {
-      val base: ExecutionContext => RequestMakerExpectingResponse => Future[Response] = { implicit ec: ExecutionContext =>
+    protected lazy val requester: (Int, Int, ExpectingResponse) => ExecutionContext => Future[Response] = {
+      val base: ExecutionContext => ExpectingResponse => Future[Response] = { implicit ec: ExecutionContext =>
         database.session match {
-          case Some(session) => { req: RequestMakerExpectingResponse =>
+          case Some(session) => { req: ExpectingResponse =>
             connection.sendExpectingResponse(req).flatMap {
               Session.updateOnResponse(session, _).map(_._2)
             }
           }
 
           case _ =>
-            connection.sendExpectingResponse(_: RequestMakerExpectingResponse)
+            connection.sendExpectingResponse(_: ExpectingResponse)
         }
       }
 
       if (lessThenV32) {
-        { (_: Int, maxDocs: Int, req: RequestMakerExpectingResponse) =>
+        { (_: Int, maxDocs: Int, req: ExpectingResponse) =>
           val max = if (maxDocs > 0) maxDocs else Int.MaxValue
 
           { implicit ec: ExecutionContext =>
@@ -282,7 +274,7 @@ private[reactivemongo] object DefaultCursor {
             }
           }
         }
-      } else { (from: Int, _: Int, req: RequestMakerExpectingResponse) =>
+      } else { (from: Int, _: Int, req: ExpectingResponse) =>
         { implicit ec: ExecutionContext =>
           base(ec)(req).map {
             // Normalizes as 'new' cursor doesn't indicate such property
@@ -307,11 +299,10 @@ private[reactivemongo] object DefaultCursor {
 
         logger.trace(s"Asking for the next batch of $ntr documents on cursor #${reply.cursorID}, after ${nextOffset}: $op")
 
-        def req = new RequestMakerExpectingResponse(
+        def req = new ExpectingResponse(
           requestMaker = RequestMaker(op, cmd,
             readPreference = preference,
             channelIdHint = Some(response.info.channelId)),
-          isMongo26WriteOp = mongo26WriteOp, // TODO: Remove
           pinnedNode = transaction.flatMap(_.pinnedNode))
 
         Failover(connection, failoverStrategy) { () =>
@@ -360,11 +351,10 @@ private[reactivemongo] object DefaultCursor {
         logger.debug(s"[$logCat] Clean up $cursorID, sending KillCursors")
 
         val result = connection.sendExpectingResponse(
-          new RequestMakerExpectingResponse(
+          new ExpectingResponse(
             requestMaker = RequestMaker(
               KillCursors(Set(cursorID)),
               readPreference = preference),
-            isMongo26WriteOp = false, // TODO: Remove
             pinnedNode = transaction.flatMap(_.pinnedNode)))
 
         result.onComplete {

@@ -46,7 +46,7 @@ import reactivemongo.core.actors, actors.{
 import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.bson.collection.BSONSerializationPack
 
-import reactivemongo.api.collections.{ QueryBuilderFactory, QueryCodecs }
+import reactivemongo.api.collections.QueryCodecs
 
 import reactivemongo.api.indexes.Index
 

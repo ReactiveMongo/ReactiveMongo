@@ -151,7 +151,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    * @param size $cappedSizeParam
    * @param maxDocuments $cappedMaxParam
    */
-  def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, ConvertToCapped(new Capped(size, maxDocuments)), ReadPreference.primary)
+  def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, new ConvertToCapped(new Capped(size, maxDocuments)), ReadPreference.primary)
 
   private implicit lazy val statsWriter = CollStats.writer(command.pack)
 

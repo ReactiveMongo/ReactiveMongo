@@ -12,7 +12,6 @@ import reactivemongo.api.commands.{
   MongodProcess,
   ReplSetGetStatus,
   ReplSetMaintenance,
-  ReplSetStatus,
   ServerStatus,
   ServerStatusResult
 }
@@ -58,9 +57,8 @@ final class CommandSpec(implicit ee: ExecutionEnv)
   "Admin" should {
     "execute replSetGetStatus" in {
       if (replSetOn) {
-        replSetGetStatusTest must beLike[ReplSetStatus] {
-          case ReplSetStatus(_, _, _, _ :: Nil) => ok
-        }.await(0, timeout)
+        replSetGetStatusTest.map(_.members.size) must beTypedEqualTo(1).
+          await(0, timeout)
       } else {
         replSetGetStatusTest must throwA[DatabaseException].await(0, timeout)
       }

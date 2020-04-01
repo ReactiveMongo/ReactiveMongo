@@ -1,7 +1,5 @@
 package reactivemongo.api
 
-import scala.language.higherKinds
-
 import scala.concurrent.Future
 
 /** Allows to enrich a base cursor. */

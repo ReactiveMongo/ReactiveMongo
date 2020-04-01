@@ -653,12 +653,12 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
       ()
     }
 
-    case req @ RequestMakerExpectingResponse(maker, _) => {
+    case req: ExpectingResponse => {
       val reqId = RequestIdGenerator.common.next
 
       debug(s"Received a request expecting a response ($reqId): $req")
 
-      val request = maker(reqId)
+      val request = req.requestMaker(reqId)
 
       foldNodeConnection(_nodeSet, req.pinnedNode, request)(
         req.promise.failure(_), { (_, con) =>
@@ -669,7 +669,6 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
               resps.put(reqId, new AwaitingResponse(
                 request, chanId, req.promise,
                 isGetLastError = false,
-                isMongo26WriteOp = req.isMongo26WriteOp, // TODO: Remove
                 pinnedNode = None))
 
               val countBefore = chans.getOrElse(chanId, 0)
@@ -778,7 +777,9 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
 
     case RegisterMonitor => { monitors += sender; () }
 
-    case req @ ExpectingResponse(promise) => {
+    case req: ExpectingResponse => {
+      import req.promise
+
       debug(s"Received an expecting response request during closing process: $req, completing its promise with a failure")
 
       updateHistory("Closing$$RejectExpectingResponse")
@@ -821,7 +822,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
       requestTracker.withAwaiting { (resps, chans) =>
         resps.get(response.header.responseTo) match {
           case Some(AwaitingResponse(
-            _, chanId, promise, isGetLastError, _ /*isMongo26WriteOp*/ )) => {
+            _, chanId, promise, isGetLastError)) => {
 
             trace(s"Got a response from ${response.info.channelId} to ${response.header.responseTo}! Will give back message=$response to promise ${System.identityHashCode(promise)}")
 
@@ -884,8 +885,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
                 }
 
                 case _ => {
-                  // TODO: Update logging
-                  trace(s"{${response.header.responseTo}} [MongoDB26 Write Op response] sending a success!")
+                  trace(s"{${response.header.responseTo}} sending a success!")
 
                   promise.success(response)
                   ()

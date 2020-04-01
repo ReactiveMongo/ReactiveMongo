@@ -1,7 +1,5 @@
 package reactivemongo.api
 
-import scala.language.higherKinds
-
 import scala.collection.generic.CanBuildFrom
 
 import scala.collection.mutable.Builder

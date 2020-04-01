@@ -2,7 +2,7 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api._
 
-import reactivemongo.api.commands.CommandError.{ Code, Message }
+import reactivemongo.api.commands.CommandError.Code
 
 import reactivemongo.api.bson.{ BSONDocument, BSONString }
 import reactivemongo.api.bson.collection.BSONCollection

@@ -1,7 +1,5 @@
 package reactivemongo.api.bson.collection
 
-import scala.util.{ Failure, Try }
-
 import reactivemongo.api.{
   CollectionMetaCommands,
   DB,
@@ -10,22 +8,7 @@ import reactivemongo.api.{
   Serialization
 }
 
-import reactivemongo.api.bson.{
-  BSONDocument,
-  BSONDocumentReader,
-  BSONDocumentWriter
-}
-
 import reactivemongo.api.collections.GenericCollection
-
-import reactivemongo.api.commands.{
-  CountCommand => CC,
-  DeleteCommand => DC,
-  InsertCommand => IC,
-  DistinctCommand => DistC,
-  ResolvedCollectionCommand,
-  UpdateCommand => UC
-}
 
 /**
  * A Collection that interacts with the BSON library.

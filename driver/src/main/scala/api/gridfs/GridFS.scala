@@ -26,16 +26,13 @@ import scala.reflect.ClassTag
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{
-  Collation,
   Collection,
   Cursor,
   CursorProducer,
   DB,
   DBMetaCommands,
   FailingCursor,
-  FailoverStrategy,
   PackSupport,
-  ReadConcern,
   ReadPreference,
   SerializationPack
 }

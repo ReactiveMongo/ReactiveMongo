@@ -27,9 +27,6 @@ private[reactivemongo] object DropCollection extends CollectionCommand
   }
 }
 
-//private[reactivemongo] object EmptyCapped extends CollectionCommand
-//with CommandWithResult[UnitBox.type]
-
 private[reactivemongo] case class RenameCollection(
   fullyQualifiedCollectionName: String,
   fullyQualifiedTargetName: String,
@@ -85,19 +82,9 @@ private[api] object CreateCollection {
   }
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-class ConvertToCapped(
-  val capped: Capped) extends Product with Serializable
-  with CollectionCommand with CommandWithResult[UnitBox.type] {
-
-  val productArity = 1
-
-  def productElement(n: Int): Any = capped
-
-  def canEqual(that: Any): Boolean = that match {
-    case _: ConvertToCapped => true
-    case _                  => false
-  }
+private[reactivemongo] final class ConvertToCapped(
+  val capped: Capped)
+  extends CollectionCommand with CommandWithResult[UnitBox.type] {
 
   override def equals(that: Any): Boolean = that match {
     case other: ConvertToCapped =>
@@ -112,13 +99,8 @@ class ConvertToCapped(
   override def toString: String = s"ConvertToCapped($capped)"
 }
 
-object ConvertToCapped
-  extends scala.runtime.AbstractFunction1[Capped, ConvertToCapped] {
-
-  @inline def apply(capped: Capped): ConvertToCapped =
-    new ConvertToCapped(capped)
-
-  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[ConvertToCapped]] = {
+private[api] object ConvertToCapped {
+  def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[ConvertToCapped]] = {
     val builder = pack.newBuilder
 
     pack.writer[ResolvedCollectionCommand[ConvertToCapped]] { convert =>
@@ -192,7 +174,7 @@ private[api] object ListCollectionNames
  * @param syncingTo the hostname of the member from which this instance is syncing (only present on the output of `rs.status()` on secondary and recovering members)
  * @param configVersion the configuration version (since MongoDB 3.0)
  */
-class ReplSetMember private[api] (
+final class ReplSetMember private[api] (
   val _id: Long,
   val name: String,
   val health: Int,
@@ -207,58 +189,7 @@ class ReplSetMember private[api] (
   val self: Boolean,
   val pingMs: Option[Long],
   val syncingTo: Option[String],
-  val configVersion: Option[Int]) extends Product15[Long, String, Int, Int, String, Long, Long, Option[Long], Option[Long], Option[String], Option[Long], Boolean, Option[Long], Option[String], Option[Int]] with Serializable {
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _1 = _id
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _2 = name
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _3 = health
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _4 = state
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _5 = stateStr
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _6 = uptime
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _7 = optime
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _8 = lastHeartbeat
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _9 = lastHeartbeatRecv
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _10 = lastHeartbeatMessage
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _11 = electionTime
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _12 = self
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _13 = pingMs
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _14 = syncingTo
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _15 = configVersion
-
-  @deprecated("No longer a case class", "0.20.3")
-  def canEqual(that: Any): Boolean = that match {
-    case _: ReplSetMember => true
-    case _                => false
-  }
+  val configVersion: Option[Int]) {
 
   private[api] def tupled = Tuple15(_id, name, health, state, stateStr, uptime, optime, lastHeartbeat, lastHeartbeatRecv, lastHeartbeatMessage, electionTime, self, pingMs, syncingTo, configVersion)
 
@@ -275,29 +206,6 @@ class ReplSetMember private[api] (
   override def toString = s"ReplSetMember${tupled.toString}"
 }
 
-object ReplSetMember extends scala.runtime.AbstractFunction15[Long, String, Int, Int, String, Long, Long, Option[Long], Option[Long], Option[String], Option[Long], Boolean, Option[Long], Option[String], Option[Int], ReplSetMember] {
-
-  def apply(
-    _id: Long,
-    name: String,
-    health: Int,
-    state: Int,
-    stateStr: String,
-    uptime: Long,
-    optime: Long,
-    lastHeartbeat: Option[Long],
-    lastHeartbeatRecv: Option[Long],
-    lastHeartbeatMessage: Option[String],
-    electionTime: Option[Long],
-    self: Boolean,
-    pingMs: Option[Long],
-    syncingTo: Option[String],
-    configVersion: Option[Int]): ReplSetMember = new ReplSetMember(_id, name, health, state, stateStr, uptime, optime, lastHeartbeat, lastHeartbeatRecv, lastHeartbeatMessage, electionTime, self, pingMs, syncingTo, configVersion)
-
-  @deprecated("No longer a case class", "0.20.3")
-  def unapply(other: ReplSetMember) = Option(other).map(_.tupled)
-}
-
 /**
  * Result from the [[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]].
  *
@@ -306,29 +214,11 @@ object ReplSetMember extends scala.runtime.AbstractFunction15[Long, String, Int,
  * @param state the [[http://docs.mongodb.org/manual/reference/replica-states/ state code]] of the current member
  * @param members the list of the members of this replicate set
  */
-class ReplSetStatus private[api] (
+final class ReplSetStatus private[api] (
   val name: String,
   val time: Long,
   val myState: Int,
-  val members: List[ReplSetMember]) extends Product4[String, Long, Int, List[ReplSetMember]] with Serializable {
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _1 = name
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _2 = time
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _3 = myState
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _4 = members
-
-  @deprecated("No longer a case class", "0.20.3")
-  def canEqual(that: Any): Boolean = that match {
-    case _: ReplSetStatus => true
-    case _                => false
-  }
+  val members: List[ReplSetMember]) {
 
   private[api] lazy val tupled = Tuple4(name, time, myState, members)
 
@@ -345,27 +235,13 @@ class ReplSetStatus private[api] (
   override def toString = s"ReplSetStatus${tupled.toString}"
 }
 
-object ReplSetStatus extends scala.runtime.AbstractFunction4[String, Long, Int, List[ReplSetMember], ReplSetStatus] {
-
-  def apply(
-    name: String,
-    time: Long,
-    myState: Int,
-    members: List[ReplSetMember]): ReplSetStatus =
-    new ReplSetStatus(name, time, myState, members)
-
-  @deprecated("No longer a case class", "0.20.3")
-  def unapply(status: ReplSetStatus) = Option(status).map(_.tupled)
-}
-
 /**
  * The command [[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]]
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case object ReplSetGetStatus
+object ReplSetGetStatus
   extends Command with CommandWithResult[ReplSetStatus] {
 
-  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ReplSetGetStatus.type] = {
+  def writer[P <: SerializationPack](pack: P): pack.Writer[ReplSetGetStatus.type] = {
     val builder = pack.newBuilder
     val cmd = builder.document(Seq(builder.elementProducer(
       "replSetGetStatus", builder.int(1))))
@@ -384,7 +260,7 @@ case object ReplSetGetStatus
       stateStr <- string(doc, "stateStr")
       uptime <- long(doc, "uptime")
       optime <- long(doc, "optimeDate")
-    } yield ReplSetMember(id, name, health, state, stateStr, uptime, optime,
+    } yield new ReplSetMember(id, name, health, state, stateStr, uptime, optime,
       long(doc, "lastHeartbeat"),
       long(doc, "lastHeartbeatRecv"),
       string(doc, "lastHeartbeatMessage"),
@@ -395,7 +271,7 @@ case object ReplSetGetStatus
       int(doc, "configVersion"))
   }
 
-  private[api] def reader[P <: SerializationPack](pack: P): pack.Reader[ReplSetStatus] = {
+  def reader[P <: SerializationPack](pack: P): pack.Reader[ReplSetStatus] = {
     val decoder = pack.newDecoder
 
     CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, ReplSetStatus](pack) { doc =>
@@ -406,7 +282,7 @@ case object ReplSetGetStatus
         members = decoder.children(doc, "members").flatMap { m =>
           readMember[pack.type](pack)(decoder, m)
         }
-      } yield ReplSetStatus(name, time, myState, members)).get
+      } yield new ReplSetStatus(name, time, myState, members)).get
     }
   }
 }
@@ -435,8 +311,7 @@ object ResyncResult extends BoxedAnyVal[Unit] {
 /**
  * The command [[https://docs.mongodb.org/manual/reference/command/resync/ resync]]
  */
-@deprecated("Internal: will be made private", "0.16.0")
-object Resync extends Command with CommandWithResult[ResyncResult.type]
+private[api] object Resync extends Command with CommandWithResult[ResyncResult.type]
 
 /**
  * The [[https://docs.mongodb.org/manual/reference/command/replSetMaintenance/ replSetMaintenance]] command.
@@ -459,19 +334,10 @@ private[reactivemongo] final class ReplSetMaintenance(
   override def toString = s"ReplSetMaintenance($enable)"
 }
 
-// TODO: Remove
 private[reactivemongo] object ReplSetMaintenance {
 
   @inline def apply(enable: Boolean): ReplSetMaintenance =
     new ReplSetMaintenance(enable)
-
-  @deprecated("", "0.19.0")
-  def unapply(that: Any): Option[Boolean] = that match {
-    case other: ReplSetMaintenance =>
-      Option(other).map(_.enable)
-
-    case _ => None
-  }
 
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ReplSetMaintenance] = {
     val builder = pack.newBuilder

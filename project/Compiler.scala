@@ -32,6 +32,7 @@ object Compiler {
       "-unchecked",
       "-deprecation",
       "-feature",
+      "-language:higherKinds",
       //"-Xfatal-warnings",
       "-Xlint",
       "-Ywarn-numeric-widen",
@@ -62,39 +63,17 @@ object Compiler {
     scalacOptions in Compile ++= {
       val v = scalaBinaryVersion.value
 
+      val mongo30eol = "MongoDB\\ 3\\.0\\ EOL\\ reached\\ by\\ Feb\\ 2018"
+
       if (v == "2.13") {
         Nil
       } else {
-        // TODO: Remove
-        val m26 = "MongoDB\\ 2\\.6\\ EOL\\ reached\\ by\\ Oct\\ 2016"
-        val m3 = "MongoDB\\ 3\\.0\\ EOL\\ reached\\ by\\ Feb\\ 2018"
-
-        // Driver
-        val internal = ".*Internal:\\ will\\ be\\ made\\ private.*"
-        val cmd = "Will\\ be\\ removed;\\ See\\ `Command`"
-        val repl = "Will\\ be\\ replaced\\ by\\ `reactivemongo.*"
-        val ns1 = ".*in\\ package\\ nodeset.*is\\ deprecated.*"
-        val ns2 = ".*class\\ NodeSet.*;NodeSetInfo\\ is\\ deprecated.*"
-        val bcmd = ".*in\\ package\\ bson.*"
-        val ncc = ".*No\\ longer\\ a\\ ReactiveMongo\\ case\\ class.*"
-        val dc = ".*Command\\ in\\ package\\ commands\\ is\\ deprecated.*"
-        val auth = ".*Use\\ SCRAM\\ or\\ X509.*"
-        val driver = s".*Unused.*;$internal;$cmd;$repl;$ns1;$ns2;$bcmd;$ncc;$dc;$auth"
-
-        // BSON
-        val bll = ".*in\\ package\\ lowlevel\\ is\\ deprecated.*"
-        val bxn = ".*ExtendedNumeric\\ is\\ deprecated.*"
-        val useBison = ".*Use\\ reactivemongo-bson-api.*"
-        val bson = s"$bll;$bxn;$useBison"
-
-        val macros = ".*value\\ macro.*\\ is never used"
-
         Seq(
           "-Ywarn-infer-any",
           "-Ywarn-unused",
           "-Ywarn-unused-import",
           "-Xlint:missing-interpolator",
-          s"-P:silencer:globalFilters=$bson;$driver;$m26;$m3;$macros"
+          s"-P:silencer:globalFilters=$mongo30eol"
         )
       }
     },

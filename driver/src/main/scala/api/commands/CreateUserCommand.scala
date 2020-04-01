@@ -96,7 +96,7 @@ trait CreateUserCommand[P <: SerializationPack]
    * @param writeConcern the optional level of [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]]
    * @param customData the custom data to associate with the user account
    */
-  class CreateUser(
+  final class CreateUser(
     val name: String,
     val pwd: Option[String],
     val customData: Option[pack.Document],
@@ -106,49 +106,7 @@ trait CreateUserCommand[P <: SerializationPack]
     val authenticationRestrictions: List[AuthenticationRestriction],
     val mechanisms: List[AuthenticationMode])
     extends Command with CommandWithPack[P]
-    with CommandWithResult[UnitBox.type] with Product with Serializable {
-
-    @deprecated("Use the complete constructor", "0.18.4")
-    def this(
-      name: String,
-      pwd: Option[String],
-      roles: List[UserRole],
-      digestPassword: Boolean,
-      writeConcern: Option[WriteConcern],
-      customData: Option[pack.Document]) = this(name, pwd, customData, roles, digestPassword, writeConcern, List.empty, List.empty)
-
-    @deprecated("No longer a product", "0.18.4")
-    def canEqual(that: Any): Boolean = that match {
-      case _: CreateUser => true
-      case _             => false
-    }
-
-    @deprecated("No longer a product", "0.18.4")
-    val productArity: Int = 8
-
-    @deprecated("No longer a product", "0.18.4")
-    def productElement(n: Int): Any = (n: @annotation.switch) match {
-      case 0 => name
-      case 1 => pwd
-      case 2 => customData
-      case 3 => roles
-      case 4 => digestPassword
-      case 5 => writeConcern
-      case 6 => authenticationRestrictions
-      case _ => mechanisms
-    }
-  }
-
-  object CreateUser extends scala.runtime.AbstractFunction6[String, Option[String], List[UserRole], Boolean, Option[WriteConcern], Option[pack.Document], CreateUser] {
-
-    @deprecated("Use the complete constructor", "0.18.4")
-    @inline def apply(
-      name: String,
-      pwd: Option[String],
-      roles: List[UserRole],
-      digestPassword: Boolean,
-      writeConcern: Option[WriteConcern],
-      customData: Option[pack.Document]): CreateUser = new CreateUser(name, pwd, roles, digestPassword, writeConcern, customData)
+    with CommandWithResult[UnitBox.type] {
   }
 }
 

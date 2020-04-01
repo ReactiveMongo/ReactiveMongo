@@ -13,15 +13,6 @@ sealed trait MongoWireVersion extends Ordered[MongoWireVersion] {
 }
 
 object MongoWireVersion {
-  @deprecated("MongoDB 2.6 EOL reached by Oct 2016: https://www.mongodb.com/support-policy", "0.16.0")
-  object V26 extends MongoWireVersion {
-    val value = 2
-    override val toString = "2.6"
-
-    override def equals(that: Any): Boolean =
-      that != null && that.isInstanceOf[V26.type]
-  }
-
   @deprecated("MongoDB 3.0 EOL reached by Feb 2018: https://www.mongodb.com/support-policy", "0.16.0")
   object V30 extends MongoWireVersion {
     val value = 3
@@ -66,8 +57,7 @@ object MongoWireVersion {
   }
 
   def apply(v: Int): MongoWireVersion = {
-    if (v <= V26.value) V26
-    else if (v >= V42.value) V42
+    if (v >= V42.value) V42
     else if (v >= V40.value) V40
     else if (v >= V36.value) V36
     else if (v >= V34.value) V34

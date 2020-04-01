@@ -11,7 +11,6 @@ private[actors] class AwaitingResponse(
   val channelID: ChannelId,
   val promise: Promise[Response],
   val isGetLastError: Boolean,
-  val isMongo26WriteOp: Boolean, // TODO: Remove
   val pinnedNode: Option[String]) {
 
   @inline def requestID: Int = request.requestID
@@ -45,10 +44,9 @@ private[actors] class AwaitingResponse(
     channelID: ChannelId = this.channelID,
     promise: Promise[Response] = this.promise,
     isGetLastError: Boolean = this.isGetLastError,
-    isMongo26WriteOp: Boolean = this.isMongo26WriteOp,
     pinnedNode: Option[String] = this.pinnedNode): AwaitingResponse =
     new AwaitingResponse(request, channelID, promise,
-      isGetLastError, isMongo26WriteOp, pinnedNode)
+      isGetLastError, pinnedNode)
 
   override def equals(that: Any): Boolean = that match {
     case other: AwaitingResponse =>
@@ -60,11 +58,11 @@ private[actors] class AwaitingResponse(
 
   override lazy val hashCode: Int = tupled.hashCode
 
-  private lazy val tupled = Tuple6(request, this.channelID, promise,
-    isGetLastError, isMongo26WriteOp, pinnedNode)
+  private lazy val tupled = Tuple5(
+    request, this.channelID, promise, isGetLastError, pinnedNode)
 
 }
 
 private[actors] object AwaitingResponse {
-  def unapply(req: AwaitingResponse): Option[(Request, ChannelId, Promise[Response], Boolean, Boolean)] = Some(Tuple5(req.request, req.channelID, req.promise, req.isGetLastError, req.isMongo26WriteOp))
+  def unapply(req: AwaitingResponse): Option[(Request, ChannelId, Promise[Response], Boolean)] = Some(Tuple4(req.request, req.channelID, req.promise, req.isGetLastError))
 }

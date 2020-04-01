@@ -46,10 +46,8 @@ private[api] trait DBMetaCommands { self: DB =>
    * The GridFS with the default serialization and collection prefix.
    *
    * {{{
-   * import scala.reflect.ClassTag
-   *
    * import reactivemongo.api.DB
-   * import reactivemongo.api.bson.{ BSONDocument, BSONValue }
+   * import reactivemongo.api.bson.BSONDocument
    *
    * def findFile(db: DB, query: BSONDocument) = db.gridfs.find(query)
    * }}}

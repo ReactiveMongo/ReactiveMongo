@@ -12,11 +12,7 @@ private[reactivemongo] object ReplyDocumentIterator
   // BSON optimized parse alternative
   def parse[A](pack: BSONSerializationPack.type)(response: Response)(implicit reader: pack.Reader[A]): Iterator[A] = response match {
     case Response.CommandError(_, _, _, cause) =>
-      new Iterator[A] { // TODO: Failing iterator
-        val hasNext = false
-        @inline def next: A = throw cause
-        //throw ReplyDocumentIteratorExhaustedException(cause)
-      }
+      new FailingIterator[A](cause)
 
     case Response.WithCursor(_, _, _, _, _, _, preloaded) => {
       val buf = response.documents
@@ -36,11 +32,7 @@ private[reactivemongo] object ReplyDocumentIterator
 
           firstBatch ++ docs
         } catch {
-          case cause: Exception => new Iterator[A] {
-            val hasNext = false
-            @inline def next: A = throw cause
-            //throw ReplyDocumentIteratorExhaustedException(cause)
-          }
+          case cause: Exception => new FailingIterator[A](cause)
         }
       }
     }
@@ -53,7 +45,6 @@ private[reactivemongo] object ReplyDocumentIterator
     override val isTraversableAgain = false // TODO: Add test
     override def hasNext = buffer.isReadable()
 
-    //@com.github.ghik.silencer.silent(".*SerializationPack\\ is\\ deprecated.*")
     override def next = try {
       val sz = buffer.getIntLE(buffer.readerIndex)
       val cbrb = reactivemongo.api.bson.buffer.
@@ -80,11 +71,7 @@ private[reactivemongo] sealed trait ReplyDocumentIteratorLowPriority {
 
   def parse[P <: SerializationPack, A](pack: P)(response: Response)(implicit reader: pack.Reader[A]): Iterator[A] = response match {
     case Response.CommandError(_, _, _, cause) =>
-      new Iterator[A] {
-        val hasNext = false
-        @inline def next: A = throw cause
-        //throw ReplyDocumentIteratorExhaustedException(cause)
-      }
+      new FailingIterator[A](cause)
 
     case Response.WithCursor(_, _, _, _, _, _, preloaded) => {
       val buf = response.documents
@@ -103,16 +90,18 @@ private[reactivemongo] sealed trait ReplyDocumentIteratorLowPriority {
 
           firstBatch ++ docs
         } catch {
-          case cause: Exception => new Iterator[A] {
-            val hasNext = false
-            @inline def next: A = throw cause
-            //throw ReplyDocumentIteratorExhaustedException(cause)
-          }
+          case cause: Exception => new FailingIterator[A](cause)
         }
       }
     }
 
     case _ => parseDocuments[P, A](pack)(response.documents)
+  }
+
+  protected final class FailingIterator[A](
+    cause: Throwable) extends Iterator[A] {
+    val hasNext = false
+    @inline def next: A = throw cause
   }
 }
 

@@ -2,8 +2,6 @@ package reactivemongo.api
 
 import java.util.UUID
 
-import scala.language.higherKinds
-
 import scala.reflect.ClassTag
 
 import scala.util.Try

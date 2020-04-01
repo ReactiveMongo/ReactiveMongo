@@ -1,7 +1,5 @@
 package reactivemongo.api.collections
 
-import scala.language.higherKinds
-
 import scala.util.{ Failure, Success, Try }
 
 import scala.collection.mutable.Builder
@@ -83,7 +81,7 @@ private[api] trait DistinctOp[P <: SerializationPack with Singleton] extends Dis
 
   private def commandWriter: pack.Writer[DistinctCmd] = {
     val builder = pack.newBuilder
-    val session = collection.db.session.filter( // TODO#1.1: Remove
+    val session = collection.db.session.filter(
       _ => (version.compareTo(MongoWireVersion.V36) >= 0))
 
     val writeReadConcern =

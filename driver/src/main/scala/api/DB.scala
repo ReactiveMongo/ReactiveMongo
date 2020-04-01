@@ -44,7 +44,7 @@ import reactivemongo.api.commands.{
  *
  * def foo(connection: MongoConnection)(implicit ec: ExecutionContext) = {
  *   val db = connection.database("plugin")
- *   val collection = db.map(_("acoll"))
+ *   val _ = db.map(_("acoll")) // Collection reference
  * }
  * }}}
  *
@@ -438,8 +438,7 @@ final class DB(
     reference: Cursor.Reference,
     readPreference: ReadPreference = defaultReadPreference,
     failoverStrategy: FailoverStrategy = this.failoverStrategy,
-    maxTimeMS: Option[Long] = None,
-    isMongo26WriteOp: Boolean = false)(
+    maxTimeMS: Option[Long] = None)(
     implicit
     reader: pack.Reader[T],
     cp: CursorProducer[T]): cp.ProducedCursor = {
@@ -450,8 +449,7 @@ final class DB(
       _ref = reference,
       readPreference = readPreference,
       failover = failoverStrategy,
-      maxTimeMS = maxTimeMS,
-      isMongo26WriteOp = isMongo26WriteOp) {
+      maxTimeMS = maxTimeMS) {
       type P = pack.type
       val _pack: P = pack
       val reader = r
