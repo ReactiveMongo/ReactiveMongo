@@ -9,6 +9,7 @@ import reactivemongo.core.errors.GenericDriverException
 import reactivemongo.api.{ SerializationPack, Session, WriteConcern }
 import reactivemongo.api.commands.{
   CommandCodecs,
+  InsertCommand,
   LastError,
   MultiBulkWriteResult,
   ResolvedCollectionCommand,
@@ -20,13 +21,10 @@ import reactivemongo.api.commands.{
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
  */
-trait InsertOps[P <: SerializationPack with Singleton] {
-  collection: GenericCollection[P] =>
+trait InsertOps[P <: SerializationPack with Singleton]
+  extends InsertCommand[P] { collection: GenericCollection[P] =>
 
-  private object InsertCommand
-    extends reactivemongo.api.commands.InsertCommand[collection.pack.type] {
-    val pack: collection.pack.type = collection.pack
-  }
+  private[reactivemongo] def session(): Option[Session] = collection.db.session
 
   /**
    * @param ordered $orderedParam
@@ -44,47 +42,6 @@ trait InsertOps[P <: SerializationPack with Singleton] {
     }
   }
 
-  private type InsertCmd = ResolvedCollectionCommand[InsertCommand.Insert]
-
-  private def insertWriter(session: Option[Session]): pack.Writer[InsertCmd] = {
-    val builder = pack.newBuilder
-    val writeWriteConcern = CommandCodecs.writeWriteConcern(pack)
-    val writeSession = CommandCodecs.writeSession(builder)
-
-    import builder.{ elementProducer => element }
-
-    pack.writer[InsertCmd] { insert =>
-      import insert.command
-
-      val documents = builder.array(command.head, command.tail)
-      val ordered = builder.boolean(command.ordered)
-      val elements = Seq.newBuilder[pack.ElementProducer]
-
-      elements ++= Seq[pack.ElementProducer](
-        element("insert", builder.string(insert.collection)),
-        element("ordered", ordered),
-        element(
-          "bypassDocumentValidation",
-          builder.boolean(command.bypassDocumentValidation)))
-
-      session.foreach { s =>
-        elements ++= writeSession(s)
-      }
-
-      if (!session.exists(_.transaction.isSuccess)) {
-        // writeConcern is not allowed within a multi-statement transaction
-        // code=72
-
-        elements += element(
-          "writeConcern", writeWriteConcern(command.writeConcern))
-      }
-
-      elements += element("documents", documents)
-
-      builder.document(elements.result())
-    }
-  }
-
   /** Builder for insert operations. */
   sealed trait InsertBuilder {
     //implicit protected def writer: pack.Writer[T]
@@ -98,7 +55,7 @@ trait InsertOps[P <: SerializationPack with Singleton] {
 
       val emptyCmd = new ResolvedCollectionCommand(
         collection.name,
-        new InsertCommand.Insert(
+        new Insert(
           emptyDoc, Seq.empty[pack.Document], ordered, writeConcern, false))
 
       val doc = pack.serialize(emptyCmd, insertWriter(None))
@@ -181,7 +138,7 @@ trait InsertOps[P <: SerializationPack with Singleton] {
         }
       })
 
-    implicit private val resultReader: pack.Reader[InsertCommand.InsertResult] =
+    implicit private val resultReader: pack.Reader[InsertResult] =
       CommandCodecs.defaultWriteResultReader(pack)
 
     implicit private lazy val writer: pack.Writer[InsertCmd] =
@@ -189,7 +146,7 @@ trait InsertOps[P <: SerializationPack with Singleton] {
 
     private final def execute(documents: Seq[pack.Document])(implicit ec: ExecutionContext): Future[WriteResult] = documents.headOption match {
       case Some(head) => {
-        val cmd = new InsertCommand.Insert(
+        val cmd = new Insert(
           head, documents.tail, ordered, writeConcern,
           bypassDocumentValidation)
 

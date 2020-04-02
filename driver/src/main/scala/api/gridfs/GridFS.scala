@@ -34,7 +34,8 @@ import reactivemongo.api.{
   FailingCursor,
   PackSupport,
   ReadPreference,
-  SerializationPack
+  SerializationPack,
+  Session
 }
 
 import reactivemongo.api.commands.{
@@ -42,6 +43,7 @@ import reactivemongo.api.commands.{
   Command,
   CommandError,
   CommandCodecs,
+  InsertCommand,
   ResolvedCollectionCommand,
   WriteResult
 }
@@ -63,7 +65,8 @@ import reactivemongo.api.gridfs.{ FileToSave => SF, ReadFile => RF }
  * @define fileReader fileReader a file reader automatically resolved if `Id` is a valid value
  */ // TODO: Remove 'with Singleton'
 sealed trait GridFS[P <: SerializationPack with Singleton]
-  extends PackSupport[P] with QueryBuilderFactory[P] { self =>
+  extends PackSupport[P] with InsertCommand[P]
+  with QueryBuilderFactory[P] { self =>
 
   /* The database where this store is located. */
   protected def db: DB with DBMetaCommands
@@ -74,6 +77,8 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
    * named `\${prefix}.files` and `\${prefix}.chunks`.
    */
   protected def prefix: String
+
+  private[reactivemongo] def session(): Option[Session] = db.session
 
   /* The `files` collection */
   private lazy val fileColl = new Collection {
@@ -460,7 +465,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
       elem("n", builder.int(n)),
       elem("data", builder.binary(bytes))))
 
-    val insertChunkCmd = new InsertCommand.Insert(
+    val insertChunkCmd = new Insert(
       head = chunkDoc,
       tail = Seq.empty[pack.Document],
       ordered = false,
@@ -510,7 +515,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
       res <- {
         val fileDoc = document(fileProps.result())
 
-        val insertFileCmd = new InsertCommand.Insert(
+        val insertFileCmd = new Insert(
           head = fileDoc,
           tail = Seq.empty[pack.Document],
           ordered = false,
@@ -588,21 +593,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
 
   // Insert command
 
-  private object InsertCommand
-    extends reactivemongo.api.commands.InsertCommand[pack.type] {
-    val pack: self.pack.type = self.pack
-  }
-
-  private type InsertCmd = ResolvedCollectionCommand[InsertCommand.Insert]
-
-  implicit private lazy val insertWriter: pack.Writer[InsertCmd] = {
-    val underlying = reactivemongo.api.commands.InsertCommand.
-      writer(pack)(InsertCommand)(db.session)
-
-    pack.writer[InsertCmd](underlying)
-  }
-
-  private lazy val insertReader: pack.Reader[InsertCommand.InsertResult] =
+  private lazy val insertReader: pack.Reader[InsertResult] =
     CommandCodecs.defaultWriteResultReader(pack)
 
   // Delete command

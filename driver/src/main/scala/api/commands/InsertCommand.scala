@@ -1,16 +1,21 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ SerializationPack, Session, WriteConcern }
+import reactivemongo.api.{
+  PackSupport,
+  SerializationPack,
+  Session,
+  WriteConcern
+}
 
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/insert/ insert]] command.
  */
-private[reactivemongo] trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
+private[reactivemongo] trait InsertCommand[P <: SerializationPack with Singleton] { self: PackSupport[P] =>
   /**
    * @param head the first mandatory document
    * @param tail maybe other documents
    */
-  final class Insert(
+  private[reactivemongo] final class Insert(
     val head: pack.Document,
     val tail: Seq[pack.Document],
     val ordered: Boolean,
@@ -30,47 +35,48 @@ private[reactivemongo] trait InsertCommand[P <: SerializationPack] extends Impli
     override def hashCode: Int = tupled.hashCode
   }
 
-  type InsertResult = DefaultWriteResult // for simplified imports
-}
+  private[reactivemongo] type InsertResult = DefaultWriteResult // for simplified imports
 
-@deprecated("Will be removed", "0.19.8")
-private[reactivemongo] object InsertCommand {
-  // TODO#1.1: Remove when BSONInsertCommand is removed
-  def writer[P <: SerializationPack with Singleton](pack: P)(
-    context: InsertCommand[pack.type]): Option[Session] => ResolvedCollectionCommand[context.Insert] => pack.Document = {
+  private[reactivemongo] final type InsertCmd = ResolvedCollectionCommand[Insert]
+
+  private[reactivemongo] def session(): Option[Session]
+
+  private[reactivemongo] final implicit lazy val insertWriter: pack.Writer[InsertCmd] = {
     val builder = pack.newBuilder
     val writeWriteConcern = CommandCodecs.writeWriteConcern(pack)
     val writeSession = CommandCodecs.writeSession(builder)
+    val session = self.session()
 
-    { session: Option[Session] =>
-      import builder.{ elementProducer => element }
+    import builder.{ elementProducer => element }
 
-      { insert =>
-        import insert.command
+    pack.writer[InsertCmd] { insert =>
+      import insert.command
 
-        val documents = builder.array(command.head, command.tail)
-        val ordered = builder.boolean(command.ordered)
-        val elements = Seq.newBuilder[pack.ElementProducer]
+      val documents = builder.array(command.head, command.tail)
+      val ordered = builder.boolean(command.ordered)
+      val elements = Seq.newBuilder[pack.ElementProducer]
 
-        elements ++= Seq[pack.ElementProducer](
-          element("insert", builder.string(insert.collection)),
-          element("ordered", ordered),
-          element("documents", documents))
+      elements ++= Seq[pack.ElementProducer](
+        element("insert", builder.string(insert.collection)),
+        element("ordered", ordered),
+        element("documents", documents),
+        element(
+          "bypassDocumentValidation",
+          builder.boolean(command.bypassDocumentValidation)))
 
-        session.foreach { s =>
-          elements ++= writeSession(s)
-        }
-
-        if (!session.exists(_.transaction.isSuccess)) {
-          // writeConcern is not allowed within a multi-statement transaction
-          // code=72
-
-          elements += element(
-            "writeConcern", writeWriteConcern(command.writeConcern))
-        }
-
-        builder.document(elements.result())
+      session.foreach { s =>
+        elements ++= writeSession(s)
       }
+
+      if (!session.exists(_.transaction.isSuccess)) {
+        // writeConcern is not allowed within a multi-statement transaction
+        // code=72
+
+        elements += element(
+          "writeConcern", writeWriteConcern(command.writeConcern))
+      }
+
+      builder.document(elements.result())
     }
   }
 }
