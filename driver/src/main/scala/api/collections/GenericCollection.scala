@@ -380,10 +380,10 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param fetchNewObject the command result must be the new object instead of the old one.
    * @param upsert $upsertParam
    */
-  def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): FindAndUpdate = new FindAndModifyCommand.Update(pack.serialize(update, updateWriter), fetchNewObject, upsert)
+  def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): FindAndUpdateOp = new FindAndUpdateOp(pack.serialize(update, updateWriter), fetchNewObject, upsert)
 
   /** Returns a removal modifier, to be used with `findAndModify`. */
-  @transient lazy val removeModifier: FindAndRemove = FindAndRemove
+  @inline def removeModifier = FindAndRemoveOp
 
   /**
    * Applies a [[http://docs.mongodb.org/manual/reference/command/findAndModify/ findAndModify]] operation. See `findAndUpdate` and `findAndRemove` convenient functions.

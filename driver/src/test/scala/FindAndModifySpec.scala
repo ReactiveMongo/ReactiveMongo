@@ -1,10 +1,7 @@
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.WriteConcern
-import reactivemongo.api.commands.{
-  CommandError,
-  FindAndModifyCommand
-}
+import reactivemongo.api.commands.CommandError
 
 import reactivemongo.api.bson.BSONDocument
 
@@ -22,8 +19,6 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
   import Common._
 
   "Raw findAndModify" should {
-    type FindAndModifyResult = FindAndModifyCommand.Result[pack.type]
-
     case class Person(
       firstName: String,
       lastName: String,
@@ -57,7 +52,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
         p: Person,
         age: Int,
         timeout: FiniteDuration)(
-        check: FindAndModifyResult => org.specs2.matcher.MatchResult[Any]) = {
+        check: c.FindAndModifyResult => org.specs2.matcher.MatchResult[Any]) = {
 
         val after = p.copy(age = age)
 
@@ -73,7 +68,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
           maxTime = Option.empty,
           collation = Option.empty,
           arrayFilters = Seq.empty).
-          aka("result") must (beLike[FindAndModifyResult] {
+          aka("result") must (beLike[c.FindAndModifyResult] {
             case result =>
               //println(s"FindAndModify#0: $age -> ${result.lastError}")
 
@@ -101,7 +96,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
         collection.count(Some(writeDocument(jack1))).
           aka("count before") must beTypedEqualTo(0L).await(1, timeout) and {
             upsertAndFetch(collection, jack1, after.age, timeout) { result =>
-              result.lastError.exists(_.upsertedId.isDefined) must beTrue
+              result.lastError.exists(_.upserted.isDefined) must beTrue
             }
           }
       }
@@ -119,7 +114,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
           } and eventually(2, timeout) {
             upsertAndFetch(
               slowColl, before, after.age, slowTimeout) { result =>
-              result.lastError.exists(_.upsertedId.isDefined) must beFalse
+              result.lastError.exists(_.upserted.isDefined) must beFalse
             }
           }
       }
@@ -135,7 +130,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
 
       collection.insert(ordered = true).one(jack2).
         map(_.n) must beTypedEqualTo(1).await(0, slowTimeout) and {
-          future must (beLike[FindAndModifyResult] {
+          future must (beLike[collection.FindAndModifyResult] {
             case res =>
               /*
               scala.concurrent.Await.result(collection.find(BSONDocument.empty).

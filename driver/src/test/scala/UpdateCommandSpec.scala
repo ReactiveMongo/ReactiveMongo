@@ -1,7 +1,6 @@
 package reactivemongo
 
 import reactivemongo.api.bson.{ BSONArray, BSONBinary, BSONDocument }
-import reactivemongo.api.bson.collection.BSONSerializationPack
 
 import reactivemongo.core.protocol.MongoWireVersion
 
