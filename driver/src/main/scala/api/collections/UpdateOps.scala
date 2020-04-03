@@ -7,10 +7,11 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.{ Collation, SerializationPack, Session, WriteConcern }
+import reactivemongo.api.{ Collation, SerializationPack, WriteConcern }
 import reactivemongo.api.commands.{
   MultiBulkWriteResult,
   ResolvedCollectionCommand,
+  UpdateCommand,
   UpdateWriteResult,
   WriteResult
 }
@@ -20,13 +21,11 @@ import reactivemongo.api.commands.{
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.update/#perform-an-unordered-update ordered]] behaviour
  * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
  */
-trait UpdateOps[P <: SerializationPack with Singleton] {
-  collection: GenericCollection[P] =>
+trait UpdateOps[P <: SerializationPack with Singleton]
+  extends UpdateCommand[P] { collection: GenericCollection[P] =>
 
-  private[reactivemongo] object UpdateCommand
-    extends reactivemongo.api.commands.UpdateCommand[collection.pack.type] {
-    val pack: collection.pack.type = collection.pack
-  }
+  protected lazy val maxWireVersion =
+    collection.db.connectionState.metadata.maxWireVersion
 
   /**
    * @param ordered $orderedParam
@@ -43,8 +42,6 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
 
   /** Builder for update operations. */
   sealed trait UpdateBuilder {
-    import UpdateCommand.UpdateElement
-
     /** $orderedParam */
     def ordered: Boolean
 
@@ -57,27 +54,27 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
     protected def bulkRecover: Option[Exception => Future[UpdateWriteResult]]
 
     /**
-     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateCommand.UpdateElement]]).
+     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateElement]]).
      */
     final def one[Q, U](q: Q, u: U, upsert: Boolean = false, multi: Boolean = false)(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi, None, Seq.empty).flatMap { upd => execute(upd) }
 
     /**
-     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateCommand.UpdateElement]]).
+     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateElement]]).
      */
     final def one[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation])(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi, collation, Seq.empty).flatMap { upd => execute(upd) }
 
     /**
-     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateCommand.UpdateElement]]).
+     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateElement]]).
      */
     final def one[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi, collation, arrayFilters).flatMap { upd => execute(upd) }
 
-    /** Prepares an [[UpdateCommand.UpdateElement]] */
+    /** Prepares an [[UpdateElement]] */
     final def element[Q, U](q: Q, u: U, upsert: Boolean = false, multi: Boolean = false)(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] = element(q, u, upsert, multi, None, Seq.empty)
 
-    /** Prepares an [[UpdateCommand.UpdateElement]] */
+    /** Prepares an [[UpdateElement]] */
     final def element[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation])(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] = element(q, u, upsert, multi, collation, Seq.empty)
 
-    /** Prepares an [[UpdateCommand.UpdateElement]] */
+    /** Prepares an [[UpdateElement]] */
     final def element[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] = {
       (Try(pack.serialize(q, qw)).map { query =>
         new UpdateElement(query, pack.serialize(u, uw), upsert, multi, collation, arrayFilters)
@@ -181,16 +178,6 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
 
     @inline private def metadata = db.connectionState.metadata
 
-    private type UpdateCmd = ResolvedCollectionCommand[UpdateCommand.Update]
-
-    private def updateWriter(
-      session: Option[Session]): pack.Writer[UpdateCmd] = {
-      val underlying = reactivemongo.api.commands.UpdateCommand.
-        writer(pack)(UpdateCommand)(session, metadata.maxWireVersion)
-
-      pack.writer[UpdateCmd](underlying)
-    }
-
     /** The max BSON size, including the size of command envelope */
     private def maxBsonSize = {
       val builder = pack.newBuilder
@@ -205,7 +192,7 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
       // Command envelope to compute accurate BSON size limit
       val emptyCmd = new ResolvedCollectionCommand(
         collection.name,
-        new UpdateCommand.Update(
+        new Update(
           emptyElm, Seq.empty, ordered, writeConcern, false))
 
       val doc = pack.serialize(emptyCmd, updateWriter(None))
@@ -247,7 +234,7 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
       implicit
       ec: ExecutionContext): Future[UpdateWriteResult] = {
 
-      val cmd = new UpdateCommand.Update(
+      val cmd = new Update(
         firstUpdate, updates, ordered, writeConcern, bypassDocumentValidation)
 
       runCommand(cmd, writePreference).flatMap { wr =>

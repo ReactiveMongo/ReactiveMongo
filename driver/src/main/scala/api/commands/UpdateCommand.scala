@@ -2,13 +2,18 @@ package reactivemongo.api.commands
 
 import reactivemongo.core.protocol.MongoWireVersion
 
-import reactivemongo.api.{ Collation, Session, SerializationPack, WriteConcern }
+import reactivemongo.api.{
+  Collation,
+  PackSupport,
+  Session,
+  SerializationPack,
+  WriteConcern
+}
 
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/update/ update]] command.
  */
-private[reactivemongo] trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
-  val pack: P
+private[reactivemongo] trait UpdateCommand[P <: SerializationPack with Singleton] { _: PackSupport[P] =>
 
   final class Update(
     val firstUpdate: UpdateElement,
@@ -26,10 +31,11 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] extends Impli
     }
 
     @inline override def hashCode: Int = tupled.hashCode
-
   }
 
-  type UpdateResult = UpdateWriteResult
+  final type UpdateResult = UpdateWriteResult
+
+  final protected[reactivemongo] type UpdateCmd = ResolvedCollectionCommand[Update]
 
   /**
    * @param q the query that matches the documents to update
@@ -58,24 +64,21 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] extends Impli
 
     override def toString: String = s"UpdateElement${data.toString}"
   }
-}
 
-private[reactivemongo] object UpdateCommand {
-  def writeElement[P <: SerializationPack with Singleton](
-    context: UpdateCommand[P], ver: MongoWireVersion)(
-    builder: SerializationPack.Builder[context.pack.type]): context.UpdateElement => context.pack.Document = {
-    import builder.{ boolean, document, elementProducer, pack }
+  final protected[reactivemongo] def writeElement(
+    builder: SerializationPack.Builder[pack.type]): UpdateElement => pack.Document = {
+    import builder.{ boolean, document, elementProducer }
 
-    def base(element: context.UpdateElement) =
+    def base(element: UpdateElement) =
       Seq.newBuilder[pack.ElementProducer] += (
         elementProducer("q", element.q),
         elementProducer("u", element.u),
         elementProducer("upsert", boolean(element.upsert)),
         elementProducer("multi", boolean(element.multi)))
 
-    if (ver < MongoWireVersion.V34) { element =>
+    if (maxWireVersion < MongoWireVersion.V34) { element =>
       document(base(element).result())
-    } else if (ver < MongoWireVersion.V36) { element =>
+    } else if (maxWireVersion < MongoWireVersion.V36) { element =>
       val elements = base(element)
 
       element.collation.foreach { c =>
@@ -103,50 +106,50 @@ private[reactivemongo] object UpdateCommand {
     }
   }
 
-  // TODO: Unit test
-  def writer[P <: SerializationPack with Singleton](pack: P)(
-    context: UpdateCommand[pack.type]): (Option[Session], MongoWireVersion) => ResolvedCollectionCommand[context.Update] => pack.Document = {
+  private[reactivemongo] def session(): Option[Session]
+
+  protected def maxWireVersion: MongoWireVersion
+
+  implicit final private[reactivemongo] lazy val updateWriter: pack.Writer[UpdateCmd] = pack.writer[UpdateCmd](writer)
+
+  final private def writer: ResolvedCollectionCommand[Update] => pack.Document = {
     val builder = pack.newBuilder
-    val writeWriteConcern = CommandCodecs.writeWriteConcern(pack)
     val writeSession = CommandCodecs.writeSession(builder)
+    val writeElement = this.writeElement(builder)
+    val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
 
-    { (session: Option[Session], ver: MongoWireVersion) =>
-      import builder.{ elementProducer => element }
+    import builder.{ elementProducer => element }
 
-      val writeElement = UpdateCommand.writeElement(context, ver)(builder)
+    { update =>
+      import update.command
 
-      { update =>
-        import update.command
+      val ordered = builder.boolean(command.ordered)
+      val elements = Seq.newBuilder[pack.ElementProducer]
 
-        val ordered = builder.boolean(command.ordered)
-        val elements = Seq.newBuilder[pack.ElementProducer]
+      elements ++= Seq[pack.ElementProducer](
+        element("update", builder.string(update.collection)),
+        element("ordered", ordered),
+        element("updates", builder.array(
+          writeElement(command.firstUpdate),
+          command.updates.map(writeElement))))
 
-        elements ++= Seq[pack.ElementProducer](
-          element("update", builder.string(update.collection)),
-          element("ordered", ordered),
-          element("updates", builder.array(
-            writeElement(command.firstUpdate),
-            command.updates.map(writeElement))))
-
-        session.foreach { s =>
-          elements ++= writeSession(s)
-        }
-
-        if (!session.exists(_.transaction.isSuccess)) {
-          // writeConcern is not allowed within a multi-statement transaction
-          // code=72
-
-          elements += element(
-            "writeConcern", writeWriteConcern(command.writeConcern))
-        }
-
-        builder.document(elements.result())
+      session.foreach { s =>
+        elements ++= writeSession(s)
       }
+
+      if (!session.exists(_.transaction.isSuccess)) {
+        // writeConcern is not allowed within a multi-statement transaction
+        // code=72
+
+        elements += element(
+          "writeConcern", writeWriteConcern(command.writeConcern))
+      }
+
+      builder.document(elements.result())
     }
   }
 
-  def reader[P <: SerializationPack with Singleton](pack: P)(
-    context: UpdateCommand[pack.type]): pack.Reader[context.UpdateResult] = {
+  final protected implicit def updateReader: pack.Reader[UpdateResult] = {
     val decoder = pack.newDecoder
     val readWriteError = CommandCodecs.readWriteError(decoder)
     val readWriteConcernError = CommandCodecs.readWriteConcernError(decoder)

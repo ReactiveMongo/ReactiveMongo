@@ -110,6 +110,9 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     readConcern = this.readConcern,
     readPreference = this.readPreference)
 
+  // Required for ops (e.g. InsertOps, ...)
+  private[reactivemongo] def session(): Option[Session] = db.session
+
   /**
    * Returns a new reference to the same collection,
    * with the given read preference.

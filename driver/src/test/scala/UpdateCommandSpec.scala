@@ -5,7 +5,13 @@ import reactivemongo.api.bson.collection.BSONSerializationPack
 
 import reactivemongo.core.protocol.MongoWireVersion
 
-import reactivemongo.api.{ NodeSetSession, SessionTransaction, WriteConcern }
+import reactivemongo.api.{
+  NodeSetSession,
+  PackSupport,
+  Session,
+  SessionTransaction,
+  WriteConcern
+}
 
 import reactivemongo.api.commands.{
   UpdateCommand,
@@ -15,7 +21,7 @@ import reactivemongo.api.commands.{
 final class UpdateCommandSpec extends org.specs2.mutable.Specification {
   "Update command" title
 
-  private val writer = UpdateCommand.writer(BSONSerializationPack)(Command)
+  //private val writer = UpdateCommand.writer(BSONSerializationPack)(Command)
 
   section("unit")
   "Update command" should {
@@ -49,29 +55,37 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
       // ---
 
       "without session" in {
-        writer(None, MongoWireVersion.V30)(
-          update1) must_=== (base ++ writeConcern)
+        val cmd = new Command(None)
+
+        withUpdate(cmd) { update =>
+          cmd.pack.serialize(
+            update, cmd.updateWriter) must_=== (base ++ writeConcern)
+        }
       }
 
       "with session" in {
-        val write = writer(Some(session), MongoWireVersion.V30)
+        val cmd = new Command(Some(session))
 
-        // w/o transaction started
-        write(update1) must_=== (base ++ lsid ++ writeConcern) and {
-          session.startTransaction(WriteConcern.Default, None).
-            aka("transaction") must beSuccessfulTry[(SessionTransaction, Boolean)].which { _ =>
-              // w/ transaction started
+        withUpdate(cmd) { update =>
+          val write = cmd.pack.serialize(_: cmd.UpdateCmd, cmd.updateWriter)
 
-              write(update1) must_=== (base ++ lsid ++ BSONDocument(
-                "txnNumber" -> 1L,
-                "startTransaction" -> true, // as first command in tx
-                "autocommit" -> false))
-            }
-        } and {
-          // w/o 'startTransaction' flag after first command in tx
+          // w/o transaction started
+          write(update) must_=== (base ++ lsid ++ writeConcern) and {
+            session.startTransaction(WriteConcern.Default, None).
+              aka("transaction") must beSuccessfulTry[(SessionTransaction, Boolean)].which { _ =>
+                // w/ transaction started
 
-          write(update1) must_=== (base ++ lsid ++ BSONDocument(
-            "txnNumber" -> 1L, "autocommit" -> false))
+                write(update) must_=== (base ++ lsid ++ BSONDocument(
+                  "txnNumber" -> 1L,
+                  "startTransaction" -> true, // as first command in tx
+                  "autocommit" -> false))
+              }
+          } and {
+            // w/o 'startTransaction' flag after first command in tx
+
+            write(update) must_=== (base ++ lsid ++ BSONDocument(
+              "txnNumber" -> 1L, "autocommit" -> false))
+          }
         }
       }
     }
@@ -80,32 +94,42 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
 
   // ---
 
-  private lazy val element1 = new Command.UpdateElement(
-    q = BSONDocument("_id" -> 1),
-    u = BSONDocument(f"$$set" -> BSONDocument("value" -> 1)),
-    upsert = true,
-    multi = false,
-    collation = None,
-    arrayFilters = Seq.empty)
+  private def withUpdate[T](cmd: Command)(f: cmd.UpdateCmd => T): T = {
+    val element1 = new cmd.UpdateElement(
+      q = BSONDocument("_id" -> 1),
+      u = BSONDocument(f"$$set" -> BSONDocument("value" -> 1)),
+      upsert = true,
+      multi = false,
+      collation = None,
+      arrayFilters = Seq.empty)
 
-  private lazy val element2 = new Command.UpdateElement(
-    q = BSONDocument("value" -> 2),
-    u = BSONDocument(f"$$set" -> BSONDocument("label" -> "two")),
-    upsert = false,
-    multi = true,
-    collation = None,
-    arrayFilters = Seq.empty)
+    val element2 = new cmd.UpdateElement(
+      q = BSONDocument("value" -> 2),
+      u = BSONDocument(f"$$set" -> BSONDocument("label" -> "two")),
+      upsert = false,
+      multi = true,
+      collation = None,
+      arrayFilters = Seq.empty)
 
-  private lazy val update1 = new ResolvedCollectionCommand(
-    collection = "foo",
-    command = new Command.Update(
-      ordered = true,
-      writeConcern = WriteConcern.Default,
-      bypassDocumentValidation = false,
-      firstUpdate = element1,
-      updates = Seq(element2)))
+    f(new ResolvedCollectionCommand(
+      collection = "foo",
+      command = new cmd.Update(
+        ordered = true,
+        writeConcern = WriteConcern.Default,
+        bypassDocumentValidation = false,
+        firstUpdate = element1,
+        updates = Seq(element2))))
+  }
 
-  private object Command extends UpdateCommand[BSONSerializationPack.type] {
-    val pack = BSONSerializationPack
+  import reactivemongo.api.tests.Pack
+
+  private final class Command(s: Option[Session])
+    extends PackSupport[Pack] with UpdateCommand[Pack] {
+
+    private[reactivemongo] def session(): Option[Session] = s
+
+    protected val maxWireVersion = MongoWireVersion.V30
+
+    val pack = reactivemongo.api.tests.pack
   }
 }

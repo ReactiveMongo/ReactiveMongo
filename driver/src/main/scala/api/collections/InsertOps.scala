@@ -6,7 +6,8 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.{ SerializationPack, Session, WriteConcern }
+import reactivemongo.api.{ SerializationPack, WriteConcern }
+
 import reactivemongo.api.commands.{
   CommandCodecsWithPack,
   InsertCommand,
@@ -24,8 +25,6 @@ import reactivemongo.api.commands.{
 trait InsertOps[P <: SerializationPack with Singleton]
   extends InsertCommand[P] with CommandCodecsWithPack[P] {
   collection: GenericCollection[P] =>
-
-  private[reactivemongo] def session(): Option[Session] = collection.db.session
 
   /**
    * @param ordered $orderedParam
