@@ -8,7 +8,8 @@ import reactivemongo.core.errors.GenericDriverException
 
 import reactivemongo.api.{ Collation, SerializationPack, Session, WriteConcern }
 import reactivemongo.api.commands.{
-  CommandCodecs,
+  CommandCodecsWithPack,
+  DeleteCommand,
   LastError,
   MultiBulkWriteResult,
   ResolvedCollectionCommand,
@@ -19,14 +20,9 @@ import reactivemongo.api.commands.{
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  * @define orderedParam the ordered behaviour
  */
-trait DeleteOps[P <: SerializationPack with Singleton] {
+trait DeleteOps[P <: SerializationPack with Singleton]
+  extends DeleteCommand[P] with CommandCodecsWithPack[P] {
   collection: GenericCollection[P] =>
-
-  private[reactivemongo] object DeleteCommand
-    extends reactivemongo.api.commands.DeleteCommand[collection.pack.type] {
-    val pack: collection.pack.type = collection.pack
-  }
-  import DeleteCommand.{ Delete, DeleteElement }
 
   /**
    * @param ordered $orderedParam
@@ -40,53 +36,6 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
   }
 
   private type DeleteCmd = ResolvedCollectionCommand[DeleteCommand.Delete]
-
-  private lazy val deleteWriter: Option[Session] => pack.Writer[DeleteCmd] = {
-    val builder = pack.newBuilder
-    import builder.{ elementProducer => element }
-
-    val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
-    val writeSession = CommandCodecs.writeSession(builder)
-    val writeCollation = Collation.serializeWith(pack, _: Collation)(builder)
-
-    def writeElement(e: DeleteElement): pack.Document = {
-      val elements = Seq.newBuilder[pack.ElementProducer]
-
-      elements ++= Seq(
-        element("q", e.q),
-        element("limit", builder.int(e.limit)))
-
-      e.collation.foreach { c =>
-        elements += element("collation", writeCollation(c))
-      }
-
-      builder.document(elements.result())
-    }
-
-    { session =>
-      pack.writer[DeleteCmd] { delete =>
-        val elements = Seq.newBuilder[pack.ElementProducer]
-
-        elements ++= Seq(
-          element("delete", builder.string(delete.collection)),
-          element("ordered", builder.boolean(delete.command.ordered)),
-          element(
-            "writeConcern",
-            writeWriteConcern(delete.command.writeConcern)))
-
-        session.foreach { s =>
-          elements ++= writeSession(s)
-        }
-
-        delete.command.deletes.headOption.foreach { first =>
-          elements += element("deletes", builder.array(
-            writeElement(first), delete.command.deletes.map(writeElement)))
-        }
-
-        builder.document(elements.result())
-      }
-    }
-  }
 
   /**
    * Builder for delete operations.
@@ -105,7 +54,7 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     protected def bulkRecover: Option[Exception => Future[WriteResult]]
 
     /**
-     * Performs a delete with a one single selector (see [[DeleteCommand.DeleteElement]]).
+     * Performs a delete with a one single selector (see [[DeleteElement]]).
      * This will delete all the documents matched by the `q` selector.
      *
      * @param q $queryParam
@@ -115,7 +64,7 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     final def one[Q, U](q: Q, limit: Option[Int] = None, collation: Option[Collation] = None)(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[WriteResult] = element[Q, U](q, limit, collation).flatMap { upd => execute(Seq(upd)) }
 
     /**
-     * Prepares an [[DeleteCommand.DeleteElement]].
+     * Prepares an [[DeleteElement]].
      *
      * @param q $queryParam
      * @param limit $limitParam
@@ -202,7 +151,7 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     private final def execute(deletes: Seq[DeleteElement])(
       implicit
       ec: ExecutionContext): Future[WriteResult] = {
-      val cmd = Delete(deletes, ordered, writeConcern)
+      val cmd = new Delete(deletes, ordered, writeConcern)
 
       Future.successful(cmd).flatMap(
         runCommand(_, writePreference).flatMap { wr =>

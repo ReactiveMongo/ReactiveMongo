@@ -8,7 +8,7 @@ import reactivemongo.core.errors.GenericDriverException
 
 import reactivemongo.api.{ SerializationPack, Session, WriteConcern }
 import reactivemongo.api.commands.{
-  CommandCodecs,
+  CommandCodecsWithPack,
   InsertCommand,
   LastError,
   MultiBulkWriteResult,
@@ -22,7 +22,8 @@ import reactivemongo.api.commands.{
  * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
  */
 trait InsertOps[P <: SerializationPack with Singleton]
-  extends InsertCommand[P] { collection: GenericCollection[P] =>
+  extends InsertCommand[P] with CommandCodecsWithPack[P] {
+  collection: GenericCollection[P] =>
 
   private[reactivemongo] def session(): Option[Session] = collection.db.session
 

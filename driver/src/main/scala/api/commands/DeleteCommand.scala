@@ -1,31 +1,41 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ Collation, SerializationPack, WriteConcern }
+import reactivemongo.api.{
+  Collation,
+  PackSupport,
+  SerializationPack,
+  WriteConcern
+}
 
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/delete/ delete]] command.
  */
-private[reactivemongo] trait DeleteCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
-  case class Delete(
-    deletes: Seq[DeleteElement],
-    ordered: Boolean,
-    writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[DeleteResult]
+private[reactivemongo] trait DeleteCommand[P <: SerializationPack with Singleton] { self: PackSupport[P] =>
+
+  final class Delete private[api] (
+    val deletes: Seq[DeleteElement],
+    val ordered: Boolean,
+    val writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[DeleteResult]
 
   /**
    * @param q the query that matches documents to delete
    * @param limit the number of matching documents to delete
    * @param collation the collation to use for the operation
    */
-  final class DeleteElement(
+  final class DeleteElement private[api] (
     val q: pack.Document,
     val limit: Int,
     val collation: Option[Collation]) {
   }
 
-  type DeleteResult = DefaultWriteResult
+  final type DeleteResult = DefaultWriteResult
 
-  // TODO: Remove
-  def serialize(delete: ResolvedCollectionCommand[Delete]): pack.Document = {
+  protected final type DeleteCmd = ResolvedCollectionCommand[Delete]
+
+  protected final implicit lazy val deleteWriter: pack.Writer[DeleteCmd] =
+    pack.writer(serialize)
+
+  final protected def serialize(delete: ResolvedCollectionCommand[Delete]): pack.Document = {
     val builder = pack.newBuilder
     import builder.{ elementProducer => element }
 
@@ -47,7 +57,6 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] extends Impli
     builder.document(elements.result())
   }
 
-  // TODO: Remove
   private[api] def writeElement(
     builder: SerializationPack.Builder[pack.type],
     e: DeleteElement): pack.Document = {

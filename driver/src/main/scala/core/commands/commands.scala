@@ -61,7 +61,7 @@ trait Command[Result] {
  *
  * @tparam Result The result type of this command.
  */
-trait CommandResultMaker[Result] {
+private[reactivemongo] trait CommandResultMaker[Result] {
   protected type Pack <: SerializationPack
 
   protected val pack: Pack

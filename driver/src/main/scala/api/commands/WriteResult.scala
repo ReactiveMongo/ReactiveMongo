@@ -198,6 +198,7 @@ class WriteConcernError private[api] (
   override def toString = s"WriteConcernError${tupled.toString}"
 }
 
+// TODO: Remove?
 object WriteConcernError extends scala.runtime.AbstractFunction2[Int, String, WriteConcernError] {
   def apply(code: Int, errmsg: String): WriteConcernError =
     new WriteConcernError(code, errmsg)

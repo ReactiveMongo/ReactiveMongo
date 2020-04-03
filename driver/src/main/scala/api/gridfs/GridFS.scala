@@ -43,8 +43,9 @@ import reactivemongo.api.commands.{
   Command,
   CommandError,
   CommandCodecs,
+  CommandCodecsWithPack,
+  DeleteCommand,
   InsertCommand,
-  ResolvedCollectionCommand,
   WriteResult
 }
 
@@ -65,8 +66,8 @@ import reactivemongo.api.gridfs.{ FileToSave => SF, ReadFile => RF }
  * @define fileReader fileReader a file reader automatically resolved if `Id` is a valid value
  */ // TODO: Remove 'with Singleton'
 sealed trait GridFS[P <: SerializationPack with Singleton]
-  extends PackSupport[P] with InsertCommand[P]
-  with QueryBuilderFactory[P] { self =>
+  extends PackSupport[P] with InsertCommand[P] with DeleteCommand[P]
+  with CommandCodecsWithPack[P] with QueryBuilderFactory[P] { self =>
 
   /* The database where this store is located. */
   protected def db: DB with DBMetaCommands
@@ -323,17 +324,13 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
    * @param id the file id to remove from this store
    */
   def remove[Id <: pack.Value](id: Id)(implicit ec: ExecutionContext): Future[WriteResult] = {
-    import DeleteCommand.{ Delete, DeleteElement }
-
-    implicit def resultReader = deleteReader
-
-    val deleteChunkCmd = Delete(
+    val deleteChunkCmd = new Delete(
       Seq(new DeleteElement(
         q = document(Seq(elem("files_id", id))), 1, None)),
       ordered = false,
       writeConcern = defaultWriteConcern)
 
-    val deleteFileCmd = Delete(
+    val deleteFileCmd = new Delete(
       Seq(new DeleteElement(
         q = document(Seq(elem("_id", id))), 1, None)),
       ordered = false,
@@ -472,8 +469,6 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
       writeConcern = defaultWriteConcern,
       bypassDocumentValidation = false)
 
-    implicit def resultReader = insertReader
-
     runner(chunkColl, insertChunkCmd, defaultReadPreference)
   }
 
@@ -521,8 +516,6 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
           ordered = false,
           writeConcern = defaultWriteConcern,
           bypassDocumentValidation = false)
-
-        implicit def resultReader = insertReader
 
         runner(fileColl, insertFileCmd, defaultReadPreference).map { _ =>
           new ReadFile[Id](
@@ -590,26 +583,6 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
 
   @inline private def stats(coll: Collection)(implicit ec: ExecutionContext) =
     runner(coll, collStatsCmd, defaultReadPreference)
-
-  // Insert command
-
-  private lazy val insertReader: pack.Reader[InsertResult] =
-    CommandCodecs.defaultWriteResultReader(pack)
-
-  // Delete command
-
-  private object DeleteCommand
-    extends reactivemongo.api.commands.DeleteCommand[self.pack.type] {
-    val pack: self.pack.type = self.pack
-  }
-
-  private type DeleteCmd = ResolvedCollectionCommand[DeleteCommand.Delete]
-
-  implicit private lazy val deleteWriter: pack.Writer[DeleteCmd] =
-    pack.writer(DeleteCommand.serialize)
-
-  private lazy val deleteReader: pack.Reader[DeleteCommand.DeleteResult] =
-    CommandCodecs.defaultWriteResultReader(pack)
 
   // ---
 
