@@ -4,6 +4,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.commands.{
   AuthenticationRestriction,
+  CreateUserCommand,
   CommandCodecs,
   RenameCollection
 }
@@ -12,18 +13,17 @@ import reactivemongo.api.indexes.IndexesManager
 
 import reactivemongo.api.gridfs.GridFS
 
+import Serialization.{ Pack, internalSerializationPack, unitBoxReader }
+
 /** A mixin that provides commands about this database itself. */
-private[api] trait DBMetaCommands { self: DB =>
+private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
   import reactivemongo.api.commands.{
     Command,
-    CreateUserCommand,
     DropDatabase,
     ListCollectionNames,
     PingCommand,
     UserRole
   }
-  import Serialization.{ Pack, internalSerializationPack, unitBoxReader }
-
   private implicit lazy val dropWriter =
     DropDatabase.writer(internalSerializationPack)
 
@@ -150,13 +150,6 @@ private[api] trait DBMetaCommands { self: DB =>
   /** Type of writer to serialization database metadata */
   final type DBMetaWriter[T] = Pack#Writer[T]
 
-  private object InternalCreateUser extends CreateUserCommand[Pack] {
-    val pack: Pack = internalSerializationPack
-
-    implicit lazy val writer =
-      CreateUserCommand.writer[Pack](InternalCreateUser.pack: Pack)
-  }
-
   /**
    * [[https://docs.mongodb.com/manual/reference/command/createUser/ Create the user]] with given properties.
    *
@@ -203,20 +196,17 @@ private[api] trait DBMetaCommands { self: DB =>
     writeConcern: WriteConcern = connection.options.writeConcern,
     restrictions: List[AuthenticationRestriction] = List.empty,
     mechanisms: List[AuthenticationMode] = List.empty)(implicit ec: ExecutionContext, w: DBMetaWriter[T]): Future[Unit] = {
-    val command: CreateUserCommand[Pack]#CreateUser =
-      new InternalCreateUser.CreateUser(
-        name = user,
-        pwd = pwd,
-        customData = customData.flatMap(w.writeOpt),
-        roles = roles,
-        digestPassword = digestPassword,
-        writeConcern = Some(writeConcern),
-        authenticationRestrictions = restrictions,
-        mechanisms = mechanisms)
+    val command: CreateUser = new CreateUser(
+      name = user,
+      pwd = pwd,
+      customData = customData.flatMap(w.writeOpt),
+      roles = roles,
+      digestPassword = digestPassword,
+      writeConcern = Some(writeConcern),
+      authenticationRestrictions = restrictions,
+      mechanisms = mechanisms)
 
-    import InternalCreateUser.writer
-
-    Command.run(InternalCreateUser.pack, failoverStrategy)(
+    Command.run(pack, failoverStrategy)(
       self, command, ReadPreference.primary).map(_ => {})
   }
 

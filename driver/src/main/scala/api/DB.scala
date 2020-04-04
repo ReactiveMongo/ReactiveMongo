@@ -77,7 +77,7 @@ final class DB(
   private[api] val connectionState: ConnectionState,
   val failoverStrategy: FailoverStrategy = FailoverStrategy(),
   private[reactivemongo] val session: Option[Session] = Option.empty)
-  extends DBMetaCommands {
+  extends DBMetaCommands with PackSupport[Serialization.Pack] {
 
   import Serialization.{ internalSerializationPack, unitBoxReader }
 

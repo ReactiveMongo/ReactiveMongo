@@ -1,15 +1,37 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ AuthenticationMode, SerializationPack, WriteConcern }
+import reactivemongo.api.{
+  AuthenticationMode,
+  PackSupport,
+  SerializationPack,
+  WriteConcern
+}
 
 /**
  * [[https://docs.mongodb.com/manual/reference/command/createUser/#roles User role]]
  *
  * @param name the role name (e.g. `readWrite`)
  */
-class UserRole(val name: String)
+sealed class UserRole private[api] (val name: String) {
+  override def equals(that: Any): Boolean = that match {
+    case other: UserRole => this.name == other.name
+    case _               => false
+  }
+
+  override def hashCode: Int = name.hashCode
+
+  override def toString = s"UserRole($name)"
+}
+
+object UserRole {
+  /**
+   * @param name the role name (e.g. `readWrite`)
+   */
+  def apply(name: String): UserRole = new UserRole(name)
+}
 
 /**
+ * @param name the role name
  * @param db the name of the database
  */
 final class DBUserRole private[api] (
@@ -32,17 +54,11 @@ final class DBUserRole private[api] (
 }
 
 object DBUserRole {
-  def apply(name: String, db: String): DBUserRole =
-    new DBUserRole(name, db)
-
-  private[api] def unapply(role: DBUserRole) = Option(role).map(_.tupled)
-}
-
-/** User role extractor */
-object UserRole {
-  def apply(name: String): UserRole = new UserRole(name)
-
-  private[reactivemongo] def unapply(role: UserRole): Option[String] = Some(role.name)
+  /**
+   * @param name the role name
+   * @param db the name of the database
+   */
+  def apply(name: String, db: String): DBUserRole = new DBUserRole(name, db)
 }
 
 /**
@@ -68,12 +84,10 @@ sealed trait AuthenticationRestriction {
 }
 
 object AuthenticationRestriction {
-  def apply(
+  private[api] def apply(
     clientSource: List[String],
     serverAddress: List[String]): AuthenticationRestriction =
     new Impl(clientSource, serverAddress)
-
-  def unapply(restriction: AuthenticationRestriction): Option[(List[String], List[String])] = Some(restriction.tupled)
 
   // ---
 
@@ -82,9 +96,7 @@ object AuthenticationRestriction {
     val serverAddress: List[String]) extends AuthenticationRestriction
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-trait CreateUserCommand[P <: SerializationPack]
-  extends ImplicitCommandHelpers[P] {
+private[reactivemongo] trait CreateUserCommand[P <: SerializationPack with Singleton] { _: PackSupport[P] =>
 
   /**
    * The [[https://docs.mongodb.com/manual/reference/command/createUser/ createUser]] command.
@@ -96,7 +108,7 @@ trait CreateUserCommand[P <: SerializationPack]
    * @param writeConcern the optional level of [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]]
    * @param customData the custom data to associate with the user account
    */
-  final class CreateUser(
+  protected final class CreateUser(
     val name: String,
     val pwd: Option[String],
     val customData: Option[pack.Document],
@@ -106,21 +118,18 @@ trait CreateUserCommand[P <: SerializationPack]
     val authenticationRestrictions: List[AuthenticationRestriction],
     val mechanisms: List[AuthenticationMode])
     extends Command with CommandWithPack[P]
-    with CommandWithResult[UnitBox.type] {
-  }
-}
+    with CommandWithResult[UnitBox.type]
 
-private[reactivemongo] object CreateUserCommand {
-  def writer[P <: SerializationPack with Singleton](pack: P): pack.Writer[CreateUserCommand[pack.type]#CreateUser] = {
+  protected final implicit lazy val createUserWriter: pack.Writer[CreateUser] = {
     val builder = pack.newBuilder
 
     import builder.{ document, elementProducer => elmt, string }
 
     def writeRole(role: UserRole): pack.Value = role match {
-      case DBUserRole(name, dbn) =>
+      case r: DBUserRole =>
         document(Seq(
-          elmt("role", string(name)),
-          elmt("db", string(dbn))))
+          elmt("role", string(r.name)),
+          elmt("db", string(r.db))))
 
       case r =>
         string(r.name)
@@ -152,7 +161,7 @@ private[reactivemongo] object CreateUserCommand {
       document(elmts.result())
     }
 
-    pack.writer[CreateUserCommand[pack.type]#CreateUser] { create =>
+    pack.writer[CreateUser] { create =>
       val base = Seq[pack.ElementProducer](
         elmt("createUser", string(create.name)),
         elmt("digestPassword", builder.boolean(create.digestPassword)))
