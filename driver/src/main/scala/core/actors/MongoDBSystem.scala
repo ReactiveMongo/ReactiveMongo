@@ -661,7 +661,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
       val request = req.requestMaker(reqId)
 
       foldNodeConnection(_nodeSet, req.pinnedNode, request)(
-        req.promise.failure(_), { (_, con) =>
+        { r => req.promise.failure(r); () }, { (_, con) =>
           if (request.op.expectsResponse) {
             requestTracker.withAwaiting { (resps, chans) =>
               val chanId = con.channel.id
@@ -686,9 +686,9 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
             { chanId =>
               trace(s"Request $reqId successful on channel #${chanId}")
             }))
-        })
 
-      ()
+          ()
+        })
     }
 
     case ConnectAll => { // monitor
@@ -960,6 +960,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
     upd
   }
 
+  @com.github.ghik.silencer.silent("retain")
   private def retryAwaitingOnError(
     ns: NodeSet,
     discardedChannels: Map[ChannelId, Exception]): Unit =

@@ -59,10 +59,10 @@ private[api] trait DistinctOp[P <: SerializationPack] extends DistinctOpCompat[P
   /**
    * @param values the raw values (should not contain duplicate)
    */
-  protected case class DistinctResult(values: Traversable[pack.Value]) {
+  protected case class DistinctResult(values: Iterable[pack.Value]) {
     @annotation.tailrec
     protected final def result[T, M[_]](
-      values: Traversable[pack.Value],
+      values: Iterable[pack.Value],
       reader: pack.WidenValueReader[T],
       out: Builder[T, M[T]]): Try[M[T]] = values.headOption match {
       case Some(t) => pack.readValue(t, reader) match {

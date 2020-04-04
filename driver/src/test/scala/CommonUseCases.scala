@@ -40,7 +40,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
     }
 
     "insert some docs from a seq of docs" in {
-      val docs = (18 to 60).toStream.map(i => BSONDocument(
+      val docs = (18 to 60).map(i => BSONDocument(
         "age" -> i, "name" -> s"Jack${i}"))
 
       (for {

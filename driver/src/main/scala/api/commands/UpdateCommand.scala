@@ -68,7 +68,7 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] { _: PackSupp
     import builder.{ boolean, document, elementProducer }
 
     def base(element: UpdateElement) =
-      Seq.newBuilder[pack.ElementProducer] += (
+      Seq.newBuilder[pack.ElementProducer] ++= Seq(
         elementProducer("q", element.q),
         elementProducer("u", element.u),
         elementProducer("upsert", boolean(element.upsert)),

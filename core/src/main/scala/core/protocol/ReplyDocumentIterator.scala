@@ -25,7 +25,6 @@ private[reactivemongo] object ReplyDocumentIterator
 
           def docs = parseDocuments[BSONSerializationPack.type, A](pack)(buf)
 
-          //@com.github.ghik.silencer.silent(".*SerializationPack\\ is\\ deprecated.*")
           val firstBatch = preloaded.iterator.map { bson =>
             pack.deserialize(bson, reader)
           }

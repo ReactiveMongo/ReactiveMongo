@@ -33,7 +33,7 @@ object Compiler {
       "-deprecation",
       "-feature",
       "-language:higherKinds",
-      //"-Xfatal-warnings",
+      "-Xfatal-warnings",
       "-Xlint",
       "-Ywarn-numeric-widen",
       "-Ywarn-dead-code",
@@ -45,8 +45,8 @@ object Compiler {
 
       if (ver == "2.12") {
         Seq("-Ywarn-macros:after")
-      } else if (ver != "2.11") {
-        Nil
+      } else if (ver != "2.11") { // 2.13
+        Seq("-Wmacros:after")
       } else Seq(
         "-Yconst-opt",
         "-Yclosure-elim",
@@ -64,16 +64,19 @@ object Compiler {
       val v = scalaBinaryVersion.value
 
       val mongo30eol = "MongoDB\\ 3\\.0\\ EOL\\ reached\\ by\\ Feb\\ 2018"
+      val rightBiaised = "Either\\ is\\ now\\ right-biased"
+
+      val silencer = s"-P:silencer:globalFilters=$mongo30eol;$rightBiaised"
 
       if (v == "2.13") {
-        Nil
+        Seq(silencer)
       } else {
         Seq(
           "-Ywarn-infer-any",
           "-Ywarn-unused",
           "-Ywarn-unused-import",
           "-Xlint:missing-interpolator",
-          s"-P:silencer:globalFilters=$mongo30eol"
+          silencer
         )
       }
     },

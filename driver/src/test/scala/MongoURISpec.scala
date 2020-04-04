@@ -573,7 +573,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     val fos = uri.options.failoverStrategy
 
     (1 to fos.retries).foldLeft(
-      StringBuilder.newBuilder ++= fos.initialDelay.toString) { (d, i) =>
+      (new StringBuilder()) ++= fos.initialDelay.toString) { (d, i) =>
         d ++= (fos.initialDelay * (fos.delayFactor(i).toLong)).toString
       }.result()
   }

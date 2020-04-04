@@ -432,7 +432,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
           n: Int,
           e: Int,
           timeout: FiniteDuration) = {
-          @inline def docs = (0 until n).toStream.map { i =>
+          @inline def docs = (0 until n).map { i =>
             if (i == 0 || i == 1529 || i == 3026 || i == 19862) {
               // duplicate plop -3
               BSONDocument("bulk" -> true, "i" -> i, "plop" -> -3)
@@ -494,9 +494,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
         lazy val coll = db(s"bulked${System identityHashCode this}_2")
 
         "to insert" in {
-          val docs = Stream.empty[BSONDocument]
-
-          coll.insert(ordered = true).many(docs).
+          coll.insert(ordered = true).many(List.empty[BSONDocument]).
             map(_.n) must beTypedEqualTo(0).await(1, timeout)
         }
 

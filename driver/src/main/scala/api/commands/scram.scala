@@ -133,7 +133,7 @@ private[reactivemongo] object ScramInitiate {
   }
 
   // Request utility
-  private val authChars: Stream[Char] = new Iterator[Char] {
+  private val authChars = util.toStream(new Iterator[Char] {
     val rand = new scala.util.Random(this.hashCode)
     val chars = rand.shuffle("""!"#$%&'()*+-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~""".toList)
 
@@ -149,7 +149,7 @@ private[reactivemongo] object ScramInitiate {
         chars(i - 1)
       }
     }
-  }.toStream
+  })
 
   def randomPrefix(seed: Int): String = {
     val pos = ((System.nanoTime() / 1000000L) % 100).toInt // temporal position
@@ -239,8 +239,8 @@ private[reactivemongo] sealed trait ScramStartNegociation[M <: AuthenticationMod
         val clientKey = hmac(saltedPassword, ScramNegociation.ClientKeySeed)
 
         val clientSig = hmac(digest(clientKey), authMsg)
-        val clientProof = (clientKey, clientSig).
-          zipped.map((a, b) => (a ^ b).toByte).toArray
+        val clientProof = util.lazyZip(clientKey, clientSig).map(
+          (a, b) => (a ^ b).toByte).toArray
 
         val message = s"$nonce,p=${Base64 encodeBase64String clientProof}"
         val serverKey = hmac(saltedPassword, ScramNegociation.ServerKeySeed)

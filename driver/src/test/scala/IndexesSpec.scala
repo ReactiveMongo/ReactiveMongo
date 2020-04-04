@@ -241,12 +241,15 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
     }
 
     "not have duplicate fixtures" in {
-      Future.fold(fixturesInsert)(false) { (inserted, res) =>
+      @com.github.ghik.silencer.silent("fold")
+      def spec = Future.fold(fixturesInsert)(false) { (inserted, res) =>
         if (res.ok) true else inserted
       }.recover {
         case err: DatabaseException => !err.code.exists(_ == 11000)
         case _                      => true
-      } aka "inserted" must beFalse.await(0, timeout)
+      }
+
+      spec aka "inserted" must beFalse.await(0, timeout)
     }
 
     "allow duplicate if the filter doesn't match" in {

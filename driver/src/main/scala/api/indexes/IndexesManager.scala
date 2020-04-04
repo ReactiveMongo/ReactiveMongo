@@ -663,7 +663,7 @@ object IndexesManager {
           val key = child(doc, "weights").fold(ks) { w =>
             val fields = decoder.names(w)
 
-            (ks, fields).zipped.map {
+            reactivemongo.util.lazyZip(ks, fields).map {
               case ((_, tpe), name) => name -> tpe
             }
           }.toSeq

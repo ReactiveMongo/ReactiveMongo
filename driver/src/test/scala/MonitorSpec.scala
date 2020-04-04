@@ -173,7 +173,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
           } and eventually(1, 3.seconds) {
             // #3 Akka Restart on unhandled exception (see issue 558)
 
-            tryUntil[Traversable[(Long, String)]](
+            tryUntil[Iterable[(Long, String)]](
               List(125, 250, 500, 1000, 2125, 4096))(
                 history(dbsystem), _.exists(_._2 startsWith "Restart")).
                 aka("history #3") must beTrue

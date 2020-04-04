@@ -50,6 +50,7 @@ import reactivemongo.api.collections.QueryCodecs
 
 import reactivemongo.api.indexes.Index
 
+// TODO: Check unused
 package object tests {
   type Pack = Serialization.Pack
   val pack: Pack = Serialization.internalSerializationPack
@@ -142,7 +143,7 @@ package object tests {
     d.supervisorActor ? message
   }
 
-  def history(sys: MongoDBSystem): Traversable[(Long, String)] = {
+  def history(sys: MongoDBSystem): Iterable[(Long, String)] = {
     val snap = sys.history.synchronized {
       sys.history.toArray()
     }

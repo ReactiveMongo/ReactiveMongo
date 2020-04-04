@@ -411,7 +411,7 @@ object MongoConnection {
     val options: MongoConnectionOptions,
     val ignoredOptions: List[String],
     val db: Option[String]) {
-    // TODO: Type for URI with required DB name
+    // TODO: Type for URI with required DB name ?
 
     override def equals(that: Any): Boolean = that match {
       case other: ParsedURI =>
