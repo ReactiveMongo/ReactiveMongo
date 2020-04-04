@@ -71,7 +71,7 @@ trait SerializationPack { self: Singleton =>
 
 object SerializationPack {
   /** A builder for serialization simple values (useful for the commands) */
-  private[reactivemongo] trait Builder[P <: SerializationPack with Singleton] {
+  private[reactivemongo] trait Builder[P <: SerializationPack] {
     protected[reactivemongo] val pack: P
 
     /** Returns a new document from a sequence of element producers. */
@@ -127,7 +127,7 @@ object SerializationPack {
    *
    * @define returnsNamedElement Returns the named element from the given document
    */
-  private[reactivemongo] trait Decoder[P <: SerializationPack with Singleton] {
+  private[reactivemongo] trait Decoder[P <: SerializationPack] {
     protected[reactivemongo] val pack: P
 
     /** Extract the value, if and only if it's a document. */

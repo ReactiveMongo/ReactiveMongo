@@ -96,7 +96,7 @@ object AuthenticationRestriction {
     val serverAddress: List[String]) extends AuthenticationRestriction
 }
 
-private[reactivemongo] trait CreateUserCommand[P <: SerializationPack with Singleton] { _: PackSupport[P] =>
+private[reactivemongo] trait CreateUserCommand[P <: SerializationPack] { _: PackSupport[P] =>
 
   /**
    * The [[https://docs.mongodb.com/manual/reference/command/createUser/ createUser]] command.

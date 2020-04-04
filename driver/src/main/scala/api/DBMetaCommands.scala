@@ -70,7 +70,7 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    * @param pack the serialization pack
    * @param prefix the collection prefix
    */
-  def gridfs[P <: SerializationPack with Singleton](
+  def gridfs[P <: SerializationPack](
     pack: P, prefix: String): GridFS[P] =
     GridFS[P](pack, this, prefix)
 
@@ -92,7 +92,7 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    */
   def indexesManager(implicit ec: ExecutionContext) = IndexesManager(self)
 
-  private[api] def indexesManager[P <: SerializationPack with Singleton](pack: P)(implicit ec: ExecutionContext): IndexesManager.Aux[P] = IndexesManager[P](pack, self)
+  private[api] def indexesManager[P <: SerializationPack](pack: P)(implicit ec: ExecutionContext): IndexesManager.Aux[P] = IndexesManager[P](pack, self)
 
   private implicit lazy val colNamesWriter =
     ListCollectionNames.writer(internalSerializationPack)

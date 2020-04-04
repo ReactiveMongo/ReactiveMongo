@@ -5,7 +5,7 @@ import reactivemongo.api.SerializationPack
 /**
  * @define fieldParam the field name
  */
-private[commands] trait GroupAggregation[P <: SerializationPack with Singleton] {
+private[commands] trait GroupAggregation[P <: SerializationPack] {
   aggregation: AggregationFramework[P] =>
 
   /**

@@ -2,7 +2,7 @@ package reactivemongo.api.collections
 
 import reactivemongo.api.{ PackSupport, SerializationPack }
 
-private[reactivemongo] trait HintFactory[P <: SerializationPack with Singleton] { collection: PackSupport[P] =>
+private[reactivemongo] trait HintFactory[P <: SerializationPack] { collection: PackSupport[P] =>
 
   /**
    * Returns a hint for the given index `name`.

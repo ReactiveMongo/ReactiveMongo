@@ -24,7 +24,7 @@ import reactivemongo.api.commands.{
 }
 import reactivemongo.core.protocol.MongoWireVersion
 
-private[collections] trait AggregationOps[P <: SerializationPack with Singleton] {
+private[collections] trait AggregationOps[P <: SerializationPack] {
   collection: GenericCollection[P] =>
 
   /** The [[https://docs.mongodb.com/manual/core/aggregation-pipeline/ aggregation framework]] for this collection */
@@ -105,7 +105,7 @@ private[collections] trait AggregationOps[P <: SerializationPack with Singleton]
    * @param bypassDocumentValidation available only if you specify the \$out aggregation operator
    * @param readConcern the read concern (since MongoDB 3.2)
    */
-  private final class Aggregate[T](
+  private[api] final class Aggregate[T](
     val operator: PipelineOperator,
     val pipeline: Seq[PipelineOperator],
     val explain: Boolean = false,

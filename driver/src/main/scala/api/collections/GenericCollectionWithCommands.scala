@@ -15,7 +15,7 @@ import reactivemongo.api.commands.{
 }
 
 /** Collection operations to run commands with */
-private[api] trait GenericCollectionWithCommands[P <: SerializationPack with Singleton] { self: GenericCollection[P] =>
+private[api] trait GenericCollectionWithCommands[P <: SerializationPack] { self: GenericCollection[P] =>
   def runner = Command.run(pack, self.failoverStrategy)
 
   def runCommand[R, C <: CollectionCommand with CommandWithResult[R]](command: C with CommandWithResult[R], readPreference: ReadPreference = self.readPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = runner(self, command, readPreference)

@@ -65,22 +65,6 @@ sealed trait CursorFetcher[P <: SerializationPack, +C[_] <: Cursor[_]] {
   protected def defaultReadPreference: ReadPreference
 }
 
-private[reactivemongo] trait ImplicitCommandHelpers[P <: SerializationPack] { //w TODO: Remove
-  import scala.language.implicitConversions
-
-  val pack: P
-
-  sealed trait ImplicitlyDocumentProducer {
-    def produce: pack.Document
-  }
-
-  object ImplicitlyDocumentProducer {
-    implicit def producer[A](a: A)(implicit writer: pack.Writer[A]): ImplicitlyDocumentProducer = new ImplicitlyDocumentProducer {
-      def produce = pack.serialize(a, writer)
-    }
-  }
-}
-
 object UnitBox extends BoxedAnyVal[Unit] {
   def value: Unit = ()
 }

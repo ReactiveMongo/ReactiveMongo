@@ -9,7 +9,7 @@ sealed trait AuthenticationMode {
 }
 
 private[reactivemongo] object AuthenticationMode {
-  type Scram = AuthenticationMode with ScramAuthentication with Singleton
+  type Scram = AuthenticationMode with ScramAuthentication
 }
 
 // SCRAM

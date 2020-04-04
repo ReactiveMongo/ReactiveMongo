@@ -18,7 +18,7 @@ import reactivemongo.api.commands.{
   ResolvedCollectionCommand
 }
 
-private[api] trait DistinctOp[P <: SerializationPack with Singleton] extends DistinctOpCompat[P] {
+private[api] trait DistinctOp[P <: SerializationPack] extends DistinctOpCompat[P] {
   collection: GenericCollection[P] =>
 
   implicit private lazy val distinctWriter: pack.Writer[DistinctCmd] = commandWriter

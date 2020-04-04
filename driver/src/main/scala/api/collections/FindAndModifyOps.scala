@@ -9,7 +9,7 @@ import reactivemongo.api.commands.FindAndModifyCommand
 /**
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  */
-trait FindAndModifyOps[P <: SerializationPack with Singleton]
+trait FindAndModifyOps[P <: SerializationPack]
   extends FindAndModifyCommand[P] { collection: GenericCollection[P] =>
 
   /**

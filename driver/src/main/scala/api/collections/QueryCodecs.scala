@@ -18,9 +18,9 @@ package reactivemongo.api.collections
 import reactivemongo.api.{ ReadPreference, SerializationPack }
 
 private[reactivemongo] object QueryCodecs {
-  @inline def writeReadPref[P <: SerializationPack with Singleton](pack: P): ReadPreference => pack.Document = writeReadPref[pack.type](pack.newBuilder)
+  @inline def writeReadPref[P <: SerializationPack](pack: P): ReadPreference => pack.Document = writeReadPref[pack.type](pack.newBuilder)
 
-  def writeReadPref[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): ReadPreference => builder.pack.Document =
+  def writeReadPref[P <: SerializationPack](builder: SerializationPack.Builder[P]): ReadPreference => builder.pack.Document =
     { readPreference: ReadPreference =>
       import builder.{ elementProducer => element, document, string }
 

@@ -65,7 +65,7 @@ import reactivemongo.api.gridfs.{ FileToSave => SF, ReadFile => RF }
  * @define readFileParam the file to be read
  * @define fileReader fileReader a file reader automatically resolved if `Id` is a valid value
  */ // TODO: Remove 'with Singleton'
-sealed trait GridFS[P <: SerializationPack with Singleton]
+sealed trait GridFS[P <: SerializationPack]
   extends PackSupport[P] with InsertCommand[P] with DeleteCommand[P]
   with CommandCodecsWithPack[P] with QueryBuilderFactory[P] { self =>
 
@@ -605,7 +605,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton]
 }
 
 object GridFS {
-  private[api] def apply[P <: SerializationPack with Singleton](
+  private[api] def apply[P <: SerializationPack](
     _pack: P,
     db: DB with DBMetaCommands,
     prefix: String): GridFS[P] = {

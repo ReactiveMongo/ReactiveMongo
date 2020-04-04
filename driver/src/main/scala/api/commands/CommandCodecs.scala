@@ -34,9 +34,9 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
-  @inline def defaultWriteResultReader[P <: SerializationPack with Singleton](pack: P): pack.Reader[DefaultWriteResult] = writeResultReader[DefaultWriteResult, pack.type](pack)
+  @inline def defaultWriteResultReader[P <: SerializationPack](pack: P): pack.Reader[DefaultWriteResult] = writeResultReader[DefaultWriteResult, pack.type](pack)
 
-  def writeResultReader[WR >: DefaultWriteResult, P <: SerializationPack with Singleton](pack: P): pack.Reader[WR] = {
+  def writeResultReader[WR >: DefaultWriteResult, P <: SerializationPack](pack: P): pack.Reader[WR] = {
     val decoder = pack.newDecoder
     val readWriteError = CommandCodecs.readWriteError(decoder)
     val readWriteConcernError = CommandCodecs.readWriteConcernError(decoder)
@@ -60,11 +60,11 @@ private[reactivemongo] object CommandCodecs {
 
   def unitBoxReader[P <: SerializationPack](pack: P): pack.Reader[UnitBox.type] = dealingWithGenericCommandErrorsReader[pack.type, UnitBox.type](pack) { _ => UnitBox }
 
-  //def writeReadConcern[P <: SerializationPack with Singleton](pack: P): ReadConcern => pack.Document = writeReadConcern[pack.type](pack.newBuilder)
+  //def writeReadConcern[P <: SerializationPack](pack: P): ReadConcern => pack.Document = writeReadConcern[pack.type](pack.newBuilder)
 
-  def writeReadConcern[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): ReadConcern => Seq[builder.pack.ElementProducer] = { c: ReadConcern => Seq(builder.elementProducer("level", builder.string(c.level))) }
+  def writeReadConcern[P <: SerializationPack](builder: SerializationPack.Builder[P]): ReadConcern => Seq[builder.pack.ElementProducer] = { c: ReadConcern => Seq(builder.elementProducer("level", builder.string(c.level))) }
 
-  def writeSessionReadConcern[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): Option[Session] => ReadConcern => Seq[builder.pack.ElementProducer] = {
+  def writeSessionReadConcern[P <: SerializationPack](builder: SerializationPack.Builder[P]): Option[Session] => ReadConcern => Seq[builder.pack.ElementProducer] = {
     import builder.{ document, elementProducer => element, pack }
 
     val simpleReadConcern = writeReadConcern(builder)
@@ -110,16 +110,16 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
-  @inline def writeWriteConcern[P <: SerializationPack with Singleton](pack: P): WriteConcern => pack.Document = writeWriteConcern[pack.type](pack.newBuilder)
+  @inline def writeWriteConcern[P <: SerializationPack](pack: P): WriteConcern => pack.Document = writeWriteConcern[pack.type](pack.newBuilder)
 
-  def writeWriteConcernWWriter[P <: SerializationPack with Singleton](
+  def writeWriteConcernWWriter[P <: SerializationPack](
     builder: SerializationPack.Builder[P]): WriteConcern.W => builder.pack.Value = {
     case WriteConcern.TagSet(tagSet)            => builder.string(tagSet)
     case WriteConcern.WaitForAcknowledgments(n) => builder.int(n)
     case _                                      => builder.string("majority")
   }
 
-  def writeWriteConcern[P <: SerializationPack with Singleton](
+  def writeWriteConcern[P <: SerializationPack](
     builder: SerializationPack.Builder[P]): WriteConcern => builder.pack.Document = {
     val writeGLEW = writeWriteConcernWWriter(builder)
 
@@ -139,7 +139,7 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
-  def writeSession[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): Session => Seq[builder.pack.ElementProducer] = {
+  def writeSession[P <: SerializationPack](builder: SerializationPack.Builder[P]): Session => Seq[builder.pack.ElementProducer] = {
     import builder.{ elementProducer => element }
 
     { session: Session =>
@@ -168,7 +168,7 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
-  def readWriteError[P <: SerializationPack with Singleton](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => WriteError = { doc =>
+  def readWriteError[P <: SerializationPack](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => WriteError = { doc =>
     (for {
       index <- decoder.int(doc, "index")
       code <- decoder.int(doc, "code")
@@ -176,14 +176,14 @@ private[reactivemongo] object CommandCodecs {
     } yield WriteError(index, code, err)).get
   }
 
-  def readWriteConcernError[P <: SerializationPack with Singleton](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => WriteConcernError = { doc =>
+  def readWriteConcernError[P <: SerializationPack](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => WriteConcernError = { doc =>
     (for {
       code <- decoder.int(doc, "code")
       err <- decoder.string(doc, "errmsg")
     } yield WriteConcernError(code, err)).get
   }
 
-  def readUpserted[P <: SerializationPack with Singleton](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => Upserted.Aux[P] = { document =>
+  def readUpserted[P <: SerializationPack](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => Upserted.Aux[P] = { document =>
     (for {
       index <- decoder.int(document, "index")
       id <- decoder.get(document, "_id")

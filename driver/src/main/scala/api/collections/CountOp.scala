@@ -13,7 +13,7 @@ import reactivemongo.api.commands.{
   ResolvedCollectionCommand
 }
 
-private[api] trait CountOp[P <: SerializationPack with Singleton] {
+private[api] trait CountOp[P <: SerializationPack] {
   collection: GenericCollection[P] =>
 
   implicit private lazy val countWriter: pack.Writer[CountCmd] = commandWriter

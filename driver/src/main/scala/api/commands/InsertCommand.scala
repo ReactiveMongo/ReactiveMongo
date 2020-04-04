@@ -10,7 +10,7 @@ import reactivemongo.api.{
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/insert/ insert]] command.
  */
-private[reactivemongo] trait InsertCommand[P <: SerializationPack with Singleton] { self: PackSupport[P] =>
+private[reactivemongo] trait InsertCommand[P <: SerializationPack] { self: PackSupport[P] =>
   /**
    * @param head the first mandatory document
    * @param tail maybe other documents

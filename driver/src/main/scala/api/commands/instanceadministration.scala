@@ -33,7 +33,7 @@ private[reactivemongo] case class RenameCollection(
   dropTarget: Boolean = false) extends Command with CommandWithResult[UnitBox.type]
 
 private[api] object RenameCollection {
-  def writer[P <: SerializationPack with Singleton](pack: P): pack.Writer[RenameCollection] = {
+  def writer[P <: SerializationPack](pack: P): pack.Writer[RenameCollection] = {
     val builder = pack.newBuilder
 
     import builder.{ elementProducer => element, string }

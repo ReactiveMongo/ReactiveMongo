@@ -22,18 +22,14 @@ import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api._
-import reactivemongo.api.commands.{
-  CommandCodecs,
-  ImplicitCommandHelpers,
-  UnitBox
-}
+import reactivemongo.api.commands.{ CommandCodecs, UnitBox }
 
 import reactivemongo.core.errors.{
   ConnectionNotInitialized,
   GenericDriverException
 }
 
-trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: GenericCollection[P]] extends CollectionProducer[C] {
+trait GenericCollectionProducer[P <: SerializationPack, +C <: GenericCollection[P]] extends CollectionProducer[C] {
   private[reactivemongo] val pack: P
 }
 
@@ -82,10 +78,10 @@ trait GenericCollectionProducer[P <: SerializationPack with Singleton, +C <: Gen
  * @define hintParam the index to use (either the index name or the index document)
  * @define maxTimeParam the time limit for processing operations on a cursor (`maxTimeMS`)
  */
-trait GenericCollection[P <: SerializationPack with Singleton]
+trait GenericCollection[P <: SerializationPack]
   extends Collection with PackSupport[P] with GenericCollectionWithCommands[P]
-  with CollectionMetaCommands with ImplicitCommandHelpers[P] with InsertOps[P]
-  with UpdateOps[P] with DeleteOps[P] with CountOp[P] with DistinctOp[P]
+  with CollectionMetaCommands with InsertOps[P] with UpdateOps[P]
+  with DeleteOps[P] with CountOp[P] with DistinctOp[P]
   with GenericCollectionWithDistinctOps[P]
   with FindAndModifyOps[P] with ChangeStreamOps[P]
   with AggregationOps[P] with GenericCollectionMetaCommands[P]

@@ -6,7 +6,7 @@ import scala.concurrent.{ Future, ExecutionContext }
 
 import reactivemongo.api.{ Collation, ReadConcern, SerializationPack }
 
-private[collections] trait GenericCollectionWithDistinctOps[P <: SerializationPack with Singleton] { self: GenericCollection[P] with DistinctOp[P] with HintFactory[P] =>
+private[collections] trait GenericCollectionWithDistinctOps[P <: SerializationPack] { self: GenericCollection[P] with DistinctOp[P] with HintFactory[P] =>
 
   /**
    * Returns the distinct values for a specified field

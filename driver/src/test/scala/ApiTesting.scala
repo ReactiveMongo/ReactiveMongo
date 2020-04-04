@@ -118,9 +118,9 @@ package object tests {
 
   import reactivemongo.api.commands.AggregationFramework
 
-  def makePipe[P <: SerializationPack with Singleton](a: AggregationFramework[P])(o: a.PipelineOperator) = o.makePipe
+  def makePipe[P <: SerializationPack](a: AggregationFramework[P])(o: a.PipelineOperator) = o.makePipe
 
-  def makeFunction[P <: SerializationPack with Singleton](a: AggregationFramework[P])(f: a.GroupFunction) = f.makeFunction
+  def makeFunction[P <: SerializationPack](a: AggregationFramework[P])(f: a.GroupFunction) = f.makeFunction
 
   // Test alias
   def _failover2[A](c: MongoConnection, s: FailoverStrategy)(p: () => Future[A])(implicit ec: ExecutionContext): Failover[A] = Failover.apply(c, s)(p)(ec)

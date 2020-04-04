@@ -44,7 +44,7 @@ import scala.concurrent.{ Future, ExecutionContext }
  * @define droppedCount The number of indexes that were dropped.
  */
 sealed trait IndexesManager {
-  type Pack <: SerializationPack with Singleton
+  type Pack <: SerializationPack
 
   final type NSIndex = reactivemongo.api.indexes.NSIndex.Aux[Pack]
 
@@ -517,7 +517,7 @@ object IndexesManager {
    * @param pack the serialization pack
    * @param db the database
    */
-  def apply[P <: SerializationPack with Singleton](pack: P, db: DB with DBMetaCommands)(implicit ec: ExecutionContext): IndexesManager.Aux[P] = {
+  def apply[P <: SerializationPack](pack: P, db: DB with DBMetaCommands)(implicit ec: ExecutionContext): IndexesManager.Aux[P] = {
     @inline def p: P = pack
 
     new AbstractIndexesManager(db) {

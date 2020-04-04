@@ -13,7 +13,7 @@ import reactivemongo.api.commands.{
 }
 
 /** The meta commands for collection that require the serialization pack. */
-private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPack with Singleton] { self: GenericCollection[P] =>
+private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPack] { self: GenericCollection[P] =>
 
   /**
    * [[https://docs.mongodb.com/manual/reference/method/db.createView/ Creates a view]] on this collection, using an aggregation pipeline.

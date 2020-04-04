@@ -21,7 +21,7 @@ import reactivemongo.api.commands.{
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.update/#perform-an-unordered-update ordered]] behaviour
  * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
  */
-trait UpdateOps[P <: SerializationPack with Singleton]
+trait UpdateOps[P <: SerializationPack]
   extends UpdateCommand[P] { collection: GenericCollection[P] =>
 
   protected lazy val maxWireVersion =

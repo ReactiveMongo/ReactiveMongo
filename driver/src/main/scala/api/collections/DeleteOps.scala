@@ -20,7 +20,7 @@ import reactivemongo.api.commands.{
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  * @define orderedParam the ordered behaviour
  */
-trait DeleteOps[P <: SerializationPack with Singleton]
+trait DeleteOps[P <: SerializationPack]
   extends DeleteCommand[P] with CommandCodecsWithPack[P] {
   collection: GenericCollection[P] =>
 

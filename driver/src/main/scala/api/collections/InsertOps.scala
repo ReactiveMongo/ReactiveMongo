@@ -22,7 +22,7 @@ import reactivemongo.api.commands.{
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
  */
-trait InsertOps[P <: SerializationPack with Singleton]
+trait InsertOps[P <: SerializationPack]
   extends InsertCommand[P] with CommandCodecsWithPack[P] {
   collection: GenericCollection[P] =>
 

@@ -13,7 +13,7 @@ import reactivemongo.api.{
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/update/ update]] command.
  */
-private[reactivemongo] trait UpdateCommand[P <: SerializationPack with Singleton] { _: PackSupport[P] =>
+private[reactivemongo] trait UpdateCommand[P <: SerializationPack] { _: PackSupport[P] =>
 
   final class Update(
     val firstUpdate: UpdateElement,

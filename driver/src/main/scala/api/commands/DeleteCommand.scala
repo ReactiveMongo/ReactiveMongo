@@ -10,7 +10,7 @@ import reactivemongo.api.{
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/delete/ delete]] command.
  */
-private[reactivemongo] trait DeleteCommand[P <: SerializationPack with Singleton] { self: PackSupport[P] =>
+private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackSupport[P] =>
 
   final class Delete private[api] (
     val deletes: Seq[DeleteElement],

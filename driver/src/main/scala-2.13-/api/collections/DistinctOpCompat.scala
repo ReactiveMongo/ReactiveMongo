@@ -6,7 +6,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{ Collation, ReadConcern, SerializationPack }
 
-private[collections] trait DistinctOpCompat[P <: SerializationPack with Singleton] { collection: GenericCollection[P] with DistinctOp[P] =>
+private[collections] trait DistinctOpCompat[P <: SerializationPack] { collection: GenericCollection[P] with DistinctOp[P] =>
 
   final protected def distinctDocuments[T, M[_] <: Iterable[_]](
     key: String,

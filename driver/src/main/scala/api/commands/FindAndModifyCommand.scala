@@ -10,7 +10,7 @@ import reactivemongo.api.{
 
 import reactivemongo.core.protocol.MongoWireVersion
 
-private[api] trait FindAndModifyCommand[P <: SerializationPack with Singleton] {
+private[api] trait FindAndModifyCommand[P <: SerializationPack] {
   _: PackSupport[P] =>
 
   private[reactivemongo] final class FindAndModify(

@@ -11,7 +11,7 @@ import reactivemongo.api.{
   SerializationPack
 }
 
-trait ChangeStreamOps[P <: SerializationPack with Singleton] { collection: GenericCollection[P] =>
+trait ChangeStreamOps[P <: SerializationPack] { collection: GenericCollection[P] =>
 
   import collection.AggregationFramework.ChangeStream
 
