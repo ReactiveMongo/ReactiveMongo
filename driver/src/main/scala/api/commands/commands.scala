@@ -23,7 +23,7 @@ trait CollectionCommand extends Command
 trait CommandWithResult[R] { self: Command => }
 trait CommandWithPack[P <: SerializationPack] { self: Command => }
 
-trait BoxedAnyVal[A <: AnyVal] {
+trait BoxedAnyVal[A <: AnyVal] { // TODO: Remove ~> use AnyVal/value class
   def value: A
 
   override def equals(that: Any): Boolean = that match {
