@@ -80,7 +80,7 @@ object WriteResult {
     def unapply(result: WriteResult): Option[String] = result.errmsg
   }
 
-  private[reactivemongo] def empty: WriteResult = DefaultWriteResult(
+  private[reactivemongo] def empty: WriteResult = new DefaultWriteResult(
     true, 0, Seq.empty, Option.empty, Option.empty, Option.empty)
 }
 
@@ -90,9 +90,9 @@ private[reactivemongo] final class LastError(
   val code: Option[Int],
   val lastOp: Option[Long],
   val n: Int,
-  val singleShard: Option[String], // string?
+  val singleShard: Option[String],
   val updatedExisting: Boolean,
-  val upserted: Option[BSONValue], // TODO: Remove
+  val upserted: Option[BSONValue], // TODO: Review
   val wnote: Option[WriteConcern.W],
   val wtimeout: Boolean,
   val waited: Option[Int],
@@ -130,14 +130,13 @@ private[reactivemongo] final class WriteError private[api] (
   val code: Int,
   val errmsg: String) {
 
-  @deprecated("No longer a case class", "0.20.3")
-  def copy(
+  private[api] lazy val tupled = Tuple3(index, code, errmsg)
+
+  private[api] def copy(
     index: Int = this.index,
     code: Int = this.code,
     errmsg: String = this.errmsg): WriteError =
     new WriteError(index, code, errmsg)
-
-  private[api] lazy val tupled = Tuple3(index, code, errmsg)
 
   override def equals(that: Any): Boolean = that match {
     case other: WriteError =>
@@ -152,36 +151,18 @@ private[reactivemongo] final class WriteError private[api] (
   override def toString = s"WriteError${tupled.hashCode}"
 }
 
-object WriteError extends scala.runtime.AbstractFunction3[Int, Int, String, WriteError] {
-
-  def apply(
-    index: Int,
-    code: Int,
-    errmsg: String): WriteError = new WriteError(index, code, errmsg)
-
-  @deprecated("No longer a case class", "0.20.3")
-  def unapply(error: WriteError) = Option(error).map(_.tupled)
+private[reactivemongo] object WriteError {
+  def apply(index: Int, code: Int, errmsg: String): WriteError =
+    new WriteError(index, code, errmsg)
 }
 
 /**
  * @param code the error code
  * @param errmsg the error message
  */
-class WriteConcernError private[api] (
+final class WriteConcernError private[api] (
   val code: Int,
-  val errmsg: String) extends Product2[Int, String] with Serializable {
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _1 = code
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _2 = errmsg
-
-  @deprecated("No longer a case class", "0.20.3")
-  def canEqual(that: Any): Boolean = that match {
-    case _: WriteConcernError => true
-    case _                    => false
-  }
+  val errmsg: String) {
 
   private[api] lazy val tupled = code -> errmsg
 
@@ -198,24 +179,14 @@ class WriteConcernError private[api] (
   override def toString = s"WriteConcernError${tupled.toString}"
 }
 
-// TODO: Remove?
-object WriteConcernError extends scala.runtime.AbstractFunction2[Int, String, WriteConcernError] {
-  def apply(code: Int, errmsg: String): WriteConcernError =
-    new WriteConcernError(code, errmsg)
-
-  @deprecated("No longer a case class", "0.20.3")
-  def unapply(error: WriteConcernError) = Option(error).map(_.tupled)
-}
-
-@deprecated("Internal: will be made private", "0.16.0")
-case class DefaultWriteResult(
+private[reactivemongo] case class DefaultWriteResult(
   ok: Boolean,
   n: Int,
   writeErrors: Seq[WriteError],
   writeConcernError: Option[WriteConcernError],
   code: Option[Int],
   errmsg: Option[String]) extends WriteResult {
-  def flatten = writeErrors.headOption.fold(this) { firstError =>
+  private[api] def flatten = writeErrors.headOption.fold(this) { firstError =>
     DefaultWriteResult(
       ok = false,
       n = n,
@@ -226,18 +197,18 @@ case class DefaultWriteResult(
   }
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-case class UpdateWriteResult(
-  ok: Boolean,
-  n: Int,
-  nModified: Int,
-  upserted: Seq[Upserted],
-  writeErrors: Seq[WriteError],
-  writeConcernError: Option[WriteConcernError],
-  code: Option[Int],
-  errmsg: Option[String]) extends WriteResult {
-  def flatten = writeErrors.headOption.fold(this) { firstError =>
-    UpdateWriteResult(
+final class UpdateWriteResult private[api] (
+  val ok: Boolean,
+  val n: Int,
+  val nModified: Int,
+  val upserted: Seq[Upserted],
+  val writeErrors: Seq[WriteError],
+  val writeConcernError: Option[WriteConcernError],
+  val code: Option[Int],
+  val errmsg: Option[String]) extends WriteResult {
+
+  private[api] def flatten = writeErrors.headOption.fold(this) { firstError =>
+    new UpdateWriteResult(
       ok = false,
       n = n,
       nModified = nModified,
@@ -247,4 +218,18 @@ case class UpdateWriteResult(
       code = code.orElse(Some(firstError.code)),
       errmsg = errmsg.orElse(Some(firstError.errmsg)))
   }
+
+  private lazy val tupled = Tuple8(ok, n, nModified, upserted, writeErrors, writeConcernError, code, errmsg)
+
+  override def equals(that: Any): Boolean = that match {
+    case other: UpdateWriteResult =>
+      other.tupled == this.tupled
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = tupled.hashCode
+
+  override def toString = s"UpdateWriteResult${tupled.toString}"
 }

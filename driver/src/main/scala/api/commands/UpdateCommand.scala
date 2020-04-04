@@ -20,7 +20,7 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] { _: PackSupp
     val updates: Seq[UpdateElement],
     val ordered: Boolean,
     val writeConcern: WriteConcern,
-    val bypassDocumentValidation: Boolean) extends CollectionCommand with CommandWithResult[UpdateResult] {
+    val bypassDocumentValidation: Boolean) extends CollectionCommand with CommandWithResult[UpdateWriteResult] {
 
     private[commands] lazy val tupled = Tuple5(
       firstUpdate, updates, ordered, writeConcern, bypassDocumentValidation)
@@ -32,8 +32,6 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] { _: PackSupp
 
     @inline override def hashCode: Int = tupled.hashCode
   }
-
-  final type UpdateResult = UpdateWriteResult
 
   final protected[reactivemongo] type UpdateCmd = ResolvedCollectionCommand[Update]
 
@@ -149,7 +147,7 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] { _: PackSupp
     }
   }
 
-  final protected implicit def updateReader: pack.Reader[UpdateResult] = {
+  final protected implicit def updateReader: pack.Reader[UpdateWriteResult] = {
     val decoder = pack.newDecoder
     val readWriteError = CommandCodecs.readWriteError(decoder)
     val readWriteConcernError = CommandCodecs.readWriteConcernError(decoder)
@@ -165,7 +163,7 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] { _: PackSupp
         decoder.asDocument(v).map(readUpserted)
       })
 
-      UpdateWriteResult(
+      new UpdateWriteResult(
         ok = decoder.booleanLike(doc, "ok").getOrElse(true),
         n = decoder.int(doc, "n").getOrElse(0),
         nModified = decoder.int(doc, "nModified").getOrElse(0),

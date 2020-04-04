@@ -267,7 +267,7 @@ trait UpdateOps[P <: SerializationPack]
   private val unorderedRecover: Option[Exception => Future[UpdateWriteResult]] =
     Some[Exception => Future[UpdateWriteResult]] {
       case lastError: WriteResult =>
-        Future.successful(UpdateWriteResult(
+        Future.successful(new UpdateWriteResult(
           ok = false,
           n = lastError.n,
           nModified = 0,
@@ -278,7 +278,7 @@ trait UpdateOps[P <: SerializationPack]
           errmsg = Some(lastError.getMessage)))
 
       case cause =>
-        Future.successful(UpdateWriteResult(
+        Future.successful(new UpdateWriteResult(
           ok = false,
           n = 0,
           nModified = 0,

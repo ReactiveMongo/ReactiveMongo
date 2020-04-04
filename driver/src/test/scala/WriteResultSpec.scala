@@ -1,6 +1,8 @@
+package reactivemongo
+
 import reactivemongo.api.commands.{ CommandError, DefaultWriteResult }
 
-class WriteResultSpec extends org.specs2.mutable.Specification {
+final class WriteResultSpec extends org.specs2.mutable.Specification {
   "Write result" title
 
   section("unit")
