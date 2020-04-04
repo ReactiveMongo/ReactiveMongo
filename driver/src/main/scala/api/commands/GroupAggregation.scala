@@ -5,7 +5,7 @@ import reactivemongo.api.SerializationPack
 /**
  * @define fieldParam the field name
  */
-private[commands] trait GroupAggregation[P <: SerializationPack] {
+private[commands] trait GroupAggregation[P <: SerializationPack with Singleton] {
   aggregation: AggregationFramework[P] =>
 
   /**
@@ -64,9 +64,6 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   object AvgField {
     def apply(field: String): AvgField =
       new AvgField(field)
-
-    def unapply(avgField: AvgField): Option[String] =
-      Option(avgField).map(_.field)
   }
 
   /**
@@ -96,9 +93,6 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   object Avg {
     def apply(expression: pack.Value): Avg =
       new Avg(expression)
-
-    def unapply(avg: Avg): Option[pack.Value] =
-      Option(avg).map(_.expression)
   }
 
   /**
@@ -129,9 +123,6 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   object FirstField {
     def apply(field: String): FirstField =
       new FirstField(field)
-
-    def unapply(firstField: FirstField): Option[String] =
-      Option(firstField).map(_.field)
   }
 
   /**
@@ -160,9 +151,6 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   object First extends scala.runtime.AbstractFunction1[pack.Value, First] {
     def apply(expression: pack.Value): First =
       new First(expression)
-
-    def unapply(first: First): Option[pack.Value] =
-      Option(first).map(_.expression)
   }
 
   /**
@@ -193,9 +181,6 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   object LastField {
     def apply(field: String): LastField =
       new LastField(field)
-
-    def unapply(lastField: LastField): Option[String] =
-      Option(lastField).map(_.field)
   }
 
   /**
@@ -224,9 +209,6 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   object Last {
     def apply(expression: pack.Value): Last =
       new Last(expression)
-
-    def unapply(last: Last): Option[pack.Value] =
-      Option(last).map(_.expression)
   }
 
   /**
@@ -256,9 +238,6 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   object MaxField {
     def apply(field: String): MaxField =
       new MaxField(field)
-
-    def unapply(maxField: MaxField): Option[String] =
-      Option(maxField).map(_.field)
   }
 
   /**
@@ -290,9 +269,6 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   object Max {
     def apply(expression: pack.Value): Max =
       new Max(expression)
-
-    def unapply(max: Max): Option[pack.Value] =
-      Option(max).map(_.expression)
   }
 
   /**
@@ -325,9 +301,6 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   object MergeObjects {
     def apply(expression: pack.Value): MergeObjects =
       new MergeObjects(expression)
-
-    def unapply(mergeObjects: MergeObjects): Option[pack.Value] =
-      Option(mergeObjects).map(_.expression)
   }
 
   /**
@@ -356,11 +329,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object MinField {
-    def apply(field: String): MinField =
-      new MinField(field)
-
-    def unapply(minField: MinField): Option[String] =
-      Option(minField).map(_.field)
+    def apply(field: String): MinField = new MinField(field)
   }
 
   /**
@@ -389,11 +358,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object Min {
-    def apply(expression: pack.Value): Min =
-      new Min(expression)
-
-    def unapply(min: Min): Option[pack.Value] =
-      Option(min).map(_.expression)
+    def apply(expression: pack.Value): Min = new Min(expression)
   }
 
   /**
@@ -421,11 +386,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object PushField {
-    def apply(field: String): PushField =
-      new PushField(field)
-
-    def unapply(pushField: PushField): Option[String] =
-      Option(pushField).map(_.field)
+    def apply(field: String): PushField = new PushField(field)
   }
 
   /**
@@ -455,11 +416,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object Push {
-    def apply(expression: pack.Value): Push =
-      new Push(expression)
-
-    def unapply(push: Push): Option[pack.Value] =
-      Option(push).map(_.expression)
+    def apply(expression: pack.Value): Push = new Push(expression)
   }
 
   /**
@@ -489,11 +446,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object AddFieldToSet {
-    def apply(field: String): AddFieldToSet =
-      new AddFieldToSet(field)
-
-    def unapply(addFieldToSet: AddFieldToSet): Option[String] =
-      Option(addFieldToSet).map(_.field)
+    def apply(field: String): AddFieldToSet = new AddFieldToSet(field)
   }
 
   /**
@@ -523,11 +476,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object AddToSet {
-    def apply(expression: pack.Value): AddToSet =
-      new AddToSet(expression)
-
-    def unapply(addToSet: AddToSet): Option[pack.Value] =
-      Option(addToSet).map(_.expression)
+    def apply(expression: pack.Value): AddToSet = new AddToSet(expression)
   }
 
   /**
@@ -556,11 +505,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object StdDevPop extends {
-    def apply(expression: pack.Value): StdDevPop =
-      new StdDevPop(expression)
-
-    def unapply(stdDevPop: StdDevPop): Option[pack.Value] =
-      Option(stdDevPop).map(_.expression)
+    def apply(expression: pack.Value): StdDevPop = new StdDevPop(expression)
   }
 
   /**
@@ -591,11 +536,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object StdDevPopField {
-    def apply(field: String): StdDevPopField =
-      new StdDevPopField(field)
-
-    def unapply(stdDevPopField: StdDevPopField): Option[String] =
-      Option(stdDevPopField).map(_.field)
+    def apply(field: String): StdDevPopField = new StdDevPopField(field)
   }
 
   /**
@@ -625,11 +566,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object StdDevSamp {
-    def apply(expression: pack.Value): StdDevSamp =
-      new StdDevSamp(expression)
-
-    def unapply(stdDevSamp: StdDevSamp): Option[pack.Value] =
-      Option(stdDevSamp).map(_.expression)
+    def apply(expression: pack.Value): StdDevSamp = new StdDevSamp(expression)
   }
 
   /**
@@ -660,11 +597,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object StdDevSampField {
-    def apply(field: String): StdDevSampField =
-      new StdDevSampField(field)
-
-    def unapply(stdDevSampField: StdDevSampField): Option[String] =
-      Option(stdDevSampField).map(_.field)
+    def apply(field: String): StdDevSampField = new StdDevSampField(field)
   }
 
   /**
@@ -693,11 +626,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object SumField {
-    def apply(field: String): SumField =
-      new SumField(field)
-
-    def unapply(sumField: SumField): Option[String] =
-      Option(sumField).map(_.field)
+    def apply(field: String): SumField = new SumField(field)
   }
 
   /**
@@ -728,11 +657,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object Sum {
-    def apply(expression: pack.Value): Sum =
-      new Sum(expression)
-
-    def unapply(sum: Sum): Option[pack.Value] =
-      Option(sum).map(_.expression)
+    def apply(expression: pack.Value): Sum = new Sum(expression)
   }
 
   /** The [[https://docs.mongodb.com/manual/reference/operator/aggregation/sum/#grp._S_sum `\$sum: 1`]] group accumulator. */

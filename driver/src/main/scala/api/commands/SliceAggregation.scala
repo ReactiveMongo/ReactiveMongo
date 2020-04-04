@@ -2,7 +2,7 @@ package reactivemongo.api.commands
 
 import reactivemongo.api.SerializationPack
 
-private[commands] trait SliceAggregation[P <: SerializationPack] {
+private[commands] trait SliceAggregation[P <: SerializationPack with Singleton] {
   aggregation: AggregationFramework[P] =>
 
   /**

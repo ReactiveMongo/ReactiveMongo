@@ -7,6 +7,7 @@ import reactivemongo.api.{
   Cursor,
   CursorOptions,
   CursorProducer,
+  PackSupport,
   ReadConcern,
   ReadPreference,
   SerializationPack,
@@ -14,6 +15,7 @@ import reactivemongo.api.{
 }
 
 import reactivemongo.api.commands.{
+  AggregationFramework => AggFramework,
   CollectionCommand,
   CommandCodecs,
   CommandWithPack,
@@ -26,7 +28,10 @@ private[collections] trait AggregationOps[P <: SerializationPack with Singleton]
   collection: GenericCollection[P] =>
 
   /** The [[https://docs.mongodb.com/manual/core/aggregation-pipeline/ aggregation framework]] for this collection */
-  object AggregationFramework extends reactivemongo.api.commands.AggregationFramework[collection.pack.type] {
+  object AggregationFramework
+    extends AggFramework[collection.pack.type]
+    with PackSupport[collection.pack.type] {
+
     val pack: collection.pack.type = collection.pack
   }
 
@@ -135,7 +140,7 @@ private[collections] trait AggregationOps[P <: SerializationPack with Singleton]
         cmd.pipeline.map(_.makePipe))
 
       lazy val isOut: Boolean = cmd.pipeline.lastOption.exists {
-        case AggregationFramework.Out(_) => true
+        case _: AggregationFramework.Out => true
         case _                           => false
       }
 

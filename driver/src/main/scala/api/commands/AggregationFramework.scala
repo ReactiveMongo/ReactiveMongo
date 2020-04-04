@@ -1,16 +1,15 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ ChangeStreams, SerializationPack }
+import reactivemongo.api.{ ChangeStreams, PackSupport, SerializationPack }
 
 /**
  * Implements the [[http://docs.mongodb.org/manual/applications/aggregation/ Aggregation Framework]].
  *
  * @see [[PipelineOperator]]
  */
-trait AggregationFramework[P <: SerializationPack]
-  extends ImplicitCommandHelpers[P]
-  with GroupAggregation[P] with SliceAggregation[P] with SortAggregation[P]
-  with AggregationPipeline[P] { self =>
+trait AggregationFramework[P <: SerializationPack with Singleton]
+  extends GroupAggregation[P] with SliceAggregation[P] with SortAggregation[P]
+  with AggregationPipeline[P] { self: PackSupport[P] =>
 
   protected final lazy val builder = pack.newBuilder
 
@@ -119,7 +118,6 @@ trait AggregationFramework[P <: SerializationPack]
       output: (String, GroupFunction)*): Bucket =
       new Bucket(groupBy, boundaries, default)(output: _*)
 
-    def unapply(res: Bucket) = Option(res).map(_.tupled)
   }
 
   /**
@@ -183,9 +181,6 @@ trait AggregationFramework[P <: SerializationPack]
       output: (String, GroupFunction)*): BucketAuto =
       new BucketAuto(groupBy, buckets, granularity)(output: _*)
 
-    def unapply(res: BucketAuto) = Option(res).map(_.tupled).collect {
-      case (a, b, c, _) => Tuple3(a, b, c)
-    }
   }
 
   /**
@@ -239,7 +234,6 @@ trait AggregationFramework[P <: SerializationPack]
       count: Boolean): CollStats =
       new CollStats(latencyStatsHistograms, storageStatsScale, count)
 
-    def unapply(collStats: CollStats) = Option(collStats).map(_.tupled)
   }
 
   /**
@@ -272,7 +266,6 @@ trait AggregationFramework[P <: SerializationPack]
   object Count {
     def apply(outputName: String): Count = new Count(outputName)
 
-    def unapply(count: Count): Option[String] = Option(count).map(_.outputName)
   }
 
   /**
@@ -324,7 +317,6 @@ trait AggregationFramework[P <: SerializationPack]
       localOps: Boolean = false): CurrentOp = new CurrentOp(
       allUsers, idleConnections, idleCursors, idleSessions, localOps)
 
-    def unapply(res: CurrentOp) = Option(res).map(_.tupled)
   }
 
   /**
@@ -372,9 +364,6 @@ trait AggregationFramework[P <: SerializationPack]
   object Facet {
     def apply(specifications: Iterable[(String, Pipeline)]): Facet =
       new Facet(specifications)
-
-    def unapply(facet: Facet): Option[Iterable[(String, Pipeline)]] =
-      Option(facet).map(_.specifications)
   }
 
   /**
@@ -438,7 +427,6 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   object GeoNear {
-
     def apply(
       near: pack.Value,
       spherical: Boolean = false,
@@ -451,7 +439,6 @@ trait AggregationFramework[P <: SerializationPack]
       distanceField: Option[String] = None,
       includeLocs: Option[String] = None): GeoNear = new GeoNear(near, spherical, limit, minDistance, maxDistance, query, distanceMultiplier, uniqueDocs, distanceField, includeLocs)
 
-    def unapply(stage: GeoNear): Option[Tuple10[pack.Value, Boolean, Long, Option[Long], Option[Long], Option[pack.Document], Option[Double], Boolean, Option[String], Option[String]]] = Some(Tuple10(stage.near, stage.spherical, stage.limit.getOrElse(100L), stage.minDistance, stage.maxDistance, stage.query, stage.distanceMultiplier, stage.uniqueDocs, stage.distanceField, stage.includeLocs))
   }
 
   /**
@@ -489,9 +476,6 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(identifiers: pack.Value)(ops: (String, GroupFunction)*): Group =
       new Group(identifiers)(ops: _*)
 
-    def unapply(other: Group): Option[pack.Value] =
-      Option(other).map(_.identifiers)
-
   }
 
   /**
@@ -522,9 +506,6 @@ trait AggregationFramework[P <: SerializationPack]
   object GroupField {
     def apply(idField: String)(ops: (String, GroupFunction)*): GroupField =
       new GroupField(idField)(ops: _*)
-
-    def unapply(other: GroupField): Option[String] =
-      Option(other).map(_.idField)
 
   }
 
@@ -559,10 +540,6 @@ trait AggregationFramework[P <: SerializationPack]
 
   object GroupMulti {
     def apply(idFields: Seq[(String, String)])(ops: (String, GroupFunction)*): GroupMulti = new GroupMulti(idFields: _*)(ops: _*)
-
-    def unapplySeq(other: GroupMulti): Seq[(String, String)] =
-      other.idFields
-
   }
 
   /**
@@ -674,8 +651,6 @@ trait AggregationFramework[P <: SerializationPack]
 
   object Limit {
     def apply(limit: Int): Limit = new Limit(limit)
-
-    def unapply(limit: Limit): Option[Int] = Option(limit).map(_.limit)
   }
 
   /**
@@ -707,9 +682,6 @@ trait AggregationFramework[P <: SerializationPack]
   object ListLocalSessions {
     def apply(expression: pack.Document): ListLocalSessions =
       new ListLocalSessions(expression)
-
-    def unapply(listLocalSessions: ListLocalSessions): Option[pack.Document] =
-      Option(listLocalSessions).map(_.expression)
   }
 
   /**
@@ -741,9 +713,6 @@ trait AggregationFramework[P <: SerializationPack]
   object ListSessions {
     def apply(expression: pack.Document): ListSessions =
       new ListSessions(expression)
-
-    def unapply(listSessions: ListSessions): Option[pack.Document] =
-      Option(listSessions).map(_.expression)
   }
 
   /**
@@ -824,8 +793,6 @@ trait AggregationFramework[P <: SerializationPack]
       restrictSearchWithMatch: Option[pack.Value] = None): GraphLookup =
       new GraphLookup(from, startWith, connectFromField, connectToField,
         as, maxDepth, depthField, restrictSearchWithMatch)
-
-    def unapply(stage: GraphLookup) = Option(stage).map(_.tupled)
   }
 
   /**
@@ -874,8 +841,6 @@ trait AggregationFramework[P <: SerializationPack]
       foreignField: String,
       as: String): Lookup =
       new Lookup(from, localField, foreignField, as)
-
-    def unapply(res: Lookup) = Option(res).map(_.tupled)
   }
 
   /**
@@ -906,9 +871,6 @@ trait AggregationFramework[P <: SerializationPack]
 
   object Match {
     def apply(predicate: pack.Document): Match = new Match(predicate)
-
-    def unapply(`match`: Match): Option[pack.Document] =
-      Option(`match`).map(_.predicate)
   }
 
   /**
@@ -975,8 +937,6 @@ trait AggregationFramework[P <: SerializationPack]
       let: Option[pack.Document],
       whenNotMatched: Option[String]): Merge =
       new Merge(intoDb, intoCollection, on, whenMatched, let, whenNotMatched)
-
-    def unapply(merge: Merge) = Option(merge).map(_.tupled)
   }
 
   /**
@@ -1007,9 +967,6 @@ trait AggregationFramework[P <: SerializationPack]
 
   object Out {
     def apply(collection: String): Out = new Out(collection)
-
-    def unapply(out: Out): Option[String] =
-      Option(out).map(_.collection)
   }
 
   /**
@@ -1051,9 +1008,6 @@ trait AggregationFramework[P <: SerializationPack]
   object Project {
     def apply(specifications: pack.Document): Project =
       new Project(specifications)
-
-    def unapply(project: Project): Option[pack.Document] =
-      Option(project).map(_.specifications)
   }
 
   /**
@@ -1085,9 +1039,6 @@ trait AggregationFramework[P <: SerializationPack]
   object Redact {
     def apply(expression: pack.Document): Redact =
       new Redact(expression)
-
-    def unapply(redact: Redact): Option[pack.Document] =
-      Option(redact).map(_.expression)
   }
 
   /**
@@ -1121,9 +1072,6 @@ trait AggregationFramework[P <: SerializationPack]
   object ReplaceRootField {
     def apply(newRoot: String): ReplaceRootField =
       new ReplaceRootField(newRoot)
-
-    def unapply(replaceRootField: ReplaceRootField): Option[String] =
-      Option(replaceRootField).map(_.newRoot)
   }
 
   /**
@@ -1157,9 +1105,6 @@ trait AggregationFramework[P <: SerializationPack]
   object ReplaceRoot {
     def apply(newRoot: pack.Document): ReplaceRoot =
       new ReplaceRoot(newRoot)
-
-    def unapply(replaceRoot: ReplaceRoot): Option[pack.Document] =
-      Option(replaceRoot).map(_.newRoot)
   }
 
   /**
@@ -1193,9 +1138,6 @@ trait AggregationFramework[P <: SerializationPack]
   object ReplaceWith {
     def apply(replacementDocument: pack.Document): ReplaceWith =
       new ReplaceWith(replacementDocument)
-
-    def unapply(replaceWith: ReplaceWith): Option[pack.Document] =
-      Option(replaceWith).map(_.replacementDocument)
   }
 
   /**
@@ -1223,8 +1165,6 @@ trait AggregationFramework[P <: SerializationPack]
 
   object Sample {
     def apply(size: Int): Sample = new Sample(size)
-
-    def unapply(size: Sample): Option[Int] = Option(size).map(_.size)
   }
 
   /**
@@ -1254,9 +1194,6 @@ trait AggregationFramework[P <: SerializationPack]
   object Set {
     def apply(expression: pack.Document): Set =
       new Set(expression)
-
-    def unapply(set: Set): Option[pack.Document] =
-      Option(set).map(_.expression)
   }
 
   /**
@@ -1284,8 +1221,6 @@ trait AggregationFramework[P <: SerializationPack]
 
   object Skip {
     def apply(skip: Int): Skip = new Skip(skip)
-
-    def unapply(skip: Skip): Option[Int] = Option(skip).map(_.skip)
   }
 
   /**
@@ -1328,8 +1263,6 @@ trait AggregationFramework[P <: SerializationPack]
 
   object Sort {
     def apply(fields: SortOrder*): Sort = new Sort(fields)
-
-    def unapplySeq(sort: Sort): Seq[SortOrder] = sort.fields
   }
 
   /**
@@ -1362,9 +1295,6 @@ trait AggregationFramework[P <: SerializationPack]
   object SortByCount {
     def apply(expression: pack.Value): SortByCount =
       new SortByCount(expression)
-
-    def unapply(sortByCount: SortByCount): Option[pack.Value] =
-      Option(sortByCount).map(_.expression)
   }
 
   /**
@@ -1398,9 +1328,6 @@ trait AggregationFramework[P <: SerializationPack]
   object SortByFieldCount {
     def apply(field: String): SortByFieldCount =
       new SortByFieldCount(field)
-
-    def unapply(sortByFieldCount: SortByFieldCount): Option[String] =
-      Option(sortByFieldCount).map(_.field)
   }
 
   /**
@@ -1434,10 +1361,6 @@ trait AggregationFramework[P <: SerializationPack]
   object Unset {
     def apply(field: String, otherFields: Seq[String]): Unset =
       new Unset(field, otherFields)
-
-    def unapply(other: Unset): Option[(String, Seq[String])] =
-      Option(other).map { i => i.field -> i.otherFields }
-
   }
 
   sealed trait Unwind extends PipelineOperator
@@ -1469,9 +1392,6 @@ trait AggregationFramework[P <: SerializationPack]
 
   object UnwindField {
     def apply(field: String): UnwindField = new UnwindField(field)
-
-    def unapply(unwindField: UnwindField): Option[String] =
-      Option(unwindField).map(_.field)
   }
 
   object Unwind {
@@ -1496,11 +1416,6 @@ trait AggregationFramework[P <: SerializationPack]
       includeArrayIndex: Option[String],
       preserveNullAndEmptyArrays: Option[Boolean]): Unwind =
       Full(path, includeArrayIndex, preserveNullAndEmptyArrays)
-
-    def unapply(that: Unwind): Option[String] = that match {
-      case UnwindField(field) => Some(field)
-      case Full(path, _, _)   => Some(path)
-    }
 
     /**
      * @param path the field path to an array field (without the `\$` prefix)
