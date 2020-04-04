@@ -355,10 +355,10 @@ final class AsyncDriver(
 
       val opts = options.appName match {
         case Some(_) => options
-        case _       => options.withAppName(s"${supervisorName}/${nm}")
+        case _       => options.copy(appName = Some(s"${supervisorName}/${nm}"))
       }
 
-      lazy val dbsystem: MongoDBSystem = opts.authMode match {
+      lazy val dbsystem: MongoDBSystem = opts.authenticationMechanism match {
         case X509Authentication => new StandardDBSystemWithX509(
           supervisorName, nm, nodes, authentications, opts)
 

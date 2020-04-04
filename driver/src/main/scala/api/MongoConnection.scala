@@ -758,6 +758,9 @@ object MongoConnection {
             unsupported -> result.copy(
               maxInFlightRequestsPerChannel = Some(max.toInt))
 
+          case ("rm.minIdleChannelsPerNode", IntRe(min)) =>
+            unsupported -> result.copy(minIdleChannelsPerNode = min.toInt)
+
           case ("writeConcern", "unacknowledged") => unsupported -> result.
             copy(writeConcern = WriteConcern.Unacknowledged)
 
@@ -829,8 +832,11 @@ object MongoConnection {
           case ("appName", nme) => Option(nme).map(_.trim).filter(v => {
             v.nonEmpty && v.getBytes("UTF-8").size < 128
           }) match {
-            case Some(appName) => unsupported -> result.withAppName(appName)
-            case _             => (unsupported + ("appName" -> nme)) -> result
+            case Some(appName) =>
+              unsupported -> result.copy(appName = Some(appName))
+
+            case _ =>
+              (unsupported + ("appName" -> nme)) -> result
           }
 
           case kv => (unsupported + kv) -> result
@@ -841,7 +847,8 @@ object MongoConnection {
       val keyStore = MongoConnectionOptions.KeyStore(
         resource = new java.net.URI(uri),
         password = remOpts.get("keyStorePassword").map(_.toCharArray),
-        storeType = remOpts.get("keyStoreType").getOrElse("PKCS12"))
+        storeType = remOpts.get("keyStoreType").getOrElse("PKCS12"),
+        trust = true)
 
       step1.copy(keyStore = Some(keyStore))
     }

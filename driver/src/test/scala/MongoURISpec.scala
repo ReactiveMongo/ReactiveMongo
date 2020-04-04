@@ -276,7 +276,8 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           MongoConnectionOptions.KeyStore(
             resource = new java.io.File("/tmp/foo").toURI,
             password = Some("bar".toCharArray),
-            storeType = "PKCS12"))
+            storeType = "PKCS12",
+            trust = true))
 
       }.awaitFor(timeout)
     }

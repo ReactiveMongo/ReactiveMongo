@@ -51,7 +51,8 @@ object Common extends CommonAuth {
         MongoConnectionOptions.KeyStore(
           resource = new java.net.URI(uri), // file://..
           storeType = "PKCS12",
-          password = sys.props.get("test.keyStorePassword").map(_.toCharArray))
+          password = sys.props.get("test.keyStorePassword").map(_.toCharArray),
+          trust = true)
       })
 
     val b = {

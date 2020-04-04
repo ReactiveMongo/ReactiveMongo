@@ -38,7 +38,7 @@ private[collections] trait GenericCollectionWithDistinctOps[P <: SerializationPa
    */
   def distinct[T, M[_] <: Iterable[_]](
     key: String,
-    @deprecatedName('query) selector: Option[pack.Document],
+    selector: Option[pack.Document],
     readConcern: ReadConcern,
     collation: Option[Collation])(implicit
     reader: pack.NarrowValueReader[T],

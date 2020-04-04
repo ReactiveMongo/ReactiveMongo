@@ -141,7 +141,8 @@ private[reactivemongo] final class ChannelFactory(
           resource = new java.io.File(path).toURI,
           storeType = sys.props.getOrElse("javax.net.ssl.keyStoreType", "JKS"),
           password = sys.props.get(
-            "javax.net.ssl.keyStorePassword").map(_.toCharArray))
+            "javax.net.ssl.keyStorePassword").map(_.toCharArray),
+          trust = true)
 
       }
     }
