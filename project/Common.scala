@@ -31,6 +31,7 @@ object Common extends AutoPlugin {
   private val java8 = scala.util.Properties.isJavaAtLeast("1.8")
 
   val scala211 = "2.11.12"
+  val scala213 = "2.13.1"
 
   val closeableObject = SettingKey[String]("class name of a closeable object")
 
@@ -42,7 +43,7 @@ object Common extends AutoPlugin {
 
   override def projectSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
     scalaVersion := "2.12.11",
-    crossScalaVersions := Seq(scala211, scalaVersion.value, "2.13.1"),
+    crossScalaVersions := Seq(scala211, scalaVersion.value, scala213),
     crossVersion := CrossVersion.binary,
     useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
     target := {

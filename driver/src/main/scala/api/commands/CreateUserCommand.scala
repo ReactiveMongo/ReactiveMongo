@@ -7,6 +7,8 @@ import reactivemongo.api.{
   WriteConcern
 }
 
+import reactivemongo.core.protocol.MongoWireVersion
+
 /**
  * [[https://docs.mongodb.com/manual/reference/command/createUser/#roles User role]]
  *
@@ -120,7 +122,7 @@ private[reactivemongo] trait CreateUserCommand[P <: SerializationPack] { _: Pack
     extends Command with CommandWithPack[P]
     with CommandWithResult[UnitBox.type]
 
-  protected final implicit lazy val createUserWriter: pack.Writer[CreateUser] = {
+  protected final def createUserWriter(version: MongoWireVersion): pack.Writer[CreateUser] = {
     val builder = pack.newBuilder
 
     import builder.{ document, elementProducer => elmt, string }
@@ -196,12 +198,14 @@ private[reactivemongo] trait CreateUserCommand[P <: SerializationPack] { _: Pack
           ()
       }
 
-      create.mechanisms match {
-        case head :: tail =>
-          extra += elmt("mechanisms", builder.array(
-            string(head.name), tail.map { m => string(m.name) }))
+      if (version >= MongoWireVersion.V40) {
+        create.mechanisms match {
+          case head :: tail =>
+            extra += elmt("mechanisms", builder.array(
+              string(head.name), tail.map { m => string(m.name) }))
 
-        case _ => ()
+          case _ => ()
+        }
       }
 
       document(base ++ roles ++ extra.result())

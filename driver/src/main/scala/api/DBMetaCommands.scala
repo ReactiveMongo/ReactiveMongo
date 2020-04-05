@@ -147,8 +147,8 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
       ReadPreference.primary).map(_ => self.collection(to))
   }
 
-  /** Type of writer to serialization database metadata */
-  final type DBMetaWriter[T] = Pack#Writer[T]
+  private implicit lazy val createUserWriter = super.createUserWriter(
+    connectionState.metadata.maxWireVersion)
 
   /**
    * [[https://docs.mongodb.com/manual/reference/command/createUser/ Create the user]] with given properties.

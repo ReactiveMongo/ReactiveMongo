@@ -10,8 +10,8 @@ object Travis {
       val (jdkLower, jdkUpper) = "openjdk8" -> "oraclejdk9"
 
       // Scala
-      import Common.scala211
-      val scalaUpper = scalaVersion.value
+      import Common.{ scala211, scala213 }
+      val scala212 = scalaVersion.value
 
       // Major libs
       val (akkaLower, akkaUpper) = "2.3.13" -> "2.5.23"
@@ -28,13 +28,13 @@ object Travis {
       // Base specifications about JDK/Scala
       val javaSpecs = List(
         "openjdk8", "oraclejdk9",
-        "scala2.12.10", "scala2.11.12"
+        s"scala${scala213}", s"scala${scala212}", s"scala${scala211}"
       ).combinations(2).flatMap {
         case jdk :: scala :: Nil if (
           !jdk.startsWith("scala") && scala.startsWith("scala")) => {
           val sv = scala.drop(5)
 
-          if (jdk == jdkLower && sv == scalaUpper) {
+          if (jdk == jdkLower && sv != scala211) {
             List.empty[(String, String)]
           } else {
             List(jdk -> sv)
@@ -86,6 +86,9 @@ object Travis {
               !vars.exists {
                 case ("AKKA_VERSION", `akkaLower`) => true
                 case ("MONGO_VER", `mongoLower`) => true
+                case ("MONGO_PROFILE", p) =>
+                  scala == scala213 && p != "rs" && p != "x509"
+
                 case _ => false
               }
             })
@@ -102,22 +105,20 @@ object Travis {
 
       }
 
-      // TODO: Remove
       def integrationMatrix =
         integrationEnv.map(integrationVars).map { c => s"  - $c" }
 
-      // TODO
       val unitTestEnv = "CI_CATEGORY=UNIT_TESTS"
 
       val unitTestIncludes = List(
         "  - os: osx",
-        s"    env: ${unitTestEnv}",
-        s"    jdk: ${jdkLower}",
-        s"    scala: ${scala211}",
+        s"    osx_image: xcode9.4",
+        s"    language: java",
+        s"    env: ${unitTestEnv} OS_NAME=osx TRAVIS_SCALA_VERSION=${scala211} REACTIVEMONGO_SHADED=false",
         "  - os: linux",
-        s"    env: ${unitTestEnv}",
+        s"    env: ${unitTestEnv} REACTIVEMONGO_SHADED=false",
         s"    jdk: ${jdkUpper}",
-        s"    scala: ${scalaUpper}")
+        s"    scala: ${scala212}")
 
       // Linux only integration
       val linuxIncludes = javaIntegration.flatMap {
@@ -143,15 +144,15 @@ object Travis {
           "    - os: osx", s"      env: ${v}")
         }) ++ Seq(
         "    - os: osx", //
-          s"      scala: ${scalaUpper}",
+          s"      scala: ${scala212}",
           "      env: CI_CATEGORY=UNIT_TESTS",
         "    - os: linux", //
-          s"      scala: ${scalaUpper}",
+          s"      scala: ${scala212}",
           "      env: CI_CATEGORY=UNIT_TESTS",
         "    - os: linux", //
-          "      scala: 2.11.12",
+          s"      scala: ${scala211}",
           "      env: CI_CATEGORY=UNIT_TESTS",
-        s"    - scala: ${scalaUpper}", //
+        s"    - scala: ${scala212}", //
           "      jdk: openjdk8",
           "      env: CI_CATEGORY=UNIT_TESTS") ++ (
         integrationEnv.flatMap { flags =>
@@ -163,7 +164,7 @@ object Travis {
                 flags.contains("MONGO_PROFILE" -> "invalid-ssl") ||
                 flags.contains("MONGO_PROFILE" -> "mutual-ssl"))) {
             List(
-              "    - scala: 2.11.12",
+              s"    - scala: ${scala211}",
               s"      env: ${integrationVars(flags)}",
               "    - jdk: openjdk8",
               s"      env: ${integrationVars(flags)}"
@@ -174,7 +175,7 @@ object Travis {
                 flags.contains("MONGO_VER" -> mongoLower)
             )) {
             List(
-              "    - scala: 2.12.10",
+              s"    - scala: ${scala212}",
               s"      env: ${integrationVars(flags)}",
               "    - jdk: oraclejdk9",
               s"      env: ${integrationVars(flags)}"
