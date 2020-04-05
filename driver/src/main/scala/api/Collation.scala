@@ -6,7 +6,7 @@ package reactivemongo.api
  * {{{
  * import reactivemongo.api.Collation
  *
- * val collation = new Collation(
+ * val collation = Collation(
  *   locale = "en-US",
  *   caseLevel = None,
  *   caseFirst = None,
@@ -17,7 +17,7 @@ package reactivemongo.api
  *   backwards = None)
  * }}}
  */
-final class Collation(
+final class Collation private[api] (
   val locale: String,
   val caseLevel: Option[Boolean],
   val caseFirst: Option[Collation.CaseFirst],
@@ -25,7 +25,8 @@ final class Collation(
   val numericOrdering: Option[Boolean],
   val alternate: Option[Collation.Alternate],
   val maxVariable: Option[Collation.MaxVariable],
-  val backwards: Option[Boolean]) {
+  val backwards: Option[Boolean],
+  val normalization: Option[Boolean]) {
 
   override def equals(that: Any): Boolean = that match {
     case other: Collation => other.tupled == tupled
@@ -40,7 +41,7 @@ final class Collation(
 
   private[api] def tupled =
     (locale, caseLevel, caseFirst, strength, numericOrdering, alternate,
-      maxVariable, backwards)
+      maxVariable, backwards, normalization)
 
 }
 
@@ -48,23 +49,48 @@ final class Collation(
  * [[Collation]] utilities.
  */
 object Collation {
-  final class Strength(val value: Int) extends AnyVal
+  /**
+   * @param locale the [[https://docs.mongodb.com/manual/reference/collation-locales-defaults/#collation-languages-locales ICU locale]]
+   * @param caseLevel the flag that determines whether to include case comparison at strength level 1 or 2 (see [[http://userguide.icu-project.org/collation/concepts#TOC-CaseLevel ICU case level]])
+   * @param caseFirst the field that determines sort order of case differences during tertiary level comparisons
+   * @param numericOrdering the flag that determines whether to compare numeric strings as numbers or as strings
+   * @param alternate the field that determines whether collation should consider whitespace and punctuation as base characters
+   * @param maxVariable the field that determines up to which characters are considered ignorable
+   * @param backwards the flag that determines whether strings with diacritics sort from back of the string
+   * @param normalization the flag that determines whether to check if text require normalization and to perform normalization
+   */
+  def apply(
+    locale: String,
+    caseLevel: Option[Boolean] = None,
+    caseFirst: Option[CaseFirst] = None,
+    strength: Option[Strength] = None,
+    numericOrdering: Option[Boolean] = None,
+    alternate: Option[Alternate] = None,
+    maxVariable: Option[MaxVariable] = None,
+    backwards: Option[Boolean] = None,
+    normalization: Option[Boolean] = None): Collation =
+    new Collation(locale, caseLevel, caseFirst, strength, numericOrdering,
+      alternate, maxVariable, backwards, normalization)
+
+  // ---
+
+  final class Strength private[api] (val value: Int) extends AnyVal
   val PrimaryStrength = new Strength(1)
   val SecondaryStrength = new Strength(2)
   val TertiaryStrength = new Strength(3)
   val QuaternaryStrength = new Strength(4)
   val IdentityStrength = new Strength(5)
 
-  final class CaseFirst(val value: String) extends AnyVal
+  final class CaseFirst private[api] (val value: String) extends AnyVal
   val UpperCaseFirst = new CaseFirst("upper")
   val LowerCaseFirst = new CaseFirst("lower")
   val OffCaseFirst = new CaseFirst("off")
 
-  final class Alternate(val value: String) extends AnyVal
+  final class Alternate private[api] (val value: String) extends AnyVal
   val NonIgnorable = new Alternate("non-ignorable")
   val Shifted = new Alternate("shifted")
 
-  final class MaxVariable(val value: String) extends AnyVal
+  final class MaxVariable private[api] (val value: String) extends AnyVal
   val Punct = new MaxVariable("punct")
   val Space = new MaxVariable("space")
 
@@ -114,6 +140,10 @@ object Collation {
       elements += element("backwards", boolean(back))
     }
 
+    collation.normalization.foreach { norm =>
+      elements += element("normalization", boolean(norm))
+    }
+
     builder.document(elements.result())
   }
 
@@ -134,7 +164,8 @@ object Collation {
           alternate = string(doc, "alternate").map(new Collation.Alternate(_)),
           maxVariable = string(
             doc, "maxVariable").map(new Collation.MaxVariable(_)),
-          backwards = booleanLike(doc, "backwards"))
+          backwards = booleanLike(doc, "backwards"),
+          normalization = booleanLike(doc, "normalization"))
 
       }
     }

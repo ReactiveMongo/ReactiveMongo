@@ -116,15 +116,9 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
       }
 
       "collation" in {
-        val colla = new Collation(
+        val colla = Collation(
           locale = "en-US",
-          caseLevel = None,
-          caseFirst = None,
-          strength = Some(Collation.PrimaryStrength),
-          numericOrdering = None,
-          alternate = None,
-          maxVariable = None,
-          backwards = None)
+          strength = Some(Collation.PrimaryStrength))
 
         b.collation must beNone and {
           b.collation(colla).collation must beSome(colla)
