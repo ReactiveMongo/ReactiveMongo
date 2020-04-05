@@ -24,8 +24,6 @@ private[reactivemongo] final class DropIndexesResult(
 private[reactivemongo] object DropIndexes {
   @inline def apply(index: String): DropIndexes = new DropIndexes(index)
 
-  //def unapply(other: DropIndexes): Option[String] = Option(other).map(_.index)
-
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[DropIndexes]] = {
     val builder = pack.newBuilder
 

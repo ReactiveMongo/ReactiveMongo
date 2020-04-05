@@ -1,6 +1,21 @@
-package reactivemongo.api.commands
+package reactivemongo.api.commands // TODO: Remove
 
 import reactivemongo.api.SerializationPack
+
+final class ServerProcess private[api] (
+  override val toString: String) extends AnyVal
+
+object ServerProcess {
+  val Mongod = new ServerProcess("mongod")
+
+  val Mongos = new ServerProcess("mongos")
+
+  def unapply(repr: String): Option[ServerProcess] = repr match {
+    case "mongos" => Some(Mongos)
+    case "mongod" => Some(Mongod)
+    case _        => None
+  }
+}
 
 /**
  * @see [[ServerStatusResult]]
@@ -294,7 +309,7 @@ private[reactivemongo] case object ServerStatus
         host <- string(doc, "host")
         version <- string(doc, "version")
         process <- string(doc, "process").map[ServerProcess] {
-          ServerProcess.unapply(_).getOrElse(MongodProcess)
+          ServerProcess.unapply(_).getOrElse(ServerProcess.Mongod)
         }
         pid <- long(doc, "pid")
         uptime <- long(doc, "uptime")

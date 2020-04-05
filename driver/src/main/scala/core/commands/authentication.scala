@@ -8,6 +8,8 @@ import reactivemongo.api.bson.collection.BSONSerializationPack
 import reactivemongo.core.protocol.Response
 import reactivemongo.core.errors.CommandError
 
+// TODO: Refactor or remove
+
 private[core] case class X509Authenticate(user: Option[String])
   extends Command[SuccessfulAuthentication] {
 

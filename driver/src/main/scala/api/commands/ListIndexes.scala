@@ -48,8 +48,6 @@ private[reactivemongo] object ListIndexes {
       case _ => indexes
     }
 
-    //import BSONCommonWriteCommandsImplicits.DefaultWriteResultReader
-
     CommandCodecs.dealingWithGenericCommandErrorsReader[P, List[Index.Aux[P]]](pack) { doc =>
       decoder.child(doc, "cursor").map {
         decoder.children(_, "firstBatch")

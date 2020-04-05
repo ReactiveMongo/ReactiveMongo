@@ -28,7 +28,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
   }
 
   /** Ascending sort order */
-  final class Ascending private[api] (val field: String) extends SortOrder {
+  final class Ascending private (val field: String) extends SortOrder {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -47,12 +47,12 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
   object Ascending {
     def apply(field: String): Ascending = new Ascending(field)
 
-    def unapply(ascending: Ascending): Option[String] =
+    private[api] def unapply(ascending: Ascending): Option[String] =
       Option(ascending).map(_.field)
   }
 
   /** Descending sort order */
-  final class Descending private[api] (val field: String) extends SortOrder {
+  final class Descending private (val field: String) extends SortOrder {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -71,7 +71,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
   object Descending {
     def apply(field: String): Descending = new Descending(field)
 
-    def unapply(descending: Descending): Option[String] =
+    private[api] def unapply(descending: Descending): Option[String] =
       Option(descending).map(_.field)
   }
 
@@ -80,7 +80,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
    *
    * @param keyword the metadata keyword to sort by
    */
-  final class MetadataSort private[api] (
+  final class MetadataSort private (
     val field: String,
     val keyword: MetadataKeyword) extends SortOrder {
 
@@ -102,8 +102,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
     def apply(field: String, keyword: MetadataKeyword): MetadataSort =
       new MetadataSort(field, keyword)
 
-    def unapply(other: MetadataSort): Option[(String, MetadataKeyword)] =
-      Option(other).map { i => i.field -> i.keyword }
+    private[api] def unapply(other: MetadataSort): Option[(String, MetadataKeyword)] = Option(other).map { i => i.field -> i.keyword }
 
   }
 }

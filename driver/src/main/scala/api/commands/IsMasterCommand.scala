@@ -11,12 +11,12 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
   /**
    * @param client the client metadata (only for first isMaster request)
    */
-  final class IsMaster(
+  private[reactivemongo] final class IsMaster(
     val client: Option[ClientMetadata],
     val comment: Option[String]) extends Command
     with CommandWithResult[IsMasterResult] with CommandWithPack[P]
 
-  final class LastWrite(
+  private[reactivemongo] final class LastWrite(
     val opTime: Long,
     val lastWriteDate: Date,
     val majorityOpTime: Long,
@@ -39,7 +39,7 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
    * @param setVersion the set version, or -1 if unknown
    * @param electionId the unique identifier for each election, or -1
    */
-  sealed class ReplicaSet private[commands] (
+  final class ReplicaSet private[commands] (
     val setName: String,
     val setVersion: Int,
     val me: String,
@@ -63,8 +63,8 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
     override lazy val hashCode = tupled.hashCode
 
     override def equals(that: Any): Boolean = that match {
-      case rs: ReplicaSet => tupled == rs.tupled
-      case _              => false
+      case rs: this.type => tupled == rs.tupled
+      case _             => false
     }
   }
 
@@ -115,11 +115,11 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
 
   }
 
-  object IsMasterResult {
+  private[reactivemongo] object IsMasterResult {
     def unapply(res: IsMasterResult) = Option(res).map(_.tupled)
   }
 
-  def writer[T <: IsMaster](pack: P): pack.Writer[T] = {
+  private[reactivemongo] def writer[T <: IsMaster](pack: P): pack.Writer[T] = {
     val builder = pack.newBuilder
     import builder.{ elementProducer => element }
 
@@ -143,7 +143,7 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
     }
   }
 
-  def reader(pack: P)(implicit sr: pack.NarrowValueReader[String]): pack.Reader[IsMasterResult] = {
+  private[reactivemongo] def reader(pack: P)(implicit sr: pack.NarrowValueReader[String]): pack.Reader[IsMasterResult] = {
     val decoder = pack.newDecoder
 
     import decoder.{ booleanLike, int, long, string, values }

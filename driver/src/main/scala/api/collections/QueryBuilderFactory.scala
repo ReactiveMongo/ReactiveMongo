@@ -95,7 +95,7 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
     failoverStrategy: FailoverStrategy = FailoverStrategy.default,
     val skip: Int = 0,
     val batchSize: Int = 0,
-    val flagsN: Int = 0,
+    val flagsN: Int = 0, // TODO: CursorOptions
     val readConcern: ReadConcern = ReadConcern.default,
     readPreference: ReadPreference = ReadPreference.primary,
     filter: Option[pack.Document] = None,

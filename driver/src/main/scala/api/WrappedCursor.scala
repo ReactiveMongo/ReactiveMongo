@@ -8,17 +8,17 @@ import scala.concurrent.{ ExecutionContext, Future }
  */
 trait WrappedCursor[T] extends Cursor[T] with WrappedCursorCompat[T] {
   /** The underlying cursor */
-  def wrappee: Cursor[T]
+  protected def wrappee: Cursor[T]
 
-  def foldBulks[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ec: ExecutionContext): Future[A] = wrappee.foldBulks(z, maxDocs)(suc, err)
+  final def foldBulks[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ec: ExecutionContext): Future[A] = wrappee.foldBulks(z, maxDocs)(suc, err)
 
-  def foldBulksM[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ec: ExecutionContext): Future[A] = wrappee.foldBulksM(z, maxDocs)(suc, err)
+  final def foldBulksM[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ec: ExecutionContext): Future[A] = wrappee.foldBulksM(z, maxDocs)(suc, err)
 
-  def foldWhile[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ec: ExecutionContext): Future[A] = wrappee.foldWhile(z, maxDocs)(suc, err)
+  final def foldWhile[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Cursor.State[A], err: Cursor.ErrorHandler[A])(implicit ec: ExecutionContext): Future[A] = wrappee.foldWhile(z, maxDocs)(suc, err)
 
-  def foldWhileM[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ec: ExecutionContext): Future[A] = wrappee.foldWhileM(z, maxDocs)(suc, err)
+  final def foldWhileM[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(implicit ec: ExecutionContext): Future[A] = wrappee.foldWhileM(z, maxDocs)(suc, err)
 
-  def head(implicit ec: ExecutionContext): Future[T] = wrappee.head
+  final def head(implicit ec: ExecutionContext): Future[T] = wrappee.head
 
-  override def headOption(implicit ec: ExecutionContext): Future[Option[T]] = wrappee.headOption
+  final def headOption(implicit ec: ExecutionContext): Future[Option[T]] = wrappee.headOption
 }

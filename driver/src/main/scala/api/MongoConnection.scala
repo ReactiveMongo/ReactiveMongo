@@ -135,7 +135,7 @@ final class MongoConnection private[reactivemongo] (
     password: String,
     failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit ec: ExecutionContext): Future[SuccessfulAuthentication] = waitIsAvailable(
     failoverStrategy, stackTrace()).flatMap { _ =>
-    val req = AuthRequest(Authenticate(db, user, Option(password)))
+    val req = new AuthRequest(Authenticate(db, user, Option(password)))
     mongosystem ! req
     req.future
   }
@@ -394,7 +394,7 @@ object MongoConnection {
 
   private[api] val logger = LazyLogger("reactivemongo.api.MongoConnection")
 
-  final class URIParsingException(message: String)
+  final class URIParsingException private[api] (message: String)
     extends Exception with NoStackTrace {
     override def getMessage() = message
   }

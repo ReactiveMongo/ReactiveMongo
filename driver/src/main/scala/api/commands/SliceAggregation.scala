@@ -6,8 +6,7 @@ private[commands] trait SliceAggregation[P <: SerializationPack] {
   aggregation: AggregationFramework[P] =>
 
   /**
-   * Returns a subset of an array.
-   * https://docs.mongodb.com/manual/reference/operator/aggregation/slice/
+   * Returns a [[https://docs.mongodb.com/manual/reference/operator/aggregation/slice/ slice]]/subset of an array.
    *
    * @param array any valid expression that resolves to an array
    * @param position any valid expression that resolves to an integer
@@ -29,6 +28,20 @@ private[commands] trait SliceAggregation[P <: SerializationPack] {
       document(Seq(
         element(f"$$slice", builder.array(array, els.result()))))
     }
+
+    private lazy val tupled = Tuple3(array, position, n)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        other.tupled == this.tupled
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"Slice${tupled.toString}"
   }
 
   /**

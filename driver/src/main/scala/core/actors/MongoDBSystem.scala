@@ -372,14 +372,6 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
 
     nodeSetUpdated("Restart", null, _nodeSet)
 
-    /*
-    // Renew the channel factory, as releaseExternalResources in close@postStop
-    channelFactory = newChannelFactory({})
-    closingFactory = false
-
-    updateNodeSet(s"Restart(${_nodeSet})")(_ => initNodeSet())
- */
-
     super.postRestart(reason) // will call preStart()
   }
 
@@ -898,7 +890,9 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
         }
       }
 
-    case request @ AuthRequest(authenticate, _) => {
+    case request: AuthRequest => {
+      import request.authenticate
+
       debug(s"New authenticate request $authenticate")
       // For [[MongoConnection.authenticate]]
 
@@ -1772,7 +1766,7 @@ private[reactivemongo] final class StandardDBSystemWithScramSha256(
 
 }
 
-final class StandardDBSystemWithX509 private[reactivemongo] (
+private[reactivemongo] final class StandardDBSystemWithX509(
   val supervisor: String,
   val name: String,
   val seeds: Seq[String],
@@ -1783,10 +1777,20 @@ final class StandardDBSystemWithX509 private[reactivemongo] (
     new ChannelFactory(supervisor, name, options)
 }
 
-case class AuthRequest(
-  authenticate: Authenticate,
-  promise: Promise[SuccessfulAuthentication] = Promise()) {
+private[reactivemongo] final class AuthRequest(
+  val authenticate: Authenticate,
+  val promise: Promise[SuccessfulAuthentication] = Promise()) {
   def future: Future[SuccessfulAuthentication] = promise.future
+
+  override def equals(that: Any): Boolean = that match {
+    case other: AuthRequest =>
+      other.authenticate == this.authenticate
+
+    case _ =>
+      false
+  }
+
+  override def hashCode: Int = authenticate.hashCode
 }
 
 private[actors] final class RequestTracker {

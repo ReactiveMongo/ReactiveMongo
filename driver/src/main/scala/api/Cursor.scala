@@ -364,7 +364,7 @@ object Cursor {
   }
 
   /** '''EXPERIMENTAL''' */
-  final class Result[T](
+  final class Result[T] private[api] (
     val value: T,
     val reference: Reference) {
 

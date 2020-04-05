@@ -24,6 +24,8 @@ import reactivemongo.core.errors.CommandError
 import reactivemongo.core.protocol.{ RequestMaker, Query, QueryFlags, Response }
 import reactivemongo.core.netty._
 
+// TODO: Remove
+
 /**
  * A MongoDB Command.
  *

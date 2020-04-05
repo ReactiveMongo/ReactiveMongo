@@ -73,7 +73,7 @@ object ReadPreference {
     override val toString = s"""PrimaryPreferred(${tags mkString ", "})"""
   }
 
-  object PrimaryPreferred extends scala.runtime.AbstractFunction1[List[Map[String, String]], PrimaryPreferred] {
+  object PrimaryPreferred {
     def apply(tags: List[Map[String, String]]): PrimaryPreferred =
       new PrimaryPreferred(tags)
 

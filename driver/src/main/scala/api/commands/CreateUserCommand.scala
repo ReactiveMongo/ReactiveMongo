@@ -65,13 +65,13 @@ object DBUserRole {
 
 /**
  * [[https://docs.mongodb.com/manual/reference/command/createUser/#authentication-restrictions Authentication restriction]] for user (since MongoDB 3.6)
+ *
+ * @param clientSource the client list of IP addresses and/or CIDR ranges
+ * @param serverAddress the server list of IP addresses and/or CIDR ranges
  */
-sealed trait AuthenticationRestriction {
-  /** List of IP addresses and/or CIDR ranges */
-  def clientSource: List[String]
-
-  /** List of IP addresses and/or CIDR ranges */
-  def serverAddress: List[String]
+final class AuthenticationRestriction private[api] (
+  val clientSource: List[String],
+  val serverAddress: List[String]) {
 
   override def equals(that: Any): Boolean = that match {
     case other: AuthenticationRestriction => tupled == other.tupled
@@ -86,16 +86,10 @@ sealed trait AuthenticationRestriction {
 }
 
 object AuthenticationRestriction {
-  private[api] def apply(
+  def apply(
     clientSource: List[String],
     serverAddress: List[String]): AuthenticationRestriction =
-    new Impl(clientSource, serverAddress)
-
-  // ---
-
-  private final class Impl(
-    val clientSource: List[String],
-    val serverAddress: List[String]) extends AuthenticationRestriction
+    new AuthenticationRestriction(clientSource, serverAddress)
 }
 
 private[reactivemongo] trait CreateUserCommand[P <: SerializationPack] { _: PackSupport[P] =>

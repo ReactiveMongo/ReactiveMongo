@@ -1,5 +1,7 @@
 package reactivemongo
 
+import reactivemongo.core.protocol.MongoWireVersion
+
 import reactivemongo.api.{
   Collation,
   Collection,
@@ -10,7 +12,13 @@ import reactivemongo.api.{
 }
 import reactivemongo.api.collections.{ HintFactory, QueryBuilderFactory }
 
-import reactivemongo.api.bson.BSONDocument
+import reactivemongo.api.bson.{
+  BSONBoolean,
+  BSONDocument,
+  BSONInteger,
+  BSONString,
+  BSONValue
+}
 
 import reactivemongo.api.tests, tests.Pack
 
@@ -145,28 +153,40 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
     lazy val coll = _root_.tests.Common.db(
       s"querybuilder${System identityHashCode this}")
 
+    lazy val ver = reactivemongo.api.tests.
+      maxWireVersion(_root_.tests.Common.db)
+
     "write minimal query" in {
       val builder = coll.find(
         BSONDocument("username" -> "John Doe"),
         Option.empty[BSONDocument])
 
-      val expected = BSONDocument(
-        "find" -> coll.name,
-        "skip" -> 0,
-        "tailable" -> false,
-        "awaitData" -> false,
-        "oplogReplay" -> false,
-        "noCursorTimeout" -> false,
-        "allowPartialResults" -> false,
-        "singleBatch" -> false,
-        "returnKey" -> false,
-        "showRecordId" -> false,
+      val elements = Seq.newBuilder[(String, BSONValue)] ++= Seq(
+        "find" -> BSONString(coll.name),
+        "skip" -> BSONInteger(0),
+        "tailable" -> BSONBoolean(false),
+        "awaitData" -> BSONBoolean(false),
+        "oplogReplay" -> BSONBoolean(false),
+        "noCursorTimeout" -> BSONBoolean(false),
+        "allowPartialResults" -> BSONBoolean(false),
+        "singleBatch" -> BSONBoolean(false),
+        "returnKey" -> BSONBoolean(false),
+        "showRecordId" -> BSONBoolean(false))
+
+      if (ver.compareTo(MongoWireVersion.V34) < 0) {
+        elements += ("snapshot" -> BSONBoolean(false))
+      }
+
+      elements ++= Seq(
         "filter" -> BSONDocument("username" -> "John Doe"),
-        "limit" -> 10, // maxDocs
+        "limit" -> BSONInteger(10), // maxDocs
         "readConcern" -> BSONDocument("level" -> "local"),
         f"$$readPreference" -> BSONDocument("mode" -> "primary"))
 
-      builder.merge(ReadPreference.Primary, 10) must_=== expected
+      val expected = BSONDocument(elements.result())
+      val res = builder.merge(ReadPreference.Primary, 10)
+
+      res.aka(BSONDocument pretty res) must_=== expected
     }
 
     "write with more options" >> {
@@ -175,23 +195,33 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
         sort(BSONDocument("age" -> 1)).
         hint(coll.hint(BSONDocument("foo" -> 1)))
 
-      lazy val expected1 = BSONDocument(
-        "find" -> coll.name,
-        "skip" -> 0,
-        "tailable" -> false,
-        "awaitData" -> false,
-        "oplogReplay" -> false,
-        "noCursorTimeout" -> false,
-        "allowPartialResults" -> false,
-        "singleBatch" -> false,
-        "returnKey" -> false,
-        "showRecordId" -> false,
-        "filter" -> BSONDocument("username" -> "John Doe"),
-        "limit" -> 11,
-        "sort" -> BSONDocument("age" -> 1),
-        "hint" -> BSONDocument("foo" -> 1),
-        "readConcern" -> BSONDocument("level" -> "local"),
-        f"$$readPreference" -> BSONDocument("mode" -> "primary"))
+      lazy val expected1: BSONDocument = {
+        val elements = Seq.newBuilder[(String, BSONValue)] ++= Seq(
+          "find" -> BSONString(coll.name),
+          "skip" -> BSONInteger(0),
+          "tailable" -> BSONBoolean(false),
+          "awaitData" -> BSONBoolean(false),
+          "oplogReplay" -> BSONBoolean(false),
+          "noCursorTimeout" -> BSONBoolean(false),
+          "allowPartialResults" -> BSONBoolean(false),
+          "singleBatch" -> BSONBoolean(false),
+          "returnKey" -> BSONBoolean(false),
+          "showRecordId" -> BSONBoolean(false))
+
+        if (ver.compareTo(MongoWireVersion.V34) < 0) {
+          elements += ("snapshot" -> BSONBoolean(false))
+        }
+
+        elements ++= Seq(
+          "filter" -> BSONDocument("username" -> "John Doe"),
+          "limit" -> BSONInteger(11),
+          "sort" -> BSONDocument("age" -> 1),
+          "hint" -> BSONDocument("foo" -> 1),
+          "readConcern" -> BSONDocument("level" -> "local"),
+          f"$$readPreference" -> BSONDocument("mode" -> "primary"))
+
+        BSONDocument(elements.result())
+      }
 
       "with query builder #1" in {
         builder1.merge(ReadPreference.Primary, 11) must_=== expected1

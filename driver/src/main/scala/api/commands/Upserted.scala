@@ -7,7 +7,7 @@ sealed trait Upserted {
 
   def index: Int
 
-  def _id: Pack#Value
+  def _id: Pack#Value // TODO: Refactor
 
   override def equals(that: Any): Boolean = that match {
     case other: Upserted =>

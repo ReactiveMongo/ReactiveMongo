@@ -18,7 +18,7 @@ trait AggregationFramework[P <: SerializationPack]
   /**
    * @param batchSize the initial batch size for the cursor
    */
-  protected class Cursor private[api] (val batchSize: Int) {
+  protected final class Cursor private[api] (val batchSize: Int) {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         this.batchSize == other.batchSize
@@ -69,7 +69,7 @@ trait AggregationFramework[P <: SerializationPack]
   /**
    * [[https://docs.mongodb.com/manual/reference/operator/aggregation/bucket/ \$bucket]] aggregation stage.
    */
-  final class Bucket private[api] (
+  final class Bucket private (
     val groupBy: pack.Value,
     val boundaries: Seq[pack.Value],
     val default: String)(
@@ -133,7 +133,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * Document fields identifier must be prefixed with `$`.
    */
-  final class BucketAuto private[api] (
+  final class BucketAuto private (
     val groupBy: pack.Value,
     val buckets: Int,
     val granularity: Option[String])(
@@ -186,7 +186,7 @@ trait AggregationFramework[P <: SerializationPack]
   /**
    * [[https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/ \$collStats]] aggregation stage.
    */
-  final class CollStats private[api] (
+  final class CollStats private (
     val latencyStatsHistograms: Boolean,
     val storageStatsScale: Option[Double],
     val count: Boolean) extends PipelineOperator {
@@ -242,7 +242,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 3.4
    * @param outputName the name of the output field which has the count as its value
    */
-  final class Count private[api] (val outputName: String)
+  final class Count private (val outputName: String)
     extends PipelineOperator {
 
     protected[reactivemongo] val makePipe: pack.Document = pipe(f"$$count", builder.string(outputName))
@@ -265,7 +265,6 @@ trait AggregationFramework[P <: SerializationPack]
 
   object Count {
     def apply(outputName: String): Count = new Count(outputName)
-
   }
 
   /**
@@ -278,7 +277,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param idleSessions (Defaults to `true`; new in 4.0)
    * @param localOps (Defaults to false; new in 4.0)
    */
-  final class CurrentOp private[api] (
+  final class CurrentOp private (
     val allUsers: Boolean,
     val idleConnections: Boolean,
     val idleCursors: Boolean,
@@ -329,7 +328,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param specifications the subpipelines to run
    * @see https://docs.mongodb.com/manual/reference/operator/aggregation/facet/
    */
-  final class Facet private[api] (
+  final class Facet private (
     val specifications: Iterable[(String, Pipeline)])
     extends PipelineOperator {
 
@@ -379,7 +378,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param distanceField the output field that contains the calculated distance
    * @param includeLocs this specifies the output field that identifies the location used to calculate the distance
    */
-  final class GeoNear private[api] (
+  final class GeoNear private (
     val near: pack.Value,
     val spherical: Boolean,
     val limit: Option[Long],
@@ -449,7 +448,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param identifiers any BSON value acceptable by mongodb as identifier
    * @param ops the sequence of operators specifying aggregate calculation
    */
-  final class Group private[api] (val identifiers: pack.Value)(val ops: (String, GroupFunction)*) extends PipelineOperator {
+  final class Group private (val identifiers: pack.Value)(val ops: (String, GroupFunction)*) extends PipelineOperator {
 
     import builder.{ document, elementProducer => element }
 
@@ -485,7 +484,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param idField the name of the field to aggregate on
    * @param ops the sequence of operators specifying aggregate calculation
    */
-  final class GroupField private[api] (val idField: String)(val ops: (String, GroupFunction)*) extends PipelineOperator {
+  final class GroupField private (val idField: String)(val ops: (String, GroupFunction)*) extends PipelineOperator {
 
     protected[reactivemongo] val makePipe = Group(builder.string("$" + idField))(ops: _*).makePipe
 
@@ -516,7 +515,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param idFields The fields to aggregate on, and the names they should be aggregated under.
    * @param ops the sequence of operators specifying aggregate calculation
    */
-  final class GroupMulti private[api] (val idFields: (String, String)*)(
+  final class GroupMulti private (val idFields: (String, String)*)(
     val ops: (String, GroupFunction)*) extends PipelineOperator {
 
     protected[reactivemongo] val makePipe = Group(builder.document(idFields.map {
@@ -579,7 +578,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param host the hostname and port of the mongod
    * @param accesses the index statistics
    */
-  final class IndexStatsResult private[api] (
+  final class IndexStatsResult private (
     val name: String,
     val key: pack.Document,
     val host: String,
@@ -632,9 +631,9 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param limit the number of documents to allow through
    */
-  final class Limit private[api] (val limit: Int) extends PipelineOperator {
-
-    protected[reactivemongo] val makePipe: pack.Document = pipe(f"$$limit", builder.int(limit))
+  final class Limit private (val limit: Int) extends PipelineOperator {
+    protected[reactivemongo] val makePipe: pack.Document =
+      pipe(f"$$limit", builder.int(limit))
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
@@ -659,7 +658,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 3.6
    * @param expression
    */
-  final class ListLocalSessions private[api] (
+  final class ListLocalSessions private (
     val expression: pack.Document) extends PipelineOperator {
     def makePipe: pack.Document = pipe(f"$$listLocalSessions", expression)
 
@@ -728,7 +727,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param depthField an optional name for a field to add to each traversed document in the search path
    * @param restrictSearchWithMatch an optional filter expression
    */
-  final class GraphLookup private[api] (
+  final class GraphLookup private (
     val from: String,
     val startWith: pack.Value,
     val connectFromField: String,
@@ -804,7 +803,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param foreignField the field from the documents in the `from` collection
    * @param as the name of the new array field to add to the input documents
    */
-  final class Lookup private[api] (
+  final class Lookup private (
     val from: String,
     val localField: String,
     val foreignField: String,
@@ -848,10 +847,11 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param predicate the query that documents must satisfy to be in the stream
    */
-  final class Match private[api] (val predicate: pack.Document)
+  final class Match private (val predicate: pack.Document)
     extends PipelineOperator {
 
-    protected[reactivemongo] val makePipe: pack.Document = pipe(f"$$match", predicate)
+    protected[reactivemongo] val makePipe: pack.Document =
+      pipe(f"$$match", predicate)
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
@@ -880,7 +880,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param intoDb the name of the `into` database
    * @param intoCollection the name of the `into` collection
    */
-  class Merge private[api] (
+  final class Merge private (
     val intoDb: String,
     val intoCollection: String,
     val on: Seq[String],
@@ -914,7 +914,8 @@ trait AggregationFramework[P <: SerializationPack]
       pipe(f"$$merge", builder.document(opts.result()))
     }
 
-    private[api] lazy val tupled = Tuple6(intoDb, intoCollection, on, whenMatched, let, whenNotMatched)
+    private[api] lazy val tupled =
+      Tuple6(intoDb, intoCollection, on, whenMatched, let, whenNotMatched)
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
@@ -944,7 +945,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param collection the name of the output collection
    */
-  final class Out private[api] (val collection: String)
+  final class Out private (val collection: String)
     extends PipelineOperator {
 
     def makePipe: pack.Document = pipe(f"$$out", builder.string(collection))
@@ -984,7 +985,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param specifications The fields to include. The resulting objects will contain only these fields.
    */
-  final class Project private[api] (val specifications: pack.Document)
+  final class Project private (val specifications: pack.Document)
     extends PipelineOperator {
 
     protected[reactivemongo] val makePipe: pack.Document = pipe(f"$$project", specifications)
@@ -1015,7 +1016,7 @@ trait AggregationFramework[P <: SerializationPack]
    * http://docs.mongodb.org/manual/reference/operator/aggregation/redact/#pipe._S_redact Redact
    * @param expression the redact expression
    */
-  final class Redact private[api] (val expression: pack.Document)
+  final class Redact private (val expression: pack.Document)
     extends PipelineOperator {
 
     protected[reactivemongo] val makePipe: pack.Document = pipe(f"$$redact", expression)
@@ -1047,7 +1048,7 @@ trait AggregationFramework[P <: SerializationPack]
    * https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot
    * @param newRoot The field name to become the new root
    */
-  final class ReplaceRootField private[api] (val newRoot: String)
+  final class ReplaceRootField private (val newRoot: String)
     extends PipelineOperator {
 
     protected[reactivemongo] val makePipe: pack.Document =
@@ -1080,7 +1081,7 @@ trait AggregationFramework[P <: SerializationPack]
    * https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot
    * @param newRoot The new root object
    */
-  final class ReplaceRoot private[api] (val newRoot: pack.Document)
+  final class ReplaceRoot private (val newRoot: pack.Document)
     extends PipelineOperator {
 
     protected[reactivemongo] val makePipe: pack.Document =
@@ -1113,7 +1114,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 4.2
    * @param replacementDocument
    */
-  final class ReplaceWith private[api] (val replacementDocument: pack.Document)
+  final class ReplaceWith private (val replacementDocument: pack.Document)
     extends PipelineOperator {
 
     def makePipe: pack.Document = pipe(f"$$replaceWith", replacementDocument)
@@ -1145,8 +1146,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param size the number of documents to return
    */
-  final class Sample private[api] (val size: Int) extends PipelineOperator {
-
+  final class Sample private (val size: Int) extends PipelineOperator {
     protected[reactivemongo] val makePipe: pack.Document =
       pipe(f"$$sample", pipe("size", builder.int(size)))
 
@@ -1170,7 +1170,7 @@ trait AggregationFramework[P <: SerializationPack]
   /**
    * [[https://docs.mongodb.com/manual/reference/operator/aggregation/set/ \$set]] aggregation stage
    */
-  final class Set private[api] (val expression: pack.Document)
+  final class Set private (val expression: pack.Document)
     extends PipelineOperator {
 
     def makePipe: pack.Document = pipe(f"$$set", expression)
@@ -1192,8 +1192,7 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   object Set {
-    def apply(expression: pack.Document): Set =
-      new Set(expression)
+    def apply(expression: pack.Document): Set = new Set(expression)
   }
 
   /**
@@ -1201,8 +1200,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param skip the number of documents to skip
    */
-  final class Skip private[api] (val skip: Int) extends PipelineOperator {
-
+  final class Skip private (val skip: Int) extends PipelineOperator {
     protected[reactivemongo] val makePipe: pack.Document = builder.document(Seq(
       builder.elementProducer(f"$$skip", builder.int(skip))))
 
@@ -1228,7 +1226,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @param fields the fields to sort by
    */
-  final class Sort private[api] (val fields: Seq[SortOrder])
+  final class Sort private (val fields: Seq[SortOrder])
     extends PipelineOperator {
 
     import builder.{ document, elementProducer => element }
@@ -1271,7 +1269,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 3.4
    * @param expression
    */
-  final class SortByCount private[api] (val expression: pack.Value)
+  final class SortByCount private (val expression: pack.Value)
     extends PipelineOperator {
 
     def makePipe: pack.Document = pipe(f"$$sortByCount", expression)
@@ -1303,7 +1301,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @since MongoDB 3.4
    * @param field the field name
    */
-  final class SortByFieldCount private[api] (val field: String)
+  final class SortByFieldCount private (val field: String)
     extends PipelineOperator {
 
     def makePipe: pack.Document =
@@ -1337,7 +1335,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param field the field name
    * @param otherFields
    */
-  final class Unset private[api] (
+  final class Unset private (
     val field: String,
     val otherFields: Seq[String]) extends PipelineOperator {
 
@@ -1371,7 +1369,7 @@ trait AggregationFramework[P <: SerializationPack]
    * http://docs.mongodb.org/manual/reference/aggregation/unwind/#_S_unwind
    * @param field the name of the array to unwind
    */
-  final class UnwindField private[api] (val field: String) extends Unwind {
+  final class UnwindField private (val field: String) extends Unwind {
     protected[reactivemongo] val makePipe = pipe(f"$$unwind", builder.string("$" + field))
 
     override def equals(that: Any): Boolean = that match {
@@ -1505,7 +1503,7 @@ trait AggregationFramework[P <: SerializationPack]
    * @param startAtOperationTime the operation time before which all change events are known. Must be in the time range of the oplog. (since MongoDB 4.0)
    * @param fullDocumentStrategy if set to UpdateLookup, every update change event will be joined with the ''current'' version of the relevant document.
    */
-  final class ChangeStream(
+  final class ChangeStream( // TODO: Factory
     resumeAfter: Option[pack.Value] = None,
     startAtOperationTime: Option[pack.Value] = None, // TODO#1.1: restrict to something more like a timestamp?
     fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None) extends PipelineOperator {
@@ -1514,5 +1512,17 @@ trait AggregationFramework[P <: SerializationPack]
       resumeAfter.map(v => builder.elementProducer("resumeAfter", v)),
       startAtOperationTime.map(v => builder.elementProducer("startAtOperationTime", v)),
       fullDocumentStrategy.map(v => builder.elementProducer("fullDocument", builder.string(v.name)))).flatten))
+
+    private lazy val tupled =
+      Tuple3(resumeAfter, startAtOperationTime, fullDocumentStrategy)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        other.tupled == this.tupled
+
+      case _ => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
   }
 }

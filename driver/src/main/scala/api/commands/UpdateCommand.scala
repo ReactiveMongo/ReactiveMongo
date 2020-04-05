@@ -15,7 +15,7 @@ import reactivemongo.api.{
  */
 private[reactivemongo] trait UpdateCommand[P <: SerializationPack] { _: PackSupport[P] =>
 
-  final class Update(
+  private[reactivemongo] final class Update(
     val firstUpdate: UpdateElement,
     val updates: Seq[UpdateElement],
     val ordered: Boolean,

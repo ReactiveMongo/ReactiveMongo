@@ -12,7 +12,7 @@ import reactivemongo.api.{
  */
 private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackSupport[P] =>
 
-  final class Delete private[api] (
+  private[api] final class Delete(
     val deletes: Seq[DeleteElement],
     val ordered: Boolean,
     val writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[DeleteResult]
@@ -22,7 +22,7 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackS
    * @param limit the number of matching documents to delete
    * @param collation the collation to use for the operation
    */
-  final class DeleteElement private[api] (
+  private[api] final class DeleteElement(
     val q: pack.Document,
     val limit: Int,
     val collation: Option[Collation]) {

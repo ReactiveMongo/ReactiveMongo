@@ -60,7 +60,7 @@ object Exceptions {
     super.setStackTrace(trace)
   }
 
-  object InternalState {
+  private[reactivemongo] object InternalState {
     val empty = new InternalState(Array.empty)
   }
 }

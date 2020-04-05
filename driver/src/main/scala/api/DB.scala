@@ -71,11 +71,11 @@ import reactivemongo.api.commands.{
  * @define cursorFetcher A cursor for the command results
  * @define singleResult A single result from command execution
  */
-final class DB(
+final class DB private[api] (
   val name: String,
   val connection: MongoConnection,
   private[api] val connectionState: ConnectionState,
-  val failoverStrategy: FailoverStrategy = FailoverStrategy(),
+  val failoverStrategy: FailoverStrategy = FailoverStrategy.default,
   private[reactivemongo] val session: Option[Session] = Option.empty)
   extends DBMetaCommands with PackSupport[Serialization.Pack] {
 

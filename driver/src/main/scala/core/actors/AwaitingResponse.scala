@@ -6,7 +6,7 @@ import reactivemongo.io.netty.channel.ChannelId
 
 import reactivemongo.core.protocol.{ Request, Response }
 
-private[actors] class AwaitingResponse(
+private[actors] final class AwaitingResponse(
   val request: Request,
   val channelID: ChannelId,
   val promise: Promise[Response],

@@ -7,13 +7,6 @@ import scala.concurrent.{ Future, ExecutionContext }
 import reactivemongo.api.{ Collation, ReadConcern, SerializationPack }
 
 private[collections] trait GenericCollectionWithDistinctOps[P <: SerializationPack] { self: GenericCollection[P] with DistinctOp[P] with HintFactory[P] =>
-
-  @deprecated("Use `distinct` with `Collation`", "0.16.0")
-  def distinct[T, M[_] <: Iterable[_]](
-    key: String,
-    selector: Option[pack.Document] = None,
-    readConcern: ReadConcern = self.readConcern)(implicit reader: pack.NarrowValueReader[T], ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] = distinctDocuments[T, M](key, selector, readConcern, collation = None)
-
   /**
    * Returns the distinct values for a specified field
    * across a single collection.

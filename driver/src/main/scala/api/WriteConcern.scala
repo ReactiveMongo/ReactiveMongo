@@ -14,7 +14,7 @@ package reactivemongo.api
  *     one(BSONDocument("foo" -> "bar"))
  * }}}
  */
-final class WriteConcern(
+final class WriteConcern private[api] (
   val w: WriteConcern.W,
   val j: Boolean,
   val fsync: Boolean,
@@ -41,6 +41,10 @@ final class WriteConcern(
 
 /** [[WriteConcern]] utilities. */
 object WriteConcern {
+  /**
+   * @param j the journal flag
+   * @param wtimeout specifies a time limit, in milliseconds (only applicable for `w` values greater than 1)
+   */
   def apply(
     w: WriteConcern.W,
     j: Boolean,
@@ -57,7 +61,7 @@ object WriteConcern {
   object Majority extends W
 
   /** [[https://docs.mongodb.com/manual/reference/write-concern/index.html#writeconcern.%3Ccustom-write-concern-name%3E Tagged]] acknowledgment */
-  final class TagSet(val tag: String) extends W {
+  final class TagSet private[api] (val tag: String) extends W {
     override def equals(that: Any): Boolean = that match {
       case other: TagSet =>
         (tag == null && other.tag == null) || (tag != null && tag == other.tag)
@@ -81,7 +85,7 @@ object WriteConcern {
   }
 
   /** Requests acknowledgment [[https://docs.mongodb.com/manual/reference/write-concern/index.html#writeconcern.%3Cnumber%3E by at least]] `i` nodes. */
-  final class WaitForAcknowledgments(val i: Int) extends W {
+  final class WaitForAcknowledgments private[api] (val i: Int) extends W {
     override def equals(that: Any): Boolean = that match {
       case other: WaitForAcknowledgments => i == other.i
       case _                             => false

@@ -14,7 +14,7 @@ import reactivemongo.core.protocol.QueryFlags
  *
  * @define enableFlag Enable the flag
  */
-final class CursorOptions(val flags: Int) extends AnyVal {
+final class CursorOptions private[api] (val flags: Int) extends AnyVal {
   /** $enableFlag [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/index.html#DBQuery.Option.tailable `tailable`]] flag */
   def tailable = copy(flags | QueryFlags.TailableCursor)
 

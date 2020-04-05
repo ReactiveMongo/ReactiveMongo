@@ -238,7 +238,7 @@ final class ReplSetStatus private[api] (
 /**
  * The command [[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]]
  */
-object ReplSetGetStatus
+private[reactivemongo] object ReplSetGetStatus
   extends Command with CommandWithResult[ReplSetStatus] {
 
   def writer[P <: SerializationPack](pack: P): pack.Writer[ReplSetGetStatus.type] = {
@@ -287,31 +287,10 @@ object ReplSetGetStatus
   }
 }
 
-sealed trait ServerProcess
-
-object ServerProcess {
-  def unapply(repr: String): Option[ServerProcess] = repr match {
-    case "mongos" => Some(MongosProcess)
-    case "mongod" => Some(MongodProcess)
-    case _        => None
-  }
-}
-
-case object MongodProcess extends ServerProcess {
-  override val toString = "mongod"
-}
-case object MongosProcess extends ServerProcess {
-  override val toString = "mongos"
-}
-
-object ResyncResult extends BoxedAnyVal[Unit] {
-  val value = {}
-}
-
 /**
  * The command [[https://docs.mongodb.org/manual/reference/command/resync/ resync]]
  */
-private[api] object Resync extends Command with CommandWithResult[ResyncResult.type]
+private[api] object Resync extends Command with CommandWithResult[UnitBox.type]
 
 /**
  * The [[https://docs.mongodb.org/manual/reference/command/replSetMaintenance/ replSetMaintenance]] command.

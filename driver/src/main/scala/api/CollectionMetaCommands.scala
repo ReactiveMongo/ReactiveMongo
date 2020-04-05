@@ -39,7 +39,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *   }
    * }}}
    */
-  def create()(implicit ec: ExecutionContext): Future[Unit] =
+  final def create()(implicit ec: ExecutionContext): Future[Unit] =
     command.unboxed(self, Create(None, false), ReadPreference.primary)
 
   /**
@@ -56,7 +56,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *
    * @param failsIfExists if true fails if the collection already exists (default: false)
    */
-  def create(failsIfExists: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = create().recover {
+  final def create(failsIfExists: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, Create(None, false), ReadPreference.primary).recover {
     case CommandError.Code(48 /* already exists */ ) if !failsIfExists => ()
 
     case CommandError.Message(
@@ -83,7 +83,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *
    * @see [[convertToCapped]]
    */
-  def createCapped(
+  final def createCapped(
     size: Long,
     maxDocuments: Option[Int],
     autoIndexId: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] =
@@ -126,7 +126,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *
    * @param failIfNotFound the flag to request whether it should fail
    */
-  def drop(failIfNotFound: Boolean)(implicit ec: ExecutionContext): Future[Boolean] = {
+  final def drop(failIfNotFound: Boolean)(implicit ec: ExecutionContext): Future[Boolean] = {
     command(self, DropCollection, ReadPreference.primary).
       map(_ => true).recoverWith {
         case CommandError.Code(26) if !failIfNotFound =>
@@ -151,7 +151,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    * @param size $cappedSizeParam
    * @param maxDocuments $cappedMaxParam
    */
-  def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, new ConvertToCapped(new Capped(size, maxDocuments)), ReadPreference.primary)
+  final def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, new ConvertToCapped(new Capped(size, maxDocuments)), ReadPreference.primary)
 
   private implicit lazy val statsWriter = CollStats.writer(command.pack)
 
@@ -168,7 +168,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *   coll.stats().map(_.capped)
    * }}}
    */
-  def stats()(implicit ec: ExecutionContext): Future[CollectionStats] =
+  final def stats()(implicit ec: ExecutionContext): Future[CollectionStats] =
     command(self, new CollStats(None), ReadPreference.primary)
 
   /**
@@ -184,7 +184,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *
    * @param scale the scale factor (for example, to get all the sizes in kilobytes)
    */
-  def stats(scale: Int)(implicit ec: ExecutionContext): Future[CollectionStats] = command(self, new CollStats(Some(scale)), ReadPreference.primary)
+  final def stats(scale: Int)(implicit ec: ExecutionContext): Future[CollectionStats] = command(self, new CollStats(Some(scale)), ReadPreference.primary)
 
   /**
    * Returns an index manager for this collection.
@@ -200,7 +200,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *   })
    * }}}
    */
-  def indexesManager(implicit ec: ExecutionContext): CollectionIndexesManager.Aux[Serialization.Pack] = CollectionIndexesManager(self.db, name)
+  final def indexesManager(implicit ec: ExecutionContext): CollectionIndexesManager.Aux[Serialization.Pack] = CollectionIndexesManager(self.db, name)
 
   // Command runner
   private lazy val command =

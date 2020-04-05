@@ -28,16 +28,11 @@ object CursorProducer {
  * {{{
  * import scala.concurrent.Future
  *
- * import reactivemongo.api.{ Cursor, CursorFlattener, FlattenedCursor }
+ * import reactivemongo.api.{ Cursor, CursorFlattener }
  *
  * trait FooCursor[T] extends Cursor[T] { def foo: String }
  *
- * implicit def fooFlattener = new CursorFlattener[FooCursor] {
- *   def flatten[T](future: Future[FooCursor[T]]): FooCursor[T] =
- *     new FlattenedCursor[T](future) with FooCursor[T] {
- *       def foo = "Flattened"
- *     }
- * }
+ * def flatFoo[T](future: Future[FooCursor[T]])(implicit cf: CursorFlattener[FooCursor]): FooCursor[T] = Cursor.flatten(future)
  * }}}
  */
 trait CursorFlattener[C[_] <: Cursor[_]] {

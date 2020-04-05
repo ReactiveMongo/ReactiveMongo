@@ -1,6 +1,6 @@
 package reactivemongo.core.protocol
 
-import reactivemongo.io.netty.buffer.ByteBuf
+import reactivemongo.io.netty.buffer.ByteBuf // TODO: Refactor
 
 /**
  * Something that can be written into a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]].
@@ -23,5 +23,5 @@ private[reactivemongo] trait ChannelBufferReadable[T] {
   def readFrom(buffer: ByteBuf): T
 
   /** @see readFrom */
-  def apply(buffer: ByteBuf): T = readFrom(buffer)
+  final def apply(buffer: ByteBuf): T = readFrom(buffer)
 }

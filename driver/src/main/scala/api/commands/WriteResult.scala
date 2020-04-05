@@ -28,25 +28,26 @@ sealed trait WriteResult {
 }
 
 object WriteResult {
-  private[reactivemongo] def lastError(result: WriteResult): Option[LastError] = result match {
-    case error: LastError => Some(error)
-    case _ if (result.ok) => None
-    case _ => Some(new LastError(
-      false, // ok
-      result.errmsg,
-      result.code,
-      None, // lastOp
-      result.n,
-      None, // singleShard
-      false, // updatedExisting,
-      None, // upserted
-      None, // wnote
-      false, // wtimeout,
-      None, // waited,
-      None, // wtime,
-      result.writeErrors,
-      result.writeConcernError))
-  }
+  private[reactivemongo] def lastError(result: WriteResult): Option[LastError] =
+    result match {
+      case error: LastError => Some(error)
+      case _ if (result.ok) => None
+      case _ => Some(new LastError(
+        false, // ok
+        result.errmsg,
+        result.code,
+        None, // lastOp
+        result.n,
+        None, // singleShard
+        false, // updatedExisting,
+        None, // upserted
+        None, // wnote
+        false, // wtimeout,
+        None, // waited,
+        None, // wtime,
+        result.writeErrors,
+        result.writeConcernError))
+    }
 
   /**
    * Code extractor for [[WriteResult]]

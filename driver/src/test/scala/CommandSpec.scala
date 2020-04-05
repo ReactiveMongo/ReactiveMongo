@@ -9,7 +9,7 @@ import reactivemongo.core.errors.DatabaseException
 
 import reactivemongo.api.commands.{
   CommandError,
-  MongodProcess,
+  ServerProcess,
   ReplSetGetStatus,
   ReplSetMaintenance,
   ServerStatus,
@@ -70,7 +70,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
       db.runCommand[ServerStatusResult, ServerStatus.type](
         ServerStatus, Common.failoverStrategy).
         aka("result") must beLike[ServerStatusResult]({
-          case ServerStatusResult(_, _, MongodProcess,
+          case ServerStatusResult(_, _, ServerProcess.Mongod,
             _, _, _, _, _, _, _, _, _, _, _, _, _) =>
             //println(s"Server status: $status")
             ok

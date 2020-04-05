@@ -2,7 +2,8 @@ package reactivemongo.api
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-class FlattenedCursor[T](protected val cursor: Future[Cursor[T]])
+class FlattenedCursor[T](
+  protected val cursor: Future[Cursor[T]])
   extends Cursor[T] with FlattenedCursorCompat[T] {
 
   final def head(implicit ec: ExecutionContext): Future[T] = cursor.flatMap(_.head)

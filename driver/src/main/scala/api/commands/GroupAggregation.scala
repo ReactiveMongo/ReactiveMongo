@@ -39,9 +39,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  final class AvgField private[api] (val field: String)
-    extends GroupFunction {
-
+  final class AvgField private (val field: String) extends GroupFunction {
     protected[reactivemongo] val makeFunction =
       pipe(f"$$avg", builder.string("$" + field))
 
@@ -62,15 +60,13 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object AvgField {
-    def apply(field: String): AvgField =
-      new AvgField(field)
+    def apply(field: String): AvgField = new AvgField(field)
   }
 
   /**
    * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/avg/#grp._S_avg \$avg]] group accumulator.
    */
-  final class Avg private[api] (
-    val expression: pack.Value) extends GroupFunction {
+  final class Avg private (val expression: pack.Value) extends GroupFunction {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$avg", expression)
 
@@ -91,8 +87,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object Avg {
-    def apply(expression: pack.Value): Avg =
-      new Avg(expression)
+    def apply(expression: pack.Value): Avg = new Avg(expression)
   }
 
   /**
@@ -100,7 +95,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  final class FirstField private[api] (val field: String) extends GroupFunction {
+  final class FirstField private (val field: String) extends GroupFunction {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$first", builder.string("$" + field))
 
@@ -121,14 +116,13 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object FirstField {
-    def apply(field: String): FirstField =
-      new FirstField(field)
+    def apply(field: String): FirstField = new FirstField(field)
   }
 
   /**
    * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/first/#grp._S_first \$field]] group accumulator.
    */
-  final class First private[api] (val expression: pack.Value) extends GroupFunction {
+  final class First private (val expression: pack.Value) extends GroupFunction {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$first", expression)
 
@@ -148,9 +142,8 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def toString: String = s"First(${expression})"
   }
 
-  object First extends scala.runtime.AbstractFunction1[pack.Value, First] {
-    def apply(expression: pack.Value): First =
-      new First(expression)
+  object First {
+    def apply(expression: pack.Value): First = new First(expression)
   }
 
   /**
@@ -158,9 +151,9 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  final class LastField private[api] (val field: String) extends GroupFunction {
-
-    protected[reactivemongo] val makeFunction = pipe(f"$$last", builder.string("$" + field))
+  final class LastField private (val field: String) extends GroupFunction {
+    protected[reactivemongo] val makeFunction =
+      pipe(f"$$last", builder.string("$" + field))
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
@@ -179,14 +172,13 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object LastField {
-    def apply(field: String): LastField =
-      new LastField(field)
+    def apply(field: String): LastField = new LastField(field)
   }
 
   /**
    * The [[https://docs.mongodb.com/manual/reference/operator/aggregation/last/#grp._S_last \$field]] group accumulator.
    */
-  final class Last private[api] (val expression: pack.Value) extends GroupFunction {
+  final class Last private (val expression: pack.Value) extends GroupFunction {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$last", expression)
 
@@ -207,8 +199,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object Last {
-    def apply(expression: pack.Value): Last =
-      new Last(expression)
+    def apply(expression: pack.Value): Last = new Last(expression)
   }
 
   /**
@@ -216,8 +207,9 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  final class MaxField private[api] (val field: String) extends GroupFunction {
-    protected[reactivemongo] val makeFunction = pipe(f"$$max", builder.string("$" + field))
+  final class MaxField private (val field: String) extends GroupFunction {
+    protected[reactivemongo] val makeFunction =
+      pipe(f"$$max", builder.string("$" + field))
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
@@ -245,8 +237,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param maxExpr the `\$max` expression
    */
-  final class Max private[api] (
-    val expression: pack.Value) extends GroupFunction {
+  final class Max private (val expression: pack.Value) extends GroupFunction {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$max", expression)
 
@@ -267,8 +258,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object Max {
-    def apply(expression: pack.Value): Max =
-      new Max(expression)
+    def apply(expression: pack.Value): Max = new Max(expression)
   }
 
   /**
@@ -276,7 +266,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param mergeExpr the `\$mergeObjects` expression
    */
-  final class MergeObjects private[api] (
+  final class MergeObjects private (
     val expression: pack.Value) extends GroupFunction {
 
     protected[reactivemongo] val makeFunction =
@@ -308,7 +298,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  final class MinField private[api] (val field: String) extends GroupFunction {
+  final class MinField private (val field: String) extends GroupFunction {
     protected[reactivemongo] val makeFunction =
       pipe(f"$$min", builder.string("$" + field))
 
@@ -338,7 +328,6 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @param minExpr the `\$min` expression
    */
   final class Min(val expression: pack.Value) extends GroupFunction {
-
     protected[reactivemongo] val makeFunction = pipe(f"$$min", expression)
 
     override def equals(that: Any): Boolean = that match {
@@ -366,8 +355,9 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  final class PushField private[api] (val field: String) extends GroupFunction {
-    protected[reactivemongo] val makeFunction = pipe(f"$$push", builder.string("$" + field))
+  final class PushField private (val field: String) extends GroupFunction {
+    protected[reactivemongo] val makeFunction =
+      pipe(f"$$push", builder.string("$" + field))
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
@@ -394,8 +384,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param pushExpr the `\$push` expression
    */
-  final class Push private[api] (
-    val expression: pack.Value) extends GroupFunction {
+  final class Push private (val expression: pack.Value) extends GroupFunction {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$push", expression)
 
@@ -424,8 +413,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  final class AddFieldToSet private[api] (
-    val field: String) extends GroupFunction {
+  final class AddFieldToSet private (val field: String) extends GroupFunction {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$addToSet", builder.string("$" + field))
 
@@ -454,7 +442,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param addToSetExpr the `\$addToSet` expression
    */
-  final class AddToSet private[api] (
+  final class AddToSet private (
     val expression: pack.Value) extends GroupFunction {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$addToSet", expression)
@@ -484,7 +472,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @since MongoDB 3.2
    */
-  final class StdDevPop private[api] (
+  final class StdDevPop private (
     val expression: pack.Value) extends GroupFunction {
     protected[reactivemongo] val makeFunction = pipe(f"$$stdDevPop", expression)
 
@@ -514,10 +502,11 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @since MongoDB 3.2
    * @param field $fieldParam
    */
-  final class StdDevPopField private[api] (
+  final class StdDevPopField private (
     val field: String) extends GroupFunction {
 
-    protected[reactivemongo] val makeFunction = pipe(f"$$stdDevPop", builder.string("$" + field))
+    protected[reactivemongo] val makeFunction =
+      pipe(f"$$stdDevPop", builder.string("$" + field))
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
@@ -544,10 +533,11 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @since MongoDB 3.2
    */
-  final class StdDevSamp private[api] (
+  final class StdDevSamp private (
     val expression: pack.Value) extends GroupFunction {
 
-    protected[reactivemongo] val makeFunction = pipe(f"$$stdDevSamp", expression)
+    protected[reactivemongo] val makeFunction =
+      pipe(f"$$stdDevSamp", expression)
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
@@ -575,10 +565,11 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @since MongoDB 3.2
    * @param field $fieldParam
    */
-  final class StdDevSampField private[api] (
+  final class StdDevSampField private (
     val field: String) extends GroupFunction {
 
-    protected[reactivemongo] val makeFunction = pipe(f"$$stdDevSamp", builder.string("$" + field))
+    protected[reactivemongo] val makeFunction =
+      pipe(f"$$stdDevSamp", builder.string("$" + field))
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
@@ -605,9 +596,9 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param field $fieldParam
    */
-  final class SumField private[api] (val field: String) extends GroupFunction {
-
-    protected[reactivemongo] val makeFunction = pipe(f"$$sum", builder.string("$" + field))
+  final class SumField private (val field: String) extends GroupFunction {
+    protected[reactivemongo] val makeFunction =
+      pipe(f"$$sum", builder.string("$" + field))
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
@@ -634,9 +625,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    *
    * @param sumExpr the `\$sum` expression
    */
-  final class Sum private[api] (
-    val expression: pack.Value) extends GroupFunction {
-
+  final class Sum private (val expression: pack.Value) extends GroupFunction {
     protected[reactivemongo] val makeFunction: pack.Document =
       pipe(f"$$sum", expression)
 
