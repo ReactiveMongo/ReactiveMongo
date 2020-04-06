@@ -9,11 +9,8 @@ import reactivemongo.core.errors.DatabaseException
 
 import reactivemongo.api.commands.{
   CommandError,
-  ServerProcess,
   ReplSetGetStatus,
-  ReplSetMaintenance,
-  ServerStatus,
-  ServerStatusResult
+  ReplSetMaintenance
 }
 
 import org.specs2.concurrent.ExecutionEnv
@@ -62,19 +59,6 @@ final class CommandSpec(implicit ee: ExecutionEnv)
       } else {
         replSetGetStatusTest must throwA[DatabaseException].await(0, timeout)
       }
-    }
-
-    "expose serverStatus" in {
-      import commands.{ serverStatusReader, serverStatusWriter }
-
-      db.runCommand[ServerStatusResult, ServerStatus.type](
-        ServerStatus, Common.failoverStrategy).
-        aka("result") must beLike[ServerStatusResult]({
-          case ServerStatusResult(_, _, ServerProcess.Mongod,
-            _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-            //println(s"Server status: $status")
-            ok
-        }).await(0, timeout)
     }
 
     "execute ReplSetMaintenance" in {

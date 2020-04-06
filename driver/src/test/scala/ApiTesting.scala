@@ -423,12 +423,6 @@ package object tests {
     implicit val replSetStatusReader: pack.Reader[ReplSetStatus] =
       reactivemongo.api.commands.ReplSetGetStatus.reader(pack)
 
-    implicit val serverStatusWriter =
-      reactivemongo.api.commands.ServerStatus.writer(pack)
-
-    implicit val serverStatusReader =
-      reactivemongo.api.commands.ServerStatus.reader(pack)
-
     import reactivemongo.api.commands.IsMasterCommand
     type IsMaster = IsMasterCommand[pack.type]#IsMaster
 
