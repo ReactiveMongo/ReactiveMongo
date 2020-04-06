@@ -1571,10 +1571,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
   private def requestIsMaster(context: String, node: Node): IsMasterRequest =
     node.signaling.fold(new IsMasterRequest(node)) { con =>
-      import reactivemongo.api.commands.bson.BSONIsMasterCommand.{
-        IsMaster,
-        writer
-      }
+      import IsMasterCommand.{ IsMaster, writer }
       import reactivemongo.api.commands.Command
 
       lazy val id = RequestIdGenerator.isMaster.next

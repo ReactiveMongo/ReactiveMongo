@@ -1,7 +1,5 @@
 package reactivemongo.api
 
-import java.util.UUID
-
 import scala.util.Try
 
 import scala.concurrent.{ ExecutionContext, Future, Promise }
@@ -48,9 +46,6 @@ import reactivemongo.api.bson.collection.BSONSerializationPack
 
 import reactivemongo.api.collections.QueryCodecs
 
-import reactivemongo.api.indexes.Index
-
-// TODO: Check unused
 package object tests { self =>
   type Pack = Serialization.Pack
   val pack: Pack = Serialization.internalSerializationPack
@@ -58,15 +53,6 @@ package object tests { self =>
   object PrimaryAvailable {
     def unapply(msg: Any) = msg match {
       case reactivemongo.core.actors.PrimaryAvailable(metadata) =>
-        Some(metadata)
-
-      case _ => None
-    }
-  }
-
-  object SetAvailable {
-    def unapply(msg: Any) = msg match {
-      case reactivemongo.core.actors.SetAvailable(metadata) =>
         Some(metadata)
 
       case _ => None
@@ -158,8 +144,6 @@ package object tests { self =>
     }
   }
 
-  def nodeSet(sys: MongoDBSystem): NodeSet = sys.getNodeSet
-
   def channelConnected(id: ChannelId) = ChannelConnected(id)
 
   def channelClosed(id: ChannelId) = ChannelDisconnected(id)
@@ -197,7 +181,7 @@ package object tests { self =>
       responseTo = respTo,
       opCode = -1)
 
-    Response(
+    new Response(
       header,
       reply,
       documents = message,
@@ -230,6 +214,7 @@ package object tests { self =>
       cause = DatabaseException(pack)(doc))
   }
 
+/* TODO: Remove
   def foldResponses[T](
     makeRequest: ExecutionContext => Future[Response],
     next: (ExecutionContext, Response) => Future[Option[Response]],
@@ -240,6 +225,7 @@ package object tests { self =>
     err: Cursor.ErrorHandler[T])(implicit sys: akka.actor.ActorSystem, ec: ExecutionContext): Future[T] =
     FoldResponses[T](
       z, makeRequest, next, killCursors, suc, err, maxDocs)(sys, ec)
+*/
 
   val bsonReadPref: ReadPreference => BSONDocument = {
     val writeReadPref = QueryCodecs.writeReadPref(BSONSerializationPack)
@@ -269,12 +255,12 @@ package object tests { self =>
   @inline def releaseChannelFactory(f: ChannelFactory, clb: Promise[Unit]) =
     f.release(clb)
 
+  object IsMasterCommand
+    extends reactivemongo.api.commands.IsMasterCommand[Pack]
+
   @inline def isMasterRequest(reqId: Int = RequestIdGenerator.isMaster.next): Request = {
     import reactivemongo.api.commands.Command
-    import reactivemongo.api.commands.bson.BSONIsMasterCommand.{
-      IsMaster,
-      writer => mw
-    }
+    import IsMasterCommand.{ IsMaster, writer => mw }
 
     val isMaster = Command.buildRequestMaker(BSONSerializationPack)(
       new IsMaster(None, None),
@@ -368,15 +354,9 @@ package object tests { self =>
     ec: ExecutionContext) =
     MongoConnection.fromString(uri, srvResolver, txtResolver)
 
-  @inline def probe(con: MongoConnection, timeout: FiniteDuration) = con.probe(timeout)
-
-  def sessionId(db: DB): Option[UUID] = db.session.map(_.lsid)
-
   def preload(resp: Response)(implicit ec: ExecutionContext): Future[(Response, BSONDocument)] = reactivemongo.core.protocol.Response.preload(resp)
 
   @inline def session(db: DB): Option[Session] = db.session
-
-  @inline def indexOptions[P <: SerializationPack](i: Index.Aux[P]): i.pack.Document = i.options
 
   def messageHeader(
     messageLength: Int,
@@ -404,9 +384,6 @@ package object tests { self =>
     info: ResponseInfo) =
     reactivemongo.core.protocol.Response(header, reply, documents, info)
 
-  def parseResponse(response: Response) =
-    reactivemongo.core.protocol.Response.parse(response)
-
   def responseInfo(cid: ChannelId) = new ResponseInfo(cid)
 
   def readMessageHeader(buffer: ByteBuf) = MessageHeader.readFrom(buffer)
@@ -428,15 +405,5 @@ package object tests { self =>
     implicit val replSetStatusReader: pack.Reader[ReplSetStatus] =
       reactivemongo.api.commands.ReplSetGetStatus.reader(pack)
 
-    import reactivemongo.api.commands.IsMasterCommand
-    type IsMaster = IsMasterCommand[pack.type]#IsMaster
-
-    def isMasterWriter(cmd: IsMasterCommand[pack.type]) = new {
-      def get[T <: cmd.IsMaster]: pack.Writer[T] = cmd.writer[T](pack)
-    }
-
-    def isMasterReader(cmd: IsMasterCommand[pack.type]) = new {
-      def get(implicit sr: pack.NarrowValueReader[String]): pack.Reader[cmd.IsMasterResult] = cmd.reader(pack)
-    }
   }
 }

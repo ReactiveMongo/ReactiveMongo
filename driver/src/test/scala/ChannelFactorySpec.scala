@@ -12,11 +12,6 @@ import reactivemongo.io.netty.channel.{
   ChannelFutureListener
 }
 
-import reactivemongo.api.bson.collection.BSONSerializationPack
-
-import reactivemongo.api.commands.bson.BSONIsMasterCommand
-import BSONIsMasterCommand.IsMasterResult
-
 import org.specs2.specification.AfterAll
 import org.specs2.concurrent.ExecutionEnv
 
@@ -32,7 +27,9 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
     getBytes,
     initChannel,
     isMasterRequest,
+    IsMasterCommand,
     IsMasterResponse,
+    pack,
     releaseChannelFactory,
     responseInfo,
     createChannel,
@@ -40,7 +37,8 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
     reply,
     response => _response,
     Response
-  }
+  }, IsMasterCommand.IsMasterResult
+
   import Common.timeout
   implicit def actorSys = Common.driverSystem
 
@@ -152,17 +150,17 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
       val chanConnected = Promise[Unit]()
 
       def actor = new Actor {
-        val isMasterReader = BSONIsMasterCommand.reader(BSONSerializationPack)
+        val isMasterReader = IsMasterCommand.reader(pack)
         val receive: Receive = {
           case msg if (msg.toString startsWith "ChannelConnected(") =>
             chanConnected.success(Common.logger.info(s"NIO $msg")); ()
 
           case IsMasterResponse(resp) if (chanConnected.isCompleted) => {
             result.tryComplete(scala.util.Try {
-              val bson = BSONSerializationPack.readAndDeserialize(
-                resp, BSONSerializationPack.IdentityReader)
+              val bson = pack.readAndDeserialize(
+                resp, pack.IdentityReader)
 
-              BSONSerializationPack.deserialize(bson, isMasterReader)
+              pack.deserialize(bson, isMasterReader)
             })
 
             Common.logger.info(s"NIO isMasterResponse: $resp")

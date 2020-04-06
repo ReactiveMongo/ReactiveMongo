@@ -41,7 +41,6 @@ private[api] trait CountOp[P <: SerializationPack] {
 
   private type CountCmd = ResolvedCollectionCommand[CountCommand]
 
-  // TODO: Unit test
   private def commandWriter: pack.Writer[CountCmd] = {
     val builder = pack.newBuilder
     val session = collection.db.session.filter(
