@@ -35,7 +35,7 @@ final class CursorOptions private[api] (val flags: Int) extends AnyVal {
   /** $enableFlag [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/index.html#DBQuery.Option.partial `partial`]] flag */
   def partial = copy(flags | QueryFlags.Partial)
 
-  @inline private def copy(newFlags: Int) = new CursorOptions(newFlags)
+  @inline private[api] def copy(newFlags: Int) = new CursorOptions(newFlags)
 }
 
 object CursorOptions {

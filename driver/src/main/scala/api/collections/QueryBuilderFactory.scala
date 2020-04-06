@@ -26,6 +26,7 @@ import reactivemongo.api.{
   Collation,
   Collection,
   Cursor,
+  CursorOptions,
   CursorProducer,
   DefaultCursor,
   FailoverStrategy,
@@ -50,7 +51,7 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
    *
    * @param skip the number of documents to skip.
    * @param batchSize the upper limit on the number of documents to retrieve per batch (0 for unspecified)
-   * @param flagsN the query flags
+   * @param cursorOptions the cursor options
    * @param readConcern the read concern {@since MongoDB 3.6}
    * @param readPreference the query [[ReadPreference]]
    * @param filter the query filter
@@ -95,7 +96,7 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
     failoverStrategy: FailoverStrategy = FailoverStrategy.default,
     val skip: Int = 0,
     val batchSize: Int = 0,
-    val flagsN: Int = 0, // TODO: CursorOptions
+    val cursorOptions: CursorOptions = CursorOptions.empty,
     val readConcern: ReadConcern = ReadConcern.default,
     readPreference: ReadPreference = ReadPreference.primary,
     filter: Option[pack.Document] = None,
@@ -364,7 +365,8 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
     // QueryOps
 
     /** Sets the query (raw) [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#flags flags]]. */
-    private[api] def flags(n: Int): QueryBuilder = copy(flagsN = n)
+    private[api] def flags(n: Int): QueryBuilder =
+      copy(cursorOptions = cursorOptions.copy(newFlags = n))
 
     /**
      * Makes the result cursor [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.awaitData await data]].
@@ -378,7 +380,7 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
      * }}}
      */
     final def awaitData: QueryBuilder =
-      copy(flagsN = flagsN | QueryFlags.AwaitData)
+      copy(cursorOptions = cursorOptions.awaitData)
 
     /**
      * Sets the size of result batches.
@@ -404,7 +406,8 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
      *   c.find(BSONDocument.empty).exhaust
      * }}}
      */
-    final def exhaust: QueryBuilder = copy(flagsN = flagsN | QueryFlags.Exhaust)
+    final def exhaust: QueryBuilder =
+      copy(cursorOptions = cursorOptions.exhaust)
 
     /**
      * Sets the [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.noTimeout `noTimeout`]] flag.
@@ -418,10 +421,10 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
      * }}}
      */
     final def noCursorTimeout: QueryBuilder =
-      copy(flagsN = flagsN | QueryFlags.NoCursorTimeout)
+      copy(cursorOptions = cursorOptions.noCursorTimeout)
 
     private[api] def oplogReplay: QueryBuilder =
-      copy(flagsN = flagsN | QueryFlags.OplogReplay)
+      copy(cursorOptions = cursorOptions.oplogReplay)
 
     /**
      * Sets the [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.partial `partial`]] flag.
@@ -435,7 +438,7 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
      * }}}
      */
     final def allowPartialResults: QueryBuilder =
-      copy(flagsN = flagsN | QueryFlags.Partial)
+      copy(cursorOptions = cursorOptions.partial)
 
     /**
      * Sets how many documents must be skipped at the beginning of the results.
@@ -448,7 +451,8 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
      *   c.find(BSONDocument.empty).skip(10)
      * }}}
      */
-    final def skip(n: Int): QueryBuilder = copy(skip = n)
+    final def skip(n: Int): QueryBuilder =
+      copy(skip = n)
 
     /**
      * Allows querying of a replica slave ([[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.slaveOk `slaveOk`]]).
@@ -461,7 +465,8 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
      *   c.find(BSONDocument.empty).slaveOk
      * }}}
      */
-    final def slaveOk: QueryBuilder = copy(flagsN = flagsN | QueryFlags.SlaveOk)
+    final def slaveOk: QueryBuilder =
+      copy(cursorOptions = cursorOptions.slaveOk)
 
     /**
      * Makes the result [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.tailable cursor tailable]].
@@ -475,7 +480,7 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
      * }}}
      */
     final def tailable: QueryBuilder =
-      copy(flagsN = flagsN | QueryFlags.TailableCursor)
+      copy(cursorOptions = cursorOptions.tailable)
 
     // Cursor
 
@@ -605,7 +610,7 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
       failoverStrategy: FailoverStrategy = failoverStrategy,
       skip: Int = this.skip,
       batchSize: Int = this.batchSize,
-      flagsN: Int = this.flagsN,
+      cursorOptions: CursorOptions = this.cursorOptions,
       readConcern: ReadConcern = this.readConcern,
       readPreference: ReadPreference = this.readPreference,
       filter: Option[pack.Document] = this.filter,
@@ -624,9 +629,9 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
       showRecordId: Boolean = this.showRecordId,
       collation: Option[Collation] = this.collation): QueryBuilder =
       new QueryBuilder(this.collection, failoverStrategy, skip, batchSize,
-        flagsN, readConcern, readPreference, filter, projection, sort, max,
-        min, hint, explain, snapshot, comment, maxTimeMs, singleBatch, maxScan,
-        returnKey, showRecordId, collation)
+        cursorOptions, readConcern, readPreference, filter, projection, sort,
+        max, min, hint, explain, snapshot, comment, maxTimeMs, singleBatch,
+        maxScan, returnKey, showRecordId, collation)
 
     // ---
 
@@ -705,6 +710,8 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
           NoCursorTimeout,
           TailableCursor
         }
+
+        import cursorOptions.{ flags => flagsN }
 
         def partial: Boolean = (flagsN & Partial) == Partial
         def awaitData: Boolean = (flagsN & AwaitData) == AwaitData
@@ -850,8 +857,8 @@ private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends
       }
 
       val flags = {
-        if (readPreference.slaveOk) flagsN | QueryFlags.SlaveOk
-        else flagsN
+        if (readPreference.slaveOk) cursorOptions.flags | QueryFlags.SlaveOk
+        else cursorOptions.flags
       }
 
       val name = {
