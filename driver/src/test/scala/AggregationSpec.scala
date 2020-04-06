@@ -43,12 +43,15 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
   // ---
 
-  import tests.Common
-  import Common.{ timeout, slowTimeout }
+  import tests.Common, Common.{ timeout, slowTimeout }
 
-  lazy val (db, slowDb) = Common.databases(s"reactivemongo-agg-${System identityHashCode this}", Common.connection, Common.slowConnection)
+  @volatile private var integration = false
+  lazy val (db, slowDb) = {
+    integration = true
+    Common.databases(s"reactivemongo-agg-${System identityHashCode this}", Common.connection, Common.slowConnection)
+  }
 
-  def afterAll: Unit = { db.drop(); () }
+  def afterAll: Unit = if (integration) { db.drop(); () }
 
   val zipColName = s"zipcodes${System identityHashCode this}"
   lazy val coll: BSONCollection = {
@@ -217,11 +220,9 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
       "successfully as a single batch" in {
         withCtx(coll) { (firstOp, pipeline) =>
-          val result = coll.aggregateWith[BSONDocument]() { _ =>
+          coll.aggregateWith[BSONDocument]() { _ =>
             firstOp -> pipeline
-          }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]())
-
-          result aka "results" must beTypedEqualTo(expected).await(1, timeout)
+          }.collect[List]() must beTypedEqualTo(expected).await(1, timeout)
         }
       }
 
@@ -230,7 +231,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
           withCtx(c) { (firstOp, pipeline) =>
             c.aggregateWith[BSONDocument](batchSize = Some(1)) { _ =>
               firstOp -> pipeline
-            }.collect[List](upTo, Cursor.FailOnError[List[BSONDocument]]())
+            }.collect[List](upTo)
           }
 
         "without limit (maxDocs)" in {
@@ -389,8 +390,10 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   }
 
   "Inventory #1" should {
-    val orders: BSONCollection = db.collection(s"agg-orders-1-${System identityHashCode this}")
-    val inventory: BSONCollection = db.collection(
+    lazy val orders: BSONCollection =
+      db.collection(s"agg-orders-1-${System identityHashCode this}")
+
+    lazy val inventory: BSONCollection = db.collection(
       s"agg-inv-1-${System identityHashCode orders}")
 
     "be provided with order fixtures" in {
@@ -469,8 +472,10 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   }
 
   "Inventory #2" should {
-    val orders: BSONCollection = db.collection(s"agg-order-2-${System identityHashCode this}")
-    val inventory: BSONCollection = db.collection(
+    lazy val orders: BSONCollection =
+      db.collection(s"agg-order-2-${System identityHashCode this}")
+
+    lazy val inventory: BSONCollection = db.collection(
       s"agg-inv-2-${System identityHashCode orders}")
 
     "be provided the fixtures" in {
@@ -536,7 +541,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   f"Aggregation result for '$$out'" should {
     // https://docs.mongodb.com/master/reference/operator/aggregation/out/#example
 
-    val books: BSONCollection = db.collection(s"books-1-${System identityHashCode this}")
+    lazy val books: BSONCollection = db.
+      collection(s"books-1-${System identityHashCode this}")
 
     "with valid fixtures" in {
       val fixtures = Seq(
@@ -593,7 +599,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   "Aggregation result for '$stdDevPop'" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/#examples
 
-    val contest: BSONCollection = db.collection(s"contest-1-${System identityHashCode this}")
+    lazy val contest: BSONCollection =
+      db.collection(s"contest-1-${System identityHashCode this}")
 
     "with valid fixtures" in {
       /*
@@ -748,7 +755,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   "Aggregation result '$stdDevSamp'" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/#example
 
-    val contest: BSONCollection = db.collection(s"contest-2-${System identityHashCode this}")
+    lazy val contest: BSONCollection =
+      db.collection(s"contest-2-${System identityHashCode this}")
 
     "with valid fixtures" in {
       /*
@@ -788,7 +796,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   "Geo-indexed documents" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/geoNear/#example
 
-    val places: BSONCollection = db(s"places${System identityHashCode this}")
+    lazy val places: BSONCollection =
+      db(s"places${System identityHashCode this}")
 
     "must be inserted" in {
       import reactivemongo.api.indexes._, IndexType._
@@ -883,7 +892,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
   "Forecasts" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/redact/
-    val forecasts: BSONCollection = db(s"forecasts${System identityHashCode this}")
+    lazy val forecasts: BSONCollection =
+      db(s"forecasts${System identityHashCode this}")
 
     "be inserted" in {
       /*
@@ -1012,7 +1022,8 @@ db.forecasts.aggregate(
 
   "Customer accounts" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/redact/
-    val customers: BSONCollection = db(s"customers${System identityHashCode this}")
+    lazy val customers: BSONCollection =
+      db(s"customers${System identityHashCode this}")
 
     "be inserted" in {
       /*
@@ -1110,7 +1121,8 @@ db.accounts.aggregate([
   section("gt_mongo32")
   "Produce" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/#replaceroot-with-an-embedded-document
-    val fruits: BSONCollection = db(s"fruits${System identityHashCode this}")
+    lazy val fruits: BSONCollection =
+      db(s"fruits${System identityHashCode this}")
 
     "be inserted" in {
       /*
@@ -1147,7 +1159,8 @@ db.accounts.aggregate([
 
   "Contacts" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/#replaceroot-with-a-newly-created-document
-    val contacts: BSONCollection = db(s"contacts${System identityHashCode this}")
+    lazy val contacts: BSONCollection =
+      db(s"contacts${System identityHashCode this}")
 
     "be inserted" in {
       /*
@@ -1190,7 +1203,7 @@ db.accounts.aggregate([
 
   "Students" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/
-    val students: BSONCollection =
+    lazy val students: BSONCollection =
       db(s"students${System identityHashCode this}")
 
     "be inserted" in {
@@ -1250,7 +1263,7 @@ db.accounts.aggregate([
     implicit val userHandler: BSONDocumentHandler[User] = Macros.handler[User]
 
     // See https://docs.mongodb.com/manual/reference/operator/aggregation/slice/#example
-    val users: BSONCollection =
+    lazy val users: BSONCollection =
       db(s"users${System identityHashCode userHandler}")
 
     "be inserted" in {
@@ -1474,8 +1487,9 @@ db.accounts.aggregate([
     }
   }
 
-  "Group accumulator" >> { // TODO: tag as unit
-    import coll.AggregationFramework._
+  section("unit")
+  "Group accumulator" >> {
+    import reactivemongo.api.tests.AggFramework, AggFramework._
 
     Fragments.foreach(Seq[(GroupFunction, BSONDocument)](
       AvgField("foo") -> BSONDocument(f"$$avg" -> f"$$foo"),
@@ -1505,10 +1519,11 @@ db.accounts.aggregate([
       Sum(BSONString(f"$$bar")) -> BSONDocument(f"$$sum" -> f"$$bar"))) {
       case (gfun, expected) => gfun.getClass.getSimpleName in {
         reactivemongo.api.tests.makeFunction(
-          coll.AggregationFramework)(gfun) must_=== expected
+          AggFramework)(gfun) must_=== expected
       }
     }
   }
+  section("unit")
 
   // ---
 

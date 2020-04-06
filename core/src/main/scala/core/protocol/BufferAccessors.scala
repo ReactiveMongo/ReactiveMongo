@@ -5,7 +5,7 @@ import reactivemongo.io.netty.buffer.ByteBuf
 /**
  * Helper methods to write tuples of supported types into a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]].
  */
-private[protocol] object BufferAccessors { // TODO: Refactor or remove
+private[protocol] object BufferAccessors {
   /**
    * Typeclass for types that can be written into a `ByteBuffer`,
    * via writeTupleToBufferN methods.

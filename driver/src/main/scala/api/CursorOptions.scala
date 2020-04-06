@@ -21,6 +21,7 @@ final class CursorOptions private[api] (val flags: Int) extends AnyVal {
   /** $enableFlag [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/index.html#DBQuery.Option.slaveOk `slaveOk`]] flag */
   def slaveOk = copy(flags | QueryFlags.SlaveOk)
 
+  /** $enableFlag `oplogReplay` flag */
   def oplogReplay = copy(flags | QueryFlags.OplogReplay)
 
   /** $enableFlag [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/index.html#DBQuery.Option.noTimeout `noTimeout`]] flag */

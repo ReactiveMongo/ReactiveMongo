@@ -51,7 +51,7 @@ import reactivemongo.api.collections.QueryCodecs
 import reactivemongo.api.indexes.Index
 
 // TODO: Check unused
-package object tests {
+package object tests { self =>
   type Pack = Serialization.Pack
   val pack: Pack = Serialization.internalSerializationPack
 
@@ -118,6 +118,11 @@ package object tests {
   type Response = reactivemongo.core.protocol.Response
 
   import reactivemongo.api.commands.AggregationFramework
+
+  object AggFramework extends PackSupport[Pack]
+    with AggregationFramework[Pack] {
+    val pack = self.pack
+  }
 
   def makePipe[P <: SerializationPack](a: AggregationFramework[P])(o: a.PipelineOperator) = o.makePipe
 
