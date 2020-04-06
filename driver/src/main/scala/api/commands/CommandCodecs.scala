@@ -180,11 +180,4 @@ private[reactivemongo] object CommandCodecs {
       err <- decoder.string(doc, "errmsg")
     } yield new WriteConcernError(code, err)).get
   }
-
-  def readUpserted[P <: SerializationPack](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => Upserted.Aux[P] = { document =>
-    (for {
-      index <- decoder.int(document, "index")
-      id <- decoder.get(document, "_id")
-    } yield Upserted.init[P](index, id)).get
-  }
 }

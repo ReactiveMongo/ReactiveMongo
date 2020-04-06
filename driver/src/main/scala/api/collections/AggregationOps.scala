@@ -125,7 +125,7 @@ private[collections] trait AggregationOps[P <: SerializationPack] {
 
   private def commandWriter[T]: pack.Writer[AggregateCmd[T]] = {
     val builder = pack.newBuilder
-    val session = collection.db.session.filter( // TODO#1.1: Remove
+    val session = collection.db.session.filter(
       _ => (version.compareTo(MongoWireVersion.V36) >= 0))
 
     val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)

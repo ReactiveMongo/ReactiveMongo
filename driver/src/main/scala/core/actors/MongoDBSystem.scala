@@ -40,7 +40,7 @@ import reactivemongo.io.netty.channel.group.{
 
 import reactivemongo.util.{ LazyLogger, SimpleRing }
 
-import reactivemongo.api.{ Serialization, WriteConcern }
+import reactivemongo.api.{ PackSupport, Serialization, WriteConcern }
 
 import reactivemongo.api.bson.BSONDocumentReader
 import reactivemongo.api.bson.collection.BSONSerializationPack
@@ -81,14 +81,15 @@ import reactivemongo.api.{
   WriteConcern
 }
 
-import reactivemongo.api.commands.LastError
+import reactivemongo.api.commands.{ LastErrorFactory, UpsertedFactory }
 
 import external.reactivemongo.ConnectionListener
 
 /** Main actor that processes the requests. */
-private[reactivemongo] trait MongoDBSystem extends Actor {
+private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
   import scala.concurrent.duration._
   import Exceptions._
+  import Commands.{ LastError, Upserted }
 
   protected type Pack = Serialization.Pack
 
@@ -497,7 +498,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
           n = doc.int("n").getOrElse(0),
           singleShard = doc.string("singleShard"),
           updatedExisting = doc.booleanLike("updatedExisting").getOrElse(false),
-          upserted = doc.get("upserted"),
+          upserted = doc.getAsOpt[Upserted]("upserted"),
           wnote = doc.get("wnote").flatMap {
             case reactivemongo.api.bson.BSONString("majority") =>
               Some(WriteConcern.Majority)
@@ -1087,6 +1088,11 @@ private[reactivemongo] trait MongoDBSystem extends Actor {
         Some(awaiting)
       })
     }
+  }
+
+  private object Commands extends PackSupport[Pack]
+    with LastErrorFactory[Pack] with UpsertedFactory[Pack] {
+    val pack: selfSystem.pack.type = selfSystem.pack
   }
 
   private object IsMasterCommand

@@ -9,10 +9,12 @@ import reactivemongo.core.errors.GenericDriverException
 
 import reactivemongo.api.{ Collation, SerializationPack, WriteConcern }
 import reactivemongo.api.commands.{
-  MultiBulkWriteResult,
+  LastErrorFactory,
+  MultiBulkWriteResultFactory,
   ResolvedCollectionCommand,
   UpdateCommand,
-  UpdateWriteResult,
+  UpdateWriteResultFactory,
+  UpsertedFactory,
   WriteResult
 }
 
@@ -21,8 +23,10 @@ import reactivemongo.api.commands.{
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.update/#perform-an-unordered-update ordered]] behaviour
  * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
  */
-trait UpdateOps[P <: SerializationPack]
-  extends UpdateCommand[P] { collection: GenericCollection[P] =>
+trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
+  with UpdateWriteResultFactory[P] with MultiBulkWriteResultFactory[P]
+  with UpsertedFactory[P] with LastErrorFactory[P] {
+  collection: GenericCollection[P] =>
 
   protected lazy val maxWireVersion =
     collection.db.connectionState.metadata.maxWireVersion
@@ -242,7 +246,7 @@ trait UpdateOps[P <: SerializationPack]
 
         if (!flattened.ok) {
           // was ordered, with one doc => fail if has an error
-          Future.failed(WriteResult.lastError(flattened).
+          Future.failed(lastError(flattened).
             getOrElse[Exception](new GenericDriverException(
               s"fails to update: $updates")))
 

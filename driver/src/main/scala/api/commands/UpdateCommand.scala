@@ -13,7 +13,8 @@ import reactivemongo.api.{
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/update/ update]] command.
  */
-private[reactivemongo] trait UpdateCommand[P <: SerializationPack] { _: PackSupport[P] =>
+private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
+  self: PackSupport[P] with UpdateWriteResultFactory[P] with UpsertedFactory[P] =>
 
   private[reactivemongo] final class Update(
     val firstUpdate: UpdateElement,
@@ -151,7 +152,7 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] { _: PackSupp
     val decoder = pack.newDecoder
     val readWriteError = CommandCodecs.readWriteError(decoder)
     val readWriteConcernError = CommandCodecs.readWriteConcernError(decoder)
-    val readUpserted = CommandCodecs.readUpserted(decoder)
+    val readUpserted = Upserted.readUpserted(decoder)
 
     CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, UpdateWriteResult](pack) { doc =>
       val werrors = decoder.children(doc, "writeErrors").map(readWriteError)
@@ -167,7 +168,7 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] { _: PackSupp
         ok = decoder.booleanLike(doc, "ok").getOrElse(true),
         n = decoder.int(doc, "n").getOrElse(0),
         nModified = decoder.int(doc, "nModified").getOrElse(0),
-        upserted = upserted.getOrElse(Seq.empty[Upserted]),
+        upserted = upserted.getOrElse(Seq.empty[self.Upserted]),
         writeErrors = werrors,
         writeConcernError = wcError,
         code = decoder.int(doc, "code"),

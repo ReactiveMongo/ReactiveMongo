@@ -10,9 +10,10 @@ import reactivemongo.api.{ Collation, SerializationPack, Session, WriteConcern }
 import reactivemongo.api.commands.{
   CommandCodecsWithPack,
   DeleteCommand,
-  LastError,
-  MultiBulkWriteResult,
+  LastErrorFactory,
+  MultiBulkWriteResultFactory,
   ResolvedCollectionCommand,
+  UpsertedFactory,
   WriteResult
 }
 
@@ -21,7 +22,9 @@ import reactivemongo.api.commands.{
  * @define orderedParam the ordered behaviour
  */
 trait DeleteOps[P <: SerializationPack]
-  extends DeleteCommand[P] with CommandCodecsWithPack[P] {
+  extends DeleteCommand[P] with CommandCodecsWithPack[P]
+  with MultiBulkWriteResultFactory[P] with UpsertedFactory[P]
+  with LastErrorFactory[P] {
   collection: GenericCollection[P] =>
 
   /**
@@ -159,7 +162,7 @@ trait DeleteOps[P <: SerializationPack]
 
           if (!flattened.ok) {
             // was ordered, with one doc => fail if has an error
-            Future.failed(WriteResult.lastError(flattened).
+            Future.failed(lastError(flattened).
               getOrElse[Exception](new GenericDriverException(
                 s"fails to delete: $deletes")))
 

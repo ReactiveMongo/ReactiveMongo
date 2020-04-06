@@ -2,11 +2,7 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.ReadPreference
 
-import reactivemongo.api.commands.{
-  UpdateWriteResult,
-  WriteResult,
-  Upserted
-}
+import reactivemongo.api.commands.WriteResult
 
 import reactivemongo.api.bson.{ BSONDocument, BSONString }
 
@@ -37,13 +33,14 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
         c.update.one(
           q = person,
           u = BSONDocument(f"$$set" -> BSONDocument("age" -> 33)),
-          upsert = true) must beLike[UpdateWriteResult]({
-            case result => result.upserted.toList must beLike[List[Upserted]] {
-              case Upserted(0, id: BSONObjectID) :: Nil => c.find(
-                selector = BSONDocument("_id" -> id),
-                projection = Option.empty[BSONDocument]).
-                one[T] must beSome(upd(person)).await(1, timeout)
-            }
+          upsert = true) must beLike[c.UpdateWriteResult]({
+            case result =>
+              result.upserted.toList must beLike[List[c.Upserted]] {
+                case c.Upserted(0, id: BSONObjectID) :: Nil => c.find(
+                  selector = BSONDocument("_id" -> id),
+                  projection = Option.empty[BSONDocument]).
+                  one[T] must beSome(upd(person)).await(1, timeout)
+              }
           }).await(1, timeout)
       }
 
@@ -70,8 +67,8 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
         val doc = BSONDocument("_id" -> "foo", "bar" -> 2)
 
         c.update.one(q = BSONDocument.empty, u = doc, upsert = true).
-          map(_.upserted.toList) must beLike[List[Upserted]] {
-            case Upserted(0, BSONString("foo")) :: Nil =>
+          map(_.upserted.toList) must beLike[List[c.Upserted]] {
+            case c.Upserted(0, BSONString("foo")) :: Nil =>
               c.find(
                 selector = BSONDocument("_id" -> "foo"),
                 projection = Option.empty[BSONDocument]).one[BSONDocument].
@@ -98,7 +95,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
 
         c.update.one(
           q = person,
-          u = BSONDocument(f"$$set" -> BSONDocument("age" -> 66))) must beLike[UpdateWriteResult] {
+          u = BSONDocument(f"$$set" -> BSONDocument("age" -> 66))) must beLike[c.UpdateWriteResult] {
             case result => result.nModified must_=== 1 and {
               c.find(
                 selector = BSONDocument("age" -> 66),

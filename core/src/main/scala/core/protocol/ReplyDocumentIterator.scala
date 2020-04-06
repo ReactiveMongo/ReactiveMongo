@@ -41,7 +41,7 @@ private[reactivemongo] object ReplyDocumentIterator
   }
 
   private[core] def parseDocuments[P <: SerializationPack, A](pack: P)(buffer: ByteBuf)(implicit reader: pack.Reader[A]): Iterator[A] = new Iterator[A] {
-    override val isTraversableAgain = false // TODO: Add test
+    override val isTraversableAgain = false
     override def hasNext = buffer.isReadable()
 
     override def next = try {

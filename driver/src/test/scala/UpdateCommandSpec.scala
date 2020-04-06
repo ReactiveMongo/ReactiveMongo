@@ -14,6 +14,8 @@ import reactivemongo.api.{
 
 import reactivemongo.api.commands.{
   UpdateCommand,
+  UpdateWriteResultFactory,
+  UpsertedFactory,
   ResolvedCollectionCommand
 }
 
@@ -123,7 +125,8 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
   import reactivemongo.api.tests.Pack
 
   private final class Command(s: Option[Session])
-    extends PackSupport[Pack] with UpdateCommand[Pack] {
+    extends PackSupport[Pack] with UpdateCommand[Pack]
+    with UpsertedFactory[Pack] with UpdateWriteResultFactory[Pack] {
 
     private[reactivemongo] def session(): Option[Session] = s
 

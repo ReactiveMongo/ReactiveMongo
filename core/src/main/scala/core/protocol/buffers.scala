@@ -1,6 +1,6 @@
 package reactivemongo.core.protocol
 
-import reactivemongo.io.netty.buffer.ByteBuf // TODO: Refactor
+import reactivemongo.io.netty.buffer.ByteBuf
 
 /**
  * Something that can be written into a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]].

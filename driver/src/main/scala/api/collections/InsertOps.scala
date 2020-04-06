@@ -11,9 +11,10 @@ import reactivemongo.api.{ SerializationPack, WriteConcern }
 import reactivemongo.api.commands.{
   CommandCodecsWithPack,
   InsertCommand,
-  LastError,
-  MultiBulkWriteResult,
+  LastErrorFactory,
+  MultiBulkWriteResultFactory,
   ResolvedCollectionCommand,
+  UpsertedFactory,
   WriteResult
 }
 
@@ -23,8 +24,9 @@ import reactivemongo.api.commands.{
  * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
  */
 trait InsertOps[P <: SerializationPack]
-  extends InsertCommand[P] with CommandCodecsWithPack[P] {
-  collection: GenericCollection[P] =>
+  extends InsertCommand[P] with CommandCodecsWithPack[P]
+  with MultiBulkWriteResultFactory[P] with UpsertedFactory[P]
+  with LastErrorFactory[P] { collection: GenericCollection[P] =>
 
   /**
    * @param ordered $orderedParam
@@ -155,7 +157,7 @@ trait InsertOps[P <: SerializationPack]
 
           if (!flattened.ok) {
             // was ordered, with one doc => fail if has an error
-            Future.failed(WriteResult.lastError(flattened).
+            Future.failed(lastError(flattened).
               getOrElse[Exception](new GenericDriverException(
                 s"fails to insert: $documents")))
 
