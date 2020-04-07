@@ -1081,7 +1081,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       }, { (_, con) =>
         val awaiting = renew(con.channel.id)
 
-        awaiting.getWriteConcern.fold(con.send(awaiting.request)) { wc =>
+        awaiting.writeConcern.fold(con.send(awaiting.request)) { wc =>
           con.send(awaiting.request, wc)
         }
 
