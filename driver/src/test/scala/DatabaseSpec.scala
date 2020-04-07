@@ -42,11 +42,11 @@ final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
         val estmout = estTimeout(fos2)
 
         con.flatMap(_.database("foo", fos1)).map(_ => List.empty[Int]).
-          recover({ case _ => ws.result() }) must beEqualTo(expected).
+          recover({ case _ => ws.result() }) must beTypedEqualTo(expected).
           await(0, estmout * 2) and {
             val duration = System.currentTimeMillis() - before
 
-            duration must be_<(estmout.toMillis + 2500 /* ms */ )
+            duration must be_<((estmout * 2).toMillis + 1500 /* ms */ )
           }
       } tag "unit"
     }
@@ -55,38 +55,48 @@ final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
 
     "admin" >> {
       "rename successfully collection if target doesn't exist" in {
-        (for {
-          admin <- connection.database("admin", failoverStrategy)
-          name1 <- {
-            val name = s"foo_${System identityHashCode admin}"
+        eventually(2, timeout) {
+          (for {
+            admin <- connection.database("admin", failoverStrategy)
+            name1 <- {
+              val name = s"foo${System identityHashCode admin}-${System.currentTimeMillis()}"
 
-            db.collection(name).create().map(_ => name)
-          }
-          name = s"renamed_${System identityHashCode name1}"
-          c2 <- admin.renameCollection(db.name, name1, name)
-        } yield name -> c2.name) must beLike[(String, String)] {
-          case (expected, name) => name aka "new name" must_== expected
-        }.await(0, timeout)
+              db.collection(name).create().map(_ => name)
+            }
+            name = s"renamed_${System identityHashCode name1}"
+            c2 <- admin.renameCollection(db.name, name1, name)
+          } yield name -> c2.name) must beLike[(String, String)] {
+            case (expected, name) => name aka "new name" must_=== expected
+          }.await(0, timeout)
+        }
       }
 
-      "fail to rename collection if target exists" in {
-        val c1 = db.collection(s"foo_${System identityHashCode ee}")
+      "fail to rename collection if target exists" in eventually(2, timeout) {
+        val colName = s"mv_fail_${System identityHashCode ee}-${System.currentTimeMillis()}"
+
+        val c1 = {
+          val c = db.collection(colName)
+          c.create(failsIfExists = false).map(_ => c)
+        }
 
         (for {
-          _ <- c1.create()
+          _ <- c1
           name = s"renamed_${System identityHashCode c1}"
           c2 = db.collection(name)
-          _ <- c2.create()
+          _ <- c2.create(failsIfExists = false)
         } yield name) must beLike[String] {
-          case name => name must not(beEqualTo(c1.name)) and {
-            Await.result(for {
-              admin <- connection.database("admin", failoverStrategy)
-              _ <- admin.renameCollection(db.name, c1.name, name)
-            } yield {}, timeout) must throwA[DatabaseException].like {
-              case err @ CommandError.Code(48) =>
-                err.getMessage.indexOf(
-                  "target namespace exists") must not(beEqualTo(-1))
-            }
+          case name => name must not(beEqualTo(colName)) and {
+            db.collectionNames.map(
+              _.contains(name)) must beTrue.awaitFor(timeout) and {
+                Await.result(for {
+                  admin <- connection.database("admin", failoverStrategy)
+                  _ <- admin.renameCollection(db.name, colName, name)
+                } yield {}, timeout) must throwA[DatabaseException].like {
+                  case err @ CommandError.Code(48) =>
+                    err.getMessage.indexOf(
+                      "target namespace exists") must not(beEqualTo(-1))
+                }
+              }
           }
         }.await(0, timeout)
       }

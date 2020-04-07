@@ -12,7 +12,7 @@ trait WithTemporaryDb extends org.specs2.specification.AfterAll { this: org.spec
     Common.connection,
     Common.slowConnection)
 
-  def afterAll: Unit = {
+  def afterAll(): Unit = {
     db.drop()
     ()
   }

@@ -11,14 +11,12 @@ import sbt.Keys._
 
 import com.typesafe.tools.mima.plugin.MimaKeys.mimaBinaryIssueFilters
 
-import com.github.sbt.findbugs.FindbugsKeys.findbugsAnalyzedPath
-
 final class Driver(core: Project) {
   import Dependencies._
   import XmlUtil._
 
   lazy val module = Project("ReactiveMongo", file("driver")).
-    settings(Findbugs.settings ++ Seq(
+    settings(Seq(
         unmanagedSourceDirectories in Compile ++= {
           val v = scalaBinaryVersion.value
 
@@ -79,8 +77,7 @@ object Version {
           "dnsjava" % "dnsjava" % "3.2.1",
           commonsCodec,
           shapelessTest % Test, specs.value) ++ logApi,
-        findbugsAnalyzedPath += target.value / "external",
-      mimaBinaryIssueFilters ++= {
+        mimaBinaryIssueFilters ++= {
         /*
           import com.typesafe.tools.mima.core._, ProblemFilters.{ exclude => x }
 

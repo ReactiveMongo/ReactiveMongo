@@ -47,21 +47,26 @@ trait DBSessionSpec { specs: DatabaseSpec =>
         val colName = s"tx1_${System identityHashCode this}"
         @volatile var database = Option.empty[DB]
 
-        Common.db.startSession().flatMap { _db =>
-          for {
-            _ <- _db.startTransaction(None)
+        eventually(2, timeout) {
+          (for {
+            _ <- Common.db.collection(colName).create(failsIfExists = false)
+            _ <- Common.db.collectionNames.filter(_.contains(colName))
+          } yield {}) must beTypedEqualTo({}).await(0, timeout)
+        } and {
+          Common.db.startSession().flatMap { _db =>
+            for {
+              _ <- _db.startTransaction(None)
 
-            // NoOp
-            _ <- _db.startTransaction(None)
-            _ <- _db.startTransaction(None, false)
-            _ <- _db.startTransaction(None, true).failed
-
-            _ <- _db.collection(colName).create()
-          } yield {
-            database = Some(_db)
-            database
-          }
-        } must beSome[DB].awaitFor(timeout) and (
+              // NoOp
+              _ <- _db.startTransaction(None)
+              _ <- _db.startTransaction(None, false)
+              _ <- _db.startTransaction(None, true).failed
+            } yield {
+              database = Some(_db)
+              database
+            }
+          } must beSome[DB].await(0, timeout)
+        } and (
           database must beSome[DB].which { db =>
             lazy val coll = db.collection(colName)
 
@@ -195,7 +200,7 @@ trait DBSessionSpec { specs: DatabaseSpec =>
                 BSONDocument("_id" -> 2), BSONDocument("_id" -> 3))).
                 map(_.n) must beTypedEqualTo(2).awaitFor(timeout)
             } and {
-              coll.count() must beTypedEqualTo(3).awaitFor(timeout)
+              coll.count() must beTypedEqualTo(3L).awaitFor(timeout)
             } and {
               db.commitTransaction().
                 aka("commited") must beAnInstanceOf[DB].awaitFor(timeout)

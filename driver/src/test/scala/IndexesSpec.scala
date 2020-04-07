@@ -34,7 +34,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
     s"reactivemongo-gridfs-${System identityHashCode this}",
     Common.connection, Common.slowConnection)
 
-  def afterAll = { db.drop(); () }
+  def afterAll() = { db.drop(); () }
 
   lazy val geo = db(s"geo${System identityHashCode this}")
   lazy val slowGeo = slowDb(s"geo${System identityHashCode slowDb}")

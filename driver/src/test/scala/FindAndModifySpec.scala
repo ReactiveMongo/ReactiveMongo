@@ -10,7 +10,7 @@ import org.specs2.concurrent.ExecutionEnv
 import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 
 final class FindAndModifySpec(implicit ee: ExecutionEnv)
-  extends org.specs2.mutable.Specification { // with FindAndModifyFixtures {
+  extends org.specs2.mutable.Specification {
 
   "FindAndModify" title
 
@@ -79,9 +79,9 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
 
                 /*c.find(BSONDocument.empty).cursor[BSONDocument]().
                   collect[List]().flatMap { docs =>
-                    println(s"FindAndModify#2: docs = ${docs.map(BSONDocument.pretty)}")
+                    println(s"FindAndModify#2: docs = ${docs.map(BSONDocument.pretty)} / $after")
                     c.count(Some(writeDocument(after)))
-                  }.*/
+                 }*/
                 c.count(Some(writeDocument(after))).
                   aka("count after") must beTypedEqualTo(1L).await(1, timeout)
               }
@@ -93,12 +93,14 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
         val colName = s"FindAndModifySpec${System identityHashCode this}-1"
         val collection = db(colName)
 
-        collection.count(Some(writeDocument(jack1))).
-          aka("count before") must beTypedEqualTo(0L).await(1, timeout) and {
-            upsertAndFetch(collection, jack1, after.age, timeout) { result =>
-              result.lastError.exists(_.upserted.isDefined) must beTrue
+        eventually(2, timeout) {
+          collection.count(Some(writeDocument(jack1))).
+            aka("count before") must beTypedEqualTo(0L).await(1, timeout) and {
+              upsertAndFetch(collection, jack1, after.age, timeout) {
+                _.lastError.exists(_.upserted.isDefined) must beTrue
+              }
             }
-          }
+        }
       }
 
       "with the slow connection" in {
@@ -107,44 +109,52 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
         val colName = s"FindAndModifySpec${System identityHashCode this}-2"
         val slowColl = slowDb(colName)
 
-        slowColl.insert(ordered = true).one(before).
-          map(_.n) must beTypedEqualTo(1).await(0, slowTimeout) and {
-            slowColl.count(Some(writeDocument(before))).
-              aka("count before") must beTypedEqualTo(1L).await(1, slowTimeout)
-          } and eventually(2, timeout) {
-            upsertAndFetch(
-              slowColl, before, after.age, slowTimeout) { result =>
-              result.lastError.exists(_.upserted.isDefined) must beFalse
+        eventually(2, timeout) {
+          slowColl.update.one(before, before, upsert = true).
+            map(_.n) must beTypedEqualTo(1).await(0, slowTimeout) and {
+              db(colName).count(None) must beTypedEqualTo(1L).
+                await(1, slowTimeout)
+
+            } and {
+              upsertAndFetch(slowColl, before, after.age, slowTimeout) {
+                _.lastError.exists(_.upserted.isDefined) must beFalse
+              }
             }
-          }
+        }
       }
     }
 
-    val colName = s"FindAndModifySpec${System identityHashCode this}-3"
-
     "modify a document and fetch its previous value" in {
       val incrementAge = BSONDocument(f"$$inc" -> BSONDocument("age" -> 1))
+      val colName = s"FindAndModifySpec${System identityHashCode this}-3"
       val collection = db(colName)
 
-      def future = collection.findAndUpdate(jack2, incrementAge)
+      def findAndUpd = collection.findAndUpdate(jack2, incrementAge)
 
-      collection.insert(ordered = true).one(jack2).
-        map(_.n) must beTypedEqualTo(1).await(0, slowTimeout) and {
-          future must (beLike[collection.FindAndModifyResult] {
-            case res =>
-              /*
-              scala.concurrent.Await.result(collection.find(BSONDocument.empty).
-                cursor[BSONDocument]().collect[List]().map { docs =>
-                  println(s"persons[${collection.name}]#3{${jack2}} = ${docs.map(BSONDocument.pretty)}")
-                }, timeout)
-               */
+      eventually(2, timeout) {
+        collection.update.one(jack2, jack2, upsert = true).
+          map(_.n) must beTypedEqualTo(1).await(0, timeout) and {
+            collection.count(Some(BSONDocument(
+              "firstName" -> jack2.firstName,
+              "lastName" -> jack2.lastName))) must beTypedEqualTo(1L).
+              await(0, timeout)
+          } and {
+            findAndUpd must (beLike[collection.FindAndModifyResult] {
+              case res =>
+                /*
+                 scala.concurrent.Await.result(collection.find(BSONDocument.empty).
+                 cursor[BSONDocument]().collect[List]().map { docs =>
+                 println(s"persons[${collection.name}]#3{${jack2}} = ${docs.map(BSONDocument.pretty)}")
+                 }, timeout)
+                 */
 
-              res.result[Person] aka "previous value" must beSome(jack2)
-          }).await(1, timeout)
-        } and {
-          collection.find(jack2.copy(age = jack2.age + 1)).one[Person].
-            aka("incremented") must beSome[Person].await(1, timeout)
-        }
+                res.result[Person] aka "previous value" must beSome(jack2)
+            }).await(1, timeout)
+          } and {
+            collection.find(jack2.copy(age = jack2.age + 1)).one[Person].
+              aka("incremented") must beSome[Person].await(1, timeout)
+          }
+      }
     }
 
     if (replSetOn) {
@@ -152,28 +162,37 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
 
       val james = Person("James", "Joyce", 27)
 
-      "support transaction & rollback" in {
+      "support transaction & rollback" in eventually(2, timeout) {
         val selector = BSONDocument(
           "firstName" -> james.firstName,
           "lastName" -> james.lastName)
 
+        val colName = s"FindAndModifySpec${System identityHashCode selector}-4"
+        val coll = db.collection(colName)
+
         (for {
-          _ <- db.collection(colName).create(failsIfExists = false)
+          _ <- coll.create(failsIfExists = false)
           ds <- db.startSession()
           dt <- ds.startTransaction(None)
+          _ <- dt.collectionNames.filter(_ contains colName) // check created
+          _ <- dt.collection(colName).findAndUpdate(
+            selector, james, upsert = true)
+        } yield dt) must beLike[reactivemongo.api.DB] {
+          case dt =>
+            val c = dt.collection(colName)
 
-          coll = dt.collection(colName)
-          _ <- coll.findAndUpdate(selector, james, upsert = true)
-          p1 <- coll.find(selector).requireOne[Person].map(_.age)
+            (for {
+              p1 <- c.find(selector).requireOne[Person].map(_.age)
 
-          _ <- dt.abortTransaction()
+              _ <- dt.abortTransaction()
 
-          p2 <- coll.find(selector).one[Person].map(_.fold(-1)(_.age))
-        } yield p1 -> p2).andThen {
-          case _ => db.killSession()
-        } must beLike[(Int, Int)] {
-          case (27, -1 /*not found after rlb*/ ) => ok
-        }.await(1, timeout)
+              p2 <- coll.find(selector).one[Person].map(_.fold(-1)(_.age))
+            } yield p1 -> p2).andThen {
+              case _ => db.killSession()
+            } must beLike[(Int, Int)] {
+              case (27, -1 /*not found after rlb*/ ) => ok
+            }.await(1, timeout)
+        }.await(1, slowTimeout)
       }
 
       section("ge_mongo4")
@@ -182,37 +201,40 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
     "support arrayFilters" in {
       // See https://docs.mongodb.com/manual/reference/method/db.collection.findAndModify/#findandmodify-arrayfilters
 
-      val colName = s"FindAndModifySpec${System identityHashCode this}-5"
-      val collection = db(colName)
+      eventually(2, timeout) {
+        val colName = s"FindAndModify${System identityHashCode this}-5-${System.currentTimeMillis()}"
+        val collection = db(colName)
 
-      collection.insert.many(Seq(
-        BSONDocument("_id" -> 1, "grades" -> Seq(95, 92, 90)),
-        BSONDocument("_id" -> 2, "grades" -> Seq(98, 100, 102)),
-        BSONDocument("_id" -> 3, "grades" -> Seq(95, 110, 100)))).
-        map(_ => {}) must beTypedEqualTo({}).await(0, timeout) and {
-          collection.findAndModify(
-            selector = BSONDocument("grades" -> BSONDocument(f"$$gte" -> 100)),
-            modifier = collection.updateModifier(
-              update = BSONDocument(f"$$set" -> BSONDocument(
-                f"grades.$$[element]" -> 100)),
-              fetchNewObject = true,
-              upsert = false),
-            sort = None,
-            fields = None,
-            bypassDocumentValidation = false,
-            writeConcern = WriteConcern.Journaled,
-            maxTime = None,
-            collation = None,
-            arrayFilters = Seq(
-              BSONDocument("element" -> BSONDocument(f"$$gte" -> 100)))).
-            map(_.value) must beSome(BSONDocument(
-              "_id" -> 2,
-              "grades" -> Seq(98, 100, 100 /* was 102*/ ))).await(0, timeout)
-        }
+        collection.insert.many(Seq(
+          BSONDocument("_id" -> 1, "grades" -> Seq(95, 92, 90)),
+          BSONDocument("_id" -> 2, "grades" -> Seq(98, 100, 102)),
+          BSONDocument("_id" -> 3, "grades" -> Seq(95, 110, 100)))).
+          map(_.n) must beTypedEqualTo(3).await(0, timeout) and {
+            collection.findAndModify(
+              selector = BSONDocument(
+                "grades" -> BSONDocument(f"$$gte" -> 100)),
+              modifier = collection.updateModifier(
+                update = BSONDocument(f"$$set" -> BSONDocument(
+                  f"grades.$$[element]" -> 100)),
+                fetchNewObject = true,
+                upsert = false),
+              sort = None,
+              fields = None,
+              bypassDocumentValidation = false,
+              writeConcern = WriteConcern.Journaled,
+              maxTime = None,
+              collation = None,
+              arrayFilters = Seq(
+                BSONDocument("element" -> BSONDocument(f"$$gte" -> 100)))).
+              map(_.value) must beSome(BSONDocument(
+                "_id" -> 2,
+                "grades" -> Seq(98, 100, 100 /* was 102*/ ))).await(0, timeout)
+          }
+      }
     } tag "gt_mongo32"
 
-    f"fail with invalid $$inc clause" in {
-      val colName = s"FindAndModifySpec${System identityHashCode this}-5"
+    f"fail with invalid $$inc clause" in eventually(2, timeout) {
+      val colName = s"FindAndModify${System identityHashCode this}-6-${System.currentTimeMillis()}"
       val collection = db(colName)
 
       val query = BSONDocument("FindAndModifySpecFail" -> BSONDocument(

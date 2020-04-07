@@ -40,7 +40,7 @@ import reactivemongo.io.netty.channel.group.{
 
 import reactivemongo.util.{ LazyLogger, SimpleRing }
 
-import reactivemongo.api.{ PackSupport, Serialization, WriteConcern }
+import reactivemongo.api.{ PackSupport, Serialization }
 
 import reactivemongo.api.bson.BSONDocumentReader
 import reactivemongo.api.bson.collection.BSONSerializationPack
@@ -84,6 +84,8 @@ import reactivemongo.api.{
 import reactivemongo.api.commands.{ LastErrorFactory, UpsertedFactory }
 
 import external.reactivemongo.ConnectionListener
+
+import com.github.ghik.silencer.silent
 
 /** Main actor that processes the requests. */
 private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
@@ -331,8 +333,11 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       if (ms < 100) 100.milliseconds else heartbeatFrequency
     }
 
-    refreshAllJob = scheduler.schedule(interval, interval, self, RefreshAll)
-    connectAllJob = scheduler.schedule(interval, interval, self, ConnectAll)
+    @silent(".*schedule .*deprecated.*") @inline def schedule[T](msg: T) =
+      scheduler.schedule(interval, interval, self, msg)
+
+    refreshAllJob = schedule(RefreshAll)
+    connectAllJob = schedule(ConnectAll)
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -955,8 +960,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     upd
   }
 
-  @com.github.ghik.silencer.silent("retain")
-  private def retryAwaitingOnError(
+  @silent("retain") private def retryAwaitingOnError(
     ns: NodeSet,
     discardedChannels: Map[ChannelId, Exception]): Unit =
     requestTracker.withAwaiting { (resps, chans) =>

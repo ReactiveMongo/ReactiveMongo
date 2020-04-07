@@ -10,11 +10,7 @@ import scala.collection.immutable.ListSet
 import akka.util.Timeout
 import akka.actor.ActorRef
 
-import reactivemongo.io.netty.channel.{
-  Channel,
-  ChannelId,
-  DefaultChannelId
-}
+import reactivemongo.io.netty.channel.{ ChannelId, DefaultChannelId }
 
 import reactivemongo.io.netty.channel.Channel
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }

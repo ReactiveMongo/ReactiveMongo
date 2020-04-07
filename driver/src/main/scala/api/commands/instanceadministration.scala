@@ -1,6 +1,6 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ SerializationPack, WriteConcern }
 
 import reactivemongo.core.errors.GenericDriverException
 
@@ -51,8 +51,12 @@ private[api] object RenameCollection {
   }
 }
 
+// TODO: storageEngine
+// TODO: validator, validationLevel, validationAction
+// TODO: indexOptionDefaults
 private[api] case class Create(
-  capped: Option[Capped] = None, // if set, "capped" -> true, size -> <int>, max -> <int>
+  capped: Option[Capped] = None, // if set, "capped" -> true, size -> <int>, max -> <int>,
+  writeConcern: WriteConcern = WriteConcern.Default,
   flags: Int = 1 // defaults to 1
 ) extends CollectionCommand with CommandWithResult[UnitBox.type]
 
@@ -61,10 +65,14 @@ private[api] object CreateCollection {
     val builder = pack.newBuilder
     import builder.{ boolean, elementProducer => element }
 
+    val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
+
     pack.writer[ResolvedCollectionCommand[Create]] { create =>
       val elms = Seq.newBuilder[pack.ElementProducer]
 
-      elms += element("create", builder.string(create.collection))
+      elms ++= Seq(
+        element("create", builder.string(create.collection)),
+        element("writeConcern", writeWriteConcern(create.command.writeConcern)))
 
       create.command.capped.foreach { capped =>
         elms += element("capped", boolean(true))

@@ -31,7 +31,7 @@ object Common extends AutoPlugin {
   private val java8 = scala.util.Properties.isJavaAtLeast("1.8")
 
   val scala211 = "2.11.12"
-  val scala213 = "2.13.1"
+  val scala213 = "2.13.2"
 
   val closeableObject = SettingKey[String]("class name of a closeable object")
 

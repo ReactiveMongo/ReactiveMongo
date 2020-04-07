@@ -165,7 +165,8 @@ trait GenericCollection[P <: SerializationPack]
     skip: Int = 0,
     hint: Option[Hint] = None,
     readConcern: ReadConcern = this.readConcern,
-    readPreference: ReadPreference = this.readPreference)(implicit ec: ExecutionContext): Future[Long] = countDocuments(selector, limit, skip, hint, readConcern, readPreference)
+    readPreference: ReadPreference = this.readPreference)(implicit ec: ExecutionContext): Future[Long] = countDocuments(
+    selector, limit, skip, hint, readConcern, readPreference)
 
   /**
    * Returns an unordered builder for insert operations.

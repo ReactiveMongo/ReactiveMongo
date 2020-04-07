@@ -199,7 +199,7 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
         new Update(
           emptyElm, Seq.empty, ordered, writeConcern, false))
 
-      val doc = pack.serialize(emptyCmd, updateWriter(None))
+      val doc = pack.serialize(emptyCmd, updateWriter)
 
       metadata.maxBsonSize - pack.bsonSize(doc)
     }
@@ -225,12 +225,6 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
 
       pack.bsonSize(builder.document(elements.result()))
     }
-
-    implicit private val resultReader: pack.Reader[UpdateCommand.UpdateResult] =
-      reactivemongo.api.commands.UpdateCommand.reader(pack)(UpdateCommand)
-
-    implicit private lazy val writer: pack.Writer[UpdateCmd] =
-      updateWriter(collection.db.session)
 
     private final def execute(
       firstUpdate: UpdateElement,

@@ -483,7 +483,7 @@ final class AsyncDriver(
       }
     }
 
-    override def postStop: Unit = {
+    override def postStop(): Unit = {
       logger.info(s"[$supervisorName] Stopping the monitor...")
 
       ()

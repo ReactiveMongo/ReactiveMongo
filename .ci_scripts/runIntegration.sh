@@ -10,6 +10,8 @@ SBT_OPTS="$SBT_OPTS -Dtest.slowProxyDelay=300 -Dtest.slowFailoverRetries=12"
 
 TEST_OPTS=""
 
+echo "[INFO] Running integration tests ..."
+
 # MongoDB
 echo "- MongoDB major: $MONGO_VER"
 
@@ -61,6 +63,7 @@ cat > /dev/stdout <<EOF
 - JVM options: $JVM_OPTS
 - SBT options: $SBT_OPTS
 - Test options: $TEST_OPTS
+
 EOF
 
 export JVM_OPTS
@@ -72,12 +75,10 @@ if [ $# -ge 1 ]; then
     MODE="$1"
 fi
 
-perl -pe "s/"-deprecation", //;s|resolvers |resolvers += Resolver.sonatypeRepo(\"staging\"),\r\n    resolvers |" < "project/Common.scala" > /tmp/Common.scala && mv /tmp/Common.scala "project/Common.scala"
-
 if [ "x$MODE" = "xinteractive" ]; then
     sbt #++$SCALA_VERSION
 else
     TEST_ARGS=";project ReactiveMongo ;testQuick -- $TEST_OPTS"
 
-    sbt ++$SCALA_VERSION "$TEST_ARGS"
+    sbt ++$SCALA_VERSION ";warn ;update ;info $TEST_ARGS"
 fi

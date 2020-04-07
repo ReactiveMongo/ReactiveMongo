@@ -20,7 +20,9 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with WithTemporaryDb with MongoSkips {
 
-  "The ChangeStream of a collection" should {
+  "Change stream" title
+
+  "Change stream of a collection" should {
 
     "have an empty cursor head when a new cursor is opened without resuming" in skipIfNotRSAndNotVersionAtLeast(MongoWireVersion.V36) {
       withTmpCollection(db) { coll: BSONCollection =>
@@ -49,9 +51,7 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
       withTmpCollection(db) { coll: BSONCollection =>
         // given
         val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
-        val testDocument = BSONDocument(
-          "_id" -> "test",
-          "foo" -> "bar")
+        val testDocument = BSONDocument("_id" -> "test", "foo" -> "bar")
 
         // when
         val result = foldOne(cursor)

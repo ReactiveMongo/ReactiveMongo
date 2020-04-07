@@ -118,6 +118,11 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
 
   Common.nettyNativeArch.foreach { arch =>
     s"Netty native support for $arch" should {
+      val basePkg: String = {
+        if (Common.shaded) "reactivemongo.io.netty.channel"
+        else "io.netty.channel"
+      }
+
       "be loaded" in {
         def actor = new Actor {
           val receive: Receive = {
@@ -132,11 +137,11 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
             case chan => arch must beLike[String] {
               case "osx" =>
                 chan.close(); chan.getClass.getName must startWith(
-                  "reactivemongo.io.netty.channel.kqueue.KQueue")
+                  s"${basePkg}.kqueue.KQueue")
 
               case "linux" =>
                 chan.close(); chan.getClass.getName must startWith(
-                  "reactivemongo.io.netty.channel.epoll.Epoll")
+                  s"${basePkg}.epoll.Epoll")
             }
           }
       }

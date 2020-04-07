@@ -1,13 +1,14 @@
-JVM_MAX_MEM="2048M"
+JVM_MAX_MEM="1G"
 
-# See .jvmopts
-JVM_OPTS="-Xms$JVM_MAX_MEM -Xmx$JVM_MAX_MEM"
-
-if [ `echo "$JAVA_HOME" | grep java-7-oracle | wc -l` -eq 1 -o \
-     `echo "$JAVA_HOME" | grep 1.7 | wc -l` -eq 1 ]; then
-    JVM_OPTS="$JVM_OPTS -XX:PermSize=512M -XX:MaxPermSize=512M"
-else
-    JVM_OPTS="$JVM_OPTS -XX:MetaspaceSize=512M -XX:MaxMetaspaceSize=512M"
+if [ "x$CI_CATEGORY" = "xINTEGRATION_TESTS" ]; then
+  JVM_MAX_MEM="1760M" #1632M"
 fi
 
-export _JAVA_OPTIONS=""
+#JVM_OPTS="-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap"
+
+# See .jvmopts
+JVM_OPTS="-Xmx$JVM_MAX_MEM -XX:ReservedCodeCacheSize=192m"
+#JVM_OPTS="-Xms$JVM_MAX_MEM -Xmx$JVM_MAX_MEM"
+#JVM_OPTS="$JVM_OPTS -XX:MetaspaceSize=512M -XX:MaxMetaspaceSize=512M"
+
+export _JAVA_OPTIONS="$JVM_OPTS"

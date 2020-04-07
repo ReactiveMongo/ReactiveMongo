@@ -376,28 +376,35 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
           Future.successful(eventually(1, timeout) {
             isAvailable(con, timeout) must beTrue.await(0, timeout)
           } and {
-            @volatile var closed = 0
             @volatile var count = 0
+            val closing = Seq.newBuilder[Promise[Boolean]]
 
-            nodeSet(dbsystem).nodes.flatMap {
-              _.connections.map { c =>
+            nodeSet(dbsystem).nodes.foreach {
+              _.connections.foreach { c =>
                 count = count + 1
+
+                val p = Promise[Boolean]()
+                closing += p
 
                 c.channel.close().addListener(new ChannelFutureListener {
                   def operationComplete(op: ChannelFuture): Unit = {
                     if (op.isSuccess) {
-                      closed = closed + 1
+                      p.success(true)
+                    } else {
+                      p.success(false)
                     }
+
+                    ()
                   }
                 })
               }
             }
 
-            count must be_<=(opts.nbChannelsPerNode + 1 /*signaling*/ ) and {
-              eventually(2, timeout) {
-                closed must_=== count
+            Future.sequence(closing.result().map(_.future)).
+              map(_.count(identity)) must beTypedEqualTo(count).
+              awaitFor(timeout) and {
+                count must be_<=(opts.nbChannelsPerNode + 1 /*signaling*/ )
               }
-            }
           } and {
             eventually(1, timeout) {
               f(con, sysRef)

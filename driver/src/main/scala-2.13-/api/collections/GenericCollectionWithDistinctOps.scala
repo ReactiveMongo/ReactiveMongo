@@ -31,9 +31,9 @@ private[collections] trait GenericCollectionWithDistinctOps[P <: SerializationPa
    */
   def distinct[T, M[_] <: Iterable[_]](
     key: String,
-    selector: Option[pack.Document],
-    readConcern: ReadConcern,
-    collation: Option[Collation])(implicit
+    selector: Option[pack.Document] = None,
+    readConcern: ReadConcern = self.readConcern,
+    collation: Option[Collation] = None)(implicit
     reader: pack.NarrowValueReader[T],
     ec: ExecutionContext, cbf: CanBuildFrom[M[_], T, M[T]]): Future[M[T]] =
     distinctDocuments[T, M](key, selector, readConcern, collation)

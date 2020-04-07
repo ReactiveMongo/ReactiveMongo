@@ -1,15 +1,14 @@
 lazy val `ReactiveMongo-Core` = project.in(file("core")).
   settings(
-    Findbugs.settings ++ Seq(
-      sourceDirectories in Compile ++= Seq(
-        (sourceDirectory in Compile).value / "scala-2.11+"),
-      libraryDependencies ++= {
-        val deps = Dependencies.shaded.value
+    sourceDirectories in Compile ++= Seq(
+      (sourceDirectory in Compile).value / "scala-2.11+"),
+    libraryDependencies ++= {
+      val deps = Dependencies.shaded.value
 
-        ("org.reactivemongo" %% "reactivemongo-bson-api" % version.
-          value) +: deps
-      }
-    ))
+      ("org.reactivemongo" %% "reactivemongo-bson-api" % version.
+        value) +: deps
+    }
+  )
 
 lazy val `ReactiveMongo` = new Driver(`ReactiveMongo-Core`).module
 

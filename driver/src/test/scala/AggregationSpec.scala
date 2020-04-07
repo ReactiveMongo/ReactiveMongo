@@ -51,7 +51,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     Common.databases(s"reactivemongo-agg-${System identityHashCode this}", Common.connection, Common.slowConnection)
   }
 
-  def afterAll: Unit = if (integration) { db.drop(); () }
+  def afterAll(): Unit = if (integration) { db.drop(); () }
 
   val zipColName = s"zipcodes${System identityHashCode this}"
   lazy val coll: BSONCollection = {
@@ -83,7 +83,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       import coll.AggregationFramework.IndexStatsResult
       //import coll.AggregationResultImplicits.BSONIndexStatsReader
 
-      val result = coll.aggregateWith[IndexStatsResult]() { framework =>
+      val idxAgg = coll.aggregateWith[IndexStatsResult]() { framework =>
         import framework._
 
         IndexStats -> List(Sort(Ascending("name")))
@@ -91,7 +91,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         Int.MaxValue, Cursor.FailOnError[List[IndexStatsResult]]()).
         map(_.find(_.name != "_id_"))
 
-      result must beLike[Option[IndexStatsResult]] {
+      idxAgg must beLike[Option[IndexStatsResult]] {
         case Some(IndexStatsResult("_id_", k2, _, _)) =>
           sys.error(s"--> ${BSONDocument pretty k2}")
 
@@ -99,7 +99,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
           k2.string("_fts") must beSome("text") and {
             k2.int("_ftsx") must beSome(1)
           }
-      }.await(0, timeout)
+      }.await(1, timeout)
     }
 
     "be inserted" in {
@@ -541,8 +541,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   f"Aggregation result for '$$out'" should {
     // https://docs.mongodb.com/master/reference/operator/aggregation/out/#example
 
-    lazy val books: BSONCollection = db.
-      collection(s"books-1-${System identityHashCode this}")
+    lazy val books: BSONCollection = db.collection(
+      s"books-1-${System identityHashCode this}")
 
     "with valid fixtures" in {
       val fixtures = Seq(
@@ -637,7 +637,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     }
 
     "return the standard deviation of each quiz" in {
-      implicit val reader: BSONDocumentReader[QuizStdDev] = Macros.reader[QuizStdDev]
+      implicit val reader: BSONDocumentReader[QuizStdDev] =
+        Macros.reader[QuizStdDev]
 
       /*
        db.contest.aggregate([
@@ -949,8 +950,11 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     }
 
     "be redacted" in {
-      implicit val subsectionReader: BSONDocumentHandler[Subsection] = Macros.handler[Subsection]
-      implicit val reader: BSONDocumentHandler[Redaction] = Macros.handler[Redaction]
+      implicit val subsectionReader: BSONDocumentHandler[Subsection] =
+        Macros.handler[Subsection]
+
+      implicit val reader: BSONDocumentHandler[Redaction] =
+        Macros.handler[Redaction]
 
       /*
 var userAccess = [ "STLW", "G" ];
@@ -1145,7 +1149,7 @@ db.accounts.aggregate([
         map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
     }
 
-    "and reshaped using $replaceRoot" in {
+    f"and reshaped using $$replaceRoot" in {
       val result = fruits.aggregateWith[BSONDocument]() { framework =>
         import framework.{ Match, ReplaceRootField }
 
@@ -1223,7 +1227,7 @@ db.accounts.aggregate([
         map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
     }
 
-    "be aggregated with $$sum on array fields" in {
+    f"be aggregated with $$sum on array fields" in {
       val expectedResults = Set(
         document(
           "_id" -> 1,
@@ -1301,8 +1305,9 @@ db.accounts.aggregate([
   }
   section("gt_mongo32")
 
+  section("unit")
   "Stage" should {
-    import coll.AggregationFramework
+    import reactivemongo.api.tests.{ AggFramework => AggregationFramework }
 
     val makePipe = reactivemongo.api.tests.makePipe(AggregationFramework)(_)
 
@@ -1384,7 +1389,7 @@ db.accounts.aggregate([
           "localOps" -> false))
     }
 
-    f"$$graphLookup" in {
+    f"be $$graphLookup" in {
       import AggregationFramework.GraphLookup
 
       makePipe(GraphLookup(
@@ -1487,7 +1492,6 @@ db.accounts.aggregate([
     }
   }
 
-  section("unit")
   "Group accumulator" >> {
     import reactivemongo.api.tests.AggFramework, AggFramework._
 

@@ -13,6 +13,8 @@ import reactivemongo.api.{
 }
 
 object Common extends CommonAuth {
+  val shaded = sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_ != "false")
+
   val logger = reactivemongo.api.tests.logger("tests")
 
   val replSetOn = sys.props.get("test.replicaSet").fold(false) {
@@ -29,7 +31,7 @@ object Common extends CommonAuth {
 
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
 
-  private val timeoutFactor = 1.18D
+  private val timeoutFactor = 1.14D
   def estTimeout(fos: FailoverStrategy): FiniteDuration =
     (1 to fos.retries).foldLeft(fos.initialDelay) { (d, i) =>
       d + (fos.initialDelay * ((timeoutFactor * fos.delayFactor(i)).toLong))
@@ -69,7 +71,7 @@ object Common extends CommonAuth {
   lazy val connection =
     Await.result(driver.connect(List(primaryHost), DefaultOptions), timeout)
 
-  val commonDb = "specs2-test-reactivemongo"
+  val commonDb = s"specs2-test-reactivemongo${System.currentTimeMillis()}"
 
   // ---
 
@@ -127,11 +129,6 @@ object Common extends CommonAuth {
       _ <- slowProxy.start()
       resolved <- slowCon.database(name, slowFailover)
     } yield resolved), timeout + slowTimeout)
-  }
-
-  lazy val foo = {
-    import ExecutionContext.Implicits.global
-    Await.result(connection.database(commonDb, failoverStrategy), timeout)
   }
 
   lazy val (db, slowDb) = databases(commonDb, connection, slowConnection)

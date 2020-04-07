@@ -6,7 +6,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.{ Collation, SerializationPack, Session, WriteConcern }
+import reactivemongo.api.{ Collation, SerializationPack, WriteConcern }
 import reactivemongo.api.commands.{
   CommandCodecsWithPack,
   DeleteCommand,
@@ -37,8 +37,6 @@ trait DeleteOps[P <: SerializationPack]
     if (ordered) new OrderedDelete(writeConcern)
     else new UnorderedDelete(writeConcern)
   }
-
-  private type DeleteCmd = ResolvedCollectionCommand[DeleteCommand.Delete]
 
   /**
    * Builder for delete operations.
@@ -127,9 +125,9 @@ trait DeleteOps[P <: SerializationPack]
     private def maxBsonSize = {
       // Command envelope to compute accurate BSON size limit
       val emptyCmd = new ResolvedCollectionCommand(
-        collection.name, Delete(Seq.empty, ordered, writeConcern))
+        collection.name, new Delete(Seq.empty, ordered, writeConcern))
 
-      val doc = pack.serialize(emptyCmd, deleteWriter(None))
+      val doc = pack.serialize(emptyCmd, deleteWriter)
 
       metadata.maxBsonSize - pack.bsonSize(doc)
     }
@@ -144,12 +142,6 @@ trait DeleteOps[P <: SerializationPack]
 
       pack.bsonSize(builder.document(elements))
     }
-
-    implicit private val resultReader: pack.Reader[DeleteCommand.DeleteResult] =
-      CommandCodecs.defaultWriteResultReader(pack)
-
-    implicit private lazy val writer: pack.Writer[DeleteCmd] =
-      deleteWriter(collection.db.session)
 
     private final def execute(deletes: Seq[DeleteElement])(
       implicit

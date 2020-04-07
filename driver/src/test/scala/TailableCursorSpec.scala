@@ -45,13 +45,13 @@ trait TailableCursorSpec { specs: CursorSpec =>
       "using tailable" >> {
         "to fold bulks" in {
           tailable("foldw0a").foldBulks(List.empty[Int], 6)(
-            (s, bulk) => Cursor.Cont(s ++ bulk)) must beEqualTo(List(
+            (s, bulk) => Cursor.Cont(s ++ bulk)) must beTypedEqualTo(List(
               0, 1, 2, 3, 4, 5)).await(1, timeout)
         }
 
         "to fold bulks with async function" in {
           tailable("foldw0b").foldBulksM(List.empty[Int], 6)((s, bulk) =>
-            Future.successful(Cursor.Cont(s ++ bulk))) must beEqualTo(List(
+            Future.successful(Cursor.Cont(s ++ bulk))) must beTypedEqualTo(List(
             0, 1, 2, 3, 4, 5)).await(1, timeout)
         }
       }
@@ -59,13 +59,13 @@ trait TailableCursorSpec { specs: CursorSpec =>
       "using tailable foldWhile" >> {
         "successfully" in {
           tailable("foldw1a").foldWhile(List.empty[Int], 5)(
-            (s, i) => Cursor.Cont(i :: s)) must beEqualTo(List(
+            (s, i) => Cursor.Cont(i :: s)) must beTypedEqualTo(List(
               4, 3, 2, 1, 0)).await(1, timeout)
         }
 
         "successfully with async function" in {
           tailable("foldw1b").foldWhileM(List.empty[Int], 5)((s, i) =>
-            Future.successful(Cursor.Cont(i :: s))) must beEqualTo(List(
+            Future.successful(Cursor.Cont(i :: s))) must beTypedEqualTo(List(
             4, 3, 2, 1, 0)).await(1, timeout)
         }
 

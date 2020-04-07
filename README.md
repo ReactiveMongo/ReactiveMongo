@@ -44,7 +44,7 @@ When running against MongoDB 2.6, the command must replace `exclude mongo2` with
 
 > The test environement must be able to handle the maximum number of incoming connection for the MongoDB instance. This must be checked, and eventually updated, using `ulimit -n`.
 
-[Travis](https://travis-ci.org/ReactiveMongo/ReactiveMongo): ![Travis build status](https://travis-ci.org/ReactiveMongo/ReactiveMongo.png?branch=master)
+[![CircleCI](https://circleci.com/gh/ReactiveMongo/ReactiveMongo.svg?style=svg)](https://circleci.com/gh/ReactiveMongo/ReactiveMongo)
 [![Test coverage](https://img.shields.io/badge/coverage-60%25-yellowgreen.svg)](https://reactivemongo.github.io/ReactiveMongo/coverage/0.12.7/)
 
 *Reproduce Travis build:*

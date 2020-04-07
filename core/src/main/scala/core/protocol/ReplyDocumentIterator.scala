@@ -44,7 +44,7 @@ private[reactivemongo] object ReplyDocumentIterator
     override val isTraversableAgain = false
     override def hasNext = buffer.isReadable()
 
-    override def next = try {
+    override def next() = try {
       val sz = buffer.getIntLE(buffer.readerIndex)
       val cbrb = reactivemongo.api.bson.buffer.
         ReadableBuffer(buffer readSlice sz)
@@ -100,7 +100,7 @@ private[reactivemongo] sealed trait ReplyDocumentIteratorLowPriority {
   protected final class FailingIterator[A](
     cause: Throwable) extends Iterator[A] {
     val hasNext = false
-    @inline def next: A = throw cause
+    @inline def next(): A = throw cause
   }
 }
 

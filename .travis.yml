@@ -1,3 +1,4 @@
+# TODO: Remove
 os:
 - linux
 - osx
@@ -28,7 +29,7 @@ matrix:
     language: java
     env: CI_CATEGORY=UNIT_TESTS OS_NAME=osx TRAVIS_SCALA_VERSION=2.11.12 REACTIVEMONGO_SHADED=false
   - os: linux
-    env: CI_CATEGORY=UNIT_TESTS REACTIVEMONGO_SHADED=false
+    env: CI_CATEGORY=UNIT_TESTS
     jdk: oraclejdk9
     scala: 2.12.11
   - os: linux
@@ -67,10 +68,6 @@ matrix:
     jdk: oraclejdk9
     scala: 2.11.12
     env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.23 MONGO_PROFILE=default MONGO_VER=4
-  - os: linux
-    jdk: oraclejdk9
-    scala: 2.11.12
-    env: CI_CATEGORY=INTEGRATION_TESTS AKKA_VERSION=2.5.23 MONGO_PROFILE=invalid-ssl MONGO_VER=4
   - os: linux
     jdk: oraclejdk9
     scala: 2.11.12

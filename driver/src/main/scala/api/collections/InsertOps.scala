@@ -60,7 +60,7 @@ trait InsertOps[P <: SerializationPack]
         new Insert(
           emptyDoc, Seq.empty[pack.Document], ordered, writeConcern, false))
 
-      val doc = pack.serialize(emptyCmd, insertWriter(None))
+      val doc = pack.serialize(emptyCmd, insertWriter)
 
       metadata.maxBsonSize - pack.bsonSize(doc) + pack.bsonSize(emptyDoc)
     }
@@ -139,12 +139,6 @@ trait InsertOps[P <: SerializationPack]
           case Failure(e) => Future.failed[pack.Document](e)
         }
       })
-
-    implicit private val resultReader: pack.Reader[InsertResult] =
-      CommandCodecs.defaultWriteResultReader(pack)
-
-    implicit private lazy val writer: pack.Writer[InsertCmd] =
-      insertWriter(collection.db.session)
 
     private final def execute(documents: Seq[pack.Document])(implicit ec: ExecutionContext): Future[WriteResult] = documents.headOption match {
       case Some(head) => {

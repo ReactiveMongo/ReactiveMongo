@@ -1,5 +1,4 @@
 import scala.concurrent.{ Await, Future, Promise }
-import scala.concurrent.duration._
 
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
 
@@ -125,6 +124,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
       val before = System.currentTimeMillis()
       val unresolved = con.flatMap(_.database(commonDb))
       val after = System.currentTimeMillis()
+      val failTimeout = Common.estTimeout(FailoverStrategy.remote)
 
       (after - before) aka "invocation" must beBetween(0L, 75L) and {
         unresolved.map(_ => Option.empty[Throwable] -> -1L).recover {
@@ -145,7 +145,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
               } and {
                 (duration must be_>=(17000L)) and (duration must be_<(28500L))
               }
-        }.await(0, 22.seconds) and {
+        }.await(0, failTimeout + (failTimeout / 3L)) and {
           con.flatMap(_.close()(timeout)) must not(
             throwA[Exception]).await(0, timeout)
         }
@@ -206,7 +206,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
           slowConnection.flatMap(_.authenticate(
             dbName, "foo", "bar", slowFailover)).
             aka("authentication") must throwA[FailedAuthentication].
-            await(1, slowTimeout)
+            await(2, slowTimeout + (slowTimeout / 2L))
         }
       }
 
@@ -219,7 +219,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
             await(1, timeout) and {
               db_.flatMap {
                 _("testcol").insert.one(BSONDocument("foo" -> "bar"))
-              }.map(_ => {}) must beTypedEqualTo({}).await(1, timeout * 2)
+              }.map(_ => {}) must beTypedEqualTo({}).await(1, timeout * 2L)
             }
         }
 
@@ -229,7 +229,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
               _.authenticate(
                 dbName,
                 userName, s"password-$id", slowFailover)) must beAnInstanceOf[SuccessfulAuthentication].
-              awaitFor(slowTimeout)
+              awaitFor(slowTimeout + timeout)
           }
         }
       }
@@ -267,7 +267,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
 
           con.database(dbName, slowFailover).
             aka("authed DB") must beAnInstanceOf[DB].
-            await(1, slowTimeout) and {
+            await(1, slowTimeout + (slowTimeout / 4L)) and {
               con.close()(slowTimeout) must not(throwA[Exception]).
                 await(1, slowTimeout)
             }

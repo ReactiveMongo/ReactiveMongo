@@ -34,7 +34,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
   lazy val (db, slowDb) = Common.databases(s"reactivemongo-${System identityHashCode this}", Common.connection, Common.slowConnection)
 
-  def afterAll = { db.drop(); () }
+  def afterAll() = { db.drop(); () }
 
   // ---
 

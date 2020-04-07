@@ -80,7 +80,7 @@ private[api] case class ConnectionState(
  */
 final class MongoConnection private[reactivemongo] (
   private[api] val supervisor: String,
-  private[api] val name: String,
+  private[reactivemongo] val name: String,
   private[api] val actorSystem: ActorSystem,
   private[api] val mongosystem: ActorRef,
   private[api] val options: MongoConnectionOptions) {
@@ -369,7 +369,7 @@ final class MongoConnection private[reactivemongo] (
       }
     }
 
-    override def postStop = debug("Monitor is stopped")
+    override def postStop() = debug("Monitor is stopped")
   }
 
   // --- Logging ---

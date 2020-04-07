@@ -32,7 +32,8 @@ private[reactivemongo] case class VerboseSuccessfulAuthentication(
  * A failed authentication result
  */
 sealed abstract class FailedAuthentication
-  extends CmdErr with AuthenticationResult {
+  extends CmdErr with AuthenticationResult
+  with scala.util.control.NoStackTrace {
 
   /** The explanation of the error */
   def message: String = "<error>"

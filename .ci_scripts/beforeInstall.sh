@@ -5,6 +5,7 @@ set -e
 echo "[INFO] Clean some IVY cache"
 rm -rf "$HOME/.ivy2/local/org.reactivemongo"
 
+# TODO: Remove
 if [ "$OS_NAME" = "osx" ]; then
   echo "[INFO] Mac OS X setup"
 
@@ -47,7 +48,7 @@ PRIMARY_HOST=`hostname`":27018"
 PRIMARY_SLOW_PROXY=`hostname`":27019"
 
 # OpenSSL
-if [ ! -L "$HOME/ssl/lib/libssl.so.1.0.0" ] && [ ! -f "$HOME/ssl/lib/libssl.so.1.0.0" ]; then
+if [ ! -L "$HOME/ssl/lib/libssl.so.1.0.0" ] && [ ! -f "$HOME/ssl/lib/libcrypto.so.1.0.0" ]; then
   echo "[INFO] Building OpenSSL"
 
   cd /tmp

@@ -1,6 +1,7 @@
 package reactivemongo
 
 import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.duration._
 
 import reactivemongo.api.bson.{ BSONArray, BSONDocument }
 import reactivemongo.api.collections.BulkOps._
@@ -158,7 +159,7 @@ final class BulkOpsSpec(implicit ee: ExecutionEnv)
       }
     }
 
-    "be failed on the first failure for producer2" in {
+    "be failed on the first failure for producer2" in eventually(2, 1.seconds) {
       val app = bulkApply[BSONDocument, Iterable[BSONDocument]](
         _: BulkProducer[BSONDocument])(foo, None)(_: ExecutionContext)
 

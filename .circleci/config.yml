@@ -28,19 +28,58 @@ commands:
 
   build_n_tests:
     description: Build & Run tests
+    parameters:
+      jdk_version:
+        type: string
+        default: "openjdk8"
+      scala_version:
+        type: string
+        default: "2.13.2"
+      shaded:
+        type: boolean
+        default: true
+      category:
+        type: string
+        default: ""
+
     steps:
       - restore_cache:
           keys:
-            - &build_cache_key scala-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.REACTIVEMONGO_SHADED }}-{{ checksum "version.sbt" }}-{{ checksum "build.sbt" }}-{{ checksum "project/Common.scala" }}-{{ checksum "project/Dependencies.scala" }}
+            - &scala_cache_key scala-{{ .Environment.CIRCLE_JOB }}-<< parameters.shaded >>-{{ checksum "version.sbt" }}-{{ checksum "build.sbt" }}-{{ checksum "project/Common.scala" }}-{{ checksum "project/Dependencies.scala" }}
+
+      - restore_cache:
+          keys:
+          - &compile_cache_key compile-{{ arch }}-{{ .Revision }}-<< parameters.jdk_version >>-<< parameters.scala_version >>
 
       - run:
           name: Build & Run tests
           command: |
                     export PATH=$PATH:~/sbt/bin
-                    export USER=`basename $HOME`
+                    export SCALA_VERSION="<< parameters.scala_version >>"
+                    SHADED="<< parameters.shaded >>"
+                    export CI_CATEGORY="<< parameters.category >>"
+
+                    if [ "x$USER" = "x" ]; then
+                      export USER=`basename $HOME`
+                    fi
                     
-                    ./.ci_scripts/retry.sh 3 \
-                      ./.ci_scripts/validate.sh /tmp/integration-env.sh
+                    if [ ! "$SHADED" = "true" ]; then
+                      export REACTIVEMONGO_SHADED=false
+                    fi
+
+                    CMD="./.ci_scripts/validate.sh /tmp/integration-env.sh"
+
+                    if [ "x$CI_CATEGORY" = "xINTEGRATION_TESTS" ]; then
+                      TEST_TIMEOUT=270s ./.ci_scripts/retry.sh 2 $CMD
+                    else
+                      $CMD
+                    fi
+
+      - save_cache:
+          paths:
+            - ~/repo/core/target/*shaded/scala-*
+            - ~/repo/driver/target/*shaded/scala-*
+          key: *compile_cache_key
 
       - save_cache:
           paths:
@@ -48,7 +87,42 @@ commands:
             - ~/.ivy2
             - ~/.coursier/cache
             - ~/Library/Caches/Coursier
-          key: *build_cache_key
+          key: *scala_cache_key
+
+  setup_integration:
+    description: Setup integration environment
+    parameters:
+      category:
+        type: string
+        default: "INTEGRATION_TESTS"
+      mongo_version:
+        type: string
+      mongo_profile:
+        type: string
+    steps:
+      - restore_cache:
+          keys:
+            - &mongo_cache_key mongodb-<< parameters.mongo_version >>-<< parameters.mongo_profile >>
+
+      - run:
+          name: Prepare integration environment
+          command: |
+                    if [ `which make | wc -l` -eq 0 ]; then
+                      sudo apt update
+                      sudo apt install build-essential
+                    fi
+                    ./.ci_scripts/beforeInstall.sh << parameters.category >> << parameters.mongo_version >> << parameters.mongo_profile >> /tmp/integration-env.sh
+
+      - save_cache:
+          paths:
+            - ~/ssl
+            - ~/mongodb-linux-x86_64-amazon-<< parameters.mongo_version >>
+          key: *mongo_cache_key
+
+      - run:
+          name: Start integration services
+          command: if [ "x<< parameters.category >>" = "xINTEGRATION_TESTS" ]; then (./.ci_scripts/fork-mongod.sh /tmp/integration-env.sh); fi
+          background: true
 
   collect_test_reports:
     description: Collect test reports
@@ -61,54 +135,318 @@ commands:
                       -print -exec cp {} test-reports \;
           when: always
 
-jobs:
-  unit_osx_jdk8_scala211:
+  trigger_build:
+    description: Trigger a build using API
+    parameters:
+      organisation:
+        type: string
+        default: "ReactiveMongo"
+      project:
+        type: string
+        default: ""
+    steps:
+      - run:
+          name: Trigger build @ << parameters.project >>
+          command: |
+                    curl -X POST "https://circleci.com/api/v1.1/project/github/<< parameters.organisation >>/<< parameters.project >>/build?circle-token=${REACTIVEMONGO_API_TOKEN}"
+
+  publish_snapshots:
+    description: Publish artifacts to Snapshots repository
+    parameters:
+      shaded:
+        type: boolean
+        default: false
+    steps:
+      - deploy:
+          name: Publish artifacts to Sonatype Snapshots
+          command: |
+                    if [ ! "${CIRCLE_BRANCH}" = "master" ]; then
+                      echo "Skipped on branch ${CIRCLE_BRANCH}"
+                      exit 0
+                    fi
+                    
+                    export PUBLISH_REPO_NAME="Sonatype Nexus Repository Manager"
+                    export PUBLISH_REPO_ID="oss.sonatype.org"
+                    export PUBLISH_REPO_URL="https://oss.sonatype.org/content/repositories/snapshots"
+                    
+                    if [ "x$PUBLISH_USER" = "x" -o "x$PUBLISH_PASS" = "x" ]; then
+                      echo "Missing publication credentials"
+                      exit 1
+                    fi
+                    
+                    export SHADED="<< parameters.shaded >>"
+                    
+                    echo "Publishing artifacts (shaded: $SHADED)"
+                    
+                    if [ "$SHADED" = "true" ]; then
+                      sbt +publish
+                    else
+                      export REACTIVEMONGO_SHADED=false
+                      sbt +publish
+                    fi
+
+executors:
+  osx:
     macos:
       xcode: 9.4.1
+  openjdk:
+    parameters:
+      version:
+        type: integer
+        default: 8
+    docker:
+      - image: circleci/openjdk:<< parameters.version >>-jdk
 
-    working_directory: ~/repo
+jobs:
+  unit_test_suite:
+    description: Unit test suite
+
+    parameters:
+      e:
+        type: executor
+      os:
+        type: string
+        default: "linux"
+      jdk_version:
+        type: string
+        default: "openjdk8"
+      scala_version:
+        type: string
+        default: "2.13.2"
+      shaded:
+        type: boolean
+        default: true
+
+    executor: << parameters.e >>
 
     environment:
-      OS_NAME: osx
-      CI_CATEGORY: UNIT_TESTS
-      SCALA_VERSION: 2.11.12
-      REACTIVEMONGO_SHADED: false
+      OS_NAME: << parameters.os >>
+
+    working_directory: ~/repo
 
     steps:
       - checkout
       - setup_sbt
-      - build_n_tests
+
+      - build_n_tests:
+          jdk_version: << parameters.jdk_version >>
+          scala_version: << parameters.scala_version >>
+          shaded: << parameters.shaded >>
+          category: UNIT_TESTS
 
       - collect_test_reports
       - store_test_results:
           path: test-reports
 
-  unit_linux_openjdk9_scala212:
+  integration_test_suite:
+    description: Integration test suite
+
+    parameters:
+      openjdk_version:
+        type: integer
+        default: 9
+      scala_version:
+        type: string
+        default: "2.12.11"
+      akka_version:
+        type: string
+        default: "2.5.23"
+      shaded:
+        type: boolean
+        default: true
+      mongo_version:
+        type: integer
+        default: 4
+      mongo_profile:
+        type: string
+        default: "default"
+
     docker:
-      - image: circleci/openjdk:9-jdk
+      - image: circleci/openjdk:<< parameters.openjdk_version >>-jdk
 
     working_directory: ~/repo
 
     environment:
-      CI_CATEGORY: UNIT_TESTS
-      SCALA_VERSION: 2.12.11
+      AKKA_VERSION: << parameters.akka_version >>
+      MONGO_PROFILE: << parameters.mongo_profile >>
+      MONGO_VER: << parameters.mongo_version >>
+      OS_NAME: linux
+   
+    steps:
+      - checkout
+
+      - run:
+          name: Print integration parameters
+          no_output_timeout: 15m
+          command: |
+                    echo "MongoDB: version=$MONGO_VER; profile=$MONGO_PROFILE"
+                    echo "JDK: openjdk<< parameters.openjdk_version >>"
+                    echo "Scala: version=<< parameters.scala_version >>"
+                    echo "Shaded? << parameters.shaded >>"
+                    echo "Akka: version=$AKKA_VERSION"
+
+      - setup_integration:
+          mongo_version: $MONGO_VER
+          mongo_profile: $MONGO_PROFILE
+
+      - setup_sbt
+
+      - build_n_tests:
+          jdk_version: openjdk<< parameters.openjdk_version >>
+          scala_version: << parameters.scala_version >>
+          shaded: << parameters.shaded >>
+          category: INTEGRATION_TESTS
+
+      - collect_test_reports
+      - store_test_results:
+          path: test-reports
+
+  publish_snapshots:
+    docker:
+      - image: circleci/openjdk:8-jdk
+
+    working_directory: ~/repo
     
     steps:
       - checkout
       - setup_sbt
-      - build_n_tests
 
-      - collect_test_reports
-      - store_test_results:
-          path: test-reports
+      - restore_cache:
+          keys:
+            - &snapshot_cache_key scala-{{ .Environment.CIRCLE_JOB }}-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}
+
+      - publish_snapshots
+      - publish_snapshots:
+          shaded: false
+
+      - save_cache:
+          paths:
+            - ~/.sbt
+            - ~/.ivy2
+            - ~/.coursier/cache
+          key: *snapshot_cache_key
+
+  trigger_dependent_builds:
+    docker:
+      - image: cimg/base:2020.01
+
+    working_directory: ~/repo
+
+    steps:
+      - trigger_build:
+          project: ReactiveMongo-Play-Json
+      - trigger_build:
+          project: ReactiveMongo-Streaming
+      - trigger_build:
+          project: ReactiveMongo-Monitoring
 
 workflows:
   version: 2
 
-  unit_test_osx:
+  main_suite:
     jobs:
-      - unit_osx_jdk8_scala211
+      - unit_test_suite:
+          name: unit_osx_jdk8_scala211
+          os: osx
+          e: osx
+          jdk_version: jdk8
+          scala_version: 2.11.12
+          shaded: false
 
-  unit_test_linux:
-    jobs:
-      - unit_linux_openjdk9_scala212
+      - unit_test_suite:
+          name: unit_linux_openjdk9_scala212
+          e:
+            name: openjdk
+            version: 9
+          jdk_version: openjdk9
+          scala_version: 2.12.11
+
+      - integration_test_suite:
+          name: integration_openjdk8_scala211_akka23
+          openjdk_version: 8
+          scala_version: 2.11.12
+          akka_version: 2.3.13
+          mongo_version: 3
+
+      - integration_test_suite:
+          name: integration_openjdk8_scala213_akka25_rs
+          openjdk_version: 8
+          scala_version: 2.13.2
+          mongo_profile: rs
+
+      - integration_test_suite:
+          name: integration_openjdk9_scala213_akka25_x509
+          mongo_profile: x509
+          scala_version: 2.13.2
+
+      - integration_test_suite:
+          name: integration_openjdk9_scala212_akka26
+          akka_version: 2.6.5
+
+      - integration_test_suite:
+          name: integration_openjdk9_scala212_akka25_invalidssl
+          mongo_profile: invalid-ssl
+
+      - integration_test_suite:
+          name: integration_openjdk11_scala212_akka25_mutualssl
+          openjdk_version: 11
+          mongo_profile: mutual-ssl
+
+      - integration_test_suite:
+          name: integration_openjdk9_scala212_akka26_rs
+          akka_version: 2.6.5
+          mongo_profile: rs
+          shaded: false
+
+      - integration_test_suite:
+          name: integration_openjdk9_scala212_akka25_x509
+          mongo_profile: x509
+
+      - integration_test_suite:
+          name: integration_openjdk10_scala211_akka25
+          openjdk_version: 10
+          scala_version: 2.11.12
+
+      - integration_test_suite:
+          name: integration_openjdk9_scala211_akka25_mutualssl
+          scala_version: 2.11.12
+          mongo_profile: mutual-ssl
+
+      - integration_test_suite:
+          name: integration_openjdk9_scala211_akka25_rs
+          scala_version: 2.11.12
+          mongo_profile: rs
+
+      - integration_test_suite:
+          name: integration_openjdk9_scala211_akka25_x509
+          scala_version: 2.11.12
+          mongo_profile: x509
+
+      - publish_snapshots:
+          filters:
+            branches:
+              only:
+                - master
+          requires:
+            - unit_osx_jdk8_scala211
+            - unit_linux_openjdk9_scala212
+            - integration_openjdk8_scala211_akka23
+            - integration_openjdk8_scala213_akka25_rs
+            - integration_openjdk9_scala213_akka25_x509
+            - integration_openjdk9_scala212_akka26
+            - integration_openjdk9_scala212_akka25_invalidssl
+            - integration_openjdk11_scala212_akka25_mutualssl
+            - integration_openjdk9_scala212_akka26_rs
+            - integration_openjdk9_scala212_akka25_x509
+            - integration_openjdk10_scala211_akka25
+            - integration_openjdk9_scala211_akka25_mutualssl
+            - integration_openjdk9_scala211_akka25_rs
+            - integration_openjdk9_scala211_akka25_x509
+
+      - trigger_dependent_builds:
+          filters:
+            branches:
+              only:
+                - master
+          requires:
+            - publish_snapshots

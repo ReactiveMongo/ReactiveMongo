@@ -10,6 +10,7 @@ import reactivemongo.api.{ ChangeStreams, PackSupport, SerializationPack }
 private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
   extends GroupAggregation[P] with SliceAggregation[P] with SortAggregation[P]
   with AggregationPipeline[P] { self: PackSupport[P] =>
+  // TODO: Search
 
   protected final lazy val builder = pack.newBuilder
 
@@ -1473,6 +1474,9 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
 
   /** Filter companion */
   object Filter {
+    def apply(input: pack.Value, as: String, cond: pack.Document): Filter =
+      new Filter(input, as, cond)
+
     implicit val writer: pack.Writer[Filter] = pack.writer[Filter] { f =>
       import builder.{ document, elementProducer => element }
 

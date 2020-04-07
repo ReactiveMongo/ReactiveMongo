@@ -7,7 +7,6 @@ import scala.concurrent.duration.{ Duration, FiniteDuration }
 
 import akka.pattern.after
 
-import reactivemongo.core.errors.ConnectionException
 import reactivemongo.util.LazyLogger
 
 private[reactivemongo] final class Failover[A](

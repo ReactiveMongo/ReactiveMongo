@@ -69,6 +69,7 @@ import reactivemongo.api.commands.{
  * @define resultType the result type
  * @define cursorFetcher A cursor for the command results
  * @define singleResult A single result from command execution
+ * @define txWriteConcernParam the write concern for the transaction operation
  */
 final class DB private[api] (
   val name: String,
@@ -199,7 +200,7 @@ final class DB private[api] (
    *   db.startTransaction(aWriteConcern, failIfAlreadyStarted = false)
    * }}}
    *
-   * @param writeConcern the write concern for the transaction operation
+   * @param writeConcern $txWriteConcernParam
    *
    * @return The database reference with transaction.
    */
@@ -229,7 +230,7 @@ final class DB private[api] (
    *   db.startTransaction(aWriteConcern, failIfAlreadyStarted = true)
    * }}}
    *
-   * @param writeConcern the write concern for the transaction operation
+   * @param writeConcern $txWriteConcernParam
    *
    * @return The database reference with transaction.
    */
@@ -518,7 +519,7 @@ final class DB private[api] (
    */
   def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]], failoverStrategy: FailoverStrategy = FailoverStrategy.default, readPreference: ReadPreference = this.defaultReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = Command.run(pack, failoverStrategy).unboxed(this, command, readPreference)
 
-  @inline private def defaultWriteConcern: WriteConcern = connection.options.writeConcern
+  @inline private[api] def defaultWriteConcern: WriteConcern = connection.options.writeConcern
 
   override def toString = s"DB($name)"
 }

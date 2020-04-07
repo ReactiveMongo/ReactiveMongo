@@ -48,15 +48,17 @@ if [ ! "x$MONGODB_NAME" = "xFOO" ]; then
 fi
 
 # Check MongoDB options
-echo -n "- server version: "
+echo "[INFO] Checking MongoDB service ..."
+
+echo -n "- Server version: "
 
 mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'var s=db.serverStatus();s.version' 2>/dev/null | tail -n 1
 
-echo -n "- security: "
+echo -n "- Security: "
 mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'var s=db.serverStatus();var x=s["security"];(!x)?"_DISABLED_":x["SSLServerSubjectName"];' 2>/dev/null | tail -n 1
 
 if [ ! "v$MONGO_VER" = "v2_6" ]; then
-    echo -n "- storage engine: "
+    echo -n "- Storage engine: "
     mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'var s=db.serverStatus();JSON.stringify(s["storageEngine"]);' 2>/dev/null | grep '"name"' | cut -d '"' -f 4
 fi
 
@@ -66,5 +68,7 @@ if [ "$MONGO_PROFILE" = "rs" ]; then
         false
     )
 fi
+
+echo ""
 
 source "$SCRIPT_DIR/runIntegration.sh"

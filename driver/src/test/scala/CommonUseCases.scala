@@ -30,7 +30,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
   lazy val collection = db(colName)
   lazy val slowColl = slowDb(colName)
 
-  def afterAll = { db.drop(); () }
+  def afterAll() = { db.drop(); () }
 
   // ---
 
@@ -87,6 +87,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
 
     "find them with a projection" >> {
       val pjn = BSONDocument("name" -> 1, "age" -> 1, "something" -> 1)
+      val expected = (18 to 60).mkString("")
 
       def findSpec(c: DefaultCollection, t: FiniteDuration) = {
         def it = c.find(BSONDocument.empty, Some(pjn)).
@@ -98,7 +99,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
         it.collect[List](
           Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).map {
             _.map(doc => decoder.int(doc, "age").mkString).mkString("")
-          } must beTypedEqualTo((18 to 60).mkString("")).await(0, t)
+          } must beTypedEqualTo(expected).await(0, t)
       }
 
       "with the default connection" in {
@@ -106,7 +107,9 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
       }
 
       "with the slow connection" in eventually(2, timeout) {
-        findSpec(slowColl, Common.ifX509(slowTimeout * 5)(slowTimeout * 3))
+        val t = slowTimeout + (timeout / 2L)
+
+        findSpec(slowColl, Common.ifX509(t * 5)(t * 3))
       }
     }
 

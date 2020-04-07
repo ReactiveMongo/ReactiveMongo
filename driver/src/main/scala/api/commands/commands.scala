@@ -103,9 +103,14 @@ private[reactivemongo] object Command {
 
     protected def defaultReadPreference = db.connection.options.readPreference
 
+    @inline private def stackTrace() =
+      Thread.currentThread.getStackTrace.drop(4).reverse
+
     def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = {
       val requestMaker = buildRequestMaker(pack)(
         command, writer, readPreference, db.name)
+
+      val contextSTE = stackTrace()
 
       Failover(db.connection, failover) { () =>
         db.connection.sendExpectingResponse(new ExpectingResponse(
@@ -119,9 +124,13 @@ private[reactivemongo] object Command {
         case Response.CommandError(_, _, _, cause) =>
           cause.originalDocument match {
             case pack.IsDocument(doc) =>
+              // Error document as result
               Future(pack.deserialize(doc, reader))
 
-            case _ => Future.failed[T](cause)
+            case _ => Future.failed[T] {
+              cause.setStackTrace(contextSTE)
+              cause
+            }
           }
 
         case response @ Response.Successful(_, Reply(_, _, _, 0), _, _) =>
@@ -252,4 +261,6 @@ private[reactivemongo] object Command {
  * @param collection the name of the collection against which the command is executed
  * @param command the executed command
  */
-private[reactivemongo] final class ResolvedCollectionCommand[C <: CollectionCommand](val collection: String, val command: C) extends Command
+final class ResolvedCollectionCommand[C <: CollectionCommand](
+  val collection: String,
+  val command: C) extends Command

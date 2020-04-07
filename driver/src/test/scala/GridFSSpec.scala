@@ -26,7 +26,7 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
 
   lazy val (db, slowDb) = Common.databases(s"reactivemongo-gridfs-${System identityHashCode this}", Common.connection, Common.slowConnection)
 
-  def afterAll = { db.drop(); () }
+  def afterAll() = { db.drop(); () }
 
   // ---
 
@@ -143,15 +143,16 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
               _ aka "MD5" must_=== expectedMd5
             }
           }
-        }.await(1, timeout)
+        }.await(1, timeout + (timeout / 3L))
       }
     }
 
     "delete the files from GridFS" in {
-      (for {
-        a <- gfs.remove(file1.id).map(_.n)
-        b <- gfs.remove(file2.id).map(_.n)
-      } yield a + b) must beTypedEqualTo(2).await(1, timeout)
+      def spec(id: gfs.pack.Value) = eventually(2, timeout / 2L) {
+        gfs.remove(id).map(_.n) must beTypedEqualTo(1).await(0, timeout * 2L)
+      }
+
+      spec(file1.id) and spec(file2.id)
     }
   }
 

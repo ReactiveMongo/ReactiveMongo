@@ -71,7 +71,7 @@ trait DatabaseException extends ReactiveMongoException {
 private[reactivemongo] object DatabaseException {
   def apply(cause: Throwable): DatabaseException = new Default(cause)
 
-  def apply[P <: SerializationPack](pack: P)(doc: pack.Document): DatabaseException = new DatabaseException {
+  def apply[P <: SerializationPack](pack: P)(doc: pack.Document): DatabaseException = new DatabaseException with NoStackTrace {
     private lazy val decoder = pack.newDecoder
 
     lazy val originalDocument = Option(doc).map(pack.pretty(_))

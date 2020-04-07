@@ -12,6 +12,7 @@ import reactivemongo.api.indexes.CollectionIndexesManager
  * @define createDescription Creates this collection
  * @define cappedSizeParam the size of the collection (number of bytes)
  * @define cappedMaxParam the maximum number of documents this capped collection can contain
+ * @define writeConcernParam the write concern for collection operations
  */
 private[api] trait CollectionMetaCommands { self: Collection =>
   private implicit lazy val unitBoxReader =
@@ -55,8 +56,14 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    * }}}
    *
    * @param failsIfExists if true fails if the collection already exists (default: false)
+   * @param writeConcern $writeConcernParam
    */
-  final def create(failsIfExists: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, Create(None), ReadPreference.primary).recover {
+  final def create(
+    failsIfExists: Boolean = false,
+    writeConcern: WriteConcern = db.defaultWriteConcern)(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(
+    self, Create(
+    capped = None,
+    writeConcern = writeConcern), ReadPreference.primary).recover {
     case CommandError.Code(48 /* already exists */ ) if !failsIfExists => ()
 
     case CommandError.Message(

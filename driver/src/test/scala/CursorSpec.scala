@@ -50,9 +50,10 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
 
           cursor.foldBulksM({}, 128)(
             { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #18")) },
-            Cursor.FailOnError[Unit](onError)).recover({ case _ => count }).
-            aka("folding") must beEqualTo(1).await(1, timeout)
-
+            Cursor.FailOnError[Unit](onError)).
+            map(_ => -1).recover {
+              case _ => count
+            } must beTypedEqualTo(1).await(1, timeout)
         }
 
         "if fails while processing w/o documents" in {
@@ -66,8 +67,9 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
 
           cursor.foldBulks({}, 128)(
             { (_, _) => sys.error("Foo #19"): Cursor.State[Unit] },
-            Cursor.FailOnError[Unit](onError)).recover({ case _ => count }).
-            aka("folding") must beEqualTo(1).await(1, timeout)
+            Cursor.FailOnError[Unit](onError)).
+            map(_ => -1).recover({ case _ => count }).
+            aka("folding") must beTypedEqualTo(1).await(1, timeout)
         }
 
         "if fails with initial value" in {
@@ -81,9 +83,9 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
 
           cursor.foldBulksM[Unit](sys.error("Foo #20"), 128)(
             (_, _) => Future.successful(Cursor.Cont({})),
-            Cursor.FailOnError[Unit](onError)).
-            recover({ case _ => count }) must beEqualTo(0).await(1, timeout)
-
+            Cursor.FailOnError[Unit](onError)).map(_ => -1).recover {
+              case _ => count
+            } must beTypedEqualTo(0).await(1, timeout)
         }
 
         "if fails to send request" in {
@@ -103,12 +105,13 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             batchSize(64).cursor()
 
           // Close connection to make the related cursor erroneous
-          con21.flatMap(_.close()(timeout)).map(_ => {}) must beEqualTo({}).
-            await(1, timeout) and {
+          con21.flatMap(_.close()(timeout)).
+            map(_ => {}) must beTypedEqualTo({}).await(1, timeout) and {
               cursor.foldBulks({}, 128)(
                 { (_, _) => Cursor.Cont({}) },
-                Cursor.FailOnError[Unit](onError)).
-                recover({ case _ => count }) must beEqualTo(1).await(1, timeout)
+                Cursor.FailOnError[Unit](onError)).map(_ => -1).recover {
+                  case _ => count
+                } must beTypedEqualTo(1).await(1, timeout)
             }
         }
       }
@@ -127,9 +130,10 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
 
             cursor.foldWhileM({}, 128)(
               { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #25")) },
-              Cursor.FailOnError[Unit](onError)).recover({ case _ => count }).
-              aka("folding") must beEqualTo(1).await(1, timeout)
-
+              Cursor.FailOnError[Unit](onError)).
+              map(_ => -1).recover {
+                case _ => count
+              } must beTypedEqualTo(1).await(1, timeout)
           }
 
           "if fails with initial value" in {
@@ -143,8 +147,9 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
 
             cursor.foldWhile[Unit](sys.error("Foo #26"), 128)(
               (_, _) => Cursor.Cont({}), Cursor.FailOnError[Unit](onError)).
-              recover({ case _ => count }) must beEqualTo(0).
-              await(1, timeout)
+              map(_ => -1).recover {
+                case _ => count
+              } must beTypedEqualTo(0).await(1, timeout)
           }
 
           "if fails to send request" in {
@@ -164,12 +169,12 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
 
             // Close connection to make the related cursor erroneous
             con27.flatMap(_.close()(timeout)).
-              map(_ => {}) must beEqualTo({}).await(1, timeout) and {
+              map(_ => {}) must beTypedEqualTo({}).await(1, timeout) and {
                 cursor.foldWhile({}, 128)(
                   (_, _) => Cursor.Cont({}),
-                  Cursor.FailOnError[Unit](onError)).
-                  recover({ case _ => count }).
-                  aka("folding") must beEqualTo(1).await(1, timeout)
+                  Cursor.FailOnError[Unit](onError)).map(_ => -1).recover {
+                    case _ => count
+                  } must beTypedEqualTo(1).await(1, timeout)
               }
           }
         }
@@ -200,7 +205,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
       lazy val (cursorDb, slowCursorDb) =
         Common.databases(Common.commonDb, cursorCon, slowCursorCon)
 
-      @inline def defaultColl = slowCursorDb(collName)
+      @inline def defaultColl = cursorDb(collName)
       @inline def slowDefaultColl = slowCursorDb(collName)
 
       "when folding bulks" >> {
@@ -220,7 +225,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
           cursor.foldBulks({}, 128)(
             { (_, _) => sys.error("Foo #37"): Cursor.State[Unit] },
             Cursor.ContOnError[Unit](onError)).map(_ => count).
-            aka("folding") must beEqualTo(2 /* maxDocs / batchSize */ ).
+            aka("folding") must beTypedEqualTo(2 /* maxDocs / batchSize */ ).
             await(2, delayedTimeout)
         }
 
@@ -236,7 +241,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
           cursor.foldBulksM({}, 64)(
             { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #38")) },
             Cursor.ContOnError[Unit](onError)).map(_ => count).
-            aka("folding") must beEqualTo(1 /* 64 / batchSize */ ).
+            aka("folding") must beTypedEqualTo(1 /* 64 / batchSize */ ).
             await(2, delayedTimeout)
 
         }
@@ -252,7 +257,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
 
           cursor.foldBulks[Unit](sys.error("Foo #39"), 128)(
             (_, _) => Cursor.Cont({}), Cursor.ContOnError[Unit](onError)).
-            recover({ case _ => count }) must beEqualTo(0).
+            map(_ => -1).recover({ case _ => count }) must beTypedEqualTo(0).
             await(2, delayedTimeout)
         }
 
@@ -272,12 +277,12 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
           val cursor = c.find(matchAll("cursorspec40")).batchSize(64).cursor()
 
           // Close connection to make the related cursor erroneous
-          con40.flatMap(_.close()(timeout)).map(_ => {}) must beEqualTo({}).
-            await(1, timeout) and {
+          con40.flatMap(_.close()(timeout)).
+            map(_ => {}) must beTypedEqualTo({}).await(1, timeout) and {
               cursor.foldBulks({}, 128)(
                 { (_, _) => Cursor.Cont({}) },
                 Cursor.ContOnError[Unit](onError)).
-                map(_ => count) must beEqualTo(1).await(2, delayedTimeout)
+                map(_ => count) must beTypedEqualTo(1).await(2, delayedTimeout)
             }
         }
       }
@@ -299,7 +304,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             cursor.foldWhileM({}, 128)(
               { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #44")) },
               Cursor.ContOnError[Unit](onError)).map(_ => count).
-              aka("folding") must beEqualTo(128).await(2, delayedTimeout)
+              aka("folding") must beTypedEqualTo(128).await(2, delayedTimeout)
 
           }
 
@@ -314,7 +319,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
 
             cursor.foldWhile[Unit](sys.error("Foo #45"), 128)(
               (_, _) => Cursor.Cont({}), Cursor.ContOnError[Unit](onError)).
-              recover({ case _ => count }) must beEqualTo(0).
+              map(_ => -1).recover { case _ => count } must beTypedEqualTo(0).
               await(2, delayedTimeout)
           }
 
@@ -335,11 +340,11 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
 
             // Close connection to make the related cursor erroneous
             con46.flatMap(_.close()(timeout)).
-              map(_ => {}) must beEqualTo({}).await(1, timeout) and {
+              map(_ => {}) must beTypedEqualTo({}).await(1, timeout) and {
                 cursor.foldWhileM({}, 64)(
                   (_, _) => Future.successful(Cursor.Cont({})),
                   Cursor.ContOnError[Unit](onError)).map(_ => count).
-                  aka("folding") must beEqualTo(1).await(1, timeout)
+                  aka("folding") must beTypedEqualTo(1).await(1, timeout)
 
               }
           }

@@ -44,10 +44,13 @@ object Compiler {
       val ver = scalaBinaryVersion.value
 
       if (ver == "2.12") {
-        Seq("-Ywarn-macros:after")
+        Seq(
+          "-Xmax-classfile-name", "128",
+          "-Ywarn-macros:after")
       } else if (ver != "2.11") { // 2.13
         Seq("-Wmacros:after")
       } else Seq(
+        "-Xmax-classfile-name", "128",
         "-Yconst-opt",
         "-Yclosure-elim",
         "-Ydead-code",
