@@ -1,0 +1,76 @@
+version: 2
+jobs:
+  build_osx:
+    macos:
+      xcode: 9.4.1
+
+    working_directory: ~/repo
+
+    environment:
+      CI_CATEGORY: UNIT_TESTS
+      OS_NAME: osx
+      TRAVIS_SCALA_VERSION: 2.11.12
+      REACTIVEMONGO_SHADED: false
+
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}
+          - v1-dependencies-
+
+      - run:
+          name: Foo
+          command: env && java -version
+
+      - save_cache:
+          paths:
+            - $HOME/.ivy2
+            - $HOME/.sbt
+            - $HOME/ssl
+            - $HOME/mongodb-linux-x86_64-amazon-3.2.10
+            - $HOME/mongodb-linux-x86_64-amazon-4.2.1
+          key: v1-dependencies-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}
+
+  build:
+    docker:
+      - image: circleci/openjdk:9-jdk
+
+    working_directory: ~/repo
+
+    environment:
+      CI_CATEGORY: UNIT_TESTS
+      TRAVIS_SCALA_VERSION: 2.12.11
+      REACTIVEMONGO_SHADED: false
+    
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}
+          - v1-dependencies-
+
+      - run:
+          name: Foo
+          command: env && java -version
+
+      - save_cache:
+          paths:
+            - $HOME/.ivy2
+            - $HOME/.sbt
+            - $HOME/ssl
+            - $HOME/mongodb-linux-x86_64-amazon-3.2.10
+            - $HOME/mongodb-linux-x86_64-amazon-4.2.1
+          key: v1-dependencies-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}
+
+      - store_test_results:
+          path: .
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - build
+      - test
