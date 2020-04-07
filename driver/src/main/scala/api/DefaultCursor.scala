@@ -94,7 +94,6 @@ private[reactivemongo] object DefaultCursor {
         if (lessThenV32) { (cursorId, ntr) =>
           GetMore(fullCollectionName, ntr, cursorId) -> BufferSequence.empty
         } else {
-          // TODO: re-check numberToReturn = 1
           val moreQry = query.copy(numberToSkip = 0, numberToReturn = 1)
           val collName = fullCollectionName.span(_ != '.')._2.tail
 

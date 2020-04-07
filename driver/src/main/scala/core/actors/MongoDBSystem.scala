@@ -259,7 +259,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       refreshAllJob.cancel()
 
       val ns = updateNodeSet(s"${parentEvent}$$Release")(_.updateAll { node =>
-        node._copy(connections = node.connected)
+        node.copy(connections = node.connected)
 
         // Only keep already connected connection:
         // - prevent to activate other connection
@@ -400,7 +400,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     }
   }
 
-  private final def authenticateNode(node: Node, auths: Set[Authenticate]): Node = node._copy(connections = node.connections.map {
+  private final def authenticateNode(node: Node, auths: Set[Authenticate]): Node = node.copy(connections = node.connections.map {
     case connection if (
       !connection.signaling &&
       connection.status == ConnectionStatus.Connected) =>
@@ -1022,7 +1022,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
           debug(s"Discard pending isMaster ping: used channel #${chanId} is disconnected")
 
-          n._copy(pingInfo = PingInfo())
+          n.copy(pingInfo = PingInfo())
         } else {
           n
         }
@@ -1032,7 +1032,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         // If there no longer established connection
         trace(s"Unset the node status on disconnect (#${chanId})")
 
-        node._copy(status = NodeStatus.Unknown)
+        node.copy(status = NodeStatus.Unknown)
       } else {
         node
       }
@@ -1152,7 +1152,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
               isMaster.maxBsonObjectSize,
               isMaster.maxWriteBatchSize)
 
-            val an = authenticating._copy(
+            val an = authenticating.copy(
               status = nodeStatus,
               pingInfo = pingInfo,
               tags = isMaster.replicaSet.map(_.tags).getOrElse(Map.empty),
@@ -1236,7 +1236,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
                 // invalidate node status on status conflict
                 warn(s"Invalid node status ${node.status} for ${node.name} (expected: ${n.status}); Fallback to Unknown status")
 
-                n._copy(status = NodeStatus.Unknown)
+                n.copy(status = NodeStatus.Unknown)
               } else n
             }
           }
@@ -1279,7 +1279,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
     updateNodeSet(st)(_.updateAll { node =>
       if (node.status != NodeStatus.Primary) node
-      else node._copy(status = NodeStatus.Unknown)
+      else node.copy(status = NodeStatus.Unknown)
     })
 
     broadcastMonitors(PrimaryUnavailable)
@@ -1363,7 +1363,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
                     authenticated = con.authenticated + auth),
                   nodeSet.authenticates)
               }) {
-                _._copy(authenticated = node.authenticated + auth)
+                _.copy(authenticated = node.authenticated + auth)
               }
 
             case _ => node.updateByChannelId(chanId)(
@@ -1549,7 +1549,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       case _ => {
         val cons = updated.reverse
 
-        n._copy(
+        n.copy(
           connections = cons,
           authenticated = cons.toSet.flatMap((_: Connection).authenticated))
       }
@@ -1611,14 +1611,14 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         debug(s"Prepares a fresh IsMaster request to ${node.toShortString} (channel #${con.channel.id}@${con.channel.localAddress})")
 
         new IsMasterRequest(
-          node = node._copy(pingInfo = renewedPingInfo),
+          node = node.copy(pingInfo = renewedPingInfo),
           f = sendFresh)
 
       } else if ((node.pingInfo.lastIsMasterTime + pingTimeout) < now) {
         // Unregister the pending requests for this node
         val wasPrimary = node.status == NodeStatus.Primary
 
-        val updated = node._copy(
+        val updated = node.copy(
           status = NodeStatus.Unknown,
           //connections = Vector.empty,
           authenticated = Set.empty,

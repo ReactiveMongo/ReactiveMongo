@@ -15,36 +15,19 @@ import reactivemongo.core.netty.ChannelFactory
 /**
  * @param name the main name of the node
  */
-private[reactivemongo] sealed class Node(
+private[reactivemongo] final class Node(
   val name: String,
   val aliases: Set[String],
-  @transient val status: NodeStatus,
-  @transient val connections: Vector[Connection],
-  @transient val authenticated: Set[Authenticated],
+  val status: NodeStatus,
+  val connections: Vector[Connection],
+  val authenticated: Set[Authenticated],
   val tags: Map[String, String],
   val protocolMetadata: ProtocolMetadata,
   val pingInfo: PingInfo,
   val isMongos: Boolean) {
 
-  def copy(
-    name: String = this.name,
-    aliases: Set[String] = this.aliases,
-    status: NodeStatus = this.status,
-    connections: Vector[Connection] = this.connections,
-    authenticated: Set[Authenticated] = this.authenticated,
-    tags: Map[String, String] = this.tags,
-    protocolMetadata: ProtocolMetadata = this.protocolMetadata,
-    pingInfo: PingInfo = this.pingInfo,
-    isMongos: Boolean = this.isMongos): Node = new Node(
-    name, aliases, status, connections, authenticated, tags,
-    protocolMetadata, pingInfo, isMongos)
-
-  def withAlias(as: String): Node =
-    new Node(name, aliases + as, status, connections, authenticated, tags,
-      protocolMetadata, pingInfo, isMongos)
-
   /** All the node names (including its aliases) */
-  def names: Set[String] = aliases + name
+  lazy val names: Set[String] = aliases + name
 
   val (host: String, port: Int) = {
     val splitted = name.span(_ != ':')
@@ -55,29 +38,29 @@ private[reactivemongo] sealed class Node(
     })
   }
 
-  @transient val connected: Vector[Connection] = connections.filter(c =>
+  val connected: Vector[Connection] = connections.filter(c =>
     !c.signaling && c.status == ConnectionStatus.Connected)
 
   /**
    * The [[connected]] connections with no required authentication,
    * or already authenticated (at least once).
    */
-  @transient val authenticatedConnections = RoundRobiner(
+  val authenticatedConnections = RoundRobiner(
     connected.filter(_.authenticated.forall { auth =>
       authenticated.exists(_ == auth)
     }))
 
-  private[reactivemongo] lazy val signaling: Option[Connection] =
+  lazy val signaling: Option[Connection] =
     connections.find(c => c.signaling && c.status == ConnectionStatus.Connected)
 
-  private[reactivemongo] def createSignalingConnection(
+  def createSignalingConnection(
     channelFactory: ChannelFactory,
     receiver: ActorRef): Try[Node] = signaling match {
     case Some(_) => Success(this)
 
     case _ =>
       createConnection(channelFactory, receiver, true).map { con =>
-        _copy(connections = con +: connections)
+        copy(connections = con +: connections)
       }
   }
 
@@ -91,7 +74,7 @@ private[reactivemongo] sealed class Node(
     if (count < upTo) {
       createChannels(
         channelFactory, receiver, upTo - count, Vector.empty).map { created =>
-        _copy(connections = connections ++ created)
+        copy(connections = connections ++ created)
       }
     } else Success(this)
   }
@@ -123,8 +106,11 @@ private[reactivemongo] sealed class Node(
         chan, ConnectionStatus.Connecting, Set.empty, None, signaling)
     }
 
-  // TODO#1.1: Remove when aliases is refactored
-  private[reactivemongo] def _copy(
+  def withAlias(as: String): Node =
+    new Node(name, aliases + as, status, connections, authenticated, tags,
+      protocolMetadata, pingInfo, isMongos)
+
+  def copy(
     name: String = this.name,
     status: NodeStatus = this.status,
     connections: Vector[Connection] = this.connections,
@@ -144,7 +130,7 @@ private[reactivemongo] sealed class Node(
       case conn if (conn.channel.id == id) => fc(conn)
     }
 
-    if (updated) fn(_copy(connections = updCons))
+    if (updated) fn(copy(connections = updCons))
     else this
   }
 
@@ -166,7 +152,7 @@ private[reactivemongo] sealed class Node(
 
   override def hashCode: Int = tupled.hashCode
 
-  private[reactivemongo] lazy val tupled = (name, status, connections,
+  lazy val tupled = (name, status, connections,
     authenticated, tags, protocolMetadata, pingInfo, isMongos)
 }
 
