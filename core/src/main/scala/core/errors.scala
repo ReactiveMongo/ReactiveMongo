@@ -17,10 +17,10 @@ package reactivemongo.core.errors
 
 import reactivemongo.api.SerializationPack
 
-import scala.util.control.NoStackTrace
-
 import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.bson.collection.BSONSerializationPack
+
+import scala.util.control.NoStackTrace
 
 /** An error that can come from a MongoDB node or not. */
 sealed trait ReactiveMongoException extends Exception {
@@ -171,7 +171,8 @@ private[reactivemongo] trait CommandError extends DatabaseException {
   /** error code */
   val code: Option[Int]
 
-  override def getMessage: String = s"CommandError['$message'" + code.fold("")(c => " (code = " + c + ")") + "]"
+  override def getMessage: String =
+    s"CommandError['$message'" + code.fold("")(" (code = " + _ + ')') + ']'
 }
 
 private[reactivemongo] object CommandError {
@@ -190,22 +191,8 @@ private[reactivemongo] object CommandError {
       val code = _code
       val message = _message
 
-      override def getMessage: String =
-        s"CommandError['$message'" + code.fold("")(c => " (code = " + c + ")") + "]" +
-          originalDocument.fold("")(repr => " with original document " + repr)
-    }
-
-  /**
-   * Checks if the given document contains a 'ok' field which value equals 1, and produces a command error if not.
-   *
-   * @param doc The document of the response.
-   * @param name The optional name of the command.
-   * @param error A function that takes the document of the response and the optional name of the command as arguments, and produces a command error.
-   */
-  def checkOk(
-    doc: BSONDocument, name: Option[String],
-    error: (BSONDocument, Option[String]) => CommandError = (doc, name) => CommandError("command " + name.fold("")(_ + " ") + "failed because the 'ok' field is missing or equals 0", Some(doc))): Option[CommandError] =
-    doc.booleanLike("ok").orElse(Some(false)).collect {
-      case false => error(doc, name)
+      override def getMessage: String = s"CommandError['$message'" +
+        code.fold("")(" (code = " + _ + ')') + ']' +
+        originalDocument.fold("")(" with original document " + _)
     }
 }

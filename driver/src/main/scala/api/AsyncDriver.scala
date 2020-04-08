@@ -40,12 +40,12 @@ import reactivemongo.core.nodeset.Authenticate
  * @param config a custom configuration (otherwise the default options are used)
  * @param classLoader a classloader used to load the actor system
  *
- * @define parsedURIParam the URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+ * @define parsedURIParam the URI parsed by [[reactivemongo.api.MongoConnection.fromString]]
  * @define connectionNameParam the name for the connection pool
  * @define optionsParam the options for the new connection pool
  * @define nodesParam The list of node names (e.g. ''node1.foo.com:27017''); Port is optional (27017 is used by default)
  * @define authParam the list of authentication instructions
- * @define uriStrictParam the strict URI, that will be parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+ * @define uriStrictParam the strict URI, that will be parsed by [[reactivemongo.api.MongoConnection.fromString]]
  */
 final class AsyncDriver(
   protected val config: Option[Config] = None,
@@ -187,7 +187,7 @@ final class AsyncDriver(
   /**
    * Creates a new MongoConnection from URI.
    *
-   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.fromString]]
    * @param name $connectionNameParam
    *
    * {{{
@@ -205,7 +205,7 @@ final class AsyncDriver(
   /**
    * Creates a new MongoConnection from URI.
    *
-   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.parseURI]]
+   * @param parsedURI The URI parsed by [[reactivemongo.api.MongoConnection.fromString]]
    * @param name $connectionNameParam
    * @param strictMode the flag to indicate whether the given URI must be a strict one (no ignored/invalid options)
    *

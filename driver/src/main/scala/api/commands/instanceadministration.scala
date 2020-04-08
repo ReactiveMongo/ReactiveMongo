@@ -53,7 +53,6 @@ private[api] object RenameCollection {
 
 private[api] case class Create(
   capped: Option[Capped] = None, // if set, "capped" -> true, size -> <int>, max -> <int>
-  autoIndexId: Boolean = true, // optional
   flags: Int = 1 // defaults to 1
 ) extends CollectionCommand with CommandWithResult[UnitBox.type]
 
@@ -66,10 +65,6 @@ private[api] object CreateCollection {
       val elms = Seq.newBuilder[pack.ElementProducer]
 
       elms += element("create", builder.string(create.collection))
-
-      if (create.command.autoIndexId) {
-        elms += element("autoIndexId", boolean(create.command.autoIndexId))
-      }
 
       create.command.capped.foreach { capped =>
         elms += element("capped", boolean(true))

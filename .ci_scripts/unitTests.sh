@@ -66,4 +66,4 @@ TEST_ARGS="$TEST_ARGS -- include unit"
 
 sed -e 's/"-deprecation", //' < project/Driver.scala > .tmp && mv .tmp project/Driver.scala
 
-sbt ++$SCALA_VERSION "$TEST_ARGS"
+sbt ++$SCALA_VERSION "$TEST_ARGS; doc"

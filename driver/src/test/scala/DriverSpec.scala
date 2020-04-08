@@ -22,12 +22,12 @@ import reactivemongo.core.actors.Exceptions.{
 }
 
 import reactivemongo.core.protocol.ProtocolMetadata
-import reactivemongo.core.commands.{
+
+import reactivemongo.api.commands.{
+  DBUserRole,
   FailedAuthentication,
   SuccessfulAuthentication
 }
-
-import reactivemongo.api.commands.DBUserRole
 
 import org.specs2.concurrent.ExecutionEnv
 

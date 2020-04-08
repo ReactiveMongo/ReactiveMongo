@@ -2,12 +2,6 @@ package reactivemongo.api.commands
 
 import reactivemongo.api.SerializationPack
 
-import reactivemongo.core.commands.{
-  FailedAuthentication,
-  AuthenticationResult,
-  VerboseSuccessfulAuthentication
-}
-
 /**
  * Getnonce Command for Mongo CR authentication.
  *

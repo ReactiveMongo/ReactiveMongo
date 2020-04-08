@@ -23,14 +23,13 @@ import reactivemongo.core.protocol.MongoWireVersion
 
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.core.commands.SuccessfulAuthentication
-
 import reactivemongo.api.commands.{
   Command,
   CommandError,
   EndSessions,
   StartSession,
   StartSessionResult,
+  SuccessfulAuthentication,
   EndTransaction
 }
 

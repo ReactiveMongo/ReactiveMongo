@@ -40,7 +40,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    * }}}
    */
   final def create()(implicit ec: ExecutionContext): Future[Unit] =
-    command.unboxed(self, Create(None, false), ReadPreference.primary)
+    command.unboxed(self, Create(None), ReadPreference.primary)
 
   /**
    * $createDescription.
@@ -56,7 +56,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *
    * @param failsIfExists if true fails if the collection already exists (default: false)
    */
-  final def create(failsIfExists: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, Create(None, false), ReadPreference.primary).recover {
+  final def create(failsIfExists: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, Create(None), ReadPreference.primary).recover {
     case CommandError.Code(48 /* already exists */ ) if !failsIfExists => ()
 
     case CommandError.Message(
@@ -79,17 +79,15 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *
    * @param size $cappedSizeParam
    * @param maxDocuments $cappedMaxParam
-   * @param autoIndexId $autoIndexIdParam
    *
    * @see [[convertToCapped]]
    */
   final def createCapped(
     size: Long,
-    maxDocuments: Option[Int],
-    autoIndexId: Boolean = false)(implicit ec: ExecutionContext): Future[Unit] =
+    maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] =
     command.unboxed(
       self,
-      Create(Some(new Capped(size, maxDocuments)), autoIndexId),
+      Create(Some(new Capped(size, maxDocuments))),
       ReadPreference.primary)
 
   /**

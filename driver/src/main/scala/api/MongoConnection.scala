@@ -43,7 +43,8 @@ import reactivemongo.core.actors.{
   SetUnavailable
 }
 import reactivemongo.core.nodeset.Authenticate
-import reactivemongo.core.commands.SuccessfulAuthentication
+
+import reactivemongo.api.commands.SuccessfulAuthentication
 
 import reactivemongo.util, util.{ LazyLogger, SRVRecordResolver, TXTResolver }
 
@@ -53,7 +54,7 @@ private[api] case class ConnectionState(
   isMongos: Boolean)
 
 /**
- * A pool of MongoDB connections, obtained from a [[reactivemongo.api.MongoDriver]].
+ * A pool of MongoDB connections, obtained from a [[reactivemongo.api.AsyncDriver]].
  *
  * Connection here does not mean that there is one open channel to the server:
  * behind the scene, many connections (channels) are open on all the available servers in the replica set.

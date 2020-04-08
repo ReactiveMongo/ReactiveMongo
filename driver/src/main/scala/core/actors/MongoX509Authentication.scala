@@ -2,9 +2,11 @@ package reactivemongo.core.actors
 
 import reactivemongo.api.ReadPreference
 
-import reactivemongo.api.commands.{ Command, X509Authenticate }
-
-import reactivemongo.core.commands.AuthenticationResult
+import reactivemongo.api.commands.{
+  AuthenticationResult,
+  Command,
+  X509Authenticate
+}
 
 import reactivemongo.core.nodeset.{
   Authenticate,

@@ -1,42 +1,9 @@
-package reactivemongo.core.commands
+package reactivemongo.api.commands
 
 import reactivemongo.api.SerializationPack
 
-import reactivemongo.api.bson.{ BSONDocument, BSONInteger, BSONString }
-import reactivemongo.api.bson.collection.BSONSerializationPack
-
 import reactivemongo.core.protocol.Response
-import reactivemongo.core.errors.CommandError
-
-// TODO: Refactor or remove
-
-private[core] case class X509Authenticate(user: Option[String])
-  extends Command[SuccessfulAuthentication] {
-
-  private val userNameDocument = user.fold(BSONDocument.empty) { name =>
-    BSONDocument("user" -> BSONString(name))
-  }
-
-  override def makeDocuments = BSONDocument(
-    "authenticate" -> BSONInteger(1),
-    "mechanism" -> BSONString("MONGODB-X509")) ++ userNameDocument
-
-  override val ResultMaker = X509Authenticate
-}
-
-private[core] object X509Authenticate extends BSONCommandResultMaker[SuccessfulAuthentication] {
-  def parseResponse(response: Response): Either[CommandError, SuccessfulAuthentication] = apply(response)
-
-  def apply(document: BSONDocument) = {
-    CommandError.checkOk(document, Some("authenticate"), (doc, _) => {
-      FailedAuthentication(BSONSerializationPack)(
-        doc.string("errmsg").getOrElse(""),
-        doc.int("code"),
-        Some(doc))
-
-    }).toLeft(SilentSuccessfulAuthentication)
-  }
-}
+import reactivemongo.core.errors.{ CommandError => CmdErr }
 
 /** An authentication result */
 sealed trait AuthenticationResult
@@ -65,7 +32,7 @@ private[reactivemongo] case class VerboseSuccessfulAuthentication(
  * A failed authentication result
  */
 sealed abstract class FailedAuthentication
-  extends CommandError with AuthenticationResult {
+  extends CmdErr with AuthenticationResult {
 
   /** The explanation of the error */
   def message: String = "<error>"
@@ -95,7 +62,7 @@ private[reactivemongo] object AuthenticationResult {
 
   def parse[P <: SerializationPack](
     pack: P,
-    resp: Response)(reader: pack.Reader[AuthenticationResult]): Either[CommandError, SuccessfulAuthentication] = try {
+    resp: Response)(reader: pack.Reader[AuthenticationResult]): Either[CmdErr, SuccessfulAuthentication] = try {
     pack.readAndDeserialize(resp, reader) match {
       case failed: FailedAuthentication =>
         Left(failed)
@@ -105,6 +72,6 @@ private[reactivemongo] object AuthenticationResult {
     }
   } catch {
     case NonFatal(error) =>
-      Left(CommandError(pack)(error.getMessage, None, None))
+      Left(CmdErr(pack)(error.getMessage, None, None))
   }
 }

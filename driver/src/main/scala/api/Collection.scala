@@ -16,7 +16,7 @@
 package reactivemongo.api
 
 /**
- * Basic information resolved for a MongoDB Collection, resolved from a [[reactivemongo.api.DefaultDB]].
+ * Basic information resolved for a MongoDB Collection, resolved from a [[reactivemongo.api.DB]].
  *
  * For collection operations, you should consider the generic API
  * ([[reactivemongo.api.collections.GenericCollection]]).

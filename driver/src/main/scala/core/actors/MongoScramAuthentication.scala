@@ -10,14 +10,12 @@ import reactivemongo.api.{
   SerializationPack
 }
 
-import reactivemongo.core.commands.{
-  FailedAuthentication,
-  SuccessfulAuthentication
-}
 import reactivemongo.core.errors.CommandError
 
 import reactivemongo.api.commands.{
   Command,
+  FailedAuthentication,
+  SuccessfulAuthentication,
   ScramFinalNegociation,
   ScramInitiate,
   ScramNegociation,

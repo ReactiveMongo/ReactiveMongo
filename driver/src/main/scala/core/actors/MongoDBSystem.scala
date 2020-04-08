@@ -59,7 +59,7 @@ import reactivemongo.core.protocol.{
   Response,
   ProtocolMetadata
 }
-import reactivemongo.core.commands.{
+import reactivemongo.api.commands.{
   FailedAuthentication,
   SuccessfulAuthentication
 }

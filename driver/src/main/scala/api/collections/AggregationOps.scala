@@ -45,9 +45,6 @@ private[collections] trait AggregationOps[P <: SerializationPack] {
 
   // ---
 
-  /**
-   * @see [[reactivemongo.api.commands.AggregationFramework.PipelineOperator]]
-   */
   final class AggregatorContext[T] private[reactivemongo] (
     val firstOperator: PipelineOperator,
     val otherOperators: List[PipelineOperator],

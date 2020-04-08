@@ -47,7 +47,7 @@ trait GenericCollectionProducer[P <: SerializationPack, +C <: GenericCollection[
  * @define selectorParam the document selector
  * @define swriterParam the writer for the selector
  * @define selectorTParam The type of the selector. An implicit `Writer[S]` typeclass for handling it has to be in the scope.
- * @define returnQueryBuilder A [[GenericQueryBuilder]] that you can use to to customize the query. You can obtain a cursor by calling the method [[reactivemongo.api.Cursor]] on this query builder.
+ * @define returnQueryBuilder A query builder you can use to customize the query. You can obtain a cursor by calling the method [[reactivemongo.api.Cursor]] on this query builder.
  * @define implicitWriterT An implicit `Writer[T]` typeclass for handling it has to be in the scope
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
