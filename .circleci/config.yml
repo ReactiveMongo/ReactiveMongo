@@ -1,0 +1,114 @@
+version: 2.1
+
+commands:
+  setup_sbt:
+    description: Get and install SBT
+    parameters:
+      sbt_version:
+        type: string
+        default: "1.3.9"
+    steps:
+      - restore_cache:
+          keys:
+            - sbt-{{ arch }}-{{ checksum "project/build.properties" }}
+
+      - run:
+          name: Setup SBT
+          command: |
+                    if [ ! -x ~/sbt/bin/sbt ]; then
+                      cd ~/
+                      curl --silent -L -o sbt.tgz https://piccolo.link/sbt-<< parameters.sbt_version >>.tgz
+                      tar -xzvf sbt.tgz && rm -f sbt.tgz
+                    fi
+
+      - save_cache:
+          paths:
+            - ~/sbt
+          key: sbt-{{ arch }}-{{ checksum "project/build.properties" }}
+
+  build_n_tests:
+    description: Build & Run tests
+    steps:
+      - restore_cache:
+          keys:
+            - scala-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.REACTIVEMONGO_SHADED }}-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}
+
+      - run:
+          name: Build & Run tests
+          command: |
+                    export PATH=$PATH:~/sbt/bin
+                    export USER=`basename $HOME`
+                    
+                    ./.ci_scripts/retry.sh 3 \
+                      ./.ci_scripts/validate.sh /tmp/integration-env.sh
+
+      - save_cache:
+          paths:
+            - ~/.sbt
+            - ~/.ivy2
+            - ~/.coursier/cache
+            - ~/Library/Caches/Coursier
+          key: scala-{{ .Environment.CIRCLE_JOB }}-{{ .Environment.REACTIVEMONGO_SHADED }}-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}
+
+  collect_test_reports:
+    description: Collect test reports
+    steps:
+      - run:
+          name: Collect test report
+          command: |
+                    mkdir test-reports
+                    find . -path '*/test-reports/*' -name '*.xml' \
+                      -print -exec cp {} test-reports \;
+          when: always
+
+jobs:
+  unit_osx_jdk8_scala211:
+    macos:
+      xcode: 9.4.1
+
+    working_directory: ~/repo
+
+    environment:
+      OS_NAME: osx
+      CI_CATEGORY: UNIT_TESTS
+      SCALA_VERSION: 2.11.12
+      REACTIVEMONGO_SHADED: false
+
+    steps:
+      - checkout
+      - setup_sbt
+      - build_n_tests
+
+      - collect_test_reports
+      - store_test_results:
+          path: test-reports
+
+  unit_linux_openjdk9_scala212:
+    docker:
+      - image: circleci/openjdk:9-jdk
+
+    working_directory: ~/repo
+
+    environment:
+      CI_CATEGORY: UNIT_TESTS
+      SCALA_VERSION: 2.12.11
+    
+    steps:
+      - checkout
+      - setup_sbt
+      - build_n_tests
+
+      - collect_test_reports
+      - store_test_results:
+          path: test-reports
+
+workflows:
+  version: 2
+
+  unit_test_osx:
+    jobs:
+      - unit_osx_jdk8_scala211
+
+  unit_test_linux:
+    jobs:
+      - unit_linux_openjdk9_scala212

@@ -1,7 +1,6 @@
 import sbt._
 import sbt.Keys._
 
-import com.typesafe.tools.mima.plugin.MimaPlugin.mimaDefaultSettings
 import com.typesafe.tools.mima.plugin.MimaKeys.{
   mimaBinaryIssueFilters, mimaPreviousArtifacts
 }
@@ -28,7 +27,7 @@ object Publish {
     case _ => true
   }
 
-  val mimaSettings = mimaDefaultSettings ++ Seq(
+  val mimaSettings = Seq(
     mimaPreviousArtifacts := Set.empty, // TODO
     mimaBinaryIssueFilters ++= Seq(missingMethodInOld))
 
