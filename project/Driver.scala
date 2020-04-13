@@ -11,8 +11,6 @@ import sbt.Keys._
 
 import com.typesafe.tools.mima.plugin.MimaKeys.mimaBinaryIssueFilters
 
-import com.github.sbt.cpd.CpdPlugin
-
 import com.github.sbt.findbugs.FindbugsKeys.findbugsAnalyzedPath
 
 final class Driver(
@@ -25,7 +23,6 @@ final class Driver(
   import XmlUtil._
 
   lazy val module = Project("ReactiveMongo", file("driver")).
-    enablePlugins(CpdPlugin).
     settings(Findbugs.settings ++ Seq(
         unmanagedSourceDirectories in Compile ++= {
           val v = scalaBinaryVersion.value

@@ -1,8 +1,6 @@
 import sbt._
 import sbt.Keys._
 
-import com.github.sbt.cpd.CpdPlugin
-
 class Bson() {
   import Dependencies._
 
@@ -20,7 +18,6 @@ class Bson() {
   }
 
   lazy val module = Project("ReactiveMongo-BSON", file("bson")).
-    enablePlugins(CpdPlugin).
     settings(Findbugs.settings ++ Seq(
       libraryDependencies ++= shaded.value ++ Seq(
         specs.value,

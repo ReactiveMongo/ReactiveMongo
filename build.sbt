@@ -1,7 +1,6 @@
 lazy val `ReactiveMongo-BSON` = new Bson().module
 
 lazy val `ReactiveMongo-BSON-Macros` = project.in(file("macros")).
-  enablePlugins(CpdPlugin).
   dependsOn(`ReactiveMongo-BSON`).
   settings(Findbugs.settings ++ Seq(
     mimaBinaryIssueFilters += {
@@ -48,7 +47,6 @@ lazy val `ReactiveMongo-BSON-Compat` = project.in(file("bson-compat")).
   )).dependsOn(`ReactiveMongo-BSON`)
 
 lazy val `ReactiveMongo-Core` = project.in(file("core")).
-  enablePlugins(CpdPlugin).
   dependsOn(`ReactiveMongo-BSON` % Provided).
   settings(
     Findbugs.settings ++ Seq(
@@ -83,7 +81,7 @@ lazy val `ReactiveMongo` = new Driver(
 def docSettings = Documentation(excludes = Seq.empty).settings
 
 lazy val `ReactiveMongo-Root` = project.in(file(".")).
-  enablePlugins(ScalaUnidocPlugin, CpdPlugin).
+  enablePlugins(ScalaUnidocPlugin).
   settings(docSettings ++
     Travis.settings ++ Seq(
       publishArtifact := false,
