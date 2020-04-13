@@ -84,9 +84,9 @@ object Common extends AutoPlugin {
   )
 
   override def projectSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
-    scalaVersion := "2.12.10",
+    scalaVersion := "2.12.11",
     crossScalaVersions := Seq(
-      "2.10.7", scala211, scalaVersion.value, "2.13.1"),
+      scala211, scalaVersion.value, "2.13.1"),
     crossVersion := CrossVersion.binary,
     useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
     target := {
