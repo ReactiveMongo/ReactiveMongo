@@ -105,12 +105,12 @@ trait CollectionMetaSpec { collSpec: CollectionSpec =>
     val name1 = s"collection_one${System identityHashCode doc}"
     val name2 = s"collection_two${System identityHashCode doc}"
 
-    def i1 = db2(name1).insert.one(doc).map(_.ok)
+    def i1 = db2(name1).insert.one(doc).map(_.n)
 
-    def i2 = db2(name2).insert.one(doc).map(_.ok)
+    def i2 = db2(name2).insert.one(doc).map(_.n)
 
-    i1 aka "insert #1" must beTrue.await(1, timeout) and {
-      i2 aka "insert #2" must beTrue.await(1, timeout)
+    i1 aka "insert #1" must beTypedEqualTo(1).await(1, timeout) and {
+      i2 aka "insert #2" must beTypedEqualTo(1).await(1, timeout)
     } and {
       db2.collectionNames must contain(atLeast(name1, name2)).await(2, timeout)
       // ... as the concurrent tests could create other collections

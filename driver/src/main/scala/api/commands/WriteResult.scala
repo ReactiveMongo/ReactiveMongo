@@ -8,7 +8,7 @@ import reactivemongo.core.errors.DatabaseException
 
 sealed trait WriteResult {
   /** The status of the write operation */
-  def ok: Boolean
+  protected[reactivemongo] def ok: Boolean
 
   /** The number of selected documents  */
   def n: Int
@@ -71,7 +71,7 @@ private[reactivemongo] trait LastErrorFactory[P <: SerializationPack] {
   _: UpsertedFactory[P] =>
 
   private[reactivemongo] final class LastError(
-    val ok: Boolean,
+    protected[reactivemongo] val ok: Boolean,
     val errmsg: Option[String],
     val code: Option[Int],
     val lastOp: Option[Long],
@@ -188,7 +188,7 @@ final class WriteConcernError private[api] (
 }
 
 private[reactivemongo] case class DefaultWriteResult(
-  ok: Boolean,
+  protected[reactivemongo] val ok: Boolean,
   n: Int,
   writeErrors: Seq[WriteError],
   writeConcernError: Option[WriteConcernError],
@@ -217,7 +217,7 @@ private[reactivemongo] trait UpdateWriteResultFactory[P <: SerializationPack] {
    * @param upserted the upserted documents
    */
   final class UpdateWriteResult private[api] (
-    val ok: Boolean,
+    protected[reactivemongo] val ok: Boolean,
     val n: Int,
     val nModified: Int,
     val upserted: Seq[Upserted],

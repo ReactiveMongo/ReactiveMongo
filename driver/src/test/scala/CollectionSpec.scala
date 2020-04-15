@@ -82,15 +82,14 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
       implicit val writer = PersonWriter
 
       "with insert" in {
-        collection.insert.
-          one(person).map(_.ok) must beTrue.await(1, timeout) and {
+        collection.insert.one(person).
+          map(_ => {}) must beTypedEqualTo({}).await(1, timeout) and {
             val coll = slowColl.withReadPreference(ReadPreference.secondary)
 
             coll.readPreference must_=== ReadPreference.secondary and {
               // Anyway use ReadPreference.Primary for insert op
-              coll.insert.one(person2).map { r =>
-                r.ok -> r.n
-              } must beTypedEqualTo(true -> 1).await(1, timeout)
+              coll.insert.one(person2).
+                map(_.n) must beTypedEqualTo(1).await(1, timeout)
             }
           } and {
             slowColl.find(BSONDocument.empty).cursor[BSONDocument]().

@@ -144,7 +144,8 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
     "insert a weird doc" in {
       val doc = BSONDocument("coucou" -> BSONString("coucou"), "plop" -> BSONInteger(1), "plop" -> BSONInteger(2))
 
-      collection.insert.one(doc).map(_.ok) must beTrue.await(1, timeout)
+      collection.insert.one(doc).
+        map(_ => {}) must beTypedEqualTo({}).await(1, timeout)
     }
 
     "find this weird doc" in {

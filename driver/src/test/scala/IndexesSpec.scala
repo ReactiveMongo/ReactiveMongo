@@ -237,13 +237,13 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
         unique = true,
         partialFilter = Some(BSONDocument(
           "age" -> BSONDocument(f"$$gte" -> 21))))).
-        map(_.ok) must beTrue.awaitFor(timeout)
+        map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
     }
 
     "not have duplicate fixtures" in {
       @com.github.ghik.silencer.silent("fold")
-      def spec = Future.fold(fixturesInsert)(false) { (inserted, res) =>
-        if (res.ok) true else inserted
+      def spec = Future.fold(fixturesInsert)(false) { (inserted, _) =>
+        inserted
       }.recover {
         case err: DatabaseException => !err.code.exists(_ == 11000)
         case _                      => true
