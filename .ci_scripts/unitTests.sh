@@ -10,6 +10,8 @@ if [ `git grep "$SCRIPT_DIR" $(basename "$SCRIPT_DIR") | grep -v $(basename $0) 
   exit 2
 fi
 
+sbt ++$SCALA_VERSION update
+
 if [ "$SCALA_VERSION" = "2.11.12" ]; then
     echo "[INFO] Check the source format and backward compatibility"
 
