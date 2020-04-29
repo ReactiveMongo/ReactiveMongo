@@ -52,8 +52,8 @@ object BSONSerializationPack
   private[reactivemongo] val IsDocument = implicitly[ClassTag[BSONDocument]]
   private[reactivemongo] val IsValue = implicitly[ClassTag[BSONValue]]
 
-  val IdentityReader: Reader[Document] = BSONDocumentIdentity
-  val IdentityWriter: Writer[Document] = BSONDocumentIdentity
+  lazy val IdentityReader: Reader[Document] = bsonDocumentReader
+  lazy val IdentityWriter: Writer[Document] = bsonDocumentWriter
 
   def serialize[A](a: A, writer: Writer[A]): Document =
     writer.writeTry(a) match {
