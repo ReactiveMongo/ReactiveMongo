@@ -38,8 +38,7 @@ import reactivemongo.api.bson._
 import reactivemongo.api.bson.compat.ValueConverters
 
 /** The default serialization pack. */
-object BSONSerializationPack
-  extends SerializationPack with DefaultBSONHandlers { self =>
+object BSONSerializationPack extends SerializationPack { self =>
 
   type Value = BSONValue
   type ElementProducer = reactivemongo.api.bson.ElementProducer
