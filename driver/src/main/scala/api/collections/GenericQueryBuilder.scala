@@ -402,7 +402,7 @@ trait GenericQueryBuilder[P <: SerializationPack] extends QueryOps {
    * import reactivemongo.api.bson.collection.BSONCollection
    *
    * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).
-   *   maxTimeMs(1000L/* 1s */)
+   *   maxTimeMs(1000L) // 1s
    * }}}
    */
   def maxTimeMs(p: Long): Self = copy(maxTimeMsOption = Some(p))
