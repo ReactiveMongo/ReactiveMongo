@@ -39,7 +39,8 @@ import reactivemongo.api.{
 import reactivemongo.api.commands.CommandCodecs
 
 /** Query build factory */
-private[reactivemongo] trait QueryBuilderFactory[P <: SerializationPack] extends HintFactory[P] { self: PackSupport[P] =>
+trait QueryBuilderFactory[P <: SerializationPack]
+  extends HintFactory[P] { self: PackSupport[P] =>
 
   import GenericQueryBuilder.logger
 

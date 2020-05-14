@@ -218,6 +218,31 @@ trait GenericCollection[P <: SerializationPack]
     prepareInsert(ordered, writeConcern, false)
 
   /**
+   * Returns an ordered builder for insert operations.
+   *
+   * @tparam T The type of the document to insert. $implicitWriterT.
+   * @param writeConcern $writeConcernParam
+   *
+   * {{{
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.WriteConcern
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def one(coll: BSONCollection, singleDoc: BSONDocument)(
+   *   implicit ec: ExecutionContext) =
+   *   coll.insert(writeConcern = WriteConcern.Default).one(singleDoc)
+   *
+   * def many(coll: BSONCollection, multiInserts: Iterable[BSONDocument])(
+   *   implicit ec: ExecutionContext) =
+   *   coll.insert(writeConcern = WriteConcern.Default).many(multiInserts)
+   * }}}
+   */
+  def insert(writeConcern: WriteConcern): InsertBuilder =
+    prepareInsert(false, writeConcern, false)
+
+  /**
    * Returns a builder for insert operations.
    *
    * @tparam T The type of the document to insert. $implicitWriterT.
@@ -310,6 +335,30 @@ trait GenericCollection[P <: SerializationPack]
    */
   def update(ordered: Boolean): UpdateBuilder =
     prepareUpdate(ordered, writeConcern, false)
+
+  /**
+   * Returns an ordered update builder.
+   *
+   * {{{
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.WriteConcern
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def orderedUpdate(
+   *   coll: BSONCollection,
+   *   query: BSONDocument,
+   *   update: BSONDocument,
+   *   wc: WriteConcern
+   * )(implicit ec: ExecutionContext) =
+   *   coll.update(writeConcern = wc).one(query, update)
+   * }}}
+   *
+   * @param writeConcern $writeConcernParam
+   */
+  def update(writeConcern: WriteConcern): UpdateBuilder =
+    prepareUpdate(true, writeConcern, false)
 
   /**
    * Returns an update builder.

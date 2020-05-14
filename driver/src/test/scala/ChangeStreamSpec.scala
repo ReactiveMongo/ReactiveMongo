@@ -12,6 +12,7 @@ import reactivemongo.api.bson.collection.BSONCollection
 import reactivemongo.core.protocol.MongoWireVersion
 
 import tests.Common.timeout
+
 import util.BsonMatchers._
 import util.WithTemporaryCollection._
 import util.{ MongoSkips, WithTemporaryDb }
@@ -235,7 +236,7 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
   @inline private def skipIfNotRSAndNotVersionAtLeast[R: AsResult](version: MongoWireVersion)(r: => R) = skippedIf(isNotReplicaSet, isNotAtLeast(db, version))(r)
 
   // head will always fail on a changeStream cursor, so we need to fold a single element
-  private def foldOne[T](cursor: Cursor.WithOps[T]): Future[T] = {
+  private def foldOne[T](cursor: Cursor.WithOps[T]): Future[T] =
     cursor.collect[List](maxDocs = 1, Cursor.FailOnError()).flatMap { result =>
       result.headOption match {
         case Some(value) => Future.successful(value)
@@ -243,7 +244,6 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
 
       }
     }
-  }
 
   private def delayBy[T](duration: FiniteDuration)(f: => Future[T]): Future[T] = {
     val promise = Promise[T]()
