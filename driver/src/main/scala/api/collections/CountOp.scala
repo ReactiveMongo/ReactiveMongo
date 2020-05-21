@@ -89,7 +89,7 @@ private[api] trait CountOp[P <: SerializationPack] {
   private def resultReader: pack.Reader[Long] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandErrorsReader(pack) {
+    CommandCodecs.dealingWithGenericCommandExceptionsReader(pack) {
       decoder.long(_, "n").get
     }
   }

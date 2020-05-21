@@ -1,7 +1,7 @@
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.WriteConcern
-import reactivemongo.api.commands.CommandError
+import reactivemongo.api.commands.CommandException
 
 import reactivemongo.api.bson.BSONDocument
 
@@ -256,7 +256,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
       }
 
       future.map(_ => Option.empty[Int]).recover {
-        case CommandError.Code(c) =>
+        case CommandException.Code(c) =>
           //e.printStackTrace
           Some(c)
       } must beSome( /*code = */ 9).await(1, timeout)

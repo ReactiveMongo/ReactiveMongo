@@ -69,7 +69,7 @@ trait DatabaseException extends ReactiveMongoException {
 }
 
 private[reactivemongo] object DatabaseException {
-  def apply(cause: Throwable): DatabaseException = new Default(cause)
+  def apply(cause: Throwable): DatabaseException = new DefaultException(cause)
 
   def apply[P <: SerializationPack](pack: P)(doc: pack.Document): DatabaseException = new DatabaseException with NoStackTrace {
     private lazy val decoder = pack.newDecoder
@@ -86,7 +86,9 @@ private[reactivemongo] object DatabaseException {
 
   // ---
 
-  private final class Default(val cause: Throwable) extends DatabaseException {
+  private final class DefaultException(
+    val cause: Throwable) extends DatabaseException {
+
     val originalDocument = Option.empty[Nothing]
     val code = Option.empty[Int]
     val message = s"${cause.getClass.getName}: ${cause.getMessage}"
@@ -112,19 +114,20 @@ private[reactivemongo] final class GenericDriverException(
       false
   }
 
+  @SuppressWarnings(Array("NullParameter"))
   override def hashCode: Int = if (message == null) -1 else message.hashCode
 
   override def toString = s"GenericDriverException($message)"
 }
 
-private[reactivemongo] final class ConnectionNotInitialized(
+private[reactivemongo] final class ConnectionNotInitializedException(
   val message: String,
   override val cause: Throwable) extends DriverException {
 
   override lazy val hashCode = (message -> cause).hashCode
 
   override def equals(that: Any): Boolean = that match {
-    case x: ConnectionNotInitialized =>
+    case x: ConnectionNotInitializedException =>
       (message -> cause) == (x.message -> x.cause)
 
     case _ => false
@@ -143,6 +146,7 @@ private[reactivemongo] final class ConnectionException(
       false
   }
 
+  @SuppressWarnings(Array("NullParameter"))
   override def hashCode: Int = if (message == null) -1 else message.hashCode
 
   override def toString = s"ConnectionException($message)"
@@ -167,31 +171,31 @@ private[reactivemongo] final class GenericDatabaseException(
 }
 
 /** A generic command error. */
-private[reactivemongo] trait CommandError extends DatabaseException {
+private[reactivemongo] trait CommandException extends DatabaseException {
   /** error code */
   val code: Option[Int]
 
   override def getMessage: String =
-    s"CommandError['$message'" + code.fold("")(" (code = " + _ + ')') + ']'
+    s"CommandException['$message'" + code.fold("")(" (code = " + _ + ')') + ']'
 }
 
-private[reactivemongo] object CommandError {
+private[reactivemongo] object CommandException {
   @inline def apply(
     message: String,
     originalDocument: Option[BSONDocument] = None,
-    code: Option[Int] = None): CommandError =
-    CommandError(BSONSerializationPack)(message, originalDocument, code)
+    code: Option[Int] = None): CommandException =
+    CommandException(BSONSerializationPack)(message, originalDocument, code)
 
   def apply[P <: SerializationPack](pack: P)(
     _message: String,
     _originalDocument: Option[pack.Document],
-    _code: Option[Int]): CommandError =
-    new CommandError {
+    _code: Option[Int]): CommandException =
+    new CommandException {
       lazy val originalDocument = _originalDocument.map(pack.pretty)
       val code = _code
       val message = _message
 
-      override def getMessage: String = s"CommandError['$message'" +
+      override def getMessage: String = s"CommandException['$message'" +
         code.fold("")(" (code = " + _ + ')') + ']' +
         originalDocument.fold("")(" with original document " + _)
     }

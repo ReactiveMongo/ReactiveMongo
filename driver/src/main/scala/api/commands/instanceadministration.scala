@@ -138,7 +138,7 @@ private[api] object ListCollectionNames
   def reader[P <: SerializationPack](pack: P): pack.Reader[CollectionNames] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, CollectionNames](pack) { doc =>
+    CommandCodecs.dealingWithGenericCommandExceptionsReader[pack.type, CollectionNames](pack) { doc =>
       (for {
         cr <- decoder.child(doc, "cursor")
         fb = decoder.children(cr, "firstBatch")
@@ -277,7 +277,7 @@ private[reactivemongo] object ReplSetGetStatus
   def reader[P <: SerializationPack](pack: P): pack.Reader[ReplSetStatus] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, ReplSetStatus](pack) { doc =>
+    CommandCodecs.dealingWithGenericCommandExceptionsReader[pack.type, ReplSetStatus](pack) { doc =>
       (for {
         name <- decoder.string(doc, "set")
         time <- decoder.long(doc, "date")

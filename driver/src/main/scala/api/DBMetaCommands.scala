@@ -224,7 +224,7 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
   }
 
   private implicit lazy val pingReader: pack.Reader[Boolean] =
-    CommandCodecs.dealingWithGenericCommandErrorsReader[Pack, Boolean](internalSerializationPack) { _ => true }
+    CommandCodecs.dealingWithGenericCommandExceptionsReader[Pack, Boolean](internalSerializationPack) { _ => true }
 
   /**
    * Tests if the server, resolved according to the given read preference, responds to commands.

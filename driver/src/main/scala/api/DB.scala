@@ -25,7 +25,7 @@ import reactivemongo.core.errors.GenericDriverException
 
 import reactivemongo.api.commands.{
   Command,
-  CommandError,
+  CommandException,
   EndSessions,
   StartSession,
   StartSessionResult,
@@ -331,7 +331,7 @@ final class DB private[api] (
             Command.run(internalSerializationPack, failoverStrategy).apply(
               adminDb.withSession(s), command(s, wc), defaultReadPreference).
               map(_ => {}).recoverWith {
-                case CommandError.Code(251) =>
+                case CommandException.Code(251) =>
                   // Transaction isn't in progress (started but no op within)
                   Future.successful({})
               }.flatMap { _ =>

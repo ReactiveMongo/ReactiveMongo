@@ -13,7 +13,7 @@ import reactivemongo.api.{
 
 import reactivemongo.util
 
-import reactivemongo.core.errors.{ CommandError => CmdErr }
+import reactivemongo.core.errors.{ CommandException => CmdErr }
 
 // --- MongoDB SCRAM authentication ---
 

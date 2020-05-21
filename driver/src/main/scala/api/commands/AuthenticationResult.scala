@@ -3,7 +3,7 @@ package reactivemongo.api.commands
 import reactivemongo.api.SerializationPack
 
 import reactivemongo.core.protocol.Response
-import reactivemongo.core.errors.{ CommandError => CmdErr }
+import reactivemongo.core.errors.{ CommandException => CmdErr }
 
 /** An authentication result */
 sealed trait AuthenticationResult

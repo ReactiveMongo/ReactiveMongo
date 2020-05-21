@@ -123,7 +123,7 @@ private[api] trait DistinctOp[P <: SerializationPack] extends DistinctOpCompat[P
   private def resultReader: pack.Reader[DistinctResult] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandErrorsReader(pack) { doc =>
+    CommandCodecs.dealingWithGenericCommandExceptionsReader(pack) { doc =>
       decoder.array(doc, "values").map(DistinctResult(_)).get
     }
   }

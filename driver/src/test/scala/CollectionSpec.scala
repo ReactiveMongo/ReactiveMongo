@@ -10,7 +10,7 @@ import reactivemongo.api.{
   WriteConcern
 }
 
-import reactivemongo.api.commands.CommandError
+import reactivemongo.api.commands.CommandException
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -47,9 +47,9 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
       "with error when already exists (failsIfExists = true)" in {
         def test(create: => Future[Unit]): Future[Boolean] =
           create.map(_ => true).recover {
-            case CommandError.Code(48 /*already exists */ ) => false
+            case CommandException.Code(48 /*already exists */ ) => false
 
-            case CommandError.Message(
+            case CommandException.Message(
               "collection already exists") => false
           }
 

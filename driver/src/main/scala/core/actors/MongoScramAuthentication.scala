@@ -10,7 +10,7 @@ import reactivemongo.api.{
   SerializationPack
 }
 
-import reactivemongo.core.errors.CommandError
+import reactivemongo.core.errors.CommandException
 
 import reactivemongo.api.commands.{
   Command,
@@ -219,7 +219,7 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
 
       debug(s"Got authenticated response #${chanId}!")
 
-      @inline def resp: Either[Either[CommandError, SuccessfulAuthentication], Array[Byte]] = try {
+      @inline def resp: Either[Either[CommandException, SuccessfulAuthentication], Array[Byte]] = try {
         pack.readAndDeserialize(response, negociationReader) match {
           case Left(err)             => Left(Left(err))
           case Right(Left(authed))   => Left(Right(authed))

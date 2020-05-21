@@ -23,7 +23,7 @@ private[reactivemongo] case class StartSessionResult(
   timeoutMinutes: Int)
 
 private[reactivemongo] object StartSessionResult {
-  import CommandCodecs.{ dealingWithGenericCommandErrorsReader => cmdReader }
+  import CommandCodecs.{ dealingWithGenericCommandExceptionsReader => cmdReader }
 
   def reader[P <: SerializationPack](pack: P): pack.Reader[StartSessionResult] = {
     val decoder = pack.newDecoder

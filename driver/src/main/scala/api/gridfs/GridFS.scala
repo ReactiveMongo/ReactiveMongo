@@ -41,7 +41,7 @@ import reactivemongo.api.{
 import reactivemongo.api.commands.{
   CollStats,
   Command,
-  CommandError,
+  CommandException,
   CommandCodecs,
   CommandCodecsWithPack,
   DeleteCommand,
@@ -567,9 +567,9 @@ sealed trait GridFS[P <: SerializationPack]
 
   private def create(coll: Collection)(implicit ec: ExecutionContext) =
     runner(coll, createCollCmd, defaultReadPreference).recover {
-      case CommandError.Code(48 /* already exists */ ) => ()
+      case CommandException.Code(48 /* already exists */ ) => ()
 
-      case CommandError.Message(
+      case CommandException.Message(
         "collection already exists") => ()
     }
 

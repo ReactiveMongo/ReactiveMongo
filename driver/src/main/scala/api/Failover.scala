@@ -89,13 +89,12 @@ private[api] object RetryableFailure {
   }
 
   private def isRetryable(throwable: Throwable) = throwable match {
-    case e: ChannelNotFound             => e.retriable
-    case _: NotAuthenticatedException   => true
-    case _: PrimaryUnavailableException => true
-    case _: NodeSetNotReachable         => true
-    case _: ConnectionException         => true
-    case _: ConnectionNotInitialized    => true
-
+    case e: ChannelNotFound                   => e.retriable
+    case _: NotAuthenticatedException         => true
+    case _: PrimaryUnavailableException       => true
+    case _: NodeSetNotReachable               => true
+    case _: ConnectionException               => true
+    case _: ConnectionNotInitializedException => true
     case e: DatabaseException =>
       e.isNotAPrimaryError || e.isUnauthorized
 

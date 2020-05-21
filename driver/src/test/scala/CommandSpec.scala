@@ -8,7 +8,7 @@ import reactivemongo.api.bson.BSONDocument
 import reactivemongo.core.errors.DatabaseException
 
 import reactivemongo.api.commands.{
-  CommandError,
+  CommandException,
   ReplSetGetStatus,
   ReplSetMaintenance
 }
@@ -70,7 +70,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
           connection.database("admin").flatMap(_.runCommand(
             ReplSetMaintenance(true),
             Common.failoverStrategy)) must throwA[DatabaseException].like {
-            case CommandError.Code(code) => code aka "error code" must_== 76
+            case CommandException.Code(code) => code aka "error code" must_== 76
           }.await(0, timeout)
         }
       } else {
@@ -78,7 +78,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
           connection.database("admin").flatMap(_.runCommand(
             ReplSetMaintenance(true),
             Common.failoverStrategy)) must throwA[DatabaseException].like {
-            case CommandError.Code(code) => code aka "error code" must_== 95
+            case CommandException.Code(code) => code aka "error code" must_== 95
           }.await(0, timeout)
         }
       }

@@ -48,7 +48,7 @@ import reactivemongo.api.bson.collection.BSONSerializationPack
 import reactivemongo.core.netty.ChannelFactory
 
 import reactivemongo.core.ClientMetadata
-import reactivemongo.core.errors.{ CommandError, GenericDriverException }
+import reactivemongo.core.errors.{ CommandException, GenericDriverException }
 import reactivemongo.core.protocol.{
   GetMore,
   Query,
@@ -1307,7 +1307,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
   }
 
   protected final def handleAuthResponse(nodeSet: NodeSet, resp: Response)(
-    check: => Either[CommandError, SuccessfulAuthentication]): NodeSet = {
+    check: => Either[CommandException, SuccessfulAuthentication]): NodeSet = {
 
     val chanId = resp.info.channelId
     val authed = check

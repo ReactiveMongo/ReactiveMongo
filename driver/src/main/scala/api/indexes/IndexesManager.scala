@@ -27,7 +27,7 @@ import reactivemongo.api.{
 import reactivemongo.api.commands.{
   Command,
   CommandCodecs,
-  CommandError,
+  CommandException,
   DropIndexes,
   WriteResult
 }
@@ -246,7 +246,7 @@ private[api] sealed abstract class AbstractIndexesManager(
 
     def list(): Future[List[Index]] =
       runner(collection, listCommand, ReadPreference.primary).recoverWith {
-        case CommandError.Code(26 /* no database or collection */ ) =>
+        case CommandException.Code(26 /* no database or collection */ ) =>
           Future.successful(List.empty[Index])
 
         case err => Future.failed(err)
@@ -450,7 +450,7 @@ private class DefaultCollectionIndexesManager(
 
   def list(): Future[List[Index]] =
     runner(collection, listCommand, ReadPreference.primary).recoverWith {
-      case CommandError.Code(26 /* no database or collection */ ) =>
+      case CommandException.Code(26 /* no database or collection */ ) =>
         Future.successful(List.empty[Index])
 
       case err => Future.failed(err)

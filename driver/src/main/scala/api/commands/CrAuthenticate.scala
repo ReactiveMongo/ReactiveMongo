@@ -21,7 +21,7 @@ private[reactivemongo] object GetCrNonce
   def reader[P <: SerializationPack](pack: P): pack.Reader[CrNonce] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, CrNonce](pack) {
+    CommandCodecs.dealingWithGenericCommandExceptionsReader[pack.type, CrNonce](pack) {
       decoder.string(_, "nonce").map { new CrNonce(_) }.get
     }
   }

@@ -178,7 +178,7 @@ private[api] trait FindAndModifyCommand[P <: SerializationPack] {
   final private[reactivemongo] implicit lazy val findAndModifyReader: pack.Reader[FindAndModifyResult] = {
     val decoder: SerializationPack.Decoder[pack.type] = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandErrorsReader(pack) { result =>
+    CommandCodecs.dealingWithGenericCommandExceptionsReader(pack) { result =>
       new FindAndModifyResult(
         decoder.child(result, "lastErrorObject").map { doc =>
           new FindAndUpdateLastError(

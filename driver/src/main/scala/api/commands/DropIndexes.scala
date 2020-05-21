@@ -39,7 +39,7 @@ private[reactivemongo] object DropIndexes {
   private[api] def reader[P <: SerializationPack](pack: P): pack.Reader[DropIndexesResult] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, DropIndexesResult](pack) { doc =>
+    CommandCodecs.dealingWithGenericCommandExceptionsReader[pack.type, DropIndexesResult](pack) { doc =>
       new DropIndexesResult(decoder.int(doc, "nIndexesWas").getOrElse(0))
     }
   }

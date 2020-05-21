@@ -48,7 +48,7 @@ private[reactivemongo] object ListIndexes {
       case _ => indexes
     }
 
-    CommandCodecs.dealingWithGenericCommandErrorsReader[P, List[Index.Aux[P]]](pack) { doc =>
+    CommandCodecs.dealingWithGenericCommandExceptionsReader[P, List[Index.Aux[P]]](pack) { doc =>
       decoder.child(doc, "cursor").map {
         decoder.children(_, "firstBatch")
       }.fold[List[Index.Aux[P]]](throw new GenericDriverException(

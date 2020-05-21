@@ -154,7 +154,7 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
     val readWriteConcernError = CommandCodecs.readWriteConcernError(decoder)
     val readUpserted = Upserted.readUpserted(decoder)
 
-    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, UpdateWriteResult](pack) { doc =>
+    CommandCodecs.dealingWithGenericCommandExceptionsReader[pack.type, UpdateWriteResult](pack) { doc =>
       val werrors = decoder.children(doc, "writeErrors").map(readWriteError)
 
       val wcError = decoder.child(doc, "writeConcernError").

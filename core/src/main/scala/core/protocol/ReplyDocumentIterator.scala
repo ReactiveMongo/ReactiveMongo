@@ -1,5 +1,7 @@
 package reactivemongo.core.protocol
 
+import scala.util.control.NonFatal
+
 import reactivemongo.io.netty.buffer.ByteBuf
 
 import reactivemongo.api.SerializationPack
@@ -31,7 +33,7 @@ private[reactivemongo] object ReplyDocumentIterator
 
           firstBatch ++ docs
         } catch {
-          case cause: Exception => new FailingIterator[A](cause)
+          case NonFatal(cause) => new FailingIterator[A](cause)
         }
       }
     }
@@ -89,7 +91,7 @@ private[reactivemongo] sealed trait ReplyDocumentIteratorLowPriority {
 
           firstBatch ++ docs
         } catch {
-          case cause: Exception => new FailingIterator[A](cause)
+          case NonFatal(cause) => new FailingIterator[A](cause)
         }
       }
     }
@@ -116,5 +118,6 @@ private[reactivemongo] final class ReplyDocumentIteratorExhaustedException(
       false
   }
 
+  @SuppressWarnings(Array("NullParameter"))
   override def hashCode: Int = if (cause == null) -1 else cause.hashCode
 }

@@ -3,6 +3,7 @@ package reactivemongo.core.protocol
 import java.util.{ List => JList }
 
 import scala.util.{ Failure, Success, Try }
+import scala.util.control.NonFatal
 
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 import reactivemongo.io.netty.channel.ChannelHandlerContext
@@ -35,7 +36,7 @@ private[reactivemongo] class ResponseDecoder
     val header: MessageHeader = try {
       MessageHeader(frame)
     } catch {
-      case cause: Throwable =>
+      case NonFatal(cause) =>
         frame.discardReadBytes()
 
         throw new IllegalStateException("Invalid message header", cause)

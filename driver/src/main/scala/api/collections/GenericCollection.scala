@@ -25,7 +25,7 @@ import reactivemongo.api._
 import reactivemongo.api.commands.CommandCodecs
 
 import reactivemongo.core.errors.{
-  ConnectionNotInitialized,
+  ConnectionNotInitializedException,
   GenericDriverException
 }
 
@@ -773,7 +773,7 @@ trait GenericCollection[P <: SerializationPack]
   protected def watchFailure[T](future: => Future[T]): Future[T] =
     Try(future).recover { case NonFatal(e) => Future.failed(e) }.get
 
-  @inline protected def MissingMetadata() = new ConnectionNotInitialized("Connection is missing metadata (like protocol version, etc.) The connection pool is probably being initialized.", db.connection.history())
+  @inline protected def MissingMetadata() = new ConnectionNotInitializedException("Connection is missing metadata (like protocol version, etc.) The connection pool is probably being initialized.", db.connection.history())
 
   @inline protected def unsupportedVersion(metadata: reactivemongo.core.protocol.ProtocolMetadata) = new GenericDriverException(s"Unsupported MongoDB version: $metadata")
 

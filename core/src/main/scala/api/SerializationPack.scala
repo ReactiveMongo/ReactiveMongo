@@ -22,8 +22,8 @@ trait SerializationPack { self: Singleton =>
   private[reactivemongo] val IsDocument: ClassTag[Document]
   private[reactivemongo] val IsValue: ClassTag[Value]
 
-  def IdentityWriter: Writer[Document]
-  def IdentityReader: Reader[Document]
+  val IdentityWriter: Writer[Document]
+  val IdentityReader: Reader[Document]
 
   def serialize[A](a: A, writer: Writer[A]): Document
 

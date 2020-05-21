@@ -1,7 +1,7 @@
 package reactivemongo.api.commands
 
 /** Error extractor for command results */
-object CommandError {
+object CommandException {
   import reactivemongo.core.errors.DatabaseException
 
   /**
@@ -9,15 +9,15 @@ object CommandError {
    *
    * {{{
    * import reactivemongo.core.errors.DatabaseException
-   * import reactivemongo.api.commands.{ CommandError, WriteResult }
+   * import reactivemongo.api.commands.{ CommandException, WriteResult }
    *
    * def testError(err: DatabaseException): String = err match {
-   *   case CommandError.Code(code) => s"hasCode: \\$code"
+   *   case CommandException.Code(code) => s"hasCode: \\$code"
    *   case _ => "no-code"
    * }
    *
    * def testWriteRes(res: WriteResult): String = res match {
-   *   case CommandError.Code(code) => s"onlyIfFailure: \\$code"
+   *   case CommandException.Code(code) => s"onlyIfFailure: \\$code"
    *   case _ => "no-code"
    * }
    * }}}
@@ -37,15 +37,15 @@ object CommandError {
    *
    * {{{
    * import reactivemongo.core.errors.DatabaseException
-   * import reactivemongo.api.commands.{ CommandError, WriteResult }
+   * import reactivemongo.api.commands.{ CommandException, WriteResult }
    *
    * def testError(err: DatabaseException): String = err match {
-   *   case CommandError.Message(msg) => s"hasMessage: \\$msg"
+   *   case CommandException.Message(msg) => s"hasMessage: \\$msg"
    *   case _ => "no-message"
    * }
    *
    * def testWriteRes(res: WriteResult): String = res match {
-   *   case CommandError.Message(msg) => s"onlyIfFailure: \\$msg"
+   *   case CommandException.Message(msg) => s"onlyIfFailure: \\$msg"
    *   case _ => "no-message"
    * }
    * }}}

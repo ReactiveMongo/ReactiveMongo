@@ -6,7 +6,7 @@ import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.{
   Geo2D,
   Geo2DSpherical
 }
-import reactivemongo.api.commands.CommandError
+import reactivemongo.api.commands.CommandException
 
 import reactivemongo.api.bson.BSONDocument
 
@@ -225,7 +225,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
       val mngr = partial.indexesManager
       def spec[T](test: => Future[T]) =
         test must throwA[DatabaseException].like {
-          case CommandError.Code(11000) => ok
+          case CommandException.Code(11000) => ok
         }.awaitFor(timeout)
 
       spec(mngr.ensure(idx)) and spec(mngr.create(idx))

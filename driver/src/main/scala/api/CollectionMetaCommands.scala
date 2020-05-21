@@ -30,12 +30,12 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    * import scala.concurrent.ExecutionContext
    *
    * import reactivemongo.api.collections.GenericCollection
-   * import reactivemongo.api.commands.CommandError
+   * import reactivemongo.api.commands.CommandException
    *
    * def createColl(
    *   coll: GenericCollection[_])(implicit ec: ExecutionContext) =
    *   coll.create().recover {
-   *     case CommandError.Code(48) => // NamespaceExists
+   *     case CommandException.Code(48) => // NamespaceExists
    *       println(s"Collection \\${coll} already exists")
    *   }
    * }}}
@@ -64,9 +64,9 @@ private[api] trait CollectionMetaCommands { self: Collection =>
     self, Create(
     capped = None,
     writeConcern = writeConcern), ReadPreference.primary).recover {
-    case CommandError.Code(48 /* already exists */ ) if !failsIfExists => ()
+    case CommandException.Code(48 /* already exists */ ) if !failsIfExists => ()
 
-    case CommandError.Message(
+    case CommandException.Message(
       "collection already exists") if !failsIfExists => ()
 
   }
@@ -134,7 +134,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
   final def drop(failIfNotFound: Boolean)(implicit ec: ExecutionContext): Future[Boolean] = {
     command(self, DropCollection, ReadPreference.primary).
       map(_ => true).recoverWith {
-        case CommandError.Code(26) if !failIfNotFound =>
+        case CommandException.Code(26) if !failIfNotFound =>
           Future.successful(false)
 
       }
