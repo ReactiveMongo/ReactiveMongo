@@ -559,14 +559,14 @@ sealed trait GridFS[P <: SerializationPack]
 
   private lazy val createCollCmd = reactivemongo.api.commands.Create()
 
-  private implicit lazy val unitBoxReader =
-    CommandCodecs.unitBoxReader[pack.type](pack)
+  private implicit lazy val unitReader =
+    CommandCodecs.unitReader[pack.type](pack)
 
   private implicit lazy val createWriter =
     reactivemongo.api.commands.CreateCollection.writer[pack.type](pack)
 
   private def create(coll: Collection)(implicit ec: ExecutionContext) =
-    runner.unboxed(coll, createCollCmd, defaultReadPreference).recover {
+    runner(coll, createCollCmd, defaultReadPreference).recover {
       case CommandError.Code(48 /* already exists */ ) => ()
 
       case CommandError.Message(

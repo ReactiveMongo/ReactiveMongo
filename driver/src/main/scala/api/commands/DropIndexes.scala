@@ -19,7 +19,7 @@ private[reactivemongo] final class DropIndexes(
 }
 
 private[reactivemongo] final class DropIndexesResult(
-  val value: Int) extends BoxedAnyVal[Int]
+  val value: Int) extends AnyVal
 
 private[reactivemongo] object DropIndexes {
   @inline def apply(index: String): DropIndexes = new DropIndexes(index)

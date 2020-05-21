@@ -13,7 +13,7 @@ import reactivemongo.api.indexes.IndexesManager
 
 import reactivemongo.api.gridfs.GridFS
 
-import Serialization.{ Pack, internalSerializationPack, unitBoxReader }
+import Serialization.{ Pack, internalSerializationPack, unitReader }
 
 /** A mixin that provides commands about this database itself. */
 private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
@@ -40,7 +40,7 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    */
   final def drop()(implicit ec: ExecutionContext): Future[Unit] =
     Command.run(internalSerializationPack, failoverStrategy).
-      unboxed(self, DropDatabase, ReadPreference.primary)
+      apply(self, DropDatabase, ReadPreference.primary)
 
   /**
    * The GridFS with the default serialization and collection prefix.
@@ -147,7 +147,7 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
     failoverStrategy: FailoverStrategy = failoverStrategy)(
     implicit
     ec: ExecutionContext, producer: CollectionProducer[C] = Serialization.defaultCollectionProducer): Future[C] = {
-    Command.run(internalSerializationPack, failoverStrategy).unboxed(
+    Command.run(internalSerializationPack, failoverStrategy).apply(
       self, RenameCollection(s"${db}.$from", s"${db}.$to", dropExisting),
       ReadPreference.primary).map(_ => self.collection(to))
   }

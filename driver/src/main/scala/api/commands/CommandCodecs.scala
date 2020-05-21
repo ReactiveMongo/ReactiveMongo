@@ -58,7 +58,7 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
-  def unitBoxReader[P <: SerializationPack](pack: P): pack.Reader[UnitBox.type] = dealingWithGenericCommandErrorsReader[pack.type, UnitBox.type](pack) { _ => UnitBox }
+  def unitReader[P <: SerializationPack](pack: P): pack.Reader[Unit] = dealingWithGenericCommandErrorsReader[pack.type, Unit](pack) { _ => () }
 
   def writeReadConcern[P <: SerializationPack](builder: SerializationPack.Builder[P]): ReadConcern => Seq[builder.pack.ElementProducer] = { c: ReadConcern => Seq(builder.elementProducer("level", builder.string(c.level))) }
 

@@ -62,10 +62,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
     }
 
     "execute ReplSetMaintenance" in {
-      import commands.{
-        replSetMaintenanceWriter,
-        unitBoxReader
-      }
+      import commands.{ replSetMaintenanceWriter, unitReader }
 
       // MongoDB 3
       if (!replSetOn) {

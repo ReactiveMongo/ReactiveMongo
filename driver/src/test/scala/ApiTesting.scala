@@ -390,8 +390,8 @@ package object tests { self =>
     implicit val replSetMaintenanceWriter =
       reactivemongo.api.commands.ReplSetMaintenance.writer(pack)
 
-    implicit val unitBoxReader =
-      reactivemongo.api.commands.CommandCodecs.unitBoxReader(pack)
+    implicit val unitReader =
+      reactivemongo.api.commands.CommandCodecs.unitReader(pack)
 
     implicit val replSetGetStatusWriter =
       reactivemongo.api.commands.ReplSetGetStatus.writer(pack)

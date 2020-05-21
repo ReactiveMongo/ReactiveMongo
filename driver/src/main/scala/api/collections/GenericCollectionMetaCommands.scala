@@ -8,8 +8,7 @@ import reactivemongo.api.commands.{
   CollectionCommand,
   Command,
   CommandWithResult,
-  ResolvedCollectionCommand,
-  UnitBox
+  ResolvedCollectionCommand
 }
 
 /** The meta commands for collection that require the serialization pack. */
@@ -62,7 +61,7 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
     // Command codecs
     implicit def writer = createViewWriter
 
-    command.unboxed(self, cmd, writePreference)
+    command(self, cmd, writePreference)
   }
 
   // ---
@@ -71,7 +70,7 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
     val viewName: String,
     val operator: PipelineOperator,
     val pipeline: Seq[PipelineOperator],
-    val collation: Option[Collation]) extends CollectionCommand with CommandWithResult[UnitBox.type]
+    val collation: Option[Collation]) extends CollectionCommand with CommandWithResult[Unit]
 
   private type CreateViewCommand = ResolvedCollectionCommand[CreateView]
 

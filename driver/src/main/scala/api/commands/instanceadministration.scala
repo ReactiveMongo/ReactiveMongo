@@ -4,7 +4,7 @@ import reactivemongo.api.{ SerializationPack, WriteConcern }
 
 import reactivemongo.core.errors.GenericDriverException
 
-private[reactivemongo] object DropDatabase extends Command with CommandWithResult[UnitBox.type] {
+private[reactivemongo] object DropDatabase extends Command with CommandWithResult[Unit] {
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[DropDatabase.type] = {
     val builder = pack.newBuilder
     val cmd = builder.document(Seq(
@@ -15,7 +15,7 @@ private[reactivemongo] object DropDatabase extends Command with CommandWithResul
 }
 
 private[reactivemongo] object DropCollection extends CollectionCommand
-  with CommandWithResult[UnitBox.type] {
+  with CommandWithResult[Unit] {
 
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[DropCollection.type]] = {
     val builder = pack.newBuilder
@@ -30,7 +30,7 @@ private[reactivemongo] object DropCollection extends CollectionCommand
 private[reactivemongo] case class RenameCollection(
   fullyQualifiedCollectionName: String,
   fullyQualifiedTargetName: String,
-  dropTarget: Boolean = false) extends Command with CommandWithResult[UnitBox.type]
+  dropTarget: Boolean = false) extends Command with CommandWithResult[Unit]
 
 private[api] object RenameCollection {
   def writer[P <: SerializationPack](pack: P): pack.Writer[RenameCollection] = {
@@ -58,7 +58,7 @@ private[api] case class Create(
   capped: Option[Capped] = None, // if set, "capped" -> true, size -> <int>, max -> <int>,
   writeConcern: WriteConcern = WriteConcern.Default,
   flags: Int = 1 // defaults to 1
-) extends CollectionCommand with CommandWithResult[UnitBox.type]
+) extends CollectionCommand with CommandWithResult[Unit]
 
 private[api] object CreateCollection {
   def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[Create]] = {
@@ -87,7 +87,7 @@ private[api] object CreateCollection {
 
 private[reactivemongo] final class ConvertToCapped(
   val capped: Capped)
-  extends CollectionCommand with CommandWithResult[UnitBox.type] {
+  extends CollectionCommand with CommandWithResult[Unit] {
 
   override def equals(that: Any): Boolean = that match {
     case other: ConvertToCapped =>
@@ -293,7 +293,7 @@ private[reactivemongo] object ReplSetGetStatus
 /**
  * The command [[https://docs.mongodb.org/manual/reference/command/resync/ resync]]
  */
-private[api] object Resync extends Command with CommandWithResult[UnitBox.type]
+private[api] object Resync extends Command with CommandWithResult[Unit]
 
 /**
  * The [[https://docs.mongodb.org/manual/reference/command/replSetMaintenance/ replSetMaintenance]] command.
@@ -302,7 +302,7 @@ private[api] object Resync extends Command with CommandWithResult[UnitBox.type]
  * @param enable if true the the member enters the `RECOVERING` state
  */
 private[reactivemongo] final class ReplSetMaintenance(
-  val enable: Boolean = true) extends Command with CommandWithResult[UnitBox.type] {
+  val enable: Boolean = true) extends Command with CommandWithResult[Unit] {
   override def equals(that: Any): Boolean = that match {
     case other: ReplSetMaintenance =>
       this.enable == other.enable

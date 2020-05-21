@@ -7,7 +7,7 @@ import reactivemongo.api.{ Serialization, Session, WriteConcern => WC }
  */
 private[reactivemongo] sealed abstract class EndTransaction(
   val session: Session,
-  val writeConcern: WC) extends Command with CommandWithResult[UnitBox.type] {
+  val writeConcern: WC) extends Command with CommandWithResult[Unit] {
   protected def kind: String
 }
 

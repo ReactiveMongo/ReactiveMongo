@@ -114,7 +114,7 @@ private[reactivemongo] trait CreateUserCommand[P <: SerializationPack] { _: Pack
     val authenticationRestrictions: List[AuthenticationRestriction],
     val mechanisms: List[AuthenticationMode])
     extends Command with CommandWithPack[P]
-    with CommandWithResult[UnitBox.type]
+    with CommandWithResult[Unit]
 
   protected final def createUserWriter(version: MongoWireVersion): pack.Writer[CreateUser] = {
     val builder = pack.newBuilder

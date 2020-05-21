@@ -16,7 +16,7 @@ import reactivemongo.api.indexes.CollectionIndexesManager
  */
 private[api] trait CollectionMetaCommands { self: Collection =>
   private implicit lazy val unitBoxReader =
-    CommandCodecs.unitBoxReader(command.pack)
+    CommandCodecs.unitReader(command.pack)
 
   private implicit lazy val createWriter = CreateCollection.writer(command.pack)
 
@@ -41,7 +41,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    * }}}
    */
   final def create()(implicit ec: ExecutionContext): Future[Unit] =
-    command.unboxed(self, Create(None), ReadPreference.primary)
+    command(self, Create(None), ReadPreference.primary)
 
   /**
    * $createDescription.
@@ -60,7 +60,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    */
   final def create(
     failsIfExists: Boolean = false,
-    writeConcern: WriteConcern = db.defaultWriteConcern)(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(
+    writeConcern: WriteConcern = db.defaultWriteConcern)(implicit ec: ExecutionContext): Future[Unit] = command(
     self, Create(
     capped = None,
     writeConcern = writeConcern), ReadPreference.primary).recover {
@@ -92,7 +92,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
   final def createCapped(
     size: Long,
     maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] =
-    command.unboxed(
+    command(
       self,
       Create(Some(new Capped(size, maxDocuments))),
       ReadPreference.primary)
@@ -156,7 +156,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    * @param size $cappedSizeParam
    * @param maxDocuments $cappedMaxParam
    */
-  final def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] = command.unboxed(self, new ConvertToCapped(new Capped(size, maxDocuments)), ReadPreference.primary)
+  final def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] = command(self, new ConvertToCapped(new Capped(size, maxDocuments)), ReadPreference.primary)
 
   private implicit lazy val statsWriter = CollStats.writer(command.pack)
 

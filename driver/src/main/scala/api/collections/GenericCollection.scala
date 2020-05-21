@@ -22,7 +22,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api._
-import reactivemongo.api.commands.{ CommandCodecs, UnitBox }
+import reactivemongo.api.commands.CommandCodecs
 
 import reactivemongo.core.errors.{
   ConnectionNotInitialized,
@@ -96,8 +96,8 @@ trait GenericCollection[P <: SerializationPack]
 
   private[reactivemongo] implicit def PackIdentityWriter: pack.Writer[pack.Document] = pack.IdentityWriter
 
-  implicit protected lazy val unitBoxReader: pack.Reader[UnitBox.type] =
-    CommandCodecs.unitBoxReader[pack.type](pack)
+  implicit protected lazy val unitReader: pack.Reader[Unit] =
+    CommandCodecs.unitReader[pack.type](pack)
 
   /** Builder used to prepare queries */
   private[reactivemongo] lazy val genericQueryBuilder = new QueryBuilder(
@@ -763,8 +763,7 @@ trait GenericCollection[P <: SerializationPack]
   @inline protected def writeConcern = db.connection.options.writeConcern
 
   /** The default read preference */
-  @inline def readPreference: ReadPreference = db.defaultReadPreference
-  // TODO#1.1: Remove default value from this trait after next release
+  @inline def readPreference: ReadPreference
 
   /** The default read concern */
   @inline protected def readConcern = db.connection.options.readConcern

@@ -9,7 +9,7 @@ import reactivemongo.api.SerializationPack
  */
 private[reactivemongo] sealed abstract class EndSessions(
   val id: UUID,
-  val ids: Seq[UUID]) extends Command with CommandWithResult[UnitBox.type] {
+  val ids: Seq[UUID]) extends Command with CommandWithResult[Unit] {
   protected def kind: String
 }
 

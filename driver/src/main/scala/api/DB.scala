@@ -79,7 +79,7 @@ final class DB private[api] (
   private[reactivemongo] val session: Option[Session] = Option.empty)
   extends DBMetaCommands with PackSupport[Serialization.Pack] {
 
-  import Serialization.{ internalSerializationPack, unitBoxReader }
+  import Serialization.{ internalSerializationPack, unitReader }
 
   val pack: Serialization.Pack = internalSerializationPack
 
@@ -495,6 +495,7 @@ final class DB private[api] (
    *
    * @param command $commandParam
    * @param failoverStrategy $failoverStrategyParam
+   * @param readPreference $readPrefParam
    * @return $cursorFetcher
    */
   def runCommand(
@@ -506,18 +507,6 @@ final class DB private[api] (
 
     runner(this, runner.rawCommand(command))
   }
-
-  /**
-   * @tparam R $resultType
-   * @tparam C $commandTParam
-   * @param command $commandParam
-   * @param failoverStrategy $failoverStrategyParam
-   * @param readPreference $readPrefParam
-   * @param writer $writerParam
-   * @param reader $readerParam
-   * @return $singleResult
-   */
-  def runValueCommand[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R with BoxedAnyVal[A]], failoverStrategy: FailoverStrategy = FailoverStrategy.default, readPreference: ReadPreference = this.defaultReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = Command.run(pack, failoverStrategy).unboxed(this, command, readPreference)
 
   @inline private[api] def defaultWriteConcern: WriteConcern = connection.options.writeConcern
 

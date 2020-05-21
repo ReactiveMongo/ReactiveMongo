@@ -23,26 +23,6 @@ trait CollectionCommand extends Command
 trait CommandWithResult[R] { _: Command => }
 trait CommandWithPack[P <: SerializationPack] { _: Command => }
 
-trait BoxedAnyVal[A <: AnyVal] { // TODO: Remove ~> use AnyVal/value class
-  def value: A
-
-  override def equals(that: Any): Boolean = that match {
-    case other: BoxedAnyVal[A] =>
-      this.value == other.value
-
-    case _ =>
-      false
-  }
-
-  override def hashCode: Int = value.hashCode
-
-  override def toString = s"BoxedAnyVal($value)"
-}
-
-object UnitBox extends BoxedAnyVal[Unit] {
-  def value: Unit = ()
-}
-
 /**
  * @param response the response associated with the result
  * @param numberToReturn the number of documents to return
@@ -172,12 +152,7 @@ private[reactivemongo] object Command {
 
     def apply[C <: Command](db: DB, command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = defaultCursorFetcher(db, pack, command, failover)
 
-    def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R with BoxedAnyVal[A]], rp: ReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[A] = defaultCursorFetcher(db, pack, command, failover).one[R](rp).map(_.value)
-
     // collection
-    def unboxed[A <: AnyVal, R <: BoxedAnyVal[A], C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R with BoxedAnyVal[A]], rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[A] =
-      defaultCursorFetcher(collection.db, pack, new ResolvedCollectionCommand(collection.name, command), failover).one[R](rp).map(_.value)
-
     def apply[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R], rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = defaultCursorFetcher(collection.db, pack, new ResolvedCollectionCommand(collection.name, command), failover).one[R](rp)
 
     def apply[C <: CollectionCommand](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): CursorFetcher[pack.type, Cursor] = defaultCursorFetcher(collection.db, pack, new ResolvedCollectionCommand(collection.name, command), failover)

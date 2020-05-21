@@ -16,8 +16,8 @@ private[reactivemongo] object Serialization {
 
   @inline def internalSerializationPack: this.Pack = SerPack
 
-  lazy implicit val unitBoxReader =
-    CommandCodecs.unitBoxReader(internalSerializationPack)
+  lazy implicit val unitReader =
+    CommandCodecs.unitReader(internalSerializationPack)
 
   lazy implicit val writeResultReader =
     CommandCodecs.writeResultReader[WriteResult, this.Pack](
