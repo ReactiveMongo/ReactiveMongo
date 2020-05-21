@@ -111,6 +111,7 @@ sealed abstract class Index {
   /**
    * An optional `2dsphere` index [[https://docs.mongodb.com/manual/core/index-text/#text-versions version number]].
    */
+  @SuppressWarnings(Array("MethodNames"))
   def _2dsphereIndexVersion: Option[Int] = None
 
   /**
@@ -159,6 +160,7 @@ sealed abstract class Index {
 
   private[api] lazy val tupled = Tuple21(key, name, background, unique, partialFilter, sparse, expireAfterSeconds, storageEngine, weights, defaultLanguage, languageOverride, textIndexVersion, _2dsphereIndexVersion, bits, min, max, bucketSize, collation, wildcardProjection, version, options)
 
+  @SuppressWarnings(Array("ComparingUnrelatedTypes"))
   override def equals(that: Any): Boolean = that match {
     case other: Index => tupled == other.tupled
     case _            => false
@@ -204,6 +206,7 @@ object Index {
    *   options = BSONDocument.empty)
    * }}}
    */
+  @SuppressWarnings(Array("MaxParameters", "VariableShadowing"))
   def apply[P <: SerializationPack](_pack: P)(
     key: Seq[(String, IndexType)],
     name: Option[String],
@@ -304,6 +307,7 @@ object Index {
    *   options = BSONDocument.empty)
    * }}}
    */
+  @SuppressWarnings(Array("MaxParameters"))
   def apply(
     key: Seq[(String, IndexType)],
     name: Option[String],
@@ -379,6 +383,7 @@ sealed trait NSIndex {
 
   private[api] lazy val tupled = namespace -> index
 
+  @SuppressWarnings(Array("ComparingUnrelatedTypes"))
   override def equals(that: Any): Boolean = that match {
     case other: NSIndex =>
       this.tupled == other.tupled
@@ -397,6 +402,7 @@ object NSIndex {
 
   type Default = NSIndex.Aux[Serialization.Pack]
 
+  @SuppressWarnings(Array("VariableShadowing"))
   def apply[P <: SerializationPack](
     namespace: String, index: Index.Aux[P]): NSIndex.Aux[P] = {
     @inline def nsp = namespace

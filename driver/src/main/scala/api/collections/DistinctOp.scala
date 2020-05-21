@@ -60,14 +60,15 @@ private[api] trait DistinctOp[P <: SerializationPack] extends DistinctOpCompat[P
    * @param values the raw values (should not contain duplicate)
    */
   protected case class DistinctResult(values: Iterable[pack.Value]) {
+    @SuppressWarnings(Array("RedundantFinalModifierOnMethod"))
     @annotation.tailrec
     protected final def result[T, M[_]](
-      values: Iterable[pack.Value],
+      vs: Iterable[pack.Value],
       reader: pack.WidenValueReader[T],
-      out: Builder[T, M[T]]): Try[M[T]] = values.headOption match {
+      out: Builder[T, M[T]]): Try[M[T]] = vs.headOption match {
       case Some(t) => pack.readValue(t, reader) match {
         case Failure(e) => Failure(e)
-        case Success(v) => result(values.tail, reader, out += v)
+        case Success(v) => result(vs.drop(1), reader, out += v)
       }
 
       case _ => Success(out.result())
@@ -105,13 +106,13 @@ private[api] trait DistinctOp[P <: SerializationPack] extends DistinctOpCompat[P
 
           document(elements.result())
         }
-      } else { distinct: DistinctCmd =>
+      } else { d: DistinctCmd =>
         val elements = Seq.newBuilder[pack.ElementProducer]
 
-        elements += element("distinct", string(distinct.collection))
-        elements += element("key", string(distinct.command.key))
+        elements += element("distinct", string(d.collection))
+        elements += element("key", string(d.command.key))
 
-        distinct.command.query.foreach { query =>
+        d.command.query.foreach { query =>
           elements += element("query", query)
         }
 
@@ -123,8 +124,8 @@ private[api] trait DistinctOp[P <: SerializationPack] extends DistinctOpCompat[P
   private def resultReader: pack.Reader[DistinctResult] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandExceptionsReader(pack) { doc =>
-      decoder.array(doc, "values").map(DistinctResult(_)).get
+    CommandCodecs.dealingWithGenericCommandExceptionsReaderOpt(pack) { doc =>
+      decoder.array(doc, "values").map(DistinctResult(_))
     }
   }
 }

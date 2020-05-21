@@ -107,7 +107,7 @@ private[reactivemongo] sealed class NodeSetSession(
     Option(txState getAndUpdate Session.EndTxIfStarted).filter(_.isStarted)
 }
 
-private[reactivemongo] sealed class DistributedSession(
+private[reactivemongo] final class DistributedSession(
   lsid: UUID,
   causalConsistency: Boolean = true) extends NodeSetSession(lsid, causalConsistency) {
 

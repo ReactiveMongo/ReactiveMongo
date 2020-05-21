@@ -223,7 +223,7 @@ final class AsyncDriver(
     parsedURI: MongoConnection.ParsedURI,
     name: Option[String],
     strictMode: Boolean): Future[MongoConnection] = {
-    if (strictMode && !parsedURI.ignoredOptions.isEmpty) {
+    if (strictMode && parsedURI.ignoredOptions.nonEmpty) {
       Future.failed(new IllegalArgumentException(s"The connection URI contains unsupported options: ${parsedURI.ignoredOptions.mkString(", ")}"))
     } else {
       askConnection(
@@ -267,7 +267,7 @@ final class AsyncDriver(
    *   }
    * }}}
    */
-  final def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS))(implicit ec: ExecutionContext): Future[Unit] = {
+  def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS))(implicit ec: ExecutionContext): Future[Unit] = {
     logger.info(s"[$supervisorName] Closing instance of ReactiveMongo driver")
 
     val callerSTE = Thread.currentThread.getStackTrace.drop(3).take(3)
@@ -337,7 +337,7 @@ final class AsyncDriver(
    * @param options $optionsParam
    * @param name $connectionNameParam
    */
-  protected final def askConnection(
+  protected def askConnection(
     nodes: Seq[String],
     options: MongoConnectionOptions,
     name: Option[String]): Future[MongoConnection] = {
@@ -400,6 +400,7 @@ final class AsyncDriver(
     mongosystem: ActorRef)
 
   // For testing only
+  @SuppressWarnings(Array("MethodReturningAny"))
   private[api] def addConnectionMsg(
     name: String,
     nodes: Seq[String],

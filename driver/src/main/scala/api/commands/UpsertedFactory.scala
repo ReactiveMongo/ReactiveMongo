@@ -31,17 +31,17 @@ private[reactivemongo] trait UpsertedFactory[P <: SerializationPack] {
     def unapply(upserted: Upserted): Option[(Int, Any)] =
       Option(upserted).map { u => u.index -> u._id }
 
-    private[api] def readUpserted(decoder: SerializationPack.Decoder[pack.type]): pack.Document => Upserted = { document =>
+    private[api] def readUpserted(decoder: SerializationPack.Decoder[pack.type]): pack.Document => Option[Upserted] = { document =>
       (for {
         index <- decoder.int(document, "index")
         id <- decoder.get(document, "_id")
-      } yield Upserted(index, id)).get
+      } yield Upserted(index, id))
     }
 
     private[reactivemongo] implicit val reader: pack.Reader[Upserted] = {
       val decoder = pack.newDecoder
 
-      pack.reader[Upserted](readUpserted(decoder))
+      pack.readerOpt[Upserted](readUpserted(decoder))
     }
   }
 }

@@ -34,7 +34,7 @@ private[reactivemongo] final class Node(
     splitted._1 -> (try {
       splitted._2.drop(1).toInt
     } catch {
-      case _: Throwable => 27017
+      case scala.util.control.NonFatal(_) => 27017
     })
   }
 
@@ -47,12 +47,13 @@ private[reactivemongo] final class Node(
    */
   val authenticatedConnections = RoundRobiner(
     connected.filter(_.authenticated.forall { auth =>
-      authenticated.exists(_ == auth)
+      authenticated.contains(auth)
     }))
 
   lazy val signaling: Option[Connection] =
     connections.find(c => c.signaling && c.status == ConnectionStatus.Connected)
 
+  @SuppressWarnings(Array("VariableShadowing"))
   def createSignalingConnection(
     channelFactory: ChannelFactory,
     receiver: ActorRef): Try[Node] = signaling match {
@@ -65,6 +66,7 @@ private[reactivemongo] final class Node(
   }
 
   /* Create channels (not for signaling). */
+  @SuppressWarnings(Array("VariableShadowing"))
   private[core] def createUserConnections(
     channelFactory: ChannelFactory,
     receiver: ActorRef,
@@ -100,16 +102,17 @@ private[reactivemongo] final class Node(
   @inline private[core] def createConnection(
     channelFactory: ChannelFactory,
     receiver: ActorRef,
-    signaling: Boolean): Try[Connection] =
+    _signaling: Boolean): Try[Connection] =
     channelFactory.create(host, port, receiver).map { chan =>
       new Connection(
-        chan, ConnectionStatus.Connecting, Set.empty, None, signaling)
+        chan, ConnectionStatus.Connecting, Set.empty, None, _signaling)
     }
 
   def withAlias(as: String): Node =
     new Node(name, aliases + as, status, connections, authenticated, tags,
       protocolMetadata, pingInfo, isMongos)
 
+  @SuppressWarnings(Array("VariableShadowing"))
   def copy(
     name: String = this.name,
     status: NodeStatus = this.status,
@@ -125,6 +128,7 @@ private[reactivemongo] final class Node(
 
   @inline private[core] def pickConnectionByChannelId(id: ChannelId): Option[Connection] = connections.find(_.channel.id == id)
 
+  @SuppressWarnings(Array("VariableShadowing"))
   private[core] def updateByChannelId(id: ChannelId)(fc: Connection => Connection)(fn: Node => Node): Node = {
     val (updCons, updated) = utils.update(connections) {
       case conn if (conn.channel.id == id) => fc(conn)

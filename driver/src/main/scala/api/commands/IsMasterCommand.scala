@@ -119,14 +119,14 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
     def unapply(res: IsMasterResult) = Option(res).map(_.tupled)
   }
 
-  private[reactivemongo] def writer[T <: IsMaster](pack: P): pack.Writer[T] = {
+  private[reactivemongo] def writer(pack: P): pack.Writer[IsMaster] = {
     val builder = pack.newBuilder
     import builder.{ elementProducer => element }
 
     val serializeClientMeta: ClientMetadata => Option[pack.Document] =
       ClientMetadata.serialize[pack.type](pack)
 
-    pack.writer[T] { im =>
+    pack.writer[IsMaster] { im =>
       val elms = Seq.newBuilder[pack.ElementProducer]
 
       elms += element("ismaster", builder.int(1))
@@ -164,10 +164,10 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
         isArbiterOnly = booleanLike(doc, "arbiterOnly").getOrElse(false),
         isPassive = booleanLike(doc, "passive").getOrElse(false),
         isHidden = booleanLike(doc, "hidden").getOrElse(false),
-        tags = decoder.child(doc, "tags").map { doc =>
-          decoder.names(doc).flatMap { tag =>
-            string(doc, tag).map(tag -> _)
-          }.toMap
+        tags = decoder.child(doc, "tags").map { tagDoc =>
+          decoder.names(tagDoc).flatMap { tag =>
+            string(tagDoc, tag).map(tag -> _)
+          }.toMap // TODO: Optim toMap
         }.getOrElse(Map.empty),
         electionId = int(doc, "electionId").getOrElse(-1),
         lastWrite = decoder.child(doc, "lastWrite").flatMap { ld =>
@@ -177,8 +177,8 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
             majorityOpTime <- long(ld, "majorityOpTime")
             majorityWriteDate <- long(ld, "majorityWriteDate").map(new Date(_))
           } yield new LastWrite(
-            opTime.toLong, lastWriteDate,
-            majorityOpTime.toLong, majorityWriteDate)
+            opTime, lastWriteDate,
+            majorityOpTime, majorityWriteDate)
         })
 
       new IsMasterResult(

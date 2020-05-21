@@ -138,12 +138,12 @@ private[api] object ListCollectionNames
   def reader[P <: SerializationPack](pack: P): pack.Reader[CollectionNames] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandExceptionsReader[pack.type, CollectionNames](pack) { doc =>
+    CommandCodecs.dealingWithGenericCommandExceptionsReaderOpt[pack.type, CollectionNames](pack) { doc =>
       (for {
         cr <- decoder.child(doc, "cursor")
         fb = decoder.children(cr, "firstBatch")
         ns <- wtColNames[pack.type](pack)(decoder, fb, List.empty)
-      } yield CollectionNames(ns)).getOrElse[CollectionNames](
+      } yield CollectionNames(ns)).orElse[CollectionNames](
         throw new GenericDriverException("fails to read collection names"))
     }
   }
@@ -252,6 +252,7 @@ private[reactivemongo] object ReplSetGetStatus
     pack.writer[ReplSetGetStatus.type](_ => cmd)
   }
 
+  @SuppressWarnings(Array("UnusedMethodParameter"))
   private def readMember[P <: SerializationPack](pack: P)(decoder: SerializationPack.Decoder[pack.type], doc: pack.Document): Option[ReplSetMember] = {
     import decoder.{ int, long, string }
 
@@ -277,7 +278,7 @@ private[reactivemongo] object ReplSetGetStatus
   def reader[P <: SerializationPack](pack: P): pack.Reader[ReplSetStatus] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandExceptionsReader[pack.type, ReplSetStatus](pack) { doc =>
+    CommandCodecs.dealingWithGenericCommandExceptionsReaderOpt[pack.type, ReplSetStatus](pack) { doc =>
       (for {
         name <- decoder.string(doc, "set")
         time <- decoder.long(doc, "date")
@@ -285,7 +286,7 @@ private[reactivemongo] object ReplSetGetStatus
         members = decoder.children(doc, "members").flatMap { m =>
           readMember[pack.type](pack)(decoder, m)
         }
-      } yield new ReplSetStatus(name, time, myState, members)).get
+      } yield new ReplSetStatus(name, time, myState, members))
     }
   }
 }

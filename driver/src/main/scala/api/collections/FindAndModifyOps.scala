@@ -39,11 +39,11 @@ trait FindAndModifyOps[P <: SerializationPack]
     val arrayFilters: Seq[pack.Document],
     swriter: pack.Writer[S]) {
 
-    @inline final def apply()(implicit ec: ExecutionContext): Future[FindAndModifyResult] = execute()
+    @inline def apply()(implicit ec: ExecutionContext): Future[FindAndModifyResult] = execute()
 
     // ---
 
-    private final def execute()(implicit ec: ExecutionContext): Future[FindAndModifyResult] = {
+    private def execute()(implicit ec: ExecutionContext): Future[FindAndModifyResult] = {
       val cmd = new FindAndModify(
         query = pack.serialize(selector, swriter),
         modifier = modifier,

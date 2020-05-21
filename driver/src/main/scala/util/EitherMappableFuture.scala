@@ -27,7 +27,7 @@ private[reactivemongo] object ExtendedFutures {
   import akka.actor.ActorSystem
 
   // better way to this?
-  def DelayedFuture(millis: Long, system: ActorSystem): Future[Unit] = {
+  def delayedFuture(millis: Long, system: ActorSystem): Future[Unit] = {
     implicit val ec = system.dispatcher
     val promise = Promise[Unit]()
 

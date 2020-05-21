@@ -83,10 +83,10 @@ private[reactivemongo] object BulkOps {
             Right(BulkStage[I](
               bulk = (doc +: bulk).reverse,
               next = Some(new BulkProducer[I](
-                offset + nc, input.tail, sz, maxBsonSize, maxBulkSize))))
+                offset + nc, input.drop(1), sz, maxBsonSize, maxBulkSize))))
 
           } else {
-            go(input.tail, nc, nsz, doc +: bulk)
+            go(input.drop(1), nc, nsz, doc +: bulk)
           }
         }
       }
@@ -125,9 +125,9 @@ private[reactivemongo] object BulkOps {
         Future.successful(values.reverse)
 
       case Right(BulkStage(bulk, Some(next))) =>
-        f(bulk).flatMap { v => orderedApply(next, v +: values)(f) }
+        f(bulk).flatMap { v1 => orderedApply(next, v1 +: values)(f) }
 
       case Right(BulkStage(bulk, _)) =>
-        f(bulk).map { v => (v +: values).reverse }
+        f(bulk).map { v2 => (v2 +: values).reverse }
     }
 }

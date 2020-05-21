@@ -101,6 +101,7 @@ object Collation {
     collation: Collation): pack.Document =
     serializeWith(pack, collation)(pack.newBuilder)
 
+  @SuppressWarnings(Array("UnusedMethodParameter"))
   private[api] def serializeWith[P <: SerializationPack](
     pack: P,
     collation: Collation)(

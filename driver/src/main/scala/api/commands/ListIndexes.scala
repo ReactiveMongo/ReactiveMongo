@@ -48,11 +48,12 @@ private[reactivemongo] object ListIndexes {
       case _ => indexes
     }
 
-    CommandCodecs.dealingWithGenericCommandExceptionsReader[P, List[Index.Aux[P]]](pack) { doc =>
+    CommandCodecs.dealingWithGenericCommandExceptionsReaderOpt[P, List[Index.Aux[P]]](pack) { doc =>
       decoder.child(doc, "cursor").map {
         decoder.children(_, "firstBatch")
-      }.fold[List[Index.Aux[P]]](throw new GenericDriverException(
-        "the cursor and firstBatch must be defined"))(readBatch(_, Nil))
+      }.map[List[Index.Aux[P]]](readBatch(_, Nil)).orElse(
+        throw new GenericDriverException(
+          "the cursor and firstBatch must be defined"))
     }
   }
 

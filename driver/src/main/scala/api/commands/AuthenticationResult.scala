@@ -31,6 +31,7 @@ private[reactivemongo] case class VerboseSuccessfulAuthentication(
 /**
  * A failed authentication result
  */
+@SuppressWarnings(Array("IncorrectlyNamedExceptions"))
 sealed abstract class FailedAuthentication
   extends CmdErr with AuthenticationResult
   with scala.util.control.NoStackTrace {
@@ -48,6 +49,7 @@ sealed abstract class FailedAuthentication
 }
 
 private[reactivemongo] object FailedAuthentication {
+  @SuppressWarnings(Array("VariableShadowing"))
   def apply[P <: SerializationPack](_pack: P)(
     msg: String,
     c: Option[Int],

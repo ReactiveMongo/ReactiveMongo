@@ -9,7 +9,15 @@ sealed trait MongoWireVersion extends Ordered[MongoWireVersion] {
     else if (value < x.value) -1
     else 1
 
-  override lazy val hashCode = toString.hashCode
+  override final lazy val hashCode = toString.hashCode
+
+  override final def equals(that: Any): Boolean = that match {
+    case other: MongoWireVersion =>
+      this.value == other.value
+
+    case _ =>
+      false
+  }
 }
 
 object MongoWireVersion {
@@ -17,43 +25,31 @@ object MongoWireVersion {
   object V30 extends MongoWireVersion {
     val value = 3
     override val toString = "3.0"
-    override def equals(that: Any): Boolean =
-      that != null && that.isInstanceOf[V30.type]
   }
 
   object V32 extends MongoWireVersion {
     val value = 4
     override val toString = "3.2"
-    override def equals(that: Any): Boolean =
-      that != null && that.isInstanceOf[V32.type]
   }
 
   object V34 extends MongoWireVersion {
     val value = 5
     override val toString = "3.4"
-    override def equals(that: Any): Boolean =
-      that != null && that.isInstanceOf[V34.type]
   }
 
   object V36 extends MongoWireVersion {
     val value = 6
     override val toString = "3.6"
-    override def equals(that: Any): Boolean =
-      that != null && that.isInstanceOf[V36.type]
   }
 
   object V40 extends MongoWireVersion {
     val value = 7
     override val toString = "4.0"
-    override def equals(that: Any): Boolean =
-      that != null && that.isInstanceOf[V40.type]
   }
 
   object V42 extends MongoWireVersion {
     val value = 8
     override val toString = "4.2"
-    override def equals(that: Any): Boolean =
-      that != null && that.isInstanceOf[V42.type]
   }
 
   def apply(v: Int): MongoWireVersion = {

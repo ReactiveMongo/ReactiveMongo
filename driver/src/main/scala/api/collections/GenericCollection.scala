@@ -24,10 +24,7 @@ import scala.concurrent.duration.FiniteDuration
 import reactivemongo.api._
 import reactivemongo.api.commands.CommandCodecs
 
-import reactivemongo.core.errors.{
-  ConnectionNotInitializedException,
-  GenericDriverException
-}
+import reactivemongo.core.errors.GenericDriverException
 
 trait GenericCollectionProducer[P <: SerializationPack, +C <: GenericCollection[P]] extends CollectionProducer[C] {
   private[reactivemongo] val pack: P
@@ -92,9 +89,9 @@ trait GenericCollection[P <: SerializationPack]
 
   import AggregationFramework.{ Pipeline => AggregationPipeline }
 
-  private[reactivemongo] implicit def PackIdentityReader: pack.Reader[pack.Document] = pack.IdentityReader
+  private[reactivemongo] implicit def packIdentityReader: pack.Reader[pack.Document] = pack.IdentityReader
 
-  private[reactivemongo] implicit def PackIdentityWriter: pack.Writer[pack.Document] = pack.IdentityWriter
+  private[reactivemongo] implicit def packIdentityWriter: pack.Writer[pack.Document] = pack.IdentityWriter
 
   implicit protected lazy val unitReader: pack.Reader[Unit] =
     CommandCodecs.unitReader[pack.type](pack)
@@ -472,6 +469,7 @@ trait GenericCollection[P <: SerializationPack]
    * @param arrayFilters $arrayFiltersParam
    * @param swriter $swriterParam
    */
+  @SuppressWarnings(Array("MaxParameters"))
   def findAndModify[S](
     selector: S,
     modifier: FindAndModifyOp,
@@ -531,6 +529,7 @@ trait GenericCollection[P <: SerializationPack]
    * @param collation $collationParam
    * @param arrayFilters $arrayFiltersParam
    */
+  @SuppressWarnings(Array("MaxParameters"))
   def findAndUpdate[S, T](
     selector: S,
     update: T,
@@ -686,6 +685,7 @@ trait GenericCollection[P <: SerializationPack]
    * @param reader $readerParam
    * @param cp $cursorProducerParam
    */
+  @SuppressWarnings(Array("MaxParameters"))
   def aggregatorContext[T](
     firstOperator: PipelineOperator,
     otherOperators: List[PipelineOperator] = List.empty,
@@ -770,10 +770,9 @@ trait GenericCollection[P <: SerializationPack]
 
   @inline protected def defaultCursorBatchSize: Int = 101
 
+  @SuppressWarnings(Array("TryGet"))
   protected def watchFailure[T](future: => Future[T]): Future[T] =
     Try(future).recover { case NonFatal(e) => Future.failed(e) }.get
-
-  @inline protected def MissingMetadata() = new ConnectionNotInitializedException("Connection is missing metadata (like protocol version, etc.) The connection pool is probably being initialized.", db.connection.history())
 
   @inline protected def unsupportedVersion(metadata: reactivemongo.core.protocol.ProtocolMetadata) = new GenericDriverException(s"Unsupported MongoDB version: $metadata")
 

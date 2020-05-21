@@ -40,7 +40,7 @@ private[reactivemongo] object DropIndexes {
     val decoder = pack.newDecoder
 
     CommandCodecs.dealingWithGenericCommandExceptionsReader[pack.type, DropIndexesResult](pack) { doc =>
-      new DropIndexesResult(decoder.int(doc, "nIndexesWas").getOrElse(0))
+      new DropIndexesResult(decoder.int(doc, "nIndexesWas") getOrElse 0)
     }
   }
 }

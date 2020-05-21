@@ -25,6 +25,7 @@ final class FailoverStrategy private[api] (
   val retries: Int,
   val delayFactor: Int => Double) {
 
+  @SuppressWarnings(Array("VariableShadowing"))
   def copy(
     initialDelay: FiniteDuration = this.initialDelay,
     retries: Int = this.retries,
@@ -60,10 +61,11 @@ object FailoverStrategy {
      *
      * @param `try` the current number of tries
      */
-    final def apply(`try`: Int): Double = `try` * multiplier
+    def apply(`try`: Int): Double = `try` * multiplier
 
     override lazy val toString = s"× $multiplier"
 
+    @SuppressWarnings(Array("ComparingFloatingPointTypes"))
     override def equals(that: Any): Boolean = that match {
       case other: FactorFun =>
         this.multiplier == other.multiplier

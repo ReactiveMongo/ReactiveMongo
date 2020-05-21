@@ -103,6 +103,7 @@ final class MongoConnection private[reactivemongo] (
    *   con.database(name) // with configured failover
    * }}}
    */
+  @SuppressWarnings(Array("VariableShadowing"))
   def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit ec: ExecutionContext): Future[DB] =
     waitIsAvailable(failoverStrategy, stackTrace()).map { state =>
       new DB(name, this, state, failoverStrategy, None)
@@ -130,6 +131,7 @@ final class MongoConnection private[reactivemongo] (
    * @see [[MongoConnectionOptions.credentials]]
    * @see [[DB.authenticate]]
    */
+  @SuppressWarnings(Array("VariableShadowing"))
   def authenticate(
     db: String,
     user: String,
@@ -174,7 +176,7 @@ final class MongoConnection private[reactivemongo] (
   @volatile private[api] var killed: Boolean = false
 
   @inline private def stackTrace() =
-    Thread.currentThread.getStackTrace.tail.tail.take(2).reverse
+    Thread.currentThread.getStackTrace.drop(2).take(2).reverse
 
   /** Returns a future that will be successful when node set is available. */
   private[api] def waitIsAvailable(
@@ -252,7 +254,7 @@ final class MongoConnection private[reactivemongo] (
 
       def unavailResult = Future.failed[ConnectionState] {
         if (options.readPreference.slaveOk) {
-          new NodeSetNotReachable(supervisor, name, history())
+          new NodeSetNotReachableException(supervisor, name, history())
         } else {
           new PrimaryUnavailableException(supervisor, name, history())
         }
@@ -591,7 +593,7 @@ object MongoConnection {
       Await.ready(
         reactivemongo.util.srvRecords(hosts)(srvRecResolver),
         reactivemongo.util.dnsTimeout).map {
-          ListSet.empty ++ _.toList
+          ListSet.empty ++ _
         }
     } else {
       val buf = ListSet.newBuilder[(String, Int)]
@@ -605,7 +607,7 @@ object MongoConnection {
 
             case (host, "") => {
               buf += host -> DefaultPort
-              parse(input.tail)
+              parse(input.drop(1))
             }
 
             case (host, port) => {
@@ -630,7 +632,7 @@ object MongoConnection {
 
                 case Right(node) => {
                   buf += node
-                  parse(input.tail)
+                  parse(input.drop(1))
                 }
               }
             }
@@ -683,7 +685,7 @@ object MongoConnection {
 
             case (key, v) => {
               buf.put(key, v.drop(1))
-              parse(input.tail)
+              parse(input.drop(1))
             }
           }
 
@@ -848,7 +850,7 @@ object MongoConnection {
       val keyStore = MongoConnectionOptions.KeyStore(
         resource = new java.net.URI(uri),
         password = remOpts.get("keyStorePassword").map(_.toCharArray),
-        storeType = remOpts.get("keyStoreType").getOrElse("PKCS12"),
+        storeType = remOpts.getOrElse("keyStoreType", "PKCS12"),
         trust = true)
 
       step1.copy(keyStore = Some(keyStore))

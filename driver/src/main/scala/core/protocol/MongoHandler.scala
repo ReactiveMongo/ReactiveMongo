@@ -45,6 +45,7 @@ private[reactivemongo] class MongoHandler(
     super.channelIdle(ctx, e)
   }
 
+  @SuppressWarnings(Array("NullParameter"))
   override def channelInactive(ctx: ChannelHandlerContext): Unit = {
     val now = System.nanoTime()
 
@@ -86,7 +87,7 @@ private[reactivemongo] class MongoHandler(
     ctx: ChannelHandlerContext,
     msg: Any,
     promise: ChannelPromise): Unit = {
-    log(ctx, s"Channel is requested to write")
+    log(ctx, "Channel is requested to write")
 
     last = System.nanoTime()
 

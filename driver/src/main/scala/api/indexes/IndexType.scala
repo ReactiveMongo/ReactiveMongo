@@ -60,6 +60,7 @@ object IndexType {
     })
   }
 
+  @SuppressWarnings(Array("UnusedMethodParameter"))
   private[api] def write[P <: SerializationPack](pack: P)(builder: SerializationPack.Builder[pack.type]): IndexType => pack.Value = {
     case _: Ascending.type =>
       builder.int(1)

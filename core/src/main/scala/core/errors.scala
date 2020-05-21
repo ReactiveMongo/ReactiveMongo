@@ -120,20 +120,6 @@ private[reactivemongo] final class GenericDriverException(
   override def toString = s"GenericDriverException($message)"
 }
 
-private[reactivemongo] final class ConnectionNotInitializedException(
-  val message: String,
-  override val cause: Throwable) extends DriverException {
-
-  override lazy val hashCode = (message -> cause).hashCode
-
-  override def equals(that: Any): Boolean = that match {
-    case x: ConnectionNotInitializedException =>
-      (message -> cause) == (x.message -> x.cause)
-
-    case _ => false
-  }
-}
-
 private[reactivemongo] final class ConnectionException(
   val message: String) extends DriverException {
 

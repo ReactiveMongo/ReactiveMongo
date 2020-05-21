@@ -133,6 +133,7 @@ private[reactivemongo] trait CreateUserCommand[P <: SerializationPack] { _: Pack
 
     val writeWriteConcern = CommandCodecs.writeWriteConcern[pack.type](builder)
 
+    @SuppressWarnings(Array("VariableShadowing"))
     def writeRestriction(restriction: AuthenticationRestriction) = {
       val elmts = Seq.newBuilder[pack.ElementProducer]
 

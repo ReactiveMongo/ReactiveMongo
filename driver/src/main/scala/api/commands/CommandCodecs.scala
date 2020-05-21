@@ -9,28 +9,61 @@ import reactivemongo.api.{
   WriteConcern
 }
 
+import reactivemongo.core.errors.{ CommandException => CmdErr }
+
 private[reactivemongo] object CommandCodecs {
+  private def foldResult[P <: SerializationPack, A](
+    decoder: SerializationPack.Decoder[P])(
+    ko: decoder.pack.Document => A,
+    ok: decoder.pack.Document => A): decoder.pack.Document => A = { doc =>
+    decoder.booleanLike(doc, "ok") match {
+      case Some(true) => {
+        decoder.string(doc, "note").foreach { note =>
+          Command.logger.info(s"${note}: ${decoder.pack pretty doc}")
+        }
+
+        ok(doc)
+      }
+
+      case _ => ko(doc)
+    }
+  }
+
   /**
    * Helper to read a command result, with error handling.
    */
   def dealingWithGenericCommandExceptionsReader[P <: SerializationPack, A](pack: P)(readResult: pack.Document => A): pack.Reader[A] = {
     val decoder = pack.newDecoder
+    val foldRes = foldResult[pack.type, A](decoder) _
 
-    pack.reader[A] { doc: pack.Document =>
-      decoder.booleanLike(doc, "ok") match {
-        case Some(true) => {
-          decoder.string(doc, "note").foreach { note =>
-            Command.logger.info(s"${note}: ${pack pretty doc}")
-          }
+    pack.reader[A] {
+      foldRes(
+        { doc =>
+          throw CmdErr(pack)(
+            _message = decoder.string(doc, "errmsg").getOrElse(""),
+            _originalDocument = Some(doc),
+            _code = decoder.int(doc, "code"))
+        },
+        readResult)
+    }
+  }
 
-          readResult(doc)
-        }
+  /**
+   * Helper to read a command result, with error handling.
+   */
+  def dealingWithGenericCommandExceptionsReaderOpt[P <: SerializationPack, A](pack: P)(readResult: pack.Document => Option[A]): pack.Reader[A] = {
+    val decoder = pack.newDecoder
+    val foldRes = foldResult[pack.type, Option[A]](decoder) _
 
-        case _ => throw reactivemongo.core.errors.CommandException(pack)(
-          _message = decoder.string(doc, "errmsg").getOrElse(""),
-          _originalDocument = Some(doc),
-          _code = decoder.int(doc, "code"))
-      }
+    pack.readerOpt[A] {
+      foldRes(
+        { doc =>
+          throw CmdErr(pack)(
+            _message = decoder.string(doc, "errmsg").getOrElse(""),
+            _originalDocument = Some(doc),
+            _code = decoder.int(doc, "code"))
+        },
+        readResult)
     }
   }
 
@@ -42,10 +75,12 @@ private[reactivemongo] object CommandCodecs {
     val readWriteConcernError = CommandCodecs.readWriteConcernError(decoder)
 
     dealingWithGenericCommandExceptionsReader[pack.type, WR](pack) { doc =>
-      val werrors = decoder.children(doc, "writeErrors").map(readWriteError)
+      val werrors = decoder.children(doc, "writeErrors").flatMap { e =>
+        readWriteError(e).toSeq
+      }
 
       val wcError = decoder.child(doc, "writeConcernError").
-        map(readWriteConcernError)
+        flatMap(readWriteConcernError)
 
       DefaultWriteResult(
         ok = decoder.booleanLike(doc, "ok").getOrElse(true),
@@ -89,8 +124,8 @@ private[reactivemongo] object CommandCodecs {
                 elements.result()
               }
 
-              case _ => { c: ReadConcern =>
-                elements += simpleRead(c)
+              case _ => { rc: ReadConcern =>
+                elements += simpleRead(rc)
 
                 elements.result()
               }
@@ -166,18 +201,18 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
-  def readWriteError[P <: SerializationPack](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => WriteError = { doc =>
+  def readWriteError[P <: SerializationPack](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => Option[WriteError] = { doc =>
     (for {
       index <- decoder.int(doc, "index")
       code <- decoder.int(doc, "code")
       err <- decoder.string(doc, "errmsg")
-    } yield WriteError(index, code, err)).get
+    } yield WriteError(index, code, err))
   }
 
-  def readWriteConcernError[P <: SerializationPack](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => WriteConcernError = { doc =>
+  def readWriteConcernError[P <: SerializationPack](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => Option[WriteConcernError] = { doc =>
     (for {
       code <- decoder.int(doc, "code")
       err <- decoder.string(doc, "errmsg")
-    } yield new WriteConcernError(code, err)).get
+    } yield new WriteConcernError(code, err))
   }
 }

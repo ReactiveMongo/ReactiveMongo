@@ -20,6 +20,7 @@ private[reactivemongo] final class Capped(
 }
 
 private[reactivemongo] object Capped {
+  @SuppressWarnings(Array("UnusedMethodParameter"))
   private[api] def writeTo[P <: SerializationPack](pack: P)(builder: SerializationPack.Builder[pack.type], append: pack.ElementProducer => Any)(capped: Capped): Unit = {
     import builder.{ elementProducer => element }
 

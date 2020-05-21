@@ -24,6 +24,7 @@ import java.net.URI
  * @param readConcern the default [[https://docs.mongodb.com/manual/reference/read-concern/ read concern]]
  * @param appName the application name (custom or default)
  */
+@SuppressWarnings(Array("VariableShadowing"))
 final class MongoConnectionOptions private[reactivemongo] (
   // canonical options - connection
   val connectTimeoutMS: Int,
@@ -56,6 +57,7 @@ final class MongoConnectionOptions private[reactivemongo] (
 
   val appName: Option[String]) {
 
+  @SuppressWarnings(Array("MaxParameters"))
   def copy(
     connectTimeoutMS: Int = this.connectTimeoutMS,
     authenticationDatabase: Option[String] = this.authenticationDatabase,
@@ -146,6 +148,7 @@ object MongoConnectionOptions {
   /** The default options */
   @inline def default: MongoConnectionOptions = MongoConnectionOptions()
 
+  @SuppressWarnings(Array("MaxParameters"))
   def apply(
     connectTimeoutMS: Int = 0,
     authenticationDatabase: Option[String] = None,
@@ -243,10 +246,14 @@ object MongoConnectionOptions {
     override def hashCode: Int =
       (resource, storeType, password.map(Arrays.hashCode(_))).hashCode
 
+    @SuppressWarnings(Array("RedundantFinalizer"))
+    @com.github.ghik.silencer.silent("finalize\\ .*deprecated")
     override protected def finalize(): Unit = {
       password.foreach { p =>
         p.indices.foreach { p(_) = '\u0000' }
       }
+
+      super.finalize()
     }
   }
 
@@ -274,7 +281,7 @@ object MongoConnectionOptions {
   @inline private def ms(duration: Int): String = s"${duration}ms"
 
   private[reactivemongo] def toStrings(options: MongoConnectionOptions): List[(String, String)] = options.authenticationDatabase.toList.map(
-    "authenticationDatabase" -> _.toString) ++ List(
+    "authenticationDatabase" -> _) ++ List(
       "appName" -> options.appName.getOrElse("<undefined>"),
       "authenticationMechanism" -> options.authenticationMechanism.toString,
       "nbChannelsPerNode" -> options.nbChannelsPerNode.toString,

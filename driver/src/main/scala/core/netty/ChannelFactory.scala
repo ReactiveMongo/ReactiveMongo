@@ -180,7 +180,8 @@ private[reactivemongo] final class ChannelFactory(
         kmf.getKeyManagers
     }
 
-    val sslCtx = {
+    @SuppressWarnings(Array("AsInstanceOf"))
+    def sslCtx = {
       val res = javax.net.ssl.SSLContext.getInstance("SSL")
 
       val tm: Array[TrustManager] = {
@@ -225,7 +226,7 @@ private[reactivemongo] final class ChannelFactory(
         def operationComplete(f: Future[Any]): Unit = {
           childGroup.shutdownGracefully().
             addListener(new GenericFutureListener[Future[Any]] {
-              def operationComplete(f: Future[Any]): Unit = {
+              def operationComplete(g: Future[Any]): Unit = {
                 callback.success({}); ()
               }
             })

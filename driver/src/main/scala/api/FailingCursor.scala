@@ -15,6 +15,7 @@ private[api] final class FailingCursor[T](
 
   private[reactivemongo] def documentIterator(response: Response): Iterator[T] = Iterator.empty
 
+  @SuppressWarnings(Array("EmptyMethod"))
   private[reactivemongo] def killCursor(id: Long)(implicit ec: ExecutionContext): Unit = ()
 
   private[reactivemongo] def makeRequest(maxDocs: Int)(implicit ec: ExecutionContext): Future[Response] = failure

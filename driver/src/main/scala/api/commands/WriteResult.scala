@@ -23,7 +23,7 @@ sealed trait WriteResult {
   private[commands] def errmsg: Option[String]
 
   private[reactivemongo] def hasErrors: Boolean =
-    !writeErrors.isEmpty || !writeConcernError.isEmpty
+    writeErrors.nonEmpty || writeConcernError.nonEmpty
 
   private[reactivemongo] def inError: Boolean = !ok || code.isDefined
 
@@ -70,6 +70,7 @@ object WriteResult {
 private[reactivemongo] trait LastErrorFactory[P <: SerializationPack] {
   _: UpsertedFactory[P] =>
 
+  @SuppressWarnings(Array("IncorrectlyNamedExceptions"))
   private[reactivemongo] final class LastError(
     protected[reactivemongo] val ok: Boolean,
     val errmsg: Option[String],
@@ -140,6 +141,7 @@ private[reactivemongo] final class WriteError private[api] (
 
   private[api] lazy val tupled = Tuple3(index, code, errmsg)
 
+  @SuppressWarnings(Array("VariableShadowing"))
   private[api] def copy(
     index: Int = this.index,
     code: Int = this.code,

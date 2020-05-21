@@ -75,30 +75,30 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
         elementProducer("upsert", boolean(element.upsert)),
         elementProducer("multi", boolean(element.multi)))
 
-    if (maxWireVersion < MongoWireVersion.V34) { element =>
-      document(base(element).result())
-    } else if (maxWireVersion < MongoWireVersion.V36) { element =>
-      val elements = base(element)
+    if (maxWireVersion < MongoWireVersion.V34) { elmt1 =>
+      document(base(elmt1).result())
+    } else if (maxWireVersion < MongoWireVersion.V36) { elmt2 =>
+      val elements = base(elmt2)
 
-      element.collation.foreach { c =>
+      elmt2.collation.foreach { c =>
         elements += elementProducer(
           "collation",
           Collation.serializeWith(pack, c)(builder))
       }
 
       document(elements.result())
-    } else { element => // > 3.4
-      val elements = base(element)
+    } else { elmt3 => // > 3.4
+      val elements = base(elmt3)
 
-      element.collation.foreach { c =>
+      elmt3.collation.foreach { c =>
         elements += elementProducer(
           "collation",
           Collation.serializeWith(pack, c)(builder))
       }
 
-      element.arrayFilters.headOption.foreach { f =>
+      elmt3.arrayFilters.headOption.foreach { f =>
         elements += elementProducer(
-          "arrayFilters", builder.array(f, element.arrayFilters.tail))
+          "arrayFilters", builder.array(f, elmt3.arrayFilters.drop(1)))
       }
 
       document(elements.result())
@@ -155,13 +155,15 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
     val readUpserted = Upserted.readUpserted(decoder)
 
     CommandCodecs.dealingWithGenericCommandExceptionsReader[pack.type, UpdateWriteResult](pack) { doc =>
-      val werrors = decoder.children(doc, "writeErrors").map(readWriteError)
+      val werrors = decoder.children(doc, "writeErrors").flatMap { e =>
+        readWriteError(e).toSeq
+      }
 
       val wcError = decoder.child(doc, "writeConcernError").
-        map(readWriteConcernError)
+        flatMap(readWriteConcernError)
 
       val upserted = decoder.array(doc, "upserted").map(_.flatMap { v =>
-        decoder.asDocument(v).map(readUpserted)
+        decoder.asDocument(v).flatMap(readUpserted)
       })
 
       new UpdateWriteResult(

@@ -14,6 +14,7 @@ private[reactivemongo] final class PingInfo(
   private[core] val channelId: Option[ChannelId],
   private[core] val firstSent: Boolean) {
 
+  @SuppressWarnings(Array("VariableShadowing"))
   @inline def copy(
     ping: Long = this.ping,
     lastIsMasterTime: Long = this.lastIsMasterTime,

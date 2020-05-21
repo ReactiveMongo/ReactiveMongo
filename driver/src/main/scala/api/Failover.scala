@@ -1,6 +1,7 @@
 package reactivemongo.api
 
 import scala.util.{ Try, Failure, Success }
+import scala.util.control.NonFatal
 
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
@@ -31,7 +32,7 @@ private[reactivemongo] final class Failover[A](
   private def next(): Future[A] = try {
     producer()
   } catch {
-    case producerErr: Throwable => Future.failed[A](producerErr)
+    case NonFatal(producerErr) => Future.failed[A](producerErr)
   }
 
   private def send(n: Int): Future[A] =
@@ -89,12 +90,11 @@ private[api] object RetryableFailure {
   }
 
   private def isRetryable(throwable: Throwable) = throwable match {
-    case e: ChannelNotFound                   => e.retriable
-    case _: NotAuthenticatedException         => true
-    case _: PrimaryUnavailableException       => true
-    case _: NodeSetNotReachable               => true
-    case _: ConnectionException               => true
-    case _: ConnectionNotInitializedException => true
+    case e: ChannelNotFoundException     => e.retriable
+    case _: NotAuthenticatedException    => true
+    case _: PrimaryUnavailableException  => true
+    case _: NodeSetNotReachableException => true
+    case _: ConnectionException          => true
     case e: DatabaseException =>
       e.isNotAPrimaryError || e.isUnauthorized
 

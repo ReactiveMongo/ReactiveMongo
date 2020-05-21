@@ -2,6 +2,8 @@ package reactivemongo.api.commands
 
 import javax.crypto.SecretKeyFactory
 
+import scala.util.control.NonFatal
+
 import akka.util.ByteString
 
 import reactivemongo.api.{
@@ -128,9 +130,9 @@ private[reactivemongo] object ScramInitiate {
   }
 
   // Request utility
+  private val rand = new scala.util.Random(this.hashCode)
   private val authChars = util.toStream(new Iterator[Char] {
-    val rand = new scala.util.Random(this.hashCode)
-    val chars = rand.shuffle("""!"#$%&'()*+-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~""".toList)
+    val chars = rand.shuffle("""!"#$%&'()*+-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~""".toIndexedSeq)
 
     val hasNext = true
 
@@ -149,9 +151,9 @@ private[reactivemongo] object ScramInitiate {
   def randomPrefix(seed: Int): String = {
     val pos = ((System.nanoTime() / 1000000L) % 100).toInt // temporal position
     val slice = authChars.slice(pos, pos + 24 /* random str length */ )
-    val rand = new scala.util.Random(seed)
+    val pr = new scala.util.Random(seed)
 
-    rand.shuffle(slice.toList).mkString
+    pr.shuffle(slice.toList).mkString
   }
 }
 
@@ -210,11 +212,19 @@ private[reactivemongo] sealed trait ScramStartNegociation[M <: AuthenticationMod
         toRight(CmdErr(s"invalid $mechanism random prefix")).right
 
       salt <- response.get("s").flatMap[Array[Byte]] { s =>
-        try { Some(Base64 decodeBase64 s) } catch { case _: Throwable => None }
+        try {
+          Some(Base64 decodeBase64 s)
+        } catch {
+          case NonFatal(_) => None
+        }
       }.toRight(CmdErr(s"invalid $mechanism password salt")).right
 
       iter <- response.get("i").flatMap[Int] { i =>
-        try { Some(i.toInt) } catch { case _: Throwable => None }
+        try {
+          Some(i.toInt)
+        } catch {
+          case NonFatal(_) => None
+        }
       }.toRight(CmdErr(s"invalid $mechanism iteration count")).right
 
       hashCredential <- credential.right
@@ -246,7 +256,7 @@ private[reactivemongo] sealed trait ScramStartNegociation[M <: AuthenticationMod
           requestPayload = message)).right
 
       } catch {
-        case err: Throwable => Left(CmdErr(
+        case NonFatal(err) => Left(CmdErr(
           s"fails to negociate $mechanism: ${err.getMessage}")).right
       }
     } yield nego

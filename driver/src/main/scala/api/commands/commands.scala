@@ -66,7 +66,7 @@ private[reactivemongo] object Command {
   private[commands] lazy val logger =
     reactivemongo.util.LazyLogger("reactivemongo.api.commands")
 
-  def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = fetchCursor[p.type, A](db, db.name + ".$cmd", p, command, failover, CursorOptions.empty, maxTimeMS = None)
+  def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = fetchCursor[p.type, A](db, db.name + f".$$cmd", p, command, failover, CursorOptions.empty, maxTimeMS = None)
 
   /**
    * @param fullCollectionName the fully qualified collection name (even if `query.fullCollectionName` is `\$cmd`)
@@ -141,7 +141,7 @@ private[reactivemongo] object Command {
 
       val op = Query(flags, db.name + f".$$cmd", 0, 1)
 
-      DefaultCursor.query(pack, op, (_: Int) /*TODO: max?*/ => bs,
+      DefaultCursor.query(pack, op, (_: Int) => bs,
         readPreference, db, failover, fullCollectionName, maxTimeMS)
 
     }

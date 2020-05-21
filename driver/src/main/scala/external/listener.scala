@@ -61,6 +61,7 @@ object ConnectionListener {
     org.slf4j.LoggerFactory.getLogger("reactivemongo.core.ConnectionListener")
 
   /** Optionally creates a listener according the available binding. */
+  @SuppressWarnings(Array("NullParameter"))
   def apply(): Option[ConnectionListener] = {
     val binderPathSet = scala.collection.mutable.LinkedHashSet[URL]()
 
@@ -80,7 +81,7 @@ object ConnectionListener {
     }
 
     binderPathSet.headOption.flatMap { first =>
-      if (!binderPathSet.tail.isEmpty) {
+      if (binderPathSet.tail.nonEmpty) {
         logger.warn(s"Class path contains multiple StaticListenerBinder: $first, ${binderPathSet.tail mkString ", "}")
       }
 

@@ -29,6 +29,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
 
   /** Ascending sort order */
   final class Ascending private (val field: String) extends SortOrder {
+    @SuppressWarnings(Array("NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -38,6 +39,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
@@ -53,6 +55,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
 
   /** Descending sort order */
   final class Descending private (val field: String) extends SortOrder {
+    @SuppressWarnings(Array("NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -62,6 +65,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 

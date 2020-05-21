@@ -22,6 +22,7 @@ private[reactivemongo] trait MultiBulkWriteResultFactory[P <: SerializationPack]
     val errmsg: Option[String],
     val totalN: Int) {
 
+    @SuppressWarnings(Array("VariableShadowing"))
     private[api] def merge(wr: WriteResult): MultiBulkWriteResult = wr match {
       case wr: UpdateWriteResult @unchecked => new MultiBulkWriteResult(
         ok = ok && wr.ok,

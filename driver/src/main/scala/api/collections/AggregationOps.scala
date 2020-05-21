@@ -74,7 +74,7 @@ private[collections] trait AggregationOps[P <: SerializationPack] {
 
     private def ver = db.connectionState.metadata.maxWireVersion
 
-    final def cursor: AC[T] = {
+    def cursor: AC[T] = {
       def batchSz = context.batchSize.getOrElse(defaultCursorBatchSize)
       implicit def writer = commandWriter[T]
       implicit def aggReader: pack.Reader[T] = context.reader

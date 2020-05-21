@@ -19,7 +19,7 @@ private[api] final class FoldResponses[T](
   suc: (T, Response) => Future[Cursor.State[T]],
   err: Cursor.ErrorHandler[T])(implicit actorSys: ActorSystem, ec: ExecutionContext) { self =>
   import Cursor.{ Cont, Done, Fail, State, logger }
-  import CursorOps.Unrecoverable
+  import CursorOps.UnrecoverableException
 
   private val promise = scala.concurrent.Promise[T]()
   lazy val result: Future[T] = promise.future
@@ -63,7 +63,7 @@ private[api] final class FoldResponses[T](
     val handled: Future[State[T]] = try {
       suc(cur, last)
     } catch {
-      case unsafe: Exception /* see makeIterator */ =>
+      case NonFatal(unsafe) /* see makeIterator */ =>
         Future.failed[State[T]](unsafe)
     }
 
@@ -78,7 +78,7 @@ private[api] final class FoldResponses[T](
   @inline
   private def onError(last: Response, cur: T, error: Throwable, c: Int): Unit =
     error match {
-      case Unrecoverable(e) =>
+      case UnrecoverableException(e) =>
         ko(last, e) // already marked recoverable
 
       case _ => err(cur, error) match {
@@ -93,13 +93,13 @@ private[api] final class FoldResponses[T](
 
   @inline private def fetch(
     c: Int,
-    ec: ExecutionContext,
-    r: Response): Future[Option[Response]] = {
+    fec: ExecutionContext,
+    fr: Response): Future[Option[Response]] = {
     // Enforce maxDocs check as r.reply.startingFrom (checked in hasNext),
     // will always be set to 0 by the server for tailable cursor/capped coll
     if (c < maxDocs) {
       // nextResponse will take care of cursorID, ...
-      nextResponse(ec, r)
+      nextResponse(fec, fr)
     } else {
       Future.successful(Option.empty[Response])
     }
@@ -228,6 +228,7 @@ private[api] final class FoldResponses[T](
     }
 
     // @com.github.ghik.silencer.silent
+    @SuppressWarnings(Array("AsInstanceOf"))
     implicit def defaultDelay[M]: Delay.Aux[M] =
       unsafe.asInstanceOf[Delay.Aux[M]]
   }

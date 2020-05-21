@@ -47,6 +47,7 @@ private[reactivemongo] sealed class Close {
  * The MongoDBSystem actor must not be used after this message has been sent.
  */
 private[reactivemongo] case object Close extends Close {
+  @SuppressWarnings(Array("VariableShadowing"))
   def apply(src: String, timeout: FiniteDuration): Close = {
     def t = timeout
     new Close {

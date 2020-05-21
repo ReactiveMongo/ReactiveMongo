@@ -58,6 +58,14 @@ trait SerializationPack { self: Singleton =>
   // Returns a Reader from a function
   private[reactivemongo] def reader[A](f: Document => A): Reader[A]
 
+  private[reactivemongo] final def readerOpt[A](f: Document => Option[A]): Reader[A] = reader[A] { doc =>
+    f(doc) match {
+      case Some(v) => v
+      case _ => throw reactivemongo.api.bson.exceptions.
+        ValueDoesNotMatchException(pretty(doc))
+    }
+  }
+
   private[reactivemongo] def narrowIdentityReader: NarrowValueReader[Value]
 
   private[reactivemongo] def bsonSize(value: Value): Int

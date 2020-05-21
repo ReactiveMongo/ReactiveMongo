@@ -238,6 +238,7 @@ object Cursor {
    *
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
+  @SuppressWarnings(Array("MethodNames"))
   def FailOnError[A](callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}): ErrorHandler[A] = (v: A, e: Throwable) => { callback(v, e); Fail(e): State[A] }
 
   /**
@@ -245,6 +246,7 @@ object Cursor {
    *
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
+  @SuppressWarnings(Array("MethodNames"))
   def DoneOnError[A](callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}): ErrorHandler[A] = (v: A, e: Throwable) => { callback(v, e); Done(v): State[A] }
 
   /**
@@ -252,6 +254,7 @@ object Cursor {
    *
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
+  @SuppressWarnings(Array("MethodNames"))
   def ContOnError[A](callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}): ErrorHandler[A] = (v: A, e: Throwable) => { callback(v, e); Cont(v): State[A] }
 
   /**
@@ -259,6 +262,7 @@ object Cursor {
    *
    * @param callback the callback function applied on each value.
    */
+  @SuppressWarnings(Array("MethodNames"))
   def Ignore[A](callback: A => Unit = (_: A) => {}): (Unit, A) => State[Unit] = { (_, a) => Cont(callback(a)) }
 
   /**
@@ -368,6 +372,7 @@ object Cursor {
     val value: T,
     val reference: Reference) {
 
+    @SuppressWarnings(Array("NullParameter", "ComparingUnrelatedTypes"))
     override def equals(that: Any): Boolean = that match {
       case null => false
 

@@ -44,7 +44,7 @@ object CursorOps {
    * Wraps exception that has already been passed to the current error handler
    * and should not be recovered.
    */
-  private[reactivemongo] case class Unrecoverable(cause: Throwable)
+  private[reactivemongo] case class UnrecoverableException(cause: Throwable)
     extends scala.RuntimeException(cause)
     with scala.util.control.NoStackTrace
 

@@ -21,8 +21,8 @@ private[reactivemongo] object GetCrNonce
   def reader[P <: SerializationPack](pack: P): pack.Reader[CrNonce] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandExceptionsReader[pack.type, CrNonce](pack) {
-      decoder.string(_, "nonce").map { new CrNonce(_) }.get
+    CommandCodecs.dealingWithGenericCommandExceptionsReaderOpt[pack.type, CrNonce](pack) {
+      decoder.string(_, "nonce").map { new CrNonce(_) }
     }
   }
 }
@@ -70,16 +70,18 @@ private[reactivemongo] object CrAuthenticate {
 
     import decoder.string
 
-    pack.reader[AuthenticationResult] { doc =>
+    pack.readerOpt[AuthenticationResult] { doc =>
       string(doc, "errmsg") match {
         case Some(error) =>
-          FailedAuthentication(pack)(error, decoder.int(doc, "code"), Some(doc))
+          Some(
+            FailedAuthentication(pack)(error, decoder.int(doc, "code"),
+              Some(doc)))
 
         case _ => (for {
           dbn <- string(doc, "dbname")
           usr <- string(doc, "user")
           ro = decoder.booleanLike(doc, "readOnly").getOrElse(false)
-        } yield VerboseSuccessfulAuthentication(dbn, usr, ro)).get
+        } yield VerboseSuccessfulAuthentication(dbn, usr, ro))
       }
     }
   }

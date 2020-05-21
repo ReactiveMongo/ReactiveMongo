@@ -28,6 +28,7 @@ private[reactivemongo] class Connection(
   def isAuthenticated(db: String, user: String): Boolean =
     authenticated.exists(auth => auth.user == user && auth.db == db)
 
+  @SuppressWarnings(Array("VariableShadowing"))
   private[core] def copy(
     channel: Channel = this.channel,
     status: ConnectionStatus = this.status,

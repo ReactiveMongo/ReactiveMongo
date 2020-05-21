@@ -92,6 +92,7 @@ final class DB private[api] (
    * @param name $nameParam
    * @param failoverStrategy $failoverStrategyParam
    */
+  @SuppressWarnings(Array("VariableShadowing"))
   def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = Serialization.defaultCollectionProducer): C = collection(name, failoverStrategy)
 
   /**
@@ -107,6 +108,7 @@ final class DB private[api] (
    * def resolveColl(db: DB) = db.collection("acoll")
    * }}}
    */
+  @SuppressWarnings(Array("VariableShadowing"))
   def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = Serialization.defaultCollectionProducer): C = producer(this, name, failoverStrategy)
 
   /**
@@ -132,7 +134,7 @@ final class DB private[api] (
    *
    * @return The database reference updated with a new session
    */
-  @inline final def startSession()(implicit ec: ExecutionContext): Future[DB] = startSession(failIfAlreadyStarted = false)
+  @inline def startSession()(implicit ec: ExecutionContext): Future[DB] = startSession(failIfAlreadyStarted = false)
 
   /**
    * $startSessionDescription.
@@ -182,6 +184,7 @@ final class DB private[api] (
     }
   }
 
+  @SuppressWarnings(Array("VariableShadowing"))
   @inline private def withSession(session: Session): DB = new DB(
     name, connection, connectionState, failoverStrategy, Some(session))
 
@@ -204,7 +207,7 @@ final class DB private[api] (
    *
    * @return The database reference with transaction.
    */
-  @inline final def startTransaction(writeConcern: Option[WriteConcern])(implicit ec: ExecutionContext): Future[DB] = startTransaction(writeConcern, false)
+  @inline def startTransaction(writeConcern: Option[WriteConcern])(implicit ec: ExecutionContext): Future[DB] = startTransaction(writeConcern, false)
 
   private def transactionNode()(implicit ec: ExecutionContext): Future[Option[String]] = {
     if (connectionState.isMongos) { // node required to pin transaction
@@ -252,7 +255,7 @@ final class DB private[api] (
 
     case _ =>
       Future.failed[DB](new GenericDriverException(
-        s"Cannot start a transaction without a started session"))
+        "Cannot start a transaction without a started session"))
   }
 
   /**
@@ -268,7 +271,7 @@ final class DB private[api] (
    *
    * @return The database reference with transaction aborted (but not session)
    */
-  @inline final def abortTransaction()(implicit ec: ExecutionContext): Future[DB] = abortTransaction(failIfNotStarted = false)
+  @inline def abortTransaction()(implicit ec: ExecutionContext): Future[DB] = abortTransaction(failIfNotStarted = false)
 
   /**
    * $abortTxDescription, if any otherwise does nothing .
@@ -292,7 +295,7 @@ final class DB private[api] (
    *
    * @return The database reference with transaction commited (but not session)
    */
-  @inline final def commitTransaction()(implicit ec: ExecutionContext): Future[DB] = commitTransaction(failIfNotStarted = false)
+  @inline def commitTransaction()(implicit ec: ExecutionContext): Future[DB] = commitTransaction(failIfNotStarted = false)
 
   /**
    * $commitTxDescription, if any otherwise does nothing .
@@ -379,7 +382,7 @@ final class DB private[api] (
    *
    * @return The database reference with session ended
    */
-  @inline final def endSession()(implicit ec: ExecutionContext): Future[DB] = endSession(failIfNotStarted = false)
+  @inline def endSession()(implicit ec: ExecutionContext): Future[DB] = endSession(failIfNotStarted = false)
 
   /**
    * $endSessionDescription, if any otherwise does nothing .
@@ -401,7 +404,7 @@ final class DB private[api] (
    *
    * @return The database reference with session aborted
    */
-  @inline final def killSession()(implicit ec: ExecutionContext): Future[DB] = killSession(failIfNotStarted = false)
+  @inline def killSession()(implicit ec: ExecutionContext): Future[DB] = killSession(failIfNotStarted = false)
 
   /**
    * $killSessionDescription, if any otherwise does nothing .
@@ -433,6 +436,7 @@ final class DB private[api] (
   /**
    * '''EXPERIMENTAL:''' API may change without notice.
    */
+  @SuppressWarnings(Array("VariableShadowing"))
   def getMore[P <: SerializationPack, T](
     pack: P,
     reference: Cursor.Reference,
@@ -470,6 +474,7 @@ final class DB private[api] (
    * @param reader $readerParam
    * @return $singleResult
    */
+  @SuppressWarnings(Array("VariableShadowing"))
   def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R], failoverStrategy: FailoverStrategy = FailoverStrategy.default, readPreference: ReadPreference = this.defaultReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = Command.run(pack, failoverStrategy).apply(this, command, readPreference)
 
   /**
@@ -480,6 +485,7 @@ final class DB private[api] (
    * @param reader $readerParam
    * @return $cursorFetcher
    */
+  @SuppressWarnings(Array("VariableShadowing"))
   def runCommand[C <: Command](command: C, failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = Command.run(pack, failoverStrategy).apply(this, command)
 
   /**
@@ -498,6 +504,7 @@ final class DB private[api] (
    * @param readPreference $readPrefParam
    * @return $cursorFetcher
    */
+  @SuppressWarnings(Array("VariableShadowing"))
   def runCommand(
     command: pack.Document,
     failoverStrategy: FailoverStrategy): CursorFetcher[pack.type, Cursor] = {

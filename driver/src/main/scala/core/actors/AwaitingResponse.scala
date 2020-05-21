@@ -28,6 +28,7 @@ private[actors] final class AwaitingResponse(
         retry = this.retry + 1)
     })
 
+  @SuppressWarnings(Array("VariableShadowing"))
   private def copy(
     channelID: ChannelId,
     retry: Int,

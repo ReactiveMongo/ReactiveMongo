@@ -39,6 +39,7 @@ import reactivemongo.api.{
 import reactivemongo.api.commands.CommandCodecs
 
 /** Query build factory */
+@SuppressWarnings(Array("VariableShadowing"))
 trait QueryBuilderFactory[P <: SerializationPack]
   extends HintFactory[P] { self: PackSupport[P] =>
 
@@ -151,13 +152,13 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *       err = Cursor.FailOnError[List[BSONDocument]]())
      * }}}
      */
-    final def sort(document: pack.Document): QueryBuilder =
+    def sort(document: pack.Document): QueryBuilder =
       copy(sort = Some(document))
 
     /**
      * $projectionFunction.
      */
-    final def projection(document: pack.Document): QueryBuilder =
+    def projection(document: pack.Document): QueryBuilder =
       copy(projection = Some(document))
 
     /**
@@ -182,7 +183,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *
      * @tparam Pjn The type of the projection. An implicit `Writer[Pjn]` typeclass for handling it has to be in the scope.
      */
-    final def projection[Pjn](p: Pjn)(implicit writer: pack.Writer[Pjn]): QueryBuilder =
+    def projection[Pjn](p: Pjn)(implicit writer: pack.Writer[Pjn]): QueryBuilder =
       copy(projection = Some(pack.serialize(p, writer)))
 
     /**
@@ -196,7 +197,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   hint(coll.hint(BSONDocument("foo" -> 1))) // sets the hint
      * }}}
      */
-    final def hint(h: Hint): QueryBuilder = copy(hint = Some(h))
+    def hint(h: Hint): QueryBuilder = copy(hint = Some(h))
 
     /**
      * Toggles [[https://docs.mongodb.org/manual/reference/method/cursor.explain/#cursor.explain explain mode]].
@@ -208,7 +209,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).explain()
      * }}}
      */
-    final def explain(flag: Boolean = true): QueryBuilder = copy(explain = flag)
+    def explain(flag: Boolean = true): QueryBuilder = copy(explain = flag)
 
     /**
      * Toggles [[https://docs.mongodb.org/manual/faq/developers/#faq-developers-isolate-cursors snapshot mode]].
@@ -220,7 +221,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).snapshot()
      * }}}
      */
-    final def snapshot(flag: Boolean = true): QueryBuilder =
+    def snapshot(flag: Boolean = true): QueryBuilder =
       copy(snapshot = flag)
 
     /**
@@ -234,7 +235,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   comment("Any comment to trace the query")
      * }}}
      */
-    final def comment(message: String): QueryBuilder =
+    def comment(message: String): QueryBuilder =
       copy(comment = Some(message))
 
     /**
@@ -248,7 +249,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   maxTimeMs(1000L) // 1s
      * }}}
      */
-    final def maxTimeMs(milliseconds: Long): QueryBuilder =
+    def maxTimeMs(milliseconds: Long): QueryBuilder =
       copy(maxTimeMs = Some(milliseconds))
 
     /**
@@ -262,7 +263,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   readConcern(reactivemongo.api.ReadConcern.Local)
      * }}}
      */
-    final def readConcern(concern: ReadConcern): QueryBuilder =
+    def readConcern(concern: ReadConcern): QueryBuilder =
       copy(readConcern = concern)
 
     /**
@@ -276,7 +277,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   singleBatch()
      * }}}
      */
-    final def singleBatch(flag: Boolean = true): QueryBuilder =
+    def singleBatch(flag: Boolean = true): QueryBuilder =
       copy(singleBatch = flag)
 
     /**
@@ -290,7 +291,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   maxScan(1.23D)
      * }}}
      */
-    final def maxScan(max: Double): QueryBuilder = copy(maxScan = Some(max))
+    def maxScan(max: Double): QueryBuilder = copy(maxScan = Some(max))
 
     /**
      * Sets the `returnKey` flag.
@@ -302,7 +303,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).returnKey()
      * }}}
      */
-    final def returnKey(flag: Boolean = true): QueryBuilder = copy(returnKey = flag)
+    def returnKey(flag: Boolean = true): QueryBuilder = copy(returnKey = flag)
 
     /**
      * Sets the `showRecordId` flag.
@@ -315,7 +316,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   coll.find(BSONDocument.empty).showRecordId()
      * }}}
      */
-    final def showRecordId(flag: Boolean = true): QueryBuilder =
+    def showRecordId(flag: Boolean = true): QueryBuilder =
       copy(showRecordId = flag)
 
     /**
@@ -329,7 +330,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   max(BSONDocument("field" -> "maxValue"))
      * }}}
      */
-    final def max(document: pack.Document): QueryBuilder =
+    def max(document: pack.Document): QueryBuilder =
       copy(max = Some(document))
 
     /**
@@ -343,7 +344,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   min(BSONDocument("field" -> "minValue"))
      * }}}
      */
-    final def min(document: pack.Document): QueryBuilder =
+    def min(document: pack.Document): QueryBuilder =
       copy(min = Some(document))
 
     /**
@@ -360,7 +361,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   coll.find(BSONDocument.empty).collation(c)
      * }}}
      */
-    final def collation(collation: Collation): QueryBuilder =
+    def collation(collation: Collation): QueryBuilder =
       copy(collation = Some(collation))
 
     // QueryOps
@@ -380,7 +381,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   c.find(BSONDocument.empty).awaitData
      * }}}
      */
-    final def awaitData: QueryBuilder =
+    def awaitData: QueryBuilder =
       copy(cursorOptions = cursorOptions.awaitData)
 
     /**
@@ -394,7 +395,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   c.find(BSONDocument.empty).batchSize(10)
      * }}}
      */
-    final def batchSize(n: Int): QueryBuilder = copy(batchSize = n)
+    def batchSize(n: Int): QueryBuilder = copy(batchSize = n)
 
     /**
      * Sets the [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.exhaust flag]] to return all data returned by the query at once rather than splitting the results into batches.
@@ -407,7 +408,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   c.find(BSONDocument.empty).exhaust
      * }}}
      */
-    final def exhaust: QueryBuilder =
+    def exhaust: QueryBuilder =
       copy(cursorOptions = cursorOptions.exhaust)
 
     /**
@@ -421,7 +422,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   c.find(BSONDocument.empty).noCursorTimeout
      * }}}
      */
-    final def noCursorTimeout: QueryBuilder =
+    def noCursorTimeout: QueryBuilder =
       copy(cursorOptions = cursorOptions.noCursorTimeout)
 
     private[api] def oplogReplay: QueryBuilder =
@@ -438,7 +439,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   c.find(BSONDocument.empty).allowPartialResults
      * }}}
      */
-    final def allowPartialResults: QueryBuilder =
+    def allowPartialResults: QueryBuilder =
       copy(cursorOptions = cursorOptions.partial)
 
     /**
@@ -452,8 +453,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   c.find(BSONDocument.empty).skip(10)
      * }}}
      */
-    final def skip(n: Int): QueryBuilder =
-      copy(skip = n)
+    def skip(n: Int): QueryBuilder = copy(skip = n)
 
     /**
      * Allows querying of a replica slave ([[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.slaveOk `slaveOk`]]).
@@ -466,8 +466,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   c.find(BSONDocument.empty).slaveOk
      * }}}
      */
-    final def slaveOk: QueryBuilder =
-      copy(cursorOptions = cursorOptions.slaveOk)
+    def slaveOk: QueryBuilder = copy(cursorOptions = cursorOptions.slaveOk)
 
     /**
      * Makes the result [[https://docs.mongodb.com/manual/reference/method/cursor.addOption/#DBQuery.Option.tailable cursor tailable]].
@@ -480,7 +479,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *   c.find(BSONDocument.empty).tailable
      * }}}
      */
-    final def tailable: QueryBuilder =
+    def tailable: QueryBuilder =
       copy(cursorOptions = cursorOptions.tailable)
 
     // Cursor
@@ -508,7 +507,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *
      * @tparam T $resultTParam
      */
-    final def cursor[T](readPreference: ReadPreference = readPreference)(implicit reader: pack.Reader[T], cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference))
+    def cursor[T](readPreference: ReadPreference = readPreference)(implicit reader: pack.Reader[T], cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference))
 
     /**
      * $oneFunction (using the default [[reactivemongo.api.ReadPreference]]).
@@ -532,7 +531,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *
      * @tparam T $resultTParam
      */
-    final def one[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = one(this.readPreference)
+    def one[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = one(this.readPreference)
 
     /**
      * $oneFunction.
@@ -555,7 +554,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *
      * @tparam T $resultTParam
      */
-    final def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(batchSize = 1).defaultCursor(readPreference)(reader).headOption
+    def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(batchSize = 1).defaultCursor(readPreference)(reader).headOption
 
     /**
      * $requireOneFunction
@@ -576,7 +575,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *
      * @tparam T $resultTParam
      */
-    final def requireOne[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = requireOne(readPreference)
+    def requireOne[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = requireOne(readPreference)
 
     /**
      * $requireOneFunction.
@@ -603,10 +602,11 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *
      * @tparam T $resultTParam
      */
-    final def requireOne[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = copy(batchSize = 1).defaultCursor(readPreference)(reader).head
+    def requireOne[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = copy(batchSize = 1).defaultCursor(readPreference)(reader).head
 
     // ---
 
+    @SuppressWarnings(Array("MaxParameters"))
     private[reactivemongo] def copy(
       failoverStrategy: FailoverStrategy = failoverStrategy,
       skip: Int = this.skip,

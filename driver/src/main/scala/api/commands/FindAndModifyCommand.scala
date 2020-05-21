@@ -85,7 +85,7 @@ private[api] trait FindAndModifyCommand[P <: SerializationPack] {
     val lastError: Option[FindAndUpdateLastError],
     val value: Option[pack.Document]) {
 
-    final def result[T](implicit reader: pack.Reader[T]): Option[T] =
+    def result[T](implicit reader: pack.Reader[T]): Option[T] =
       value.map(pack.deserialize(_, reader))
 
     override def equals(that: Any): Boolean = that match {
@@ -141,10 +141,10 @@ private[api] trait FindAndModifyCommand[P <: SerializationPack] {
         elements += element("fields", f)
       }
 
-      command.arrayFilters.headOption.foreach { f =>
+      command.arrayFilters.headOption.foreach { af =>
         elements += element(
           "arrayFilters",
-          array(f, command.arrayFilters.tail))
+          array(af, command.arrayFilters.drop(1)))
       }
 
       command.modifier match {

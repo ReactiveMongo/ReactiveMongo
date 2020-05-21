@@ -143,7 +143,7 @@ trait InsertOps[P <: SerializationPack]
     private final def execute(documents: Seq[pack.Document])(implicit ec: ExecutionContext): Future[WriteResult] = documents.headOption match {
       case Some(head) => {
         val cmd = new Insert(
-          head, documents.tail, ordered, writeConcern,
+          head, documents.drop(1), ordered, writeConcern,
           bypassDocumentValidation)
 
         runCommand(cmd, writePreference).flatMap { wr =>

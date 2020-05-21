@@ -294,12 +294,13 @@ sealed trait GridFS[P <: SerializationPack]
           finalizeFile[Id](file, previous, n, chunkSize, length.toLong, md5Hex)
         }
 
-      @inline def writeChunk(n: Int, bytes: Array[Byte]) =
-        self.writeChunk(file.id, n, bytes)
+      @inline def writeChunk(cn: Int, bytes: Array[Byte]) =
+        self.writeChunk(file.id, cn, bytes)
     }
 
     val buffer = Array.ofDim[Byte](chunkSize)
 
+    @SuppressWarnings(Array("VariableShadowing"))
     def go(previous: Chunk): Future[Chunk] =
       Future(input read buffer).flatMap {
         case n if n > 0 => {
@@ -352,6 +353,7 @@ sealed trait GridFS[P <: SerializationPack]
    *
    * @return A future containing true if the index was created, false if it already exists.
    */
+  @SuppressWarnings(Array("VariableShadowing"))
   def ensureIndex()(implicit ec: ExecutionContext): Future[Boolean] = {
     val indexMngr = db.indexesManager[P](pack)(ec)
 
@@ -410,9 +412,10 @@ sealed trait GridFS[P <: SerializationPack]
    * Returns whether the data related to this GridFS instance
    * exists on the database.
    */
+  @SuppressWarnings(Array("VariableShadowing"))
   def exists(implicit ec: ExecutionContext): Future[Boolean] = (for {
-    _ <- stats(chunkColl).filter { s => s.size > 0 || s.nindexes > 0 }
-    _ <- stats(fileColl).filter { s => s.size > 0 || s.nindexes > 0 }
+    _ <- stats(chunkColl).filter { c => c.size > 0 || c.nindexes > 0 }
+    _ <- stats(fileColl).filter { f => f.size > 0 || f.nindexes > 0 }
   } yield true).recover {
     case _ => false
   }
@@ -492,31 +495,30 @@ sealed trait GridFS[P <: SerializationPack]
       elem("uploadDate", builder.dateTime(uploadDate)),
       elem("metadata", file.metadata))
 
-    file.filename.foreach { n =>
-      fileProps += elem("filename", builder.string(n))
+    file.filename.foreach { fn =>
+      fileProps += elem("filename", builder.string(fn))
     }
 
-    file.contentType.foreach { t =>
-      fileProps += elem("contentType", builder.string(t))
+    file.contentType.foreach { ct =>
+      fileProps += elem("contentType", builder.string(ct))
     }
 
     md5Hex.foreach { hex =>
       fileProps += elem("md5", builder.string(hex))
     }
 
-    for {
-      _ <- writeChunk(file.id, n, previous)
+    writeChunk(file.id, n, previous).flatMap { _ =>
+      val fileDoc = document(fileProps.result())
 
-      res <- {
-        val fileDoc = document(fileProps.result())
+      val insertFileCmd = new Insert(
+        head = fileDoc,
+        tail = Seq.empty[pack.Document],
+        ordered = false,
+        writeConcern = defaultWriteConcern,
+        bypassDocumentValidation = false)
 
-        val insertFileCmd = new Insert(
-          head = fileDoc,
-          tail = Seq.empty[pack.Document],
-          ordered = false,
-          writeConcern = defaultWriteConcern,
-          bypassDocumentValidation = false)
-
+      @SuppressWarnings(Array("VariableShadowing"))
+      @inline def run =
         runner(fileColl, insertFileCmd, defaultReadPreference).map { _ =>
           new ReadFile[Id](
             id = file.id,
@@ -528,8 +530,9 @@ sealed trait GridFS[P <: SerializationPack]
             metadata = file.metadata,
             md5 = md5Hex)
         }
-      }
-    } yield res
+
+      run
+    }
   }
 
   @inline private def chunkSelector[Id <: pack.Value](
@@ -543,10 +546,10 @@ sealed trait GridFS[P <: SerializationPack]
             if (file.length % file.chunkSize > 0) 1 else 0))))))))
 
   private lazy val chunkReader: pack.Reader[Array[Byte]] = {
-    val decoder = pack.newDecoder
+    val dec = pack.newDecoder
 
-    pack.reader[Array[Byte]] { doc =>
-      decoder.binary(doc, "data").get
+    pack.readerOpt[Array[Byte]] { doc =>
+      dec.binary(doc, "data")
     }
   }
 
@@ -605,12 +608,13 @@ sealed trait GridFS[P <: SerializationPack]
 }
 
 object GridFS {
+  @SuppressWarnings(Array("VariableShadowing"))
   private[api] def apply[P <: SerializationPack](
     _pack: P,
     db: DB with DBMetaCommands,
     prefix: String): GridFS[P] = {
-    def _prefix = prefix
-    def _db = db
+    @SuppressWarnings(Array("MethodNames")) def _prefix = prefix
+    @SuppressWarnings(Array("MethodNames")) def _db = db
 
     new GridFS[P] {
       val db = _db

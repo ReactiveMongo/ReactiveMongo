@@ -39,7 +39,7 @@ private[reactivemongo] object CollStats {
   def reader[P <: SerializationPack](pack: P): pack.Reader[CollectionStats] = {
     val decoder = pack.newDecoder
 
-    pack.reader[CollectionStats] { doc =>
+    pack.readerOpt[CollectionStats] { doc =>
       (for {
         ns <- decoder.string(doc, "ns")
         count <- decoder.int(doc, "count")
@@ -63,7 +63,7 @@ private[reactivemongo] object CollStats {
         ms = decoder.double(doc, "maxSize")
       } yield new CollectionStats(
         ns, count, sz, avg, ss, ne, ni, le, pf, sf,
-        uf, ti, is, cp, mx, ms)).get
+        uf, ti, is, cp, mx, ms))
     }
   }
 }

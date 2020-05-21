@@ -43,6 +43,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     protected[reactivemongo] val makeFunction =
       pipe(f"$$avg", builder.string("$" + field))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -53,6 +54,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
@@ -70,6 +72,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$avg", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -80,6 +83,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -99,6 +103,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$first", builder.string("$" + field))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -109,6 +114,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
@@ -126,6 +132,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$first", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -136,6 +143,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -155,6 +163,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     protected[reactivemongo] val makeFunction =
       pipe(f"$$last", builder.string("$" + field))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -165,6 +174,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
@@ -182,6 +192,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$last", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -192,6 +203,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -211,6 +223,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     protected[reactivemongo] val makeFunction =
       pipe(f"$$max", builder.string("$" + field))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -221,6 +234,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
@@ -241,6 +255,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$max", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -251,6 +266,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -272,6 +288,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     protected[reactivemongo] val makeFunction =
       pipe(f"$$mergeObjects", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -282,6 +299,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -302,6 +320,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     protected[reactivemongo] val makeFunction =
       pipe(f"$$min", builder.string("$" + field))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -312,6 +331,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
@@ -330,6 +350,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   final class Min(val expression: pack.Value) extends GroupFunction {
     protected[reactivemongo] val makeFunction = pipe(f"$$min", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -340,6 +361,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -359,6 +381,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     protected[reactivemongo] val makeFunction =
       pipe(f"$$push", builder.string("$" + field))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -369,6 +392,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
@@ -388,6 +412,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$push", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -398,6 +423,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -417,6 +443,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$addToSet", builder.string("$" + field))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -427,6 +454,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
@@ -447,6 +475,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$addToSet", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -457,6 +486,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -476,6 +506,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     val expression: pack.Value) extends GroupFunction {
     protected[reactivemongo] val makeFunction = pipe(f"$$stdDevPop", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -486,6 +517,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -508,6 +540,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     protected[reactivemongo] val makeFunction =
       pipe(f"$$stdDevPop", builder.string("$" + field))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -518,6 +551,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
@@ -539,6 +573,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     protected[reactivemongo] val makeFunction =
       pipe(f"$$stdDevSamp", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -549,6 +584,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -571,6 +607,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     protected[reactivemongo] val makeFunction =
       pipe(f"$$stdDevSamp", builder.string("$" + field))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -581,6 +618,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
@@ -600,6 +638,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     protected[reactivemongo] val makeFunction =
       pipe(f"$$sum", builder.string("$" + field))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -610,6 +649,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
@@ -629,6 +669,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     protected[reactivemongo] val makeFunction: pack.Document =
       pipe(f"$$sum", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -639,6 +680,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 

@@ -52,9 +52,9 @@ private[reactivemongo] class NodeSet(
       fold(ProtocolMetadata.Default)(_.protocolMetadata)
 
   def primary(authenticated: Authenticated): Option[Node] =
-    primary.filter(_.authenticated.exists(_ == authenticated))
+    primary.filter(_.authenticated.contains(authenticated))
 
-  def isReachable = !primary.isEmpty || !_secondaries.isEmpty
+  def isReachable = primary.nonEmpty || _secondaries.nonEmpty
 
   def updateOrAddNode(f: PartialFunction[Node, Node], default: Node): NodeSet = {
     val (maybeUpdatedNodes, updated) = utils.update(nodes)(f)
@@ -62,8 +62,8 @@ private[reactivemongo] class NodeSet(
     else copy(nodes = maybeUpdatedNodes)
   }
 
-  def updateOrAddNodes(f: PartialFunction[Node, Node], nodes: Seq[Node]) =
-    nodes.foldLeft(this)(_.updateOrAddNode(f, _))
+  def updateOrAddNodes(f: PartialFunction[Node, Node], ns: Seq[Node]) =
+    ns.foldLeft(this)(_.updateOrAddNode(f, _))
 
   def updateAll(f: Node => Node): NodeSet = copy(nodes = nodes.map(f))
 
@@ -121,7 +121,7 @@ private[reactivemongo] class NodeSet(
     val p: RoundRobiner[Connection, Vector] => Option[Connection] =
       if (authenticates.isEmpty) _.pickWithFilter(accept)
       else _.pickWithFilter(c =>
-        !c.authenticating.isDefined && !c.authenticated.isEmpty && accept(c))
+        !c.authenticating.isDefined && c.authenticated.nonEmpty && accept(c))
 
     _.flatMap(node => p(node.authenticatedConnections).map(node -> _))
   }
@@ -166,7 +166,7 @@ private[reactivemongo] class NodeSet(
               Failure(cause)
 
             case Success(updated) =>
-              update(ns.tail, updated +: upd)
+              update(ns.drop(1), updated +: upd)
           }
 
         case _ =>
@@ -191,6 +191,7 @@ private[reactivemongo] class NodeSet(
 
   }
 
+  @SuppressWarnings(Array("VariableShadowing"))
   def copy(
     name: Option[String] = this.name,
     version: Option[Long] = this.version,

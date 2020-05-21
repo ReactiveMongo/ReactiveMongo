@@ -43,7 +43,7 @@ private[reactivemongo] object QueryCodecs {
 
           elements += element("tags", builder.array(
             head,
-            tagSet.toSeq.map { tags =>
+            tagSet.map { tags =>
               document(tags.toSeq.map {
                 case (k, v) => element(k, string(v))
               })

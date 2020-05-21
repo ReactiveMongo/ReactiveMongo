@@ -20,6 +20,7 @@ final class WriteConcern private[api] (
   val fsync: Boolean,
   val wtimeout: Option[Int]) {
 
+  @SuppressWarnings(Array("VariableShadowing"))
   def copy(
     w: WriteConcern.W = this.w,
     j: Boolean = this.j,
@@ -121,10 +122,13 @@ object WriteConcern {
   val Journaled: WriteConcern =
     WriteConcern(new WaitForAcknowledgments(1), true, false, None)
 
+  @SuppressWarnings(Array("MethodNames"))
   def ReplicaAcknowledged(n: Int, timeout: Int, journaled: Boolean): WriteConcern = WriteConcern(new WaitForAcknowledgments(if (n < 2) 2 else n), journaled, false, (if (timeout <= 0) None else Some(timeout)))
 
+  @SuppressWarnings(Array("MethodNames"))
   def TagReplicaAcknowledged(tag: String, timeout: Int, journaled: Boolean): WriteConcern = WriteConcern(new TagSet(tag), journaled, false, (if (timeout <= 0) None else Some(timeout)))
 
   /** The default [[WriteConcern]] */
+  @SuppressWarnings(Array("MethodNames"))
   def Default: WriteConcern = Acknowledged
 }

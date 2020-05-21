@@ -88,6 +88,7 @@ import external.reactivemongo.ConnectionListener
 import com.github.ghik.silencer.silent
 
 /** Main actor that processes the requests. */
+@SuppressWarnings(Array("NullAssignment"))
 private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
   import scala.concurrent.duration._
   import Exceptions._
@@ -152,6 +153,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     new SimpleRing[(Long, String)](options.maxHistorySize)
 
   private type NodeSetHandler = (String, NodeSetInfo, NodeSet) => Unit
+
+  @SuppressWarnings(Array("NullParameter"))
   private val nodeSetUpdated: NodeSetHandler =
     listener.fold[NodeSetHandler]({ (event: String, _, _) =>
       updateHistory(event); ()
@@ -162,7 +165,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         if (context != null && context.system != null /* Akka workaround */ ) {
           scheduler.scheduleOnce(1.second) {
             requestTracker.withAwaiting { (responses, channels) =>
-              val maxAwaitingPerChannel = {
+              @SuppressWarnings(Array("UnsafeTraversableMethods"))
+              def maxAwaitingPerChannel = {
                 if (channels.isEmpty) 0
                 else channels.map(_._2).max
               }
@@ -189,6 +193,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
   private val pingTimeout = options.heartbeatFrequencyMS * 1000000L
 
   private val nodeSetLock = new Object {}
+
   private[reactivemongo] var _nodeSet: NodeSet = null
   private var _setInfo: NodeSetInfo = null
   // <-- monitor
@@ -202,11 +207,10 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     }
 
     new InternalState(snap.foldLeft(Array.empty[StackTraceElement]) {
-      case (trace, null) => trace
+      case (trace, (time, event: String)) => new StackTraceElement(
+        "reactivemongo", event, s"<time:$time>", -1) +: trace
 
-      case (trace, (time, event)) => new StackTraceElement(
-        "reactivemongo", event.asInstanceOf[String],
-        s"<time:$time>", -1) +: trace
+      case (trace, _) => trace
     })
   }
 
@@ -270,12 +274,12 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
       // close all connections
       val done = Promise[Unit]()
-      val listener = new ChannelGroupFutureListener {
+      val relistener = new ChannelGroupFutureListener {
         def operationComplete(future: ChannelGroupFuture): Unit =
           factory.release(done)
       }
 
-      allChannelGroup(ns).close().addListener(listener)
+      allChannelGroup(ns).close().addListener(relistener)
 
       // fail all requests waiting for a response
       val istate = internalState
@@ -304,7 +308,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     logSuccess: ChannelId => Unit)
     extends ChannelFutureListener {
 
-    final def operationComplete(op: ChannelFuture): Unit = {
+    def operationComplete(op: ChannelFuture): Unit = {
       if (!op.isSuccess) {
         logError(op.cause)
       } else {
@@ -352,7 +356,9 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       // ... so the monitors are restored after restart
       debug("Restore monitor registrations after restart")
 
-      val ms = monitors.toSeq
+      @SuppressWarnings(Array("UnnecessaryConversion"))
+      val ms = monitors.toSeq // clone as local var before clearing
+
       monitors.clear()
 
       ms.foreach { mon =>
@@ -373,6 +379,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     ()
   }
 
+  @SuppressWarnings(Array("NullParameter"))
   override def postRestart(reason: Throwable): Unit = {
     info("MongoDBSystem is restarted", reason)
 
@@ -396,7 +403,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     } else auths.headOption match {
       case Some(nextAuth) =>
         if (connection.isAuthenticated(nextAuth.db, nextAuth.user)) {
-          authenticateConnection(connection, auths.tail)
+          authenticateConnection(connection, auths.drop(1))
         } else {
           sendAuthenticate(connection, nextAuth)
         }
@@ -414,6 +421,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     case connection => connection
   })
 
+  @SuppressWarnings(Array("NullParameter"))
   private def stopWhenDisconnected[T](state: String, msg: T): Unit = {
     val remainingConnections = _nodeSet.nodes.foldLeft(0) {
       _ + _.connected.size
@@ -642,7 +650,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
           req.promise.success(node.name)
 
         case _ =>
-          req.promise.failure(new ChannelNotFound(
+          req.promise.failure(new ChannelNotFoundException(
             s"No active channel can be found: ${readPref}",
             false, internalState))
 
@@ -1094,6 +1102,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     }
   }
 
+  @SuppressWarnings(Array("VariableShadowing"))
   private object Commands extends PackSupport[Pack]
     with LastErrorFactory[Pack] with UpsertedFactory[Pack] {
     val pack: selfSystem.pack.type = selfSystem.pack
@@ -1409,7 +1418,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     val info = s"connected:${node.connected.size}, channels:${node.connections.size}"
 
     if (!reqAuth) info else {
-      s"authenticated:${node.authenticatedConnections.size}, authenticating: ${node.connected.filter(_.authenticating.isDefined).size}, $info"
+      s"authenticated:${node.authenticatedConnections.size}, authenticating: ${node.connected.count(_.authenticating.isDefined)}, $info"
     }
   }
 
@@ -1418,7 +1427,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     pinnedNode: Option[String],
     request: Request): Try[(Node, Connection)] = request.channelIdHint match {
     case Some(chanId) => ns.pickByChannelId(chanId).
-      fold[Try[(Node, Connection)]](Failure(new ChannelNotFound(
+      fold[Try[(Node, Connection)]](Failure(new ChannelNotFoundException(
         s"#${chanId}", false, internalState)))(Success(_))
 
     case _ => requestTracker.withAwaiting { (_, chans) =>
@@ -1444,7 +1453,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
               val details = s"'${prim.name}' { ${nodeInfo(reqAuth, prim)} } ($supervisor/$name)"
 
               if (!reqAuth || prim.authenticated.nonEmpty) {
-                new ChannelNotFound(s"No active channel can be found to the primary node: $details", true, internalState)
+                new ChannelNotFoundException(s"No active channel can be found to the primary node: $details", true, internalState)
               } else {
                 new NotAuthenticatedException(
                   s"No authenticated channel for the primary node: $details")
@@ -1455,7 +1464,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
               supervisor, name, internalState)
           }
         } else if (!ns.isReachable) {
-          new NodeSetNotReachable(supervisor, name, internalState)
+          new NodeSetNotReachableException(supervisor, name, internalState)
         } else {
           // Node set is reachable, secondary is ok, but no channel found
           val (authed, msgs) = ns.nodes.foldLeft(
@@ -1468,7 +1477,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
           val details = s"""${msgs.mkString(", ")} ($supervisor/$name)"""
 
           if (!reqAuth || authed) {
-            new ChannelNotFound(s"No active channel with '${request.readPreference}' found for the nodes: $details", true, internalState)
+            new ChannelNotFoundException(s"No active channel with '${request.readPreference}' found for the nodes: $details", true, internalState)
           } else {
             new NotAuthenticatedException(s"No authenticated channel: $details")
           }
@@ -1506,7 +1515,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         if (c.status == ConnectionStatus.Connecting ||
           c.status == ConnectionStatus.Connected) {
 
-          updateNode(n, before.tail, c +: updated)
+          updateNode(n, before.drop(1), c +: updated)
         } else {
           val upStatus: ConnectionStatus = {
             if (c.channel.isActive) {
@@ -1546,7 +1555,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
             else n.updateByChannelId(c.channel.id)(_ => upCon)(identity)
           }
 
-          updateNode(upNode, before.tail, upCon +: updated)
+          updateNode(upNode, before.drop(1), upCon +: updated)
         }
       }
 
@@ -1724,6 +1733,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
   protected final lazy val lnm = s"$supervisor/$name" // log naming
 
+  @SuppressWarnings(Array("MethodNames"))
   @inline protected def _println(msg: => String) = println(s"[$lnm] $msg")
 
   @inline protected def debug(msg: => String) = logger.debug(s"[$lnm] $msg")

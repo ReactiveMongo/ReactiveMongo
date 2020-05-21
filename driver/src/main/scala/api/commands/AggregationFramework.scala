@@ -45,6 +45,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
 
     protected[reactivemongo] val makePipe = pipe(f"$$addFields", specifications)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.specifications == null && other.specifications == null) || (
@@ -55,6 +56,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (specifications == null) -1 else specifications.hashCode
 
@@ -89,7 +91,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         }))))
 
       boundaries.headOption.foreach { first =>
-        opts += element("boundaries", builder.array(first, boundaries.tail))
+        opts += element("boundaries", builder.array(first, boundaries.drop(1)))
       }
 
       pipe(f"$$bucket", document(opts.result()))
@@ -248,6 +250,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
 
     protected[reactivemongo] val makePipe: pack.Document = pipe(f"$$count", builder.string(outputName))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.outputName == null && other.outputName == null) || (
@@ -258,6 +261,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (outputName == null) -1 else outputName.hashCode
 
@@ -345,6 +349,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
       pipe(f"$$facet", specDoc)
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.specifications == null && other.specifications == null) || (
@@ -355,6 +360,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (specifications == null) -1 else specifications.hashCode
 
@@ -403,16 +409,16 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
       element("near", near),
       element("spherical", boolean(spherical))) ++ Seq(
         limit.map(l => element("limit", long(l))),
-        minDistance.map(l => element("minDistance", long(l))),
-        maxDistance.map(l => element("maxDistance", long(l))),
+        minDistance.map(md => element("minDistance", long(md))),
+        maxDistance.map(mxd => element("maxDistance", long(mxd))),
         query.map(s => element("query", s)),
-        distanceMultiplier.map(d => element(
-          "distanceMultiplier", builder.double(d))),
+        distanceMultiplier.map(dm => element(
+          "distanceMultiplier", builder.double(dm))),
         Some(element("uniqueDocs", boolean(uniqueDocs))),
-        distanceField.map(s =>
-          element("distanceField", string(s))),
-        includeLocs.map(s =>
-          element("includeLocs", string(s)))).flatten))
+        distanceField.map(df =>
+          element("distanceField", string(df))),
+        includeLocs.map(ils =>
+          element("includeLocs", string(ils)))).flatten))
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type => tupled == other.tupled
@@ -607,14 +613,14 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
     implicit def reader: pack.Reader[IndexStatsResult] = {
       val decoder = pack.newDecoder
 
-      val accessReader = pack.reader[IndexStatAccesses] { doc =>
+      val accessReader = pack.readerOpt[IndexStatAccesses] { doc =>
         (for {
           ops <- decoder.long(doc, "ops")
           since <- decoder.long(doc, "since")
-        } yield new IndexStatAccesses(ops, since)).get
+        } yield new IndexStatAccesses(ops, since))
       }
 
-      pack.reader[IndexStatsResult] { doc =>
+      pack.readerOpt[IndexStatsResult] { doc =>
         (for {
           name <- decoder.string(doc, "name")
           key <- decoder.child(doc, "key")
@@ -622,7 +628,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
           accesses <- decoder.child(doc, "accesses").map {
             pack.deserialize(_, accessReader)
           }
-        } yield new IndexStatsResult(name, key, host, accesses)).get
+        } yield new IndexStatsResult(name, key, host, accesses))
       }
     }
   }
@@ -663,6 +669,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
     val expression: pack.Document) extends PipelineOperator {
     def makePipe: pack.Document = pipe(f"$$listLocalSessions", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -673,6 +680,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -694,6 +702,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
     val expression: pack.Document) extends PipelineOperator {
     def makePipe: pack.Document = pipe(f"$$listSessions", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -704,6 +713,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -854,6 +864,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
     protected[reactivemongo] val makePipe: pack.Document =
       pipe(f"$$match", predicate)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.predicate == null && other.predicate == null) || (
@@ -864,6 +875,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (predicate == null) -1 else predicate.hashCode
 
@@ -897,19 +909,20 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
       opts += element("into", string(f"${intoDb}.${intoCollection}"))
 
       on.headOption.foreach { o1 =>
-        opts += element("on", builder.array(string(o1), on.tail.map(string)))
+        opts += element("on", builder.array(
+          string(o1), on.drop(1).map(string)))
       }
 
-      whenMatched.foreach { w =>
-        opts += element("whenMatched", string(w))
+      whenMatched.foreach { wm =>
+        opts += element("whenMatched", string(wm))
       }
 
       let.foreach { l =>
         opts += element("let", l)
       }
 
-      whenNotMatched.foreach { w =>
-        opts += element("whenNotMatched", string(w))
+      whenNotMatched.foreach { wnm =>
+        opts += element("whenNotMatched", string(wnm))
       }
 
       pipe(f"$$merge", builder.document(opts.result()))
@@ -951,6 +964,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
 
     def makePipe: pack.Document = pipe(f"$$out", builder.string(collection))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.collection == null && other.collection == null) || (
@@ -961,6 +975,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (collection == null) -1 else collection.hashCode
 
@@ -991,6 +1006,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
 
     protected[reactivemongo] val makePipe: pack.Document = pipe(f"$$project", specifications)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.specifications == null && other.specifications == null) || (
@@ -1001,6 +1017,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (specifications == null) -1 else specifications.hashCode
 
@@ -1022,6 +1039,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
 
     protected[reactivemongo] val makePipe: pack.Document = pipe(f"$$redact", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -1032,6 +1050,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -1055,6 +1074,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
     protected[reactivemongo] val makePipe: pack.Document =
       pipe(f"$$replaceRoot", pipe("newRoot", builder.string("$" + newRoot)))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.newRoot == null && other.newRoot == null) || (
@@ -1065,6 +1085,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (newRoot == null) -1 else newRoot.hashCode
 
@@ -1088,6 +1109,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
     protected[reactivemongo] val makePipe: pack.Document =
       pipe(f"$$replaceRoot", pipe("newRoot", newRoot))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.newRoot == null && other.newRoot == null) || (
@@ -1098,6 +1120,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (newRoot == null) -1 else newRoot.hashCode
 
@@ -1120,6 +1143,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
 
     def makePipe: pack.Document = pipe(f"$$replaceWith", replacementDocument)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.replacementDocument == null &&
@@ -1131,6 +1155,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (replacementDocument == null) -1 else replacementDocument.hashCode
 
@@ -1176,6 +1201,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
 
     def makePipe: pack.Document = pipe(f"$$set", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -1186,6 +1212,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -1245,6 +1272,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         }
       }))))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.fields == null && other.fields == null) || (
@@ -1254,6 +1282,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (fields == null) -1 else fields.hashCode
 
@@ -1275,6 +1304,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
 
     def makePipe: pack.Document = pipe(f"$$sortByCount", expression)
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
@@ -1285,6 +1315,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (expression == null) -1 else expression.hashCode
 
@@ -1308,6 +1339,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
     def makePipe: pack.Document =
       pipe(f"$$sortByCount", builder.string("$" + field))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -1318,6 +1350,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
@@ -1373,6 +1406,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
   final class UnwindField private (val field: String) extends Unwind {
     protected[reactivemongo] val makePipe = pipe(f"$$unwind", builder.string("$" + field))
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
@@ -1383,6 +1417,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         false
     }
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
@@ -1513,9 +1548,9 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
     fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None) extends PipelineOperator {
 
     def makePipe: pack.Document = pipe(f"$$changeStream", builder.document(Seq(
-      resumeAfter.map(v => builder.elementProducer("resumeAfter", v)),
-      startAtOperationTime.map(v => builder.elementProducer("startAtOperationTime", v)),
-      fullDocumentStrategy.map(v => builder.elementProducer("fullDocument", builder.string(v.name)))).flatten))
+      resumeAfter.map(v0 => builder.elementProducer("resumeAfter", v0)),
+      startAtOperationTime.map(v1 => builder.elementProducer("startAtOperationTime", v1)),
+      fullDocumentStrategy.map(v2 => builder.elementProducer("fullDocument", builder.string(v2.name)))).flatten))
 
     private lazy val tupled =
       Tuple3(resumeAfter, startAtOperationTime, fullDocumentStrategy)

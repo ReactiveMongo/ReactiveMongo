@@ -4,7 +4,7 @@ import scala.util.{ Failure, Success, Try }
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.util.ExtendedFutures.DelayedFuture
+import reactivemongo.util.ExtendedFutures.delayedFuture
 
 import reactivemongo.core.netty.BufferSequence
 
@@ -28,7 +28,7 @@ import reactivemongo.core.actors.{
 
 private[reactivemongo] object DefaultCursor {
   import Cursor.{ State, Cont, Fail, logger }
-  import CursorOps.Unrecoverable
+  import CursorOps.UnrecoverableException
 
   /**
    * @param collectionName the fully qualified collection name (even if `query.fullCollectionName` is `\$cmd`)
@@ -273,9 +273,9 @@ private[reactivemongo] object DefaultCursor {
             }
           }
         }
-      } else { (from: Int, _: Int, req: ExpectingResponse) =>
+      } else { (from: Int, _: Int, req32: ExpectingResponse) =>
         { implicit ec: ExecutionContext =>
-          base(ec)(req).map {
+          base(ec)(req32).map {
             // Normalizes as 'new' cursor doesn't indicate such property
             _.startingFrom(from)
           }
@@ -334,7 +334,7 @@ private[reactivemongo] object DefaultCursor {
           }
         } else {
           logger.debug("[tailResponse] Current cursor exhausted, renewing...")
-          DelayedFuture(500, connection.actorSystem).
+          delayedFuture(500, connection.actorSystem).
             flatMap { _ => makeRequest(maxDocs).map(Some(_)) }
         }
       }
@@ -416,11 +416,11 @@ private[reactivemongo] object DefaultCursor {
 
           case Failure(e) => err(v, e) match {
             case Cont(cv) => go(cv, it)
-            case f @ Fail(Unrecoverable(_)) =>
+            case f @ Fail(UnrecoverableException(_)) =>
               /* already marked unrecoverable */ Future.successful(f)
 
             case Fail(u) =>
-              Future.successful(Fail(Unrecoverable(u)))
+              Future.successful(Fail(UnrecoverableException(u)))
 
             case st => Future.successful(st)
           }
@@ -432,7 +432,7 @@ private[reactivemongo] object DefaultCursor {
 
             case Fail(cause) =>
               // Prevent error handler at bulk/response level to recover
-              Future.successful(Fail(Unrecoverable(cause)))
+              Future.successful(Fail(UnrecoverableException(cause)))
 
             case st => Future.successful(st)
           }
@@ -443,14 +443,14 @@ private[reactivemongo] object DefaultCursor {
     }
 
     def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]] = {
-      if (!tailable) { (ec: ExecutionContext, r: Response) =>
-        if (!hasNext(r, maxDocs)) {
+      if (!tailable) { (ec1: ExecutionContext, r1: Response) =>
+        if (!hasNext(r1, maxDocs)) {
           Future.successful(Option.empty[Response])
         } else {
-          next(r, maxDocs)(ec)
+          next(r1, maxDocs)(ec1)
         }
-      } else { (ec: ExecutionContext, r: Response) =>
-        tailResponse(r, maxDocs)(ec)
+      } else { (ec2: ExecutionContext, r2: Response) =>
+        tailResponse(r2, maxDocs)(ec2)
       }
     }
   }

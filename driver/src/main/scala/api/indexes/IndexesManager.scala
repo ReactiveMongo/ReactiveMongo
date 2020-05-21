@@ -477,8 +477,11 @@ private class DefaultCollectionIndexesManager(
       new CreateIndexes.Command[Pack](db.name, List(index)),
       ReadPreference.primary)
 
-  private implicit def dropWriter = IndexesManager.dropWriter
-  private implicit def dropReader = IndexesManager.dropReader
+  private implicit def dropWriter =
+    DropIndexes.writer(Serialization.internalSerializationPack)
+
+  private implicit def dropReader =
+    DropIndexes.reader(Serialization.internalSerializationPack)
 
   def drop(indexName: String): Future[Int] = {
     runner(
@@ -517,6 +520,7 @@ object IndexesManager {
    * @param pack the serialization pack
    * @param db the database
    */
+  @SuppressWarnings(Array("VariableShadowing"))
   def apply[P <: SerializationPack](pack: P, db: DB with DBMetaCommands)(implicit ec: ExecutionContext): IndexesManager.Aux[P] = {
     @inline def p: P = pack
 
@@ -582,16 +586,16 @@ object IndexesManager {
         elements += element("default_language", builder.string(lang))
       }
 
-      index.languageOverride.foreach { lang =>
-        elements += element("language_override", builder.string(lang))
+      index.languageOverride.foreach { langOver =>
+        elements += element("language_override", builder.string(langOver))
       }
 
-      index.textIndexVersion.foreach { ver =>
-        elements += element("textIndexVersion", builder.int(ver))
+      index.textIndexVersion.foreach { txtVer =>
+        elements += element("textIndexVersion", builder.int(txtVer))
       }
 
-      index._2dsphereIndexVersion.foreach { ver =>
-        elements += element("2dsphereIndexVersion", builder.int(ver))
+      index._2dsphereIndexVersion.foreach { sphereVer =>
+        elements += element("2dsphereIndexVersion", builder.int(sphereVer))
       }
 
       index.bits.foreach { bits =>
@@ -728,11 +732,5 @@ object IndexesManager {
 
   private[api] implicit lazy val nsIndexReader =
     nsIndexReader[Serialization.Pack](Serialization.internalSerializationPack)
-
-  private[api] lazy val dropWriter = // TODO: Remove
-    DropIndexes.writer(Serialization.internalSerializationPack)
-
-  private[api] lazy val dropReader = // TODO: Remove
-    DropIndexes.reader(Serialization.internalSerializationPack)
 
 }
