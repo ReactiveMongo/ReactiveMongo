@@ -51,14 +51,9 @@ private[api] object RenameCollection {
   }
 }
 
-// TODO: storageEngine
-// TODO: validator, validationLevel, validationAction
-// TODO: indexOptionDefaults
 private[api] case class Create(
-  capped: Option[Capped] = None, // if set, "capped" -> true, size -> <int>, max -> <int>,
-  writeConcern: WriteConcern = WriteConcern.Default,
-  flags: Int = 1 // defaults to 1
-) extends CollectionCommand with CommandWithResult[Unit]
+  capped: Option[Capped] = None,
+  writeConcern: WriteConcern = WriteConcern.Default) extends CollectionCommand with CommandWithResult[Unit]
 
 private[api] object CreateCollection {
   def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[Create]] = {

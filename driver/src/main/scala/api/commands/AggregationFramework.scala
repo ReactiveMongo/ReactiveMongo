@@ -1,6 +1,6 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ ChangeStreams, PackSupport, SerializationPack }
+import reactivemongo.api.{ PackSupport, SerializationPack }
 
 /**
  * Implements the [[http://docs.mongodb.org/manual/applications/aggregation/ Aggregation Framework]].
@@ -9,8 +9,8 @@ import reactivemongo.api.{ ChangeStreams, PackSupport, SerializationPack }
  */
 private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
   extends GroupAggregation[P] with SliceAggregation[P] with SortAggregation[P]
-  with AggregationPipeline[P] { self: PackSupport[P] =>
-  // TODO: Search
+  with AggregationPipeline[P] with ChangeStreamAggregation[P] {
+  self: PackSupport[P] =>
 
   protected final lazy val builder = pack.newBuilder
 
@@ -1520,48 +1520,5 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
         element("as", builder.string(f.as)),
         element("cond", f.cond))))
     }
-  }
-
-  // Change Stream
-  //
-  // Specification:
-  // https://github.com/mongodb/specifications/blob/master/source/change-streams/change-streams.rst#server-specification
-
-  /**
-   * Low level pipeline operator which allows to open a tailable cursor
-   * against subsequent [[https://docs.mongodb.com/manual/reference/change-events/ change events]] of a given collection.
-   *
-   * For common use-cases, you might prefer to use the `watch`
-   * operator on a collection.
-   *
-   * '''Note:''' the target mongo instance MUST be a replica-set
-   * (even in the case of a single node deployement).
-   *
-   * @since MongoDB 3.6
-   * @param resumeAfter the id of the last known change event, if any. The stream will resume just after that event.
-   * @param startAtOperationTime the operation time before which all change events are known. Must be in the time range of the oplog. (since MongoDB 4.0)
-   * @param fullDocumentStrategy if set to UpdateLookup, every update change event will be joined with the ''current'' version of the relevant document.
-   */
-  final class ChangeStream( // TODO: Factory
-    resumeAfter: Option[pack.Value] = None,
-    startAtOperationTime: Option[pack.Value] = None, // TODO#1.1: restrict to something more like a timestamp?
-    fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None) extends PipelineOperator {
-
-    def makePipe: pack.Document = pipe(f"$$changeStream", builder.document(Seq(
-      resumeAfter.map(v0 => builder.elementProducer("resumeAfter", v0)),
-      startAtOperationTime.map(v1 => builder.elementProducer("startAtOperationTime", v1)),
-      fullDocumentStrategy.map(v2 => builder.elementProducer("fullDocument", builder.string(v2.name)))).flatten))
-
-    private lazy val tupled =
-      Tuple3(resumeAfter, startAtOperationTime, fullDocumentStrategy)
-
-    override def equals(that: Any): Boolean = that match {
-      case other: this.type =>
-        other.tupled == this.tupled
-
-      case _ => false
-    }
-
-    override def hashCode: Int = tupled.hashCode
   }
 }

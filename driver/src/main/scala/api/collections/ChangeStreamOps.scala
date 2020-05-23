@@ -16,7 +16,7 @@ trait ChangeStreamOps[P <: SerializationPack] { collection: GenericCollection[P]
   import collection.AggregationFramework.ChangeStream
 
   /**
-   * Prepares a builder for watching the [[https://docs.mongodb.com/manual/changeStreams change stream]] of this collection.
+   * '''EXPERIMENTAL:''' Prepares a builder for watching the [[https://docs.mongodb.com/manual/changeStreams change stream]] of this collection.
    *
    * '''Note:''' The target mongo instance MUST be a replica-set
    * (even in the case of a single node deployement).
@@ -31,8 +31,7 @@ trait ChangeStreamOps[P <: SerializationPack] { collection: GenericCollection[P]
    * }}}
    *
    * @since MongoDB 3.6
-   * @param resumeAfter The id of the last known Change Event, if any. The stream will resume just after that event.
-   * @param startAtOperationTime The operation time before which all Change Events are known. Must be in the time range of the oplog. (since MongoDB 4.0)
+   * @param offset the change stream offset
    * @param pipeline The sequence of aggregation stages to apply on events in the stream (see MongoDB documentation for a list of valid stages for a change stream).
    * @param maxAwaitTimeMS The maximum amount of time in milliseconds the server waits for new data changes before returning an empty batch. In practice, this parameter controls the duration of the long-polling behavior of the cursor.
    * @param fullDocumentStrategy if set to UpdateLookup, every update change event will be joined with the ''current'' version of the relevant document.
@@ -40,15 +39,13 @@ trait ChangeStreamOps[P <: SerializationPack] { collection: GenericCollection[P]
    * @tparam T the type into which Change Events are deserialized
    */
   final def watch[T](
-    resumeAfter: Option[pack.Value] = None,
-    startAtOperationTime: Option[pack.Value] = None,
+    offset: Option[ChangeStream.Offset] = None,
     pipeline: List[PipelineOperator] = Nil,
     maxTime: Option[FiniteDuration] = None,
     fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None)(implicit reader: pack.Reader[T]): WatchBuilder[T] = {
     new WatchBuilder[T] {
       protected val context: AggregatorContext[T] = aggregatorContext[T](
-        firstOperator = new ChangeStream(
-          resumeAfter, startAtOperationTime, fullDocumentStrategy),
+        firstOperator = new ChangeStream(offset, fullDocumentStrategy),
         otherOperators = pipeline,
         readConcern = ReadConcern.Majority,
         cursorOptions = CursorOptions.empty.tailable,

@@ -1364,6 +1364,60 @@ db.accounts.aggregate([
         "output" -> BSONDocument.empty))
     }
 
+    f"be $$changeStream" >> {
+      import reactivemongo.api.ChangeStreams.{ FullDocumentStrategy => St }
+      import AggregationFramework.ChangeStream
+
+      "when empty" in {
+        makePipe(ChangeStream()) must_=== BSONDocument(
+          f"$$changeStream" -> BSONDocument.empty)
+      }
+
+      "with fullDocument strategy" >> {
+        Fragments.foreach[St](Seq(St.Default, St.UpdateLookup)) { st =>
+          st.name in {
+            makePipe(ChangeStream(
+              fullDocumentStrategy = Some(st))) must_=== BSONDocument(
+              f"$$changeStream" -> BSONDocument("fullDocument" -> st.name))
+          }
+        }
+      }
+
+      "with offset" >> {
+        "that startAfter" in {
+          makePipe(ChangeStream(offset = Some(ChangeStream.
+            StartAfter(BSONString("offset"))))) must_=== BSONDocument(
+            f"$$changeStream" -> BSONDocument("startAfter" -> "offset"))
+
+        }
+
+        "that startAtOperationTime" in {
+          makePipe(ChangeStream(
+            offset = Some(ChangeStream.StartAt(1234L)))) must_=== BSONDocument(
+            f"$$changeStream" -> BSONDocument(
+              "startAtOperationTime" -> 1234L))
+
+        }
+
+        "that resumeAfter" in {
+          makePipe(ChangeStream(offset = Some(ChangeStream.
+            ResumeAfter(BSONString("offset"))))) must_=== BSONDocument(
+            f"$$changeStream" -> BSONDocument("resumeAfter" -> "offset"))
+
+        }
+      }
+
+      "with both fullDocument strategy and offset" in {
+        makePipe(ChangeStream(
+          offset = Some(ChangeStream.StartAt(1234L)),
+          fullDocumentStrategy = Some(St.Default))) must_=== BSONDocument(
+          f"$$changeStream" -> BSONDocument(
+            "startAtOperationTime" -> 1234L,
+            "fullDocument" -> "default"))
+
+      }
+    }
+
     f"be $$collStats" in {
       import AggregationFramework.CollStats
 

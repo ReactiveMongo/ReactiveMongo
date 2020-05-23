@@ -80,6 +80,8 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
 
     "resume with the next event after a known id" in skipIfNotRSAndNotVersionAtLeast(MongoWireVersion.V36) {
       withTmpCollection(db) { coll: BSONCollection =>
+        import coll.AggregationFramework.ChangeStream.ResumeAfter
+
         // given
         val initialCursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument1 = BSONDocument(
@@ -92,13 +94,14 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         // when
         val result = foldOne(initialCursor).flatMap { firstEvent =>
           firstEvent.get("_id") match {
-            case None => Future.failed(new Exception("The event had no id"))
             case Some(eventId) =>
-              val resumedCursor = coll.watch(resumeAfter = Some(eventId))
-                .cursor[Cursor.WithOps]
-              resumedCursor.head
+              coll.watch(offset = Some(ResumeAfter(eventId))).
+                cursor[Cursor.WithOps].head
+
+            case _ => Future.failed(new Exception("The event had no id"))
           }
         }
+
         // See comment above
         val forkedInsertion = delayBy(500.millis) {
           coll.insert(ordered = false).many(Seq(testDocument1, testDocument2))
@@ -121,6 +124,8 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
 
     "resume with the same event after a known operation time" in skipIfNotRSAndNotVersionAtLeast(MongoWireVersion.V40) {
       withTmpCollection(db) { coll: BSONCollection =>
+        import coll.AggregationFramework.ChangeStream.StartAt
+
         // given
         val initialCursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
         val testDocument1 = BSONDocument(
@@ -132,12 +137,14 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
 
         // when
         val result = foldOne(initialCursor).flatMap { firstEvent =>
-          firstEvent.get("clusterTime") match {
-            case None => Future.failed(new Exception("The event had no clusterTime"))
+          firstEvent.long("clusterTime") match {
             case Some(clusterTime) =>
-              val resumedCursor = coll.watch[BSONDocument](startAtOperationTime = Some(clusterTime))
-                .cursor[Cursor.WithOps]
-              resumedCursor.head
+              coll.watch[BSONDocument](
+                offset = Some(StartAt(operationTime = clusterTime))).
+                cursor[Cursor.WithOps].head
+
+            case _ =>
+              Future.failed(new Exception("The event had no clusterTime"))
           }
         }
         // See comment above
@@ -180,6 +187,8 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
             "_id" -> id,
             fieldName -> "bar1")
 
+          import coll.AggregationFramework.ChangeStream.ResumeAfter
+
           val res = foldOne(initialCursor).flatMap { firstEvent =>
             firstEvent.get("_id") match {
               case None => Future.failed(new Exception("The event had no id"))
@@ -194,7 +203,7 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
                     BSONDocument("_id" -> id),
                     BSONDocument(f"$$set" -> BSONDocument(fieldName -> lastValue)))
                   resumedCursor = coll.watch[BSONDocument](
-                    resumeAfter = Some(eventId),
+                    offset = Some(ResumeAfter(eventId)),
                     fullDocumentStrategy = Some(
                       ChangeStreams.FullDocumentStrategy.UpdateLookup)).cursor[Cursor.WithOps]
 

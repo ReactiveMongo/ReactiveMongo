@@ -165,9 +165,9 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
         isPassive = booleanLike(doc, "passive").getOrElse(false),
         isHidden = booleanLike(doc, "hidden").getOrElse(false),
         tags = decoder.child(doc, "tags").map { tagDoc =>
-          decoder.names(tagDoc).flatMap { tag =>
+          reactivemongo.util.toFlatMap(decoder names tagDoc) { tag =>
             string(tagDoc, tag).map(tag -> _)
-          }.toMap // TODO: Optim toMap
+          }
         }.getOrElse(Map.empty),
         electionId = int(doc, "electionId").getOrElse(-1),
         lastWrite = decoder.child(doc, "lastWrite").flatMap { ld =>
