@@ -110,6 +110,10 @@ package object tests { self =>
 
   def makeFunction[P <: SerializationPack](a: AggregationFramework[P])(f: a.GroupFunction) = f.makeFunction
 
+  def scoreDocument[P <: SerializationPack](a: AggregationFramework[P])(score: a.AtlasSearch.Score) = score.document
+
+  def makeSearch[P <: SerializationPack](a: AggregationFramework[P])(search: a.AtlasSearch.Operator) = search.document
+
   // Test alias
   def _failover2[A](c: MongoConnection, s: FailoverStrategy)(p: () => Future[A])(implicit ec: ExecutionContext): Failover[A] = Failover.apply(c, s)(p)(ec)
 

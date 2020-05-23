@@ -12,6 +12,7 @@ import reactivemongo.api.bson.{
   BSONLong,
   BSONNull,
   BSONString,
+  BSONTimestamp,
   Macros,
   array,
   document
@@ -1395,7 +1396,7 @@ db.accounts.aggregate([
           makePipe(ChangeStream(
             offset = Some(ChangeStream.StartAt(1234L)))) must_=== BSONDocument(
             f"$$changeStream" -> BSONDocument(
-              "startAtOperationTime" -> 1234L))
+              "startAtOperationTime" -> BSONTimestamp(1234L)))
 
         }
 
@@ -1412,7 +1413,7 @@ db.accounts.aggregate([
           offset = Some(ChangeStream.StartAt(1234L)),
           fullDocumentStrategy = Some(St.Default))) must_=== BSONDocument(
           f"$$changeStream" -> BSONDocument(
-            "startAtOperationTime" -> 1234L,
+            "startAtOperationTime" -> BSONTimestamp(1234L),
             "fullDocument" -> "default"))
 
       }
@@ -1581,6 +1582,430 @@ db.accounts.aggregate([
       }
     }
   }
+
+  "Atlas Search" >> {
+    import reactivemongo.api.tests.{
+      AggFramework,
+      scoreDocument,
+      makeSearch
+    }, AggFramework._, AtlasSearch.{ Score => AtlasScore, _ }
+
+    "serialize score for term search" >> {
+      val doc = scoreDocument(AggFramework) _
+
+      Fragments.foreach[(AtlasScore, BSONDocument)](Seq(
+        AtlasScore.constant(1.23D) -> BSONDocument("constant" -> 1.23D),
+        AtlasScore.boost(45.6D) -> BSONDocument("boost" -> 45.6D))) {
+        case (score, expected) => score.toString in {
+          doc(score) must_=== expected
+        }
+      }
+    }
+
+    // ---
+
+    val term1 = Term(
+      query = "foo",
+      path = "title" -> Seq("description", "tags"))
+
+    val text1 = Text(
+      query = "foo",
+      path = "title" -> Seq("description", "tags"))
+
+    val phrase1 = Phrase(
+      query = "foo",
+      path = "title" -> Seq("description", "tags"))
+
+    "support operator" >> {
+      val doc = makeSearch(AggFramework) _
+
+      "<custom>" in {
+        val expected = BSONDocument("foo" -> "bar")
+        val op = Operator("custom", expected)
+
+        op.name must_=== "custom" and (doc(op) must_=== expected)
+      }
+
+      "term" >> {
+        "with minimal options" in {
+          term1.name must_=== "term" and {
+            doc(term1) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> Seq("title", "description", "tags"))
+          }
+        }
+
+        "with score" in {
+          doc(Term(
+            query = "foo" -> Seq("bar"),
+            path = "title" -> Nil,
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "query" -> Seq("foo", "bar"),
+            "path" -> "title",
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+
+        Fragments.foreach[(Term.Modifier, String)](Seq(
+          Term.Wildcard -> "wildcard",
+          Term.Regex -> "regex",
+          Term.Prefix -> "prefix")) {
+          case (mod, flag) => s"with simple modifier ${flag}" in {
+            doc(Term(
+              query = "foo",
+              path = "title",
+              modifier = Some(mod),
+              score = Some(AtlasScore.constant(3.45D)))) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> "title",
+              flag -> true,
+              "score" -> BSONDocument("constant" -> 3.45D))
+          }
+        }
+
+        "with fuzzy modifier" in {
+          doc(Term(
+            query = "foo",
+            path = "title",
+            modifier = Some(Term.Fuzzy(
+              maxEdits = 3,
+              prefixLength = 2)))) must_=== BSONDocument(
+            "query" -> "foo",
+            "path" -> "title",
+            "fuzzy" -> BSONDocument(
+              "maxEdits" -> 3,
+              "prefixLength" -> 2))
+
+        }
+      }
+
+      "text" >> {
+        "with minimal options" in {
+          text1.name must_=== "text" and {
+            doc(text1) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> Seq("title", "description", "tags"))
+          }
+        }
+
+        "with score" in {
+          doc(Text(
+            query = "foo" -> Seq("bar"),
+            path = "title" -> Nil,
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "query" -> Seq("foo", "bar"),
+            "path" -> "title",
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+
+        "with fuzzy" in {
+          doc(Text(
+            query = "foo" -> Seq.empty,
+            path = "title" -> Nil,
+            fuzzy = Some(Text.Fuzzy(
+              maxEdits = 3,
+              prefixLength = 2,
+              maxExpansions = 5)))) must_=== BSONDocument(
+            "query" -> "foo",
+            "path" -> "title",
+            "fuzzy" -> BSONDocument(
+              "maxEdits" -> 3,
+              "prefixLength" -> 2,
+              "maxExpansions" -> 5))
+
+        }
+      }
+
+      "phrase" >> {
+        "with minimal options" in {
+          phrase1.name must_=== "phrase" and {
+            doc(phrase1) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> Seq("title", "description", "tags"),
+              "slop" -> 0)
+          }
+        }
+
+        "with score" in {
+          doc(Phrase(
+            query = "foo" -> Seq("bar"),
+            path = "title",
+            slop = 5,
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "query" -> Seq("foo", "bar"),
+            "path" -> "title",
+            "slop" -> 5,
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+      }
+
+      "compound" >> {
+        import Compound.newBuilder
+
+        val builder1 = newBuilder(Compound.must, term1)
+
+        "with minimal options" in {
+          val op = builder1.result()
+
+          op.name must_=== "compound" and {
+            doc(op) must_=== BSONDocument(
+              "must" -> Seq(BSONDocument("term" -> doc(term1))))
+          } and {
+            val expected = BSONDocument(
+              "must" -> Seq(BSONDocument("term" -> doc(term1))),
+              "minimumShouldMatch" -> 2)
+
+            doc(builder1.minimumShouldMatch(2).
+              result()) must_=== expected and {
+              doc(newBuilder(
+                Compound.must, term1, 2).result()) must_=== expected
+            }
+          }
+        }
+
+        "with multiple 'must' operators" in {
+          val builder = newBuilder(Compound.must, term1, Seq(text1))
+          val expected1 = BSONDocument("must" -> Seq(
+            BSONDocument("term" -> doc(term1)),
+            BSONDocument("text" -> doc(text1))))
+
+          doc(builder.result()) must_=== expected1 and {
+            doc(newBuilder(Compound.must, term1 -> Seq(text1)).
+              result()) must_=== expected1
+          } and {
+            val expected2 = expected1 ++ BSONDocument("minimumShouldMatch" -> 3)
+
+            doc(builder.minimumShouldMatch(3).
+              result()) must_=== expected2 and {
+              doc(newBuilder(
+                Compound.must, term1, Seq(text1), 3).
+                result()) must_=== expected2
+            } and {
+              doc(newBuilder(
+                Compound.must, term1 -> Seq(text1), 3).
+                result()) must_=== expected2
+            }
+          }
+        }
+
+        "with multiple clauses" in {
+          doc(builder1.append(Compound.mustNot, phrase1).
+            result()) must_=== BSONDocument(
+            "must" -> Seq(BSONDocument("term" -> doc(term1))),
+            "mustNot" -> Seq(BSONDocument("phrase" -> doc(phrase1)))) and {
+              val expected = BSONDocument(
+                "must" -> Seq(BSONDocument("term" -> doc(term1))),
+                "mustNot" -> Seq(
+                  BSONDocument("text" -> doc(text1)),
+                  BSONDocument("phrase" -> doc(phrase1))))
+
+              doc(builder1.append(
+                Compound.mustNot, text1, Seq(phrase1)).
+                result()) must_=== expected and {
+                doc(builder1.append(
+                  Compound.mustNot, text1 -> Seq(phrase1)).
+                  result()) must_=== expected
+              }
+            }
+        }
+
+        "with overriden clause" in {
+          doc(builder1.append(Compound.must, phrase1).
+            result()) must_=== BSONDocument(
+            "must" -> Seq(BSONDocument("phrase" -> doc(phrase1))))
+        }
+      }
+
+      "exists" in {
+        val op = Exists("title" -> Nil)
+
+        op.name must_=== "exists" and {
+          doc(op) must_=== BSONDocument(
+            "path" -> "title") and {
+              doc(Exists("title" -> Seq(
+                "description", "tags"))) must_=== BSONDocument(
+                "path" -> Seq("title", "description", "tags"))
+            }
+        }
+      }
+
+      "near" >> {
+        "with minimal options" in {
+          val op = Near(
+            query = "foo" -> Seq.empty,
+            path = "title" -> Seq("description", "tags"))
+
+          op.name must_=== "near" and {
+            doc(op) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> Seq("title", "description", "tags"))
+          }
+        }
+
+        "with pivot and score" in {
+          doc(Near(
+            query = "foo" -> Seq("bar"),
+            path = "title" -> Nil,
+            pivot = Some(0.5D),
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "query" -> Seq("foo", "bar"),
+            "path" -> "title",
+            "pivot" -> 0.5D,
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+      }
+
+      "wildcard" >> {
+        "with minimal options" in {
+          val op = Wildcard(
+            query = "foo" -> Seq.empty,
+            path = "title" -> Seq(
+              "description", "tags"))
+
+          op.name must_=== "wildcard" and {
+            doc(op) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> Seq("title", "description", "tags"),
+              "allowAnalyzedField" -> false)
+          }
+        }
+
+        "with pivot and score" in {
+          doc(Wildcard(
+            query = "foo" -> Seq("bar"),
+            path = "title" -> Nil,
+            allowAnalyzedField = true,
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "query" -> Seq("foo", "bar"),
+            "path" -> "title",
+            "allowAnalyzedField" -> true,
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+      }
+
+      "regex" >> {
+        "with minimal options" in {
+          val op = Regex(
+            query = "foo" -> Seq.empty,
+            path = "title" -> Seq("description", "tags"))
+
+          op.name must_=== "regex" and {
+            doc(op) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> Seq("title", "description", "tags"),
+              "allowAnalyzedField" -> false)
+          }
+        }
+
+        "with pivot and score" in {
+          doc(Regex(
+            query = "foo" -> Seq("bar"),
+            path = "title",
+            allowAnalyzedField = true,
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "query" -> Seq("foo", "bar"),
+            "path" -> "title",
+            "allowAnalyzedField" -> true,
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+      }
+
+      "range" >> {
+        "with minimal options" in {
+          val op = Range(
+            path = "foo" -> Seq("bar"),
+            start = Range.greaterThan(2),
+            end = Range.lessThanOrEqual(7.5D))
+
+          op.name must_=== "range" and {
+            doc(op) must_=== BSONDocument(
+              "path" -> Seq("foo", "bar"),
+              "gt" -> 2,
+              "lte" -> 7.5D)
+          }
+        }
+
+        "with score" in {
+          doc(Range(
+            path = "foo",
+            start = Range.greaterThan(2),
+            end = Range.lessThanOrEqual(7.5D),
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "path" -> "foo",
+            "gt" -> 2,
+            "lte" -> 7.5D,
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+      }
+
+      "query string" >> {
+        "with minimal options" in {
+          val op = QueryString(
+            defaultPath = "title",
+            query = "Rocky AND (IV OR 4 OR Four)")
+
+          op.name must_=== "queryString" and {
+            doc(op) must_=== BSONDocument(
+              "defaultPath" -> "title",
+              "query" -> "Rocky AND (IV OR 4 OR Four)")
+          }
+        }
+
+        "with score" in {
+          doc(QueryString(
+            defaultPath = "title",
+            query = "Rocky AND (IV OR 4 OR Four)",
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "defaultPath" -> "title",
+            "query" -> "Rocky AND (IV OR 4 OR Four)",
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+      }
+    }
+
+    f"be serialized as $$search" >> {
+      val doc = makeSearch(AggFramework) _
+      val makePipe = reactivemongo.api.tests.makePipe(AggFramework)(_)
+
+      Fragments.foreach(Seq[(Operator, BSONDocument)](
+        term1 -> BSONDocument(
+          "query" -> "foo",
+          "path" -> Seq("title", "description", "tags")),
+        text1 -> BSONDocument(
+          "query" -> "foo",
+          "path" -> Seq("title", "description", "tags")),
+        phrase1 -> BSONDocument(
+          "query" -> "foo",
+          "path" -> Seq("title", "description", "tags"),
+          "slop" -> 0))) {
+        case (sop, doc) => s"with ${sop.name} operator" in {
+          makePipe(AtlasSearch(sop)) must_=== BSONDocument(
+            f"$$search" -> BSONDocument(sop.name -> doc))
+        }
+      }
+
+      "with compound operator" in {
+        val builder = Compound.newBuilder(Compound.must, term1).
+          append(Compound.mustNot, text1 -> Seq(phrase1))
+
+        makePipe(AtlasSearch(builder.result())) must_=== BSONDocument(
+          f"$$search" -> BSONDocument("compound" -> BSONDocument(
+            "must" -> Seq(BSONDocument("term" -> doc(term1))),
+            "mustNot" -> Seq(
+              BSONDocument("text" -> doc(text1)),
+              BSONDocument("phrase" -> doc(phrase1))))))
+
+      }
+    }
+  }
+
   section("unit")
 
   // ---

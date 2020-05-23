@@ -9,8 +9,8 @@ import reactivemongo.api.{ PackSupport, SerializationPack }
  */
 private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
   extends GroupAggregation[P] with SliceAggregation[P] with SortAggregation[P]
-  with AggregationPipeline[P] with ChangeStreamAggregation[P] {
-  self: PackSupport[P] =>
+  with AggregationPipeline[P] with ChangeStreamAggregation[P]
+  with AtlasSearchAggregation[P] { self: PackSupport[P] =>
 
   protected final lazy val builder = pack.newBuilder
 
