@@ -881,7 +881,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
                     } else {
                       trace(s"{${response.header.responseTo}} sending a success (lasterror is ok)")
 
-                      response.documents.readerIndex(response.documents.readerIndex)
+                      response.documents.readerIndex(
+                        response.documents.readerIndex)
 
                       promise.success(response)
                     }
@@ -1685,7 +1686,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     private var authRequests =
       Map.empty[Authenticate, List[Promise[SuccessfulAuthentication]]]
 
-    def addAuthRequest(request: AuthRequest): Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = {
+    def addAuthRequest(request: AuthRequest): Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = this.synchronized {
       val found = authRequests.get(request.authenticate)
 
       authRequests = authRequests + (request.authenticate -> (
@@ -1695,9 +1696,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     }
 
     private def withRequest[T](authenticate: Authenticate)(
-      f: Promise[SuccessfulAuthentication] => T): Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = {
-      // TODO: synchronized
-
+      f: Promise[SuccessfulAuthentication] => T): Map[Authenticate, List[Promise[SuccessfulAuthentication]]] = this.synchronized {
       authRequests.get(authenticate) match {
         case Some(found) => {
           authRequests = authRequests - authenticate

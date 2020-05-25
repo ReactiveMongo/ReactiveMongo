@@ -280,7 +280,6 @@ final class MongoConnection private[reactivemongo] (
   private[api] lazy val monitor = actorSystem.actorOf(
     Props(new MonitorActor), s"Monitor-$name")
 
-  // TODO#1.1: Remove (use probe or DB.connectionState)
   @volatile private[api] var _metadata = Option.empty[ProtocolMetadata]
 
   private class MonitorActor extends Actor {
