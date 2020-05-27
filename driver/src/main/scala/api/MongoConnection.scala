@@ -390,49 +390,63 @@ final class MongoConnection private[reactivemongo] (
 
 }
 
+/**
+ * @define parseFromStringBrief Parses a [[http://docs.mongodb.org/manual/reference/connection-string/ connection URI]] from its string representation
+ * @define uriParam the connection URI
+ */
 object MongoConnection {
   val DefaultHost = "localhost"
   val DefaultPort = 27017
 
   private[api] val logger = LazyLogger("reactivemongo.api.MongoConnection")
 
-  final class URIParsingException private[api] (message: String)
-    extends Exception with NoStackTrace {
-    override def getMessage() = message
+  final class URIParsingException private[api] (
+    message: String,
+    cause: Throwable) extends Exception(message, cause) with NoStackTrace {
+
+    @com.github.ghik.silencer.silent
+    def this(message: String) = this(message, null)
   }
 
   /**
+   * @tparam T the type for the database name
    * @param hosts the host and port for the servers of the MongoDB replica set
    * @param options the connection options
    * @param ignoredOptions the options ignored from the parsed URI
    * @param db the name of the database
    * @param authenticate the authenticate information (see [[MongoConnectionOptions.authenticationMechanism]])
    */
-  final class ParsedURI private[api] (
+  final class URI[T] private[api] (
     val hosts: ListSet[(String, Int)],
     val options: MongoConnectionOptions,
     val ignoredOptions: List[String],
-    val db: Option[String]) {
-    // TODO: Type for URI with required DB name ?
+    val db: T) {
 
+    @SuppressWarnings(Array("ComparingUnrelatedTypes"))
     override def equals(that: Any): Boolean = that match {
-      case other: ParsedURI =>
-        other.tupled == tupled
+      case other: URI[_] =>
+        other.tupled == this.tupled
 
       case _ => false
     }
 
     override def hashCode: Int = tupled.hashCode
 
-    override def toString = s"ParsedURI${tupled.toString}"
+    override def toString = s"URI${tupled.toString}"
 
     private[api] lazy val tupled =
       Tuple4(hosts.toList, options, ignoredOptions, db)
 
   }
 
+  /** An URI parsed from the configuration, with an optional database name. */
+  type ParsedURI = URI[Option[String]]
+
+  /** An URI parsed from the configuration, with a defined database name. */
+  type ParsedURIWithDB = URI[String]
+
   /**
-   * Parses a [[http://docs.mongodb.org/manual/reference/connection-string/ connection URI]] from its string representation.
+   * $parseFromStringBrief.
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
@@ -445,18 +459,86 @@ object MongoConnection {
    * } yield con
    * }}}
    *
-   * @param uri the connection URI
+   * @param uri $uriParam
    */
-  def fromString(uri: String)(implicit ec: ExecutionContext): Future[ParsedURI] = fromString(uri, reactivemongo.util.dnsResolve(), reactivemongo.util.txtRecords())
+  @inline def fromString(uri: String)(implicit ec: ExecutionContext): Future[ParsedURI] = parse[Option[String]](uri, reactivemongo.util.dnsResolve(), reactivemongo.util.txtRecords())
 
-  private[reactivemongo] def fromString(
+  /**
+   * $parseFromStringBrief, with a required DB name.
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   * import reactivemongo.api.MongoConnection
+   *
+   * def uriWithDB(uri: String)(
+   *   implicit ec: ExecutionContext): Future[MongoConnection.ParsedURIWithDB] =
+   *   MongoConnection.fromStringWithDB(uri)
+   * }}}
+   *
+   * @param uri $uriParam
+   */
+  @inline def fromStringWithDB(uri: String)(implicit ec: ExecutionContext): Future[ParsedURIWithDB] = parse[String](uri, reactivemongo.util.dnsResolve(), reactivemongo.util.txtRecords())
+
+  // ---
+
+  private sealed trait URIBuilder[T] {
+    def apply(
+      hosts: ListSet[(String, Int)],
+      options: MongoConnectionOptions,
+      ignoredOptions: List[String],
+      db: Option[String]): Future[URI[T]]
+  }
+
+  private object URIBuilder {
+    implicit def default: URIBuilder[Option[String]] =
+      new FunctionalBuilder[Option[String]]({
+        (hosts, options, ignoredOptions, db) =>
+          Future.successful(new ParsedURI(hosts, options, ignoredOptions, db))
+      })
+
+    implicit def requiredDB: URIBuilder[String] =
+      new FunctionalBuilder[String]({
+        case (hosts, options, ignoredOptions, Some(db)) =>
+          Future.successful(new URI[String](hosts, options, ignoredOptions, db))
+
+        case _ =>
+          Future.failed[URI[String]](
+            new IllegalArgumentException("Missing database name"))
+
+      })
+
+    // ---
+
+    private final class FunctionalBuilder[T](
+      f: Function4[ListSet[(String, Int)], MongoConnectionOptions, List[String], Option[String], Future[URI[T]]]) extends URIBuilder[T] {
+      @inline def apply(
+        hosts: ListSet[(String, Int)],
+        options: MongoConnectionOptions,
+        ignoredOptions: List[String],
+        db: Option[String]): Future[URI[T]] =
+        f(hosts, options, ignoredOptions, db)
+    }
+  }
+
+  private[reactivemongo] def parse[T](
     uri: String,
     srvRecResolver: SRVRecordResolver,
     txtResolver: TXTResolver)(
     implicit
-    ec: ExecutionContext): Future[ParsedURI] = {
+    ec: ExecutionContext, uriBuilder: URIBuilder[T]): Future[URI[T]] = {
 
     val seedList = uri.startsWith("mongodb+srv://")
+
+    val createUri = {
+      (hosts: ListSet[(String, Int)],
+      options: MongoConnectionOptions,
+      ignoredOptions: List[String],
+      db: Option[String]) =>
+        uriBuilder(hosts, options, ignoredOptions, db).recoverWith {
+          case cause: IllegalArgumentException => Future.failed[URI[T]](
+            new URIParsingException(s"${cause.getMessage}: $uri"))
+        }
+    }
 
     for {
       useful <- {
@@ -519,37 +601,36 @@ object MongoConnection {
 
       parsedUri <- {
         if (credentialEnd == -1) {
-          parseHostsAndDbName(seedList, setSpec, srvRecResolver).flatMap {
+          parseHostsAndDB(seedList, setSpec, srvRecResolver).flatMap {
             case (db, hosts) => options.authenticationMechanism match {
               case X509Authentication => db match {
                 case Some(dbName) => {
                   val optsWithX509 = options.copy(credentials = Map(
                     dbName -> MongoConnectionOptions.Credential("", None)))
 
-                  Future.successful(new ParsedURI(
-                    hosts, optsWithX509, unsupportedKeys, db))
+                  createUri(hosts, optsWithX509, unsupportedKeys, db)
                 }
 
                 case _ =>
-                  Future.failed[ParsedURI](new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI"))
+                  Future.failed[URI[T]](new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI"))
               }
 
-              case _ => Future.successful(
-                new ParsedURI(hosts, options, unsupportedKeys, db))
+              case _ =>
+                createUri(hosts, options, unsupportedKeys, db)
             }
           }
         } else {
           val WithAuth = """([^:]+)(|:[^@]*)@(.+)""".r
 
           setSpec match {
-            case WithAuth(user, p, hostsPortsAndDbName) => {
+            case WithAuth(user, p, hostsPortsAndDB) => {
               val pass = p.stripPrefix(":")
 
-              parseHostsAndDbName(
-                seedList, hostsPortsAndDbName, srvRecResolver).flatMap {
+              parseHostsAndDB(
+                seedList, hostsPortsAndDB, srvRecResolver).flatMap {
                 case (Some(database), hosts) => {
                   if (options.authenticationMechanism == X509Authentication && pass.nonEmpty) {
-                    Future.failed[ParsedURI](new URIParsingException("You should not provide a password when authenticating with X509 authentication"))
+                    Future.failed[URI[T]](new URIParsingException("You should not provide a password when authenticating with X509 authentication"))
                   } else {
                     val password = {
                       if (options.authenticationMechanism != X509Authentication) {
@@ -565,18 +646,17 @@ object MongoConnection {
                         authDb -> MongoConnectionOptions.Credential(
                           user, password)))
 
-                    Future.successful(new ParsedURI(
-                      hosts, optsWithCred, unsupportedKeys,
-                      Some(database)))
+                    createUri(
+                      hosts, optsWithCred, unsupportedKeys, Some(database))
                   }
                 }
 
                 case _ =>
-                  Future.failed[ParsedURI](new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI"))
+                  Future.failed[URI[T]](new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI"))
               }
             }
 
-            case _ => Future.failed[ParsedURI](
+            case _ => Future.failed[URI[T]](
               new URIParsingException(s"Could not parse URI '$uri'"))
           }
         }
@@ -648,7 +728,7 @@ object MongoConnection {
     }
   }
 
-  private def parseHostsAndDbName(
+  private def parseHostsAndDB(
     seedList: Boolean,
     input: String,
     srvRecResolver: SRVRecordResolver)(

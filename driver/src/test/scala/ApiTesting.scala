@@ -352,7 +352,15 @@ package object tests { self =>
     txtResolver: reactivemongo.util.TXTResolver)(
     implicit
     ec: ExecutionContext) =
-    MongoConnection.fromString(uri, srvResolver, txtResolver)
+    MongoConnection.parse[Option[String]](uri, srvResolver, txtResolver)
+
+  def parseURIWithDB(
+    uri: String,
+    srvResolver: reactivemongo.util.SRVRecordResolver,
+    txtResolver: reactivemongo.util.TXTResolver)(
+    implicit
+    ec: ExecutionContext) =
+    MongoConnection.parse[String](uri, srvResolver, txtResolver)
 
   def preload(resp: Response)(implicit ec: ExecutionContext): Future[(Response, BSONDocument)] = reactivemongo.core.protocol.Response.preload(resp)
 

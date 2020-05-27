@@ -200,7 +200,7 @@ final class AsyncDriver(
    *   driver.connect(uri, name = Some("ConnectionName"))
    * }}}
    */
-  def connect(parsedURI: MongoConnection.ParsedURI, name: Option[String]): Future[MongoConnection] = connect(parsedURI, name, true)
+  def connect[T](parsedURI: MongoConnection.URI[T], name: Option[String]): Future[MongoConnection] = connect(parsedURI, name, true)
 
   /**
    * Creates a new MongoConnection from URI.
@@ -219,8 +219,8 @@ final class AsyncDriver(
    *   driver.connect(uri, name = Some("ConnectionName"))
    * }}}
    */
-  def connect(
-    parsedURI: MongoConnection.ParsedURI,
+  def connect[T](
+    parsedURI: MongoConnection.URI[T],
     name: Option[String],
     strictMode: Boolean): Future[MongoConnection] = {
     if (strictMode && parsedURI.ignoredOptions.nonEmpty) {
@@ -248,7 +248,7 @@ final class AsyncDriver(
    * // with automatic name
    * }}}
    */
-  def connect(parsedURI: MongoConnection.ParsedURI): Future[MongoConnection] =
+  def connect[T](parsedURI: MongoConnection.URI[T]): Future[MongoConnection] =
     connect(parsedURI, None)
 
   private var closedBy = Array.empty[StackTraceElement]

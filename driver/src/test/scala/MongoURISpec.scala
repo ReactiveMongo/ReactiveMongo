@@ -16,7 +16,7 @@ import reactivemongo.core.errors.ReactiveMongoException
 
 import org.specs2.concurrent.ExecutionEnv
 
-import reactivemongo.api.tests.ParsedURI
+import reactivemongo.api.tests.{ ParsedURI, parseURIWithDB }
 
 final class MongoURISpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
@@ -37,6 +37,12 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           db = None,
           options = MongoConnectionOptions.default,
           ignoredOptions = List.empty)).awaitFor(timeout)
+    }
+
+    "fail without DB" in {
+      parseURIWithDB(simplest, srvRecResolver(), txtResolver()).
+        aka("with DB") must throwA[URIParsingException](
+          s"Missing\\ database\\ name:\\ $simplest").awaitFor(Common.timeout)
     }
 
     val withOpts = "mongodb://host1?foo=bar"
