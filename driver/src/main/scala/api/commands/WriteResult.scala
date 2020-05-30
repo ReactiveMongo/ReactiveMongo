@@ -105,7 +105,7 @@ private[reactivemongo] trait LastErrorFactory[P <: SerializationPack] {
         false
     }
 
-    override def toString = s"LastError${tupled.hashCode}"
+    override def toString = s"LastError${tupled.toString}"
   }
 
   private[reactivemongo] def lastError(result: WriteResult): Option[LastError] =

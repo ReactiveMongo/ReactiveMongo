@@ -27,7 +27,7 @@ import scala.concurrent.{ ExecutionContext, Future }
  * @define errorHandlerParam The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler.
  * @define collect Collects all the documents into a collection of type `M[T]`
  */
-trait CursorCompatAPI[T] { _: Cursor[T] =>
+private[api] trait CursorCompatAPI[T] { _: Cursor[T] =>
   import Cursor.ErrorHandler
 
   /**

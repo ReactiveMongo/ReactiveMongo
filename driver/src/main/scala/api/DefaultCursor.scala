@@ -53,7 +53,7 @@ private[reactivemongo] object DefaultCursor {
           fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
         if (version.compareTo(MongoWireVersion.V32) < 0) {
-          // see QueryOpts.batchSizeN
+          // see QueryBuilder.batchSizeN
 
           if (query.numberToReturn <= 0) {
             Cursor.DefaultBatchSize
@@ -138,7 +138,7 @@ private[reactivemongo] object DefaultCursor {
         fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
 
       if (version.compareTo(MongoWireVersion.V32) < 0) {
-        // see QueryOpts.batchSizeN
+        // see QueryBuilder.batchSizeN
 
         if (_ref.numberToReturn <= 0) {
           Cursor.DefaultBatchSize

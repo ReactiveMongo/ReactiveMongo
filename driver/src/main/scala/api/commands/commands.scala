@@ -93,6 +93,8 @@ private[reactivemongo] object Command {
       val contextSTE = stackTrace()
 
       Failover(db.connection, failover) { () =>
+        println(s"${db.name} :: Send($command)")
+
         db.connection.sendExpectingResponse(new ExpectingResponse(
           requestMaker = requestMaker,
           pinnedNode = for {
@@ -238,4 +240,20 @@ private[reactivemongo] object Command {
  */
 final class ResolvedCollectionCommand[C <: CollectionCommand](
   val collection: String,
-  val command: C) extends Command
+  val command: C) extends Command {
+
+  private lazy val tupled = collection -> command
+
+  override def hashCode: Int = tupled.hashCode
+
+  override def equals(that: Any): Boolean = that match {
+    case other: ResolvedCollectionCommand[_] =>
+      this.tupled == other.tupled
+
+    case _ =>
+      false
+  }
+
+  @inline override def toString: String =
+    s"ResolvedCollectionCommand${tupled.toString}"
+}

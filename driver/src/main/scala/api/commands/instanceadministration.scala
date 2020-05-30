@@ -12,6 +12,8 @@ private[reactivemongo] object DropDatabase extends Command with CommandWithResul
 
     pack.writer[DropDatabase.type](_ => cmd)
   }
+
+  override val toString = "DropDatabase"
 }
 
 private[reactivemongo] object DropCollection extends CollectionCommand
@@ -152,6 +154,8 @@ private[api] object ListCollectionNames
 
     case _ => Some(ns.reverse)
   }
+
+  override val toString = "ListCollectionNames"
 }
 
 /**

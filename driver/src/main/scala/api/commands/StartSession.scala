@@ -16,6 +16,8 @@ private[reactivemongo] object StartSession
         builder.elementProducer("startSession", builder.int(1))))
     }
   }
+
+  override val toString = "StartSession"
 }
 
 private[reactivemongo] case class StartSessionResult(

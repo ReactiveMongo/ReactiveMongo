@@ -9,6 +9,20 @@ private[reactivemongo] sealed abstract class EndTransaction(
   val session: Session,
   val writeConcern: WC) extends Command with CommandWithResult[Unit] {
   protected def kind: String
+
+  private lazy val tupled = Tuple3(session, writeConcern, kind)
+
+  override def hashCode: Int = tupled.hashCode
+
+  override def equals(that: Any): Boolean = that match {
+    case other: EndTransaction =>
+      this.tupled == other.tupled
+
+    case _ =>
+      false
+  }
+
+  @inline override def toString: String = s"EndTransaction${tupled.toString}"
 }
 
 private[reactivemongo] object EndTransaction {

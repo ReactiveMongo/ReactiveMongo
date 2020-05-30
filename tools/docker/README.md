@@ -22,6 +22,10 @@ To check the MongoDB logs:
 
     docker logs -f reactivemongo_db_...
 
+To only run the MongoDB with a test profile (e.g. `rs`):
+
+     MONGO_PROFILE=rs docker-compose -f docker-compose.yml up
+
 Cleanup:
 
 ```

@@ -812,8 +812,13 @@ object MongoConnection {
           case ("authenticationMechanism", _) => unsupported -> result.
             copy(authenticationMechanism = ScramSha1Authentication)
 
-          case ("authenticationDatabase", v) =>
+          case (n @ ("authenticationDatabase" | "authSource"), v) => {
+            if (n == "authSource") {
+              logger.info("Connection option 'authSource' is deprecated in favor of 'authenticationDatabase'")
+            }
+
             unsupported -> result.copy(authenticationDatabase = Some(v))
+          }
 
           case ("connectTimeoutMS", v) => unsupported -> result.
             copy(connectTimeoutMS = v.toInt)

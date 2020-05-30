@@ -74,6 +74,7 @@ trait GenericCollectionProducer[P <: SerializationPack, +C <: GenericCollection[
  * @define arrayFiltersParam an array of filter documents that determines which array elements to modify for an update operation on an array field
  * @define hintParam the index to use (either the index name or the index document)
  * @define maxTimeParam the time limit for processing operations on a cursor (`maxTimeMS`)
+ * @define useDefaultWC Uses the default write concern
  */
 trait GenericCollection[P <: SerializationPack]
   extends Collection with PackSupport[P] with GenericCollectionWithCommands[P]
@@ -167,7 +168,7 @@ trait GenericCollection[P <: SerializationPack]
 
   /**
    * Returns an unordered builder for insert operations.
-   * Uses the default write concern.
+   * $useDefaultWC.
    *
    * @tparam T The type of the document to insert. $implicitWriterT.
    * @param ordered $orderedParam
@@ -191,7 +192,7 @@ trait GenericCollection[P <: SerializationPack]
 
   /**
    * Returns a builder for insert operations.
-   * Uses the default write concern.
+   * $useDefaultWC.
    *
    * @tparam T The type of the document to insert. $implicitWriterT.
    * @param ordered $orderedParam
@@ -264,6 +265,31 @@ trait GenericCollection[P <: SerializationPack]
 
   /**
    * Returns a builder for insert operations.
+   * $useDefaultWC.
+   *
+   * @tparam T The type of the document to insert. $implicitWriterT.
+   *
+   * @param ordered $orderedParam
+   * @param bypassDocumentValidation $bypassDocumentValidationParam
+   *
+   * {{{
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def withDefaultWriteConcern(coll: BSONCollection, query: BSONDocument)(
+   *   implicit ec: ExecutionContext) =
+   *   coll.insert(true, false).one(query)
+   * }}}
+   */
+  def insert(
+    ordered: Boolean,
+    bypassDocumentValidation: Boolean): InsertBuilder =
+    prepareInsert(ordered, this.writeConcern, bypassDocumentValidation)
+
+  /**
+   * Returns a builder for insert operations.
    *
    * @tparam T The type of the document to insert. $implicitWriterT.
    *
@@ -291,6 +317,7 @@ trait GenericCollection[P <: SerializationPack]
 
   /**
    * Returns an unordered update builder.
+   * $useDefaultWC.
    *
    * {{{
    * import scala.concurrent.ExecutionContext
@@ -311,6 +338,7 @@ trait GenericCollection[P <: SerializationPack]
 
   /**
    * Returns an update builder.
+   * $useDefaultWC.
    *
    * {{{
    * import scala.concurrent.ExecutionContext
@@ -367,7 +395,7 @@ trait GenericCollection[P <: SerializationPack]
    * import reactivemongo.api.bson.BSONDocument
    * import reactivemongo.api.bson.collection.BSONCollection
    *
-   * def withDefaultWriteConcern(
+   * def myUpdate(
    *   coll: BSONCollection,
    *   query: BSONDocument,
    *   update: BSONDocument,
@@ -386,6 +414,35 @@ trait GenericCollection[P <: SerializationPack]
 
   /**
    * Returns an update builder.
+   * $useDefaultWC.
+   *
+   * {{{
+   * import scala.concurrent.ExecutionContext
+   *
+   * import reactivemongo.api.bson.BSONDocument
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def withDefaultWriteConcern(
+   *   coll: BSONCollection,
+   *   query: BSONDocument,
+   *   update: BSONDocument
+   * )(implicit ec: ExecutionContext) = coll.update(
+   *   ordered = false,
+   *   bypassDocumentValidation = true
+   * ).one(query, update)
+   * }}}
+   *
+   * @param ordered $orderedParam
+   * @param writeConcern $writeConcernParam
+   * @param bypassDocumentValidation $bypassDocumentValidationParam
+   */
+  def update(
+    ordered: Boolean,
+    bypassDocumentValidation: Boolean): UpdateBuilder =
+    prepareUpdate(ordered, this.writeConcern, bypassDocumentValidation)
+
+  /**
+   * Returns an update builder.
    *
    * {{{
    * import scala.concurrent.ExecutionContext
@@ -394,7 +451,7 @@ trait GenericCollection[P <: SerializationPack]
    * import reactivemongo.api.bson.BSONDocument
    * import reactivemongo.api.bson.collection.BSONCollection
    *
-   * def withDefaultWriteConcern(
+   * def myUpdate(
    *   coll: BSONCollection,
    *   query: BSONDocument,
    *   update: BSONDocument,

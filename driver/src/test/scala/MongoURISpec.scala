@@ -135,18 +135,26 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           ignoredOptions = List("foo"))).awaitFor(timeout)
     }
 
-    val withAuthParamAndSource = "mongodb://user123:;qGu:je/LX}nN\\8@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationDatabase=authdb"
+    val withAuthParamAndSource1 = "mongodb://user123:;qGu:je/LX}nN\\8@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationDatabase=authdb"
 
-    s"parse $withAuthParamAndSource with success" in {
-      parseURI(withAuthParamAndSource) must beTypedEqualTo(
-        ParsedURI(
-          hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
-          db = Some("somedb"),
-          options = MongoConnectionOptions.default.copy(
-            authenticationDatabase = Some("authdb"),
-            credentials = Map(
-              "authdb" -> Credential("user123", Some(";qGu:je/LX}nN\\8")))),
-          ignoredOptions = List("foo"))).awaitFor(timeout)
+    // 'authSource' to be compatible with MongoDB Atlas options in SRV
+    val withAuthParamAndSource2 = "mongodb://user123:;qGu:je/LX}nN\\8@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authSource=authdb"
+
+    s"parse $withAuthParamAndSource1 with success" in {
+      val expected = ParsedURI(
+        hosts = ListSet("host1" -> 27018, "host2" -> 27019, "host3" -> 27020),
+        db = Some("somedb"),
+        options = MongoConnectionOptions.default.copy(
+          authenticationDatabase = Some("authdb"),
+          credentials = Map(
+            "authdb" -> Credential("user123", Some(";qGu:je/LX}nN\\8")))),
+        ignoredOptions = List("foo"))
+
+      parseURI(withAuthParamAndSource1) must beTypedEqualTo(
+        expected).awaitFor(timeout) and {
+        parseURI(withAuthParamAndSource2) must beTypedEqualTo(expected).
+          awaitFor(timeout)
+      }
     }
 
     val withAuthModeX509WithNoUser = "mongodb://host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=x509"

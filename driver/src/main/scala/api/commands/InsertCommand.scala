@@ -34,6 +34,8 @@ private[reactivemongo] trait InsertCommand[P <: SerializationPack] { self: PackS
     }
 
     override def hashCode: Int = tupled.hashCode
+
+    @inline override def toString = s"Insert${tupled.toString}"
   }
 
   private[reactivemongo] type InsertResult = DefaultWriteResult // for simplified imports

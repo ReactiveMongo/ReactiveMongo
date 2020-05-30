@@ -6,12 +6,15 @@ trait DBSessionSpec { specs: DatabaseSpec =>
   import tests.Common
   import Common._
 
+  @inline private def _db = Common.connection.database(
+    s"dbsession-${System identityHashCode this}")
+
   def sessionSpecs = "manage session" >> {
     section("gt_mongo32")
 
     "start & end" in {
       (for {
-        db <- Common.db.startSession()
+        db <- _db.flatMap(_.startSession())
 
         // NoOp startSession
         _ <- db.startSession()
@@ -32,13 +35,14 @@ trait DBSessionSpec { specs: DatabaseSpec =>
     }
 
     "not kill without start" in {
-      Common.db.killSession() must beAnInstanceOf[DB].await
+      _db.flatMap(_.killSession()) must beAnInstanceOf[DB].await
     }
 
     "start & kill" in {
-      Common.db.startSession().flatMap(
-        _.killSession()) must beAnInstanceOf[DB].awaitFor(timeout)
-
+      (for {
+        db1 <- _db.flatMap(_.startSession())
+        db2 <- db1.killSession()
+      } yield db2) must beAnInstanceOf[DB].awaitFor(timeout)
     }
 
     if (replSetOn) {
@@ -49,11 +53,12 @@ trait DBSessionSpec { specs: DatabaseSpec =>
 
         eventually(2, timeout) {
           (for {
-            _ <- Common.db.collection(colName).create(failsIfExists = false)
-            _ <- Common.db.collectionNames.filter(_.contains(colName))
+            db <- _db
+            _ <- db.collection(colName).create(failsIfExists = false)
+            _ <- db.collectionNames.filter(_.contains(colName))
           } yield {}) must beTypedEqualTo({}).await(0, timeout)
         } and {
-          Common.db.startSession().flatMap { _db =>
+          _db.flatMap(_.startSession()).flatMap { _db =>
             for {
               _ <- _db.startTransaction(None)
 
@@ -114,12 +119,12 @@ trait DBSessionSpec { specs: DatabaseSpec =>
                 } yield n1 -> n2) must beTypedEqualTo(0 -> 1).awaitFor(timeout)
               } and {
                 // 0 document found outside the transaction
-                Common.db.collection(colName).find(
-                  selector = BSONDocument.empty,
-                  projection = Option.empty[BSONDocument]).
-                  one[BSONDocument].map(_.size) must beTypedEqualTo(0).
-                  awaitFor(timeout)
-
+                _db.flatMap {
+                  _.collection(colName).find(
+                    selector = BSONDocument.empty,
+                    projection = Option.empty[BSONDocument]).
+                    one[BSONDocument].map(_.size)
+                } must beTypedEqualTo(0).awaitFor(timeout)
               } and {
                 // 0 document found in session after transaction is aborted
 
@@ -139,11 +144,16 @@ trait DBSessionSpec { specs: DatabaseSpec =>
       }
 
       "cannot abort transaction after session is killed" in {
+        val colName = s"abort-after-killed${System identityHashCode this}"
+
         (for {
-          sdb <- Common.db.startSession()
+          db <- _db
+          _ <- db.collection(colName).create(failsIfExists = false)
+
+          sdb <- db.startSession()
           tdb <- sdb.startTransaction(None)
 
-          c = sdb.collection(s"session${System identityHashCode sdb}")
+          c = sdb.collection(colName)
           _ <- c.insert.one(BSONDocument("foo" -> 1))
           _ <- c.insert.many(Seq(
             BSONDocument("foo" -> 2), BSONDocument("bar" -> 3)))
@@ -155,7 +165,7 @@ trait DBSessionSpec { specs: DatabaseSpec =>
 
       "cannot commit transaction after session is killed" in {
         (for {
-          sdb <- Common.db.startSession()
+          sdb <- _db.flatMap(_.startSession())
           tdb <- sdb.startTransaction(None)
 
           kdb <- tdb.killSession()
@@ -167,7 +177,7 @@ trait DBSessionSpec { specs: DatabaseSpec =>
         val colName = s"tx2_${System identityHashCode this}"
         @volatile var database = Option.empty[DB]
 
-        Common.db.startSession().flatMap { _db =>
+        _db.flatMap(_.startSession()).flatMap { _db =>
           _db.startTransaction(Some(WriteConcern.Default.copy(
             w = WriteConcern.Majority))).flatMap { _ =>
             _db.collection(colName).create().map { _ =>
@@ -190,17 +200,18 @@ trait DBSessionSpec { specs: DatabaseSpec =>
               find().map(_.size) must beTypedEqualTo(1).awaitFor(timeout)
             } and {
               // 0 document found outside transaction
-              Common.db.collection(colName).find(
-                selector = BSONDocument("_id" -> 1),
-                projection = Option.empty[BSONDocument]).
-                one[BSONDocument].map(_.size).
-                aka("found") must beTypedEqualTo(0).awaitFor(timeout)
+              _db.flatMap {
+                _.collection(colName).find(
+                  selector = BSONDocument("_id" -> 1),
+                  projection = Option.empty[BSONDocument]).
+                  one[BSONDocument].map(_.size)
+              } must beTypedEqualTo(0).awaitFor(timeout)
             } and {
               coll.insert.many(Seq(
                 BSONDocument("_id" -> 2), BSONDocument("_id" -> 3))).
                 map(_.n) must beTypedEqualTo(2).awaitFor(timeout)
             } and {
-              coll.count() must beTypedEqualTo(3L).awaitFor(timeout)
+              find().map(_.size) must beTypedEqualTo(3).awaitFor(timeout)
             } and {
               db.commitTransaction().
                 aka("commited") must beAnInstanceOf[DB].awaitFor(timeout)
@@ -208,11 +219,12 @@ trait DBSessionSpec { specs: DatabaseSpec =>
             } and {
               // 1 document found outside transaction after commit
 
-              Common.db.collection(colName).find(
-                selector = BSONDocument("_id" -> 1),
-                projection = Option.empty[BSONDocument]).
-                one[BSONDocument].map(_.size).
-                aka("found") must beTypedEqualTo(1).awaitFor(timeout)
+              _db.flatMap {
+                _.collection(colName).find(
+                  selector = BSONDocument("_id" -> 1),
+                  projection = Option.empty[BSONDocument]).
+                  one[BSONDocument].map(_.size)
+              } must beTypedEqualTo(1).awaitFor(timeout)
             }
           })
       }
