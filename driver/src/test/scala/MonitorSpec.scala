@@ -199,7 +199,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
       }.await(0, timeout * expectFactor)
     }
 
-    "manage channel disconnection while probing isMaster" in {
+    "manage channel disconnection while probing isMaster" in eventually(2, timeout) {
       val expectFactor = 4L
       val opts = Common.DefaultOptions.copy(
         nbChannelsPerNode = 2,
@@ -213,7 +213,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
         //println(s"MonitorSpec_1: ${System.currentTimeMillis()}")
 
         Future.successful(eventually(2, timeout) {
-          isAvailable(con, timeout) must beTrue.await(0, timeout)
+          isAvailable(con, timeout) must beTrue.awaitFor(timeout)
         } and {
           @volatile var connections1 = Vector.empty[Connection]
 
@@ -224,7 +224,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
               // #1 - Fully available with expected connection count (1)
 
               case nodes1 => nodes1.size must_=== 1 and {
-                isAvailable(con, 1.seconds) must beTrue.await(0, timeout)
+                isAvailable(con, 1.seconds) must beTrue.awaitFor(timeout)
               } and {
                 nodes1.flatMap(_.connections) must beLike[Vector[Connection]] {
                   case cons =>
@@ -374,7 +374,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
           @inline def dbsystem = sysRef.underlyingActor
 
           Future.successful(eventually(1, timeout) {
-            isAvailable(con, timeout) must beTrue.await(0, timeout)
+            isAvailable(con, timeout) must beTrue.awaitFor(timeout)
           } and {
             @volatile var count = 0
             val closing = Seq.newBuilder[Promise[Boolean]]
@@ -405,23 +405,23 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
               awaitFor(timeout) and {
                 count must be_<=(opts.nbChannelsPerNode + 1 /*signaling*/ )
               }
-          } and {
-            eventually(1, timeout) {
-              f(con, sysRef)
-            }
+          } and eventually(1, timeout) {
+            f(con, sysRef)
           })
         }.awaitFor(timeout * expectFactor)
       }
 
       "so re-connect quickly with a short heartbeat (500ms)" in {
         withClosedChannels(500) {
-          (con, _) => isAvailable(con, timeout) must beTrue.await(0, timeout)
+          (con, _) => isAvailable(con, timeout) must beTrue.awaitFor(timeout)
         }
       }
 
       "so doesn't re-connect with a long heartbeat (1h)" in {
-        withClosedChannels(3600000) {
-          (con, _) => isAvailable(con, timeout) must beFalse.await(0, timeout)
+        eventually(Common.ifX509(4)(2), timeout / 2L) {
+          withClosedChannels(3600000) { (con, _) =>
+            isAvailable(con, timeout) must beFalse.awaitFor(timeout)
+          }
         }
       }
     }

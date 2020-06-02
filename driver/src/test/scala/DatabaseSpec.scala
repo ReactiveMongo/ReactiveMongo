@@ -15,6 +15,7 @@ final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
   "Database" title
 
   sequential
+  stopOnFail
 
   import tests.Common
   import Common._
@@ -67,7 +68,7 @@ final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
             c2 <- admin.renameCollection(db.name, name1, name)
           } yield name -> c2.name) must beLike[(String, String)] {
             case (expected, name) => name aka "new name" must_=== expected
-          }.await(0, timeout)
+          }.awaitFor(timeout)
         }
       }
 
@@ -98,23 +99,28 @@ final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
                 }
               }
           }
-        }.await(0, timeout)
+        }.await(1, timeout)
       }
     }
 
     {
-      val dbName = s"databasespec-${System identityHashCode ee}"
-
-      def dropSpec(con: MongoConnection, timeout: FiniteDuration) =
+      def dropSpec(
+        con: MongoConnection,
+        dbName: String,
+        timeout: FiniteDuration) =
         con.database(dbName).flatMap(_.drop()).
-          aka("drop") must beTypedEqualTo({}).await(2, timeout)
+          aka("drop") must beTypedEqualTo({}).awaitFor(timeout * 4L)
 
       "be dropped with the default connection" in {
-        dropSpec(connection, timeout)
+        val dbName = s"databasespec-${System identityHashCode ee}"
+
+        dropSpec(connection, dbName, timeout)
       }
 
       "be dropped with the slow connection" in {
-        dropSpec(slowConnection, slowTimeout)
+        val dbName = s"slowdatabasespec-${System identityHashCode ee}"
+
+        dropSpec(slowConnection, dbName, slowTimeout)
       }
     }
   }

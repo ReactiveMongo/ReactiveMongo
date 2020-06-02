@@ -98,12 +98,14 @@ private[reactivemongo] object DatabaseException {
 /** A driver-specific error */
 private[reactivemongo] trait DriverException extends ReactiveMongoException {
   protected def cause: Throwable = null
-  override def getCause = cause
+  @inline override def getCause = cause
 }
 
 /** A generic driver error. */
+@SuppressWarnings(Array("NullAssignment"))
 private[reactivemongo] final class GenericDriverException(
-  val message: String) extends DriverException with NoStackTrace {
+  val message: String,
+  override val cause: Throwable = null) extends DriverException with NoStackTrace {
 
   override def equals(that: Any): Boolean = that match {
     case other: GenericDriverException =>

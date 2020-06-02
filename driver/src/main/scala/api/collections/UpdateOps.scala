@@ -199,7 +199,7 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
         new Update(
           emptyElm, Seq.empty, ordered, writeConcern, false))
 
-      val doc = pack.serialize(emptyCmd, updateWriter)
+      val doc = pack.serialize(emptyCmd, updateWriter(None))
 
       metadata.maxBsonSize - pack.bsonSize(doc)
     }

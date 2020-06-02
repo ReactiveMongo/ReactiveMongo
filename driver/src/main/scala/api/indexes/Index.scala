@@ -176,6 +176,8 @@ object Index {
 
   type Default = Aux[Serialization.Pack]
 
+  @inline private def defaultOpts = Serialization.internalSerializationPack.newBuilder.document(Seq.empty)
+
   /**
    * {{{
    * import reactivemongo.api.bson.BSONDocument
@@ -310,26 +312,26 @@ object Index {
   @SuppressWarnings(Array("MaxParameters"))
   def apply(
     key: Seq[(String, IndexType)],
-    name: Option[String],
-    unique: Boolean,
-    background: Boolean,
-    sparse: Boolean,
-    expireAfterSeconds: Option[Int],
-    storageEngine: Option[Serialization.Pack#Document],
-    weights: Option[Serialization.Pack#Document],
-    defaultLanguage: Option[String],
-    languageOverride: Option[String],
-    textIndexVersion: Option[Int],
-    sphereIndexVersion: Option[Int],
-    bits: Option[Int],
-    min: Option[Double],
-    max: Option[Double],
-    bucketSize: Option[Double],
-    collation: Option[Collation],
-    wildcardProjection: Option[Serialization.Pack#Document],
-    version: Option[Int],
-    partialFilter: Option[Serialization.Pack#Document],
-    options: Serialization.Pack#Document): Index.Aux[Serialization.Pack] =
+    name: Option[String] = None,
+    unique: Boolean = false,
+    background: Boolean = false,
+    sparse: Boolean = false,
+    expireAfterSeconds: Option[Int] = None,
+    storageEngine: Option[Serialization.Pack#Document] = None,
+    weights: Option[Serialization.Pack#Document] = None,
+    defaultLanguage: Option[String] = None,
+    languageOverride: Option[String] = None,
+    textIndexVersion: Option[Int] = None,
+    sphereIndexVersion: Option[Int] = None,
+    bits: Option[Int] = None,
+    min: Option[Double] = None,
+    max: Option[Double] = None,
+    bucketSize: Option[Double] = None,
+    collation: Option[Collation] = None,
+    wildcardProjection: Option[Serialization.Pack#Document] = None,
+    version: Option[Int] = None,
+    partialFilter: Option[Serialization.Pack#Document] = None,
+    options: Serialization.Pack#Document = defaultOpts): Index.Aux[Serialization.Pack] =
     apply[Serialization.Pack](Serialization.internalSerializationPack)(
       key,
       name,

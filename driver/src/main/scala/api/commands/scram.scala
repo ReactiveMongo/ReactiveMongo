@@ -400,7 +400,7 @@ private[reactivemongo] object ScramStartNegociation {
           Left(CmdErr(error))
 
         case _ =>
-          if (decoder.booleanLike(doc, "done").exists(_ == true)) {
+          if (decoder.booleanLike(doc, "done") contains true) {
             Right(Left(SilentSuccessfulAuthentication))
           } else {
             decoder.binary(doc, "payload").fold[Result](

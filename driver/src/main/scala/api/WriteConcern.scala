@@ -59,7 +59,9 @@ object WriteConcern {
   sealed trait W
 
   /** [[https://docs.mongodb.com/manual/reference/write-concern/index.html#writeconcern._dq_majority_dq_ Majority]] acknowledgment */
-  object Majority extends W
+  object Majority extends W {
+    override def toString = "Majority"
+  }
 
   /** [[https://docs.mongodb.com/manual/reference/write-concern/index.html#writeconcern.%3Ccustom-write-concern-name%3E Tagged]] acknowledgment */
   final class TagSet private[api] (val tag: String) extends W {

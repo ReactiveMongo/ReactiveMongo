@@ -18,13 +18,14 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
   "Common use cases" title
 
   sequential
+  stopOnFail
 
   // ---
 
   import Common.{ timeout, slowTimeout }
   import builder.regex
 
-  lazy val (db, slowDb) = Common.databases(s"reactivemongo-usecases-${System identityHashCode this}", Common.connection, Common.slowConnection)
+  lazy val (db, slowDb) = Common.databases(s"reactivemongo-usecases-${System identityHashCode this}", Common.connection, Common.slowConnection, retries = 1)
 
   val colName = s"commonusecases${System identityHashCode this}"
   lazy val collection = db(colName)
@@ -39,21 +40,25 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
       collection.create() must beTypedEqualTo({}).await(1, timeout)
     }
 
-    "insert some docs from a seq of docs" in {
+    "insert some documents" in eventually(2, timeout / 2L) {
       val docs = (18 to 60).map(i => BSONDocument(
         "age" -> i, "name" -> s"Jack${i}"))
 
-      (for {
-        _ /*result*/ <- collection.insert(ordered = true).many(docs)
-        count <- collection.count(Some(
-          BSONDocument("age" -> BSONDocument(f"$$gte" -> 18, f"$$lte" -> 60))))
-      } yield count) must beEqualTo(43).await(1, timeout)
+      collection.delete.one(BSONDocument.empty).flatMap { _ =>
+        collection.count(Option.empty[BSONDocument])
+      } must beTypedEqualTo(0L).awaitFor(timeout) and {
+        (for {
+          _ /*result*/ <- collection.insert(ordered = true).many(docs)
+          count <- collection.count(Some(BSONDocument(
+            "age" -> BSONDocument(f"$$gte" -> 18, f"$$lte" -> 60))))
+        } yield count) must beEqualTo(43).awaitFor(timeout)
+      }
     }
 
     "find them" in {
       // batchSize (>1) allows us to test cursors ;)
-      val it = collection.find(BSONDocument()).
-        batchSize(2).cursor[BSONDocument]()
+      val it = collection.find(BSONDocument()).batchSize(2).
+        sort(BSONDocument("age" -> 1)).cursor[BSONDocument]()
 
       //import reactivemongo.core.protocol.{ Response, Reply }
       //import reactivemongo.api.tests.{ makeRequest => req, nextResponse }

@@ -183,7 +183,9 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *
      * @tparam Pjn The type of the projection. An implicit `Writer[Pjn]` typeclass for handling it has to be in the scope.
      */
-    def projection[Pjn](p: Pjn)(implicit writer: pack.Writer[Pjn]): QueryBuilder =
+    def projection[Pjn](p: Pjn)(
+      implicit
+      writer: pack.Writer[Pjn]): QueryBuilder =
       copy(projection = Some(pack.serialize(p, writer)))
 
     /**

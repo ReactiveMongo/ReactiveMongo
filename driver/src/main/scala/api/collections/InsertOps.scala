@@ -46,8 +46,6 @@ trait InsertOps[P <: SerializationPack]
 
   /** Builder for insert operations. */
   sealed trait InsertBuilder {
-    //implicit protected def writer: pack.Writer[T]
-
     @inline private def metadata = db.connectionState.metadata
 
     /** The max BSON size, including the size of command envelope */
@@ -60,7 +58,7 @@ trait InsertOps[P <: SerializationPack]
         new Insert(
           emptyDoc, Seq.empty[pack.Document], ordered, writeConcern, false))
 
-      val doc = pack.serialize(emptyCmd, insertWriter)
+      val doc = pack.serialize(emptyCmd, insertWriter(None))
 
       metadata.maxBsonSize - pack.bsonSize(doc) + pack.bsonSize(emptyDoc)
     }

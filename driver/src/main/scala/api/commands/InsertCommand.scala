@@ -35,7 +35,11 @@ private[reactivemongo] trait InsertCommand[P <: SerializationPack] { self: PackS
 
     override def hashCode: Int = tupled.hashCode
 
-    @inline override def toString = s"Insert${tupled.toString}"
+    @inline override lazy val toString: String = {
+      val docs = (head +: tail).map(pack.pretty)
+
+      s"""Insert(${docs.mkString("[", ", ", "]")}, ${ordered.toString}, ${writeConcern.toString}, ${bypassDocumentValidation.toString})"""
+    }
   }
 
   private[reactivemongo] type InsertResult = DefaultWriteResult // for simplified imports
@@ -44,11 +48,14 @@ private[reactivemongo] trait InsertCommand[P <: SerializationPack] { self: PackS
 
   private[reactivemongo] def session(): Option[Session]
 
-  private[reactivemongo] final implicit lazy val insertWriter: pack.Writer[InsertCmd] = {
+  implicit private[reactivemongo] final lazy val insertWriter: pack.Writer[InsertCmd] = insertWriter(self.session())
+
+  private[reactivemongo] final def insertWriter(
+    session: Option[Session]): pack.Writer[InsertCmd] = {
+
     val builder = pack.newBuilder
     val writeWriteConcern = CommandCodecs.writeWriteConcern(pack)
     val writeSession = CommandCodecs.writeSession(builder)
-    val session = self.session()
 
     import builder.{ elementProducer => element }
 

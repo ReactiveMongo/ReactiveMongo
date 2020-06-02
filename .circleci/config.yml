@@ -70,7 +70,7 @@ commands:
                     CMD="./.ci_scripts/validate.sh /tmp/integration-env.sh"
 
                     if [ "x$CI_CATEGORY" = "xINTEGRATION_TESTS" ]; then
-                      TEST_TIMEOUT=270s ./.ci_scripts/retry.sh 2 $CMD
+                      TEST_TIMEOUT=260s ./.ci_scripts/retry.sh 2 $CMD
                     else
                       $CMD
                     fi

@@ -93,8 +93,6 @@ private[reactivemongo] object Command {
       val contextSTE = stackTrace()
 
       Failover(db.connection, failover) { () =>
-        println(s"${db.name} :: Send($command)")
-
         db.connection.sendExpectingResponse(new ExpectingResponse(
           requestMaker = requestMaker,
           pinnedNode = for {
@@ -246,6 +244,7 @@ final class ResolvedCollectionCommand[C <: CollectionCommand](
 
   override def hashCode: Int = tupled.hashCode
 
+  @SuppressWarnings(Array("ComparingUnrelatedTypes"))
   override def equals(that: Any): Boolean = that match {
     case other: ResolvedCollectionCommand[_] =>
       this.tupled == other.tupled

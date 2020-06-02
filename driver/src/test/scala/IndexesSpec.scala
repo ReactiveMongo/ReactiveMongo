@@ -24,6 +24,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
   "Indexes management" title
 
   sequential
+  stopOnFail
 
   // ---
 
@@ -80,7 +81,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
         map(_ => false).recover {
           case e: DatabaseException =>
             // MongoError['point not in interval of [ -95, 95 )' (code = 13027)]
-            e.code.exists(_ == 13027)
+            e.code contains 13027
 
           case _ => false
         } must beTrue.await(1, timeout)
@@ -165,9 +166,8 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
   }
 
   "Index manager" should {
-    "drop all indexes in db.geo" in {
-      geo.indexesManager.dropAll() must beEqualTo(2 /* _id and loc */ ).
-        await(1, timeout)
+    "drop all indexes _id and loc in db.geo" in {
+      geo.indexesManager.dropAll() must beTypedEqualTo(2).await(1, timeout)
     }
   }
 
@@ -245,7 +245,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
       def spec = Future.fold(fixturesInsert)(false) { (inserted, _) =>
         inserted
       }.recover {
-        case err: DatabaseException => !err.code.exists(_ == 11000)
+        case err: DatabaseException => !err.code.contains(11000)
         case _                      => true
       }
 

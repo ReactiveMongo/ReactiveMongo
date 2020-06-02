@@ -177,12 +177,14 @@ trait DBSessionSpec { specs: DatabaseSpec =>
         val colName = s"tx2_${System identityHashCode this}"
         @volatile var database = Option.empty[DB]
 
-        _db.flatMap(_.startSession()).flatMap { _db =>
-          _db.startTransaction(Some(WriteConcern.Default.copy(
-            w = WriteConcern.Majority))).flatMap { _ =>
-            _db.collection(colName).create().map { _ =>
-              database = Some(_db); database
-            }
+        _db.flatMap(_.startSession()).flatMap { sdb =>
+          for {
+            _ <- sdb.collection(colName).create()
+            tdb <- sdb.startTransaction(Some(WriteConcern.Default.copy(
+              w = WriteConcern.Majority)))
+          } yield {
+            database = Some(tdb)
+            database
           }
         } must beSome[DB].awaitFor(timeout) and (
           database must beSome[DB].which { db =>
@@ -190,14 +192,18 @@ trait DBSessionSpec { specs: DatabaseSpec =>
 
             def find() = coll.find(
               selector = BSONDocument.empty,
-              projection = Option.empty[BSONDocument]).one[BSONDocument]
+              projection = Option.empty[BSONDocument]).cursor[BSONDocument]()
 
-            find().map(_.size) must beTypedEqualTo(0).awaitFor(timeout) and {
-              coll.insert.one(BSONDocument("_id" -> 1)).
+            find().headOption must beNone.awaitFor(timeout) and {
+              coll.insert.
+                many(Seq(BSONDocument("_id" -> 1))).
+                //one(BSONDocument("_id" -> 1)).
                 map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
             } and {
               // 1 document found in transaction after insert
-              find().map(_.size) must beTypedEqualTo(1).awaitFor(timeout)
+              find().collect[List]().
+                map(_.size) must beTypedEqualTo(1).awaitFor(timeout)
+
             } and {
               // 0 document found outside transaction
               _db.flatMap {
@@ -211,7 +217,8 @@ trait DBSessionSpec { specs: DatabaseSpec =>
                 BSONDocument("_id" -> 2), BSONDocument("_id" -> 3))).
                 map(_.n) must beTypedEqualTo(2).awaitFor(timeout)
             } and {
-              find().map(_.size) must beTypedEqualTo(3).awaitFor(timeout)
+              find().collect[List]().
+                map(_.size) must beTypedEqualTo(3).awaitFor(timeout)
             } and {
               db.commitTransaction().
                 aka("commited") must beAnInstanceOf[DB].awaitFor(timeout)
@@ -228,6 +235,7 @@ trait DBSessionSpec { specs: DatabaseSpec =>
             }
           })
       }
+
       section("ge_mongo4")
     } // end: replSetOn
 

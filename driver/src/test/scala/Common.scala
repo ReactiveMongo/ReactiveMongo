@@ -58,7 +58,7 @@ object Common extends CommonAuth {
       })
 
     val b = {
-      if (sys.props.get("test.enableSSL").exists(_ == "true")) {
+      if (sys.props.get("test.enableSSL") contains "true") {
         a.copy(sslEnabled = true, sslAllowsInvalidCert = true)
       } else a
     }
@@ -117,7 +117,11 @@ object Common extends CommonAuth {
   lazy val slowConnection =
     Await.result(driver.connect(List(slowPrimary), SlowOptions), slowTimeout)
 
-  def databases(name: String, con: MongoConnection, slowCon: MongoConnection): (DB, DB) = {
+  def databases(
+    name: String,
+    con: MongoConnection,
+    slowCon: MongoConnection,
+    retries: Int = 0): (DB, DB) = {
     import ExecutionContext.Implicits.global
 
     val _db = for {
@@ -125,10 +129,15 @@ object Common extends CommonAuth {
       _ <- d.drop
     } yield d
 
-    Await.result(_db, timeout) -> Await.result((for {
-      _ <- slowProxy.start()
-      resolved <- slowCon.database(name, slowFailover)
-    } yield resolved), timeout + slowTimeout)
+    try {
+      Await.result(_db, timeout) -> Await.result((for {
+        _ <- slowProxy.start()
+        resolved <- slowCon.database(name, slowFailover)
+      } yield resolved), timeout + slowTimeout)
+    } catch {
+      case _: java.util.concurrent.TimeoutException if (retries > 0) =>
+        databases(name, con, slowCon, retries - 1)
+    }
   }
 
   lazy val (db, slowDb) = databases(commonDb, connection, slowConnection)

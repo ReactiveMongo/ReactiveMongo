@@ -83,7 +83,7 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
     val replicaSet: Option[ReplicaSet], // flattened in the result
     val msg: Option[String] // Contains the value isdbgrid when isMaster returns from a mongos instance.
   ) {
-    def isMongos: Boolean = msg.exists(_ == "isdbgrid")
+    def isMongos: Boolean = msg contains "isdbgrid"
 
     def status: NodeStatus = {
       if (isMaster) NodeStatus.Primary

@@ -18,6 +18,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
   "Cursor" title
 
   sequential
+  stopOnFail
 
   "ReactiveMongo" should {
     group1 // include fixture insert
@@ -202,11 +203,11 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
       lazy val slowCursorCon = Await.result(
         cursorDrv.connect(List(slowPrimary), SlowOptions), slowTimeout)
 
-      lazy val (cursorDb, slowCursorDb) =
-        Common.databases(Common.commonDb, cursorCon, slowCursorCon)
+      val (cursorDb, slowCursorDb) =
+        Common.databases(Common.commonDb, cursorCon, slowCursorCon,
+          retries = 1)
 
       @inline def defaultColl = cursorDb(collName)
-      @inline def slowDefaultColl = slowCursorDb(collName)
 
       "when folding bulks" >> {
         lazy val delayedTimeout = FiniteDuration(
@@ -298,8 +299,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
               debug(s"continueOnError: foldWhileM(#1): $count")
               count = count + 1
             }
-            val cursor = defaultColl.
-              find(matchAll("cursorspec44")).cursor()
+            val cursor = defaultColl.find(matchAll("cursorspec44")).cursor()
 
             cursor.foldWhileM({}, 128)(
               { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #44")) },
@@ -355,7 +355,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
         }
 
         "when folding documents with the slow connection" >> {
-          foldWhileSpec(slowDefaultColl, slowTimeout)
+          foldWhileSpec(slowCursorDb(collName), slowTimeout)
         }
       }
 

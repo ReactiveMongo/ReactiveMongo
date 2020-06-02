@@ -30,7 +30,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
       def reindexSpec(db: DB, coll: String, t: FiniteDuration) = {
         val reIndexDoc = BSONDocument("reIndex" -> coll)
 
-        db(coll).create() must beTypedEqualTo({}).await(0, t) and {
+        db(coll).create() must beTypedEqualTo({}).await(1, t) and {
           db.runCommand(reIndexDoc, db.failoverStrategy).
             one[BSONDocument](ReadPreference.primary) must beLike[BSONDocument] {
               case doc => decoder.double(doc, "ok") must beSome(1)
@@ -55,9 +55,9 @@ final class CommandSpec(implicit ee: ExecutionEnv)
     "execute replSetGetStatus" in {
       if (replSetOn) {
         replSetGetStatusTest.map(_.members.size) must beTypedEqualTo(1).
-          await(0, timeout)
+          awaitFor(timeout)
       } else {
-        replSetGetStatusTest must throwA[DatabaseException].await(0, timeout)
+        replSetGetStatusTest must throwA[DatabaseException].awaitFor(timeout)
       }
     }
 
@@ -71,7 +71,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
             ReplSetMaintenance(true),
             Common.failoverStrategy)) must throwA[DatabaseException].like {
             case CommandException.Code(code) => code aka "error code" must_== 76
-          }.await(0, timeout)
+          }.awaitFor(timeout)
         }
       } else {
         "fail with replicaSet (MongoDB 3+)" in {
@@ -79,7 +79,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
             ReplSetMaintenance(true),
             Common.failoverStrategy)) must throwA[DatabaseException].like {
             case CommandException.Code(code) => code aka "error code" must_== 95
-          }.await(0, timeout)
+          }.awaitFor(timeout)
         }
       }
     }
@@ -87,12 +87,12 @@ final class CommandSpec(implicit ee: ExecutionEnv)
     "response to ping with ok/1.0" in {
       "with the default connection" in {
         connection.database("admin").
-          flatMap(_.ping()) must beTrue.await(0, timeout)
+          flatMap(_.ping()) must beTrue.awaitFor(timeout)
       }
 
       "with the slow connection" in {
         slowConnection.database("admin").
-          flatMap(_.ping()) must beTrue.await(0, timeout)
+          flatMap(_.ping()) must beTrue.await(1, timeout)
       }
     }
   }

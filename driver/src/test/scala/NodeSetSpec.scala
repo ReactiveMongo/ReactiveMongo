@@ -35,6 +35,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
   "Node set" title
 
   sequential // for ConnectAllSpec
+  stopOnFail
 
   import reactivemongo.api.tests._
   import tests.Common

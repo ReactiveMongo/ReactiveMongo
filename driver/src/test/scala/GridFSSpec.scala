@@ -18,13 +18,14 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
   "GridFS" title
 
   sequential
+  stopOnFail
 
   // ---
 
   import tests.Common
   import Common.{ timeout, slowTimeout }
 
-  lazy val (db, slowDb) = Common.databases(s"reactivemongo-gridfs-${System identityHashCode this}", Common.connection, Common.slowConnection)
+  lazy val (db, slowDb) = Common.databases(s"reactivemongo-gridfs-${System identityHashCode this}", Common.connection, Common.slowConnection, retries = 1)
 
   def afterAll() = { db.drop(); () }
 

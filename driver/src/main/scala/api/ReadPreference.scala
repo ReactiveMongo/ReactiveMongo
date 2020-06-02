@@ -33,7 +33,7 @@ object ReadPreference {
     if (tags.isEmpty) None else Some { ts: Map[String, String] =>
       val matching = tags.find(_.foldLeft(Map.empty[String, String]) {
         case (ms, (k, v)) =>
-          if (ts.get(k).exists(_ == v)) {
+          if (ts.get(k) contains v) {
             ms + (k -> v)
           } else ms
       }.isEmpty)

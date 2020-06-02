@@ -41,6 +41,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   "Aggregation framework" title
 
   sequential
+  stopOnFail
 
   // ---
 

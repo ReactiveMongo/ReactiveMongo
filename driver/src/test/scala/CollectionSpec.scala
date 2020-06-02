@@ -27,12 +27,13 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
   "Collection" title
 
   sequential
+  stopOnFail
 
   // ---
 
   import Common.{ timeout, slowTimeout }
 
-  lazy val (db, slowDb) = Common.databases(s"reactivemongo-${System identityHashCode this}", Common.connection, Common.slowConnection)
+  lazy val (db, slowDb) = Common.databases(s"reactivemongo-${System identityHashCode this}", Common.connection, Common.slowConnection, retries = 2)
 
   def afterAll() = { db.drop(); () }
 
@@ -41,7 +42,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
   "BSON collection" should {
     "support creation" >> {
       "successfully when not exist" in {
-        collection.create() must beTypedEqualTo({}).awaitFor(timeout)
+        collection.create() must beTypedEqualTo({}).await(1, timeout)
       }
 
       "with error when already exists (failsIfExists = true)" in {

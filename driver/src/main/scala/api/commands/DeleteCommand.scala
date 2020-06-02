@@ -4,6 +4,7 @@ import reactivemongo.api.{
   Collation,
   PackSupport,
   SerializationPack,
+  Session,
   WriteConcern
 }
 
@@ -32,29 +33,40 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackS
 
   protected final type DeleteCmd = ResolvedCollectionCommand[Delete]
 
-  protected final implicit lazy val deleteWriter: pack.Writer[DeleteCmd] =
-    pack.writer(serialize)
+  private[reactivemongo] def session(): Option[Session]
 
-  final protected def serialize(delete: ResolvedCollectionCommand[Delete]): pack.Document = {
+  protected final implicit lazy val deleteWriter: pack.Writer[DeleteCmd] =
+    deleteWriter(self.session)
+
+  protected final def deleteWriter(
+    session: Option[Session]): pack.Writer[DeleteCmd] = {
     val builder = pack.newBuilder
+
     import builder.{ elementProducer => element }
 
-    val elements = Seq.newBuilder[pack.ElementProducer]
-
     val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
+    val writeSession = CommandCodecs.writeSession(builder)
 
-    elements ++= Seq(
-      element("delete", builder.string(delete.collection)),
-      element("ordered", builder.boolean(delete.command.ordered)),
-      element("writeConcern", writeWriteConcern(delete.command.writeConcern)))
+    pack.writer[DeleteCmd] { delete =>
+      val elements = Seq.newBuilder[pack.ElementProducer]
 
-    delete.command.deletes.headOption.foreach { first =>
-      elements += element("deletes", builder.array(
-        writeElement(builder, first),
-        delete.command.deletes.map(writeElement(builder, _))))
+      elements ++= Seq(
+        element("delete", builder.string(delete.collection)),
+        element("ordered", builder.boolean(delete.command.ordered)),
+        element("writeConcern", writeWriteConcern(delete.command.writeConcern)))
+
+      session.foreach { s =>
+        elements ++= writeSession(s)
+      }
+
+      delete.command.deletes.headOption.foreach { first =>
+        elements += element("deletes", builder.array(
+          writeElement(builder, first),
+          delete.command.deletes.map(writeElement(builder, _))))
+      }
+
+      builder.document(elements.result())
     }
-
-    builder.document(elements.result())
   }
 
   private[api] def writeElement(

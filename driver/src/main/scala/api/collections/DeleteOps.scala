@@ -127,7 +127,7 @@ trait DeleteOps[P <: SerializationPack]
       val emptyCmd = new ResolvedCollectionCommand(
         collection.name, new Delete(Seq.empty, ordered, writeConcern))
 
-      val doc = pack.serialize(emptyCmd, deleteWriter)
+      val doc = pack.serialize(emptyCmd, deleteWriter(None))
 
       metadata.maxBsonSize - pack.bsonSize(doc)
     }

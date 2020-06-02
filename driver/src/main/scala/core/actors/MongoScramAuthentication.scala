@@ -241,13 +241,12 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
 
               con.authenticating match {
                 case Some(a @ ScramAuthenticating(
-                  db, _, _, _, _, Some(cid), Some(sig),
-                  1 /* step; TODO#1.1: more retry? */ )) => {
+                  db, _, _, _, _, Some(cid), Some(sig), 1 /* step */ )) => {
 
                   val serverSig: Option[String] =
                     ScramNegociation.parsePayload(payload).get("v")
 
-                  if (!serverSig.exists(_ == Base64.encodeBase64String(sig))) {
+                  if (!serverSig.contains(Base64.encodeBase64String(sig))) {
                     val msg = s"${mechanism} server signature is invalid"
 
                     warn(msg)

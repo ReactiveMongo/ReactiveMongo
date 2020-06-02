@@ -147,7 +147,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
               }
         }.await(0, failTimeout + (failTimeout / 3L)) and {
           con.flatMap(_.close()(timeout)) must not(
-            throwA[Exception]).await(0, timeout)
+            throwA[Exception]).awaitFor(timeout)
         }
       }
     }
@@ -190,7 +190,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
             writeConcern = WriteConcern.Default,
             restrictions = List.empty,
             mechanisms = List(mechanism))
-        } yield ()) must beTypedEqualTo({}).await(0, timeout * 2)
+        } yield ()) must beTypedEqualTo({}).await(2, timeout * 2)
       }
 
       "not be successful with wrong credentials" >> {
@@ -198,11 +198,11 @@ final class DriverSpec(implicit ee: ExecutionEnv)
           connection.flatMap(_.authenticate(
             dbName, "foo", "bar", failoverStrategy)).
             aka("authentication") must throwA[FailedAuthentication].
-            await(0, timeout)
+            await(1, timeout)
 
         }
 
-        "with the slow connection" in {
+        "with the slow connection" in eventually(2, timeout) {
           slowConnection.flatMap(_.authenticate(
             dbName, "foo", "bar", slowFailover)).
             aka("authentication") must throwA[FailedAuthentication].
@@ -250,27 +250,26 @@ final class DriverSpec(implicit ee: ExecutionEnv)
             aka("authed DB") must beLike[DB] {
               case rdb => rdb.collection("testcol").insert.one(
                 BSONDocument("foo" -> "bar")).map(_ => {}).
-                aka("insertion") must beTypedEqualTo({}).await(1, timeout)
+                aka("insertion") must beTypedEqualTo({}).awaitFor(timeout)
 
             }.await(1, timeout) and {
               con.close()(timeout).
-                aka("close") must not(throwA[Exception]).await(1, timeout)
+                aka("close") must not(throwA[Exception]).awaitFor(timeout)
             }
         }
 
-        "with the slow connection" in {
-          val con = Await.result(
-            drv.connect(
-              List(slowPrimary),
-              options = slowOpts.copy(credentials = rightCreds)),
-            slowTimeout)
+        "with the slow connection" in eventually(2, timeout) {
+          (for {
+            con <- drv.connect(
+              nodes = List(slowPrimary),
+              options = slowOpts.copy(credentials = rightCreds))
 
-          con.database(dbName, slowFailover).
-            aka("authed DB") must beAnInstanceOf[DB].
-            await(1, slowTimeout + (slowTimeout / 4L)) and {
-              con.close()(slowTimeout) must not(throwA[Exception]).
+            db <- con.database(dbName, slowFailover)
+          } yield db) must beLike[DB] {
+            case db =>
+              db.connection.close()(slowTimeout) must not(throwA[Exception]).
                 await(1, slowTimeout)
-            }
+          }.await(1, slowTimeout + (slowTimeout / 4L))
         }
       }
 
@@ -381,7 +380,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
         c <- con
         db <- c.database(commonDb, failoverStrategy)
         _ <- db.collectionNames
-      } yield {}) must beTypedEqualTo({}).await(0, timeout)
+      } yield {}) must beTypedEqualTo({}).awaitFor(timeout)
     }
 
     "fail without a valid credential" in {

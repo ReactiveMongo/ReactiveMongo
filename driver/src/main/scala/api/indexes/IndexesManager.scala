@@ -254,7 +254,7 @@ private[api] sealed abstract class AbstractIndexesManager(
 
     def ensure(index: Index): Future[Boolean] = list().flatMap { indexes =>
       val idx = index.name match {
-        case Some(n) => indexes.find(_.name.exists(_ == n))
+        case Some(n) => indexes.find(_.name contains n)
         case _       => indexes.find(_.key == index.key)
       }
 
@@ -458,7 +458,7 @@ private class DefaultCollectionIndexesManager(
 
   def ensure(index: Index): Future[Boolean] = list().flatMap { indexes =>
     val idx = index.name match {
-      case Some(n) => indexes.find(_.name.exists(_ == n))
+      case Some(n) => indexes.find(_.name contains n)
       case _       => indexes.find(_.key == index.key)
     }
 

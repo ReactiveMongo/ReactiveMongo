@@ -537,7 +537,6 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     }
   }
 
-  // TODO: Specific option?
   @inline private def requestRetries = options.failoverStrategy.retries
 
   private def failureOrLog[T](promise: Promise[T], cause: Throwable)(log: Throwable => Unit): Unit = {
@@ -864,11 +863,9 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
                 case _ if isGetLastError => {
                   debug(s"{${response.header.responseTo}} it's a getlasterror")
 
-                  // TODO: for now rewinding buffer at original index
-
                   lastError(response).fold({ e =>
                     error(s"Error deserializing LastError message #${response.header.responseTo}", e)
-                    promise.failure(new RuntimeException(s"Error deserializing LastError message #${response.header.responseTo} ($lnm)", e))
+                    promise.failure(new GenericDriverException(s"Error deserializing LastError message #${response.header.responseTo} ($lnm)", e))
                   }, { lastError =>
                     if (lastError.inError) {
                       trace(s"{${response.header.responseTo}} sending a failure (lasterror is not ok)")
@@ -1029,7 +1026,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
     val ns = nodeSet.updateNodeByChannelId(chanId) { n =>
       val node = {
-        if (n.pingInfo.channelId.exists(_ == chanId)) {
+        if (n.pingInfo.channelId contains chanId) {
           // #cch2: The channel used to send isMaster/ping request is
           // the one disconnected there
 

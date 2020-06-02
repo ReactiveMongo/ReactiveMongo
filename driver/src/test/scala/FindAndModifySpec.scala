@@ -111,7 +111,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
 
         eventually(2, timeout) {
           slowColl.update.one(before, before, upsert = true).
-            map(_.n) must beTypedEqualTo(1).await(0, slowTimeout) and {
+            map(_.n) must beTypedEqualTo(1).await(1, slowTimeout) and {
               db(colName).count(None) must beTypedEqualTo(1L).
                 await(1, slowTimeout)
 
@@ -259,7 +259,8 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
         case CommandException.Code(c) =>
           //e.printStackTrace
           Some(c)
-      } must beSome( /*code = */ 9).await(1, timeout)
+      } must beSome( /*code = */ 9).
+        await(1, (timeout * 2) + (timeout / 2))
     }
   }
 }
