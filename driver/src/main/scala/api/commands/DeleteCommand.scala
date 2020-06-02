@@ -57,6 +57,7 @@ trait DeleteCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
 
   type DeleteResult = DefaultWriteResult
 
+  // TODO: Remove
   def serialize(delete: ResolvedCollectionCommand[Delete]): pack.Document = {
     val builder = pack.newBuilder
     import builder.{ elementProducer => element }
@@ -79,6 +80,7 @@ trait DeleteCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
     builder.document(elements.result())
   }
 
+  // TODO: Remove
   private[api] def writeElement(
     builder: SerializationPack.Builder[pack.type],
     e: DeleteElement): pack.Document = {
