@@ -139,6 +139,11 @@ trait DBSessionSpec { specs: DatabaseSpec =>
           sdb <- Common.db.startSession()
           tdb <- sdb.startTransaction(None)
 
+          c = sdb.collection(s"session${System identityHashCode sdb}")
+          _ <- c.insert.one(BSONDocument("foo" -> 1))
+          _ <- c.insert.many(Seq(
+            BSONDocument("foo" -> 2), BSONDocument("bar" -> 3)))
+
           kdb <- tdb.killSession()
           _ <- kdb.abortTransaction(failIfNotStarted = true).failed
         } yield ()) must beTypedEqualTo({}).awaitFor(timeout)
@@ -186,7 +191,12 @@ trait DBSessionSpec { specs: DatabaseSpec =>
                 projection = Option.empty[BSONDocument]).
                 one[BSONDocument].map(_.size).
                 aka("found") must beTypedEqualTo(0).awaitFor(timeout)
-
+            } and {
+              coll.insert.many(Seq(
+                BSONDocument("_id" -> 2), BSONDocument("_id" -> 3))).
+                map(_.n) must beTypedEqualTo(2).awaitFor(timeout)
+            } and {
+              coll.count() must beTypedEqualTo(3).awaitFor(timeout)
             } and {
               db.commitTransaction().
                 aka("commited") must beAnInstanceOf[DefaultDB].awaitFor(timeout)

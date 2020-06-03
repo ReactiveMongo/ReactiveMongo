@@ -7,7 +7,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.{ Collation, SerializationPack }
+import reactivemongo.api.{ Collation, SerializationPack, Session }
 import reactivemongo.api.commands.{
   CommandCodecs,
   LastError,
@@ -40,6 +40,55 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     writeConcern: WriteConcern): DeleteBuilder = {
     if (ordered) new OrderedDelete(writeConcern)
     else new UnorderedDelete(writeConcern)
+  }
+
+  private type DeleteCmd = ResolvedCollectionCommand[DeleteCommand.Delete]
+
+  private val deleteWriter: Option[Session] => pack.Writer[DeleteCmd] = {
+    val builder = pack.newBuilder
+    import builder.{ elementProducer => element }
+
+    val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
+    val writeSession = CommandCodecs.writeSession(builder)
+    val writeCollation = Collation.serializeWith(pack, _: Collation)(builder)
+
+    def writeElement(e: DeleteElement): pack.Document = {
+      val elements = Seq.newBuilder[pack.ElementProducer]
+
+      elements ++= Seq(
+        element("q", e.q),
+        element("limit", builder.int(e.limit)))
+
+      e.collation.foreach { c =>
+        elements += element("collation", writeCollation(c))
+      }
+
+      builder.document(elements.result())
+    }
+
+    { session =>
+      pack.writer[DeleteCmd] { delete =>
+        val elements = Seq.newBuilder[pack.ElementProducer]
+
+        elements ++= Seq(
+          element("delete", builder.string(delete.collection)),
+          element("ordered", builder.boolean(delete.command.ordered)),
+          element(
+            "writeConcern",
+            writeWriteConcern(delete.command.writeConcern)))
+
+        session.foreach { s =>
+          elements ++= writeSession(s)
+        }
+
+        delete.command.deletes.headOption.foreach { first =>
+          elements += element("deletes", builder.array(
+            writeElement(first), delete.command.deletes.map(writeElement)))
+        }
+
+        builder.document(elements.result())
+      }
+    }
   }
 
   /**
@@ -129,10 +178,9 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     private def maxBsonSize = {
       // Command envelope to compute accurate BSON size limit
       val emptyCmd = ResolvedCollectionCommand(
-        collection.name,
-        Delete(Seq.empty, ordered, writeConcern))
+        collection.name, Delete(Seq.empty, ordered, writeConcern))
 
-      val doc = serialize(emptyCmd)
+      val doc = pack.serialize(emptyCmd, deleteWriter(None))
 
       metadata.maxBsonSize - pack.bsonSize(doc)
     }
@@ -151,14 +199,14 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     implicit private val resultReader: pack.Reader[DeleteCommand.DeleteResult] =
       CommandCodecs.defaultWriteResultReader(pack)
 
+    implicit private lazy val writer: pack.Writer[DeleteCmd] =
+      deleteWriter(collection.db.session)
+
     private final def execute(deletes: Seq[DeleteElement])(
       implicit
       ec: ExecutionContext): Future[WriteResult] = {
       if (metadata.maxWireVersion >= MongoWireVersion.V26) {
         val cmd = Delete(deletes, ordered, writeConcern)
-
-        implicit def writer: pack.Writer[ResolvedCollectionCommand[Delete]] =
-          pack.writer { serialize(_) }
 
         Future.successful(cmd).flatMap(
           runCommand(_, writePreference).flatMap { wr =>
@@ -217,6 +265,4 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     val ordered = false
     val bulkRecover = unorderedRecover
   }
-
-  private val serialize = DeleteCommand.serialize _
 }
