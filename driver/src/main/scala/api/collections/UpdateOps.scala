@@ -7,7 +7,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.{ Collation, SerializationPack }
+import reactivemongo.api.{ Collation, SerializationPack, Session }
 import reactivemongo.api.commands.{
   MultiBulkWriteResult,
   ResolvedCollectionCommand,
@@ -188,10 +188,10 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
 
     private type UpdateCmd = ResolvedCollectionCommand[UpdateCommand.Update]
 
-    implicit private lazy val updateWriter: pack.Writer[UpdateCmd] = {
+    private def updateWriter(
+      session: Option[Session]): pack.Writer[UpdateCmd] = {
       val underlying = reactivemongo.api.commands.UpdateCommand.
-        writer(pack)(UpdateCommand)(
-          collection.db.session, metadata.maxWireVersion)
+        writer(pack)(UpdateCommand)(session, metadata.maxWireVersion)
 
       pack.writer[UpdateCmd](underlying)
     }
@@ -213,7 +213,7 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
         new UpdateCommand.Update(
           emptyElm, Seq.empty, ordered, writeConcern, false))
 
-      val doc = pack.serialize(emptyCmd, updateWriter)
+      val doc = pack.serialize(emptyCmd, updateWriter(None))
 
       metadata.maxBsonSize - pack.bsonSize(doc)
     }
@@ -242,6 +242,9 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
 
     implicit private val resultReader: pack.Reader[UpdateCommand.UpdateResult] =
       reactivemongo.api.commands.UpdateCommand.reader(pack)(UpdateCommand)
+
+    implicit private lazy val writer: pack.Writer[UpdateCmd] =
+      updateWriter(collection.db.session)
 
     private final def execute(
       firstUpdate: UpdateElement,

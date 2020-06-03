@@ -7,7 +7,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ SerializationPack, Session }
 import reactivemongo.api.commands.{
   CommandCodecs,
   LastError,
@@ -48,11 +48,10 @@ trait InsertOps[P <: SerializationPack with Singleton] {
 
   private type InsertCmd = ResolvedCollectionCommand[InsertCommand.Insert]
 
-  implicit private lazy val insertWriter: pack.Writer[InsertCmd] = {
+  private def insertWriter(session: Option[Session]): pack.Writer[InsertCmd] = {
     val builder = pack.newBuilder
     val writeWriteConcern = CommandCodecs.writeWriteConcern(pack)
     val writeSession = CommandCodecs.writeSession(builder)
-    val session = collection.db.session
 
     import builder.{ elementProducer => element }
 
@@ -66,7 +65,6 @@ trait InsertOps[P <: SerializationPack with Singleton] {
       elements ++= Seq[pack.ElementProducer](
         element("insert", builder.string(insert.collection)),
         element("ordered", ordered),
-        element("documents", documents),
         element(
           "bypassDocumentValidation",
           builder.boolean(command.bypassDocumentValidation)))
@@ -82,6 +80,8 @@ trait InsertOps[P <: SerializationPack with Singleton] {
         elements += element(
           "writeConcern", writeWriteConcern(command.writeConcern))
       }
+
+      elements += element("documents", documents)
 
       builder.document(elements.result())
     }
@@ -103,7 +103,7 @@ trait InsertOps[P <: SerializationPack with Singleton] {
         InsertCommand.Insert(
           emptyDoc, Seq.empty[pack.Document], ordered, writeConcern, false))
 
-      val doc = pack.serialize(emptyCmd, insertWriter)
+      val doc = pack.serialize(emptyCmd, insertWriter(None))
 
       metadata.maxBsonSize - pack.bsonSize(doc) + pack.bsonSize(emptyDoc)
     }
@@ -186,32 +186,38 @@ trait InsertOps[P <: SerializationPack with Singleton] {
     implicit private val resultReader: pack.Reader[InsertCommand.InsertResult] =
       CommandCodecs.defaultWriteResultReader(pack)
 
-    private final def execute(documents: Seq[pack.Document])(implicit ec: ExecutionContext): Future[WriteResult] = documents.headOption match {
-      case Some(head) => {
-        if (metadata.maxWireVersion >= MongoWireVersion.V26) {
-          val cmd = InsertCommand.Insert(
-            head, documents.tail, ordered, writeConcern,
-            bypassDocumentValidation)
+    implicit private lazy val writer: pack.Writer[InsertCmd] =
+      insertWriter(collection.db.session)
 
-          runCommand(cmd, writePreference).flatMap { wr =>
-            val flattened = wr.flatten
+    private final def execute(documents: Seq[pack.Document])(
+      implicit
+      ec: ExecutionContext): Future[WriteResult] =
+      documents.headOption match {
+        case Some(head) => {
+          if (metadata.maxWireVersion >= MongoWireVersion.V26) {
+            val cmd = InsertCommand.Insert(
+              head, documents.tail, ordered, writeConcern,
+              bypassDocumentValidation)
 
-            if (!flattened.ok) {
-              // was ordered, with one doc => fail if has an error
-              Future.failed(WriteResult.lastError(flattened).
-                getOrElse[Exception](GenericDriverException(
-                  s"fails to insert: $documents")))
+            runCommand(cmd, writePreference).flatMap { wr =>
+              val flattened = wr.flatten
 
-            } else Future.successful(wr)
+              if (!flattened.ok) {
+                // was ordered, with one doc => fail if has an error
+                Future.failed(WriteResult.lastError(flattened).
+                  getOrElse[Exception](GenericDriverException(
+                    s"fails to insert: $documents")))
+
+              } else Future.successful(wr)
+            }
+          } else { // Mongo < 2.6
+            Future.failed[WriteResult](GenericDriverException(
+              s"unsupported MongoDB version: $metadata"))
           }
-        } else { // Mongo < 2.6
-          Future.failed[WriteResult](GenericDriverException(
-            s"unsupported MongoDB version: $metadata"))
         }
-      }
 
-      case _ => Future.successful(WriteResult.empty) // No doc to insert
-    }
+        case _ => Future.successful(WriteResult.empty) // No doc to insert
+      }
   }
 
   // ---
