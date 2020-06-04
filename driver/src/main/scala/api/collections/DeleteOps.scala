@@ -44,7 +44,7 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
 
   private type DeleteCmd = ResolvedCollectionCommand[DeleteCommand.Delete]
 
-  private val deleteWriter: Option[Session] => pack.Writer[DeleteCmd] = {
+  private lazy val deleteWriter: Option[Session] => pack.Writer[DeleteCmd] = {
     val builder = pack.newBuilder
     import builder.{ elementProducer => element }
 
