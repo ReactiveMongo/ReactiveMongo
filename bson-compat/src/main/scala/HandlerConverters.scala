@@ -99,7 +99,7 @@ private[bson] sealed trait LowPriorityHandlerConverters1
    * and a `BSONDocumentWriter` for the given type `T`,
    * a `BSONDocumentHandler` is materialized.
    */
-  final def providedDocumentHandler[T](implicit r: BSONDocumentReader[T], w: BSONDocumentWriter[T]): BSONDocumentHandler[T] = new DefaultDocumentHandler[T](r, w)
+  final def providedDocumentHandler[T](implicit r: BSONDocumentReader[T], w: BSONDocumentWriter[T]): BSONDocumentHandler[T] = new WrappedDocumentHandler[T](r, w)
 
   implicit final def fromHandler[T](h: BSONHandler[T]): LegacyHandler[LegacyValue, T] = LegacyHandler.provided[LegacyValue, T](fromWriter(h), fromReader(h))
 
