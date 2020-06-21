@@ -63,7 +63,7 @@ final class AsyncDriver(
    * so it can have complete control separate from other
    * Actor Systems in the application
    */
-  private[api] val system = {
+  private[reactivemongo] val system = {
     import com.typesafe.config.ConfigFactory
 
     val reference = config getOrElse ConfigFactory.load()

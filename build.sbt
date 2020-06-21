@@ -12,21 +12,25 @@ lazy val `ReactiveMongo-Core` = project.in(file("core")).
 
 lazy val `ReactiveMongo` = new Driver(`ReactiveMongo-Core`).module
 
+lazy val `ReactiveMongo-Test` = project.in(file("test")).settings(
+  description := "ReactiveMongo test helpers",
+).dependsOn(`ReactiveMongo`)
+
 // ---
 
 def docSettings = Documentation(excludes = Seq.empty).settings
 
 lazy val `ReactiveMongo-Root` = project.in(file(".")).
   enablePlugins(ScalaUnidocPlugin).
-  settings(docSettings ++
-    Travis.settings ++ Seq(
-      publishArtifact := false,
-      publishTo := None,
-      publishLocal := {},
-      publish := {}
+  settings(docSettings ++ Seq(
+    publishArtifact := false,
+    publishTo := None,
+    publishLocal := {},
+    publish := {}
   )).aggregate(
     `ReactiveMongo-Core`,
-    `ReactiveMongo`)
+    `ReactiveMongo`,
+    `ReactiveMongo-Test`)
 
 lazy val benchmarks = (project in file("benchmarks")).
   enablePlugins(JmhPlugin).

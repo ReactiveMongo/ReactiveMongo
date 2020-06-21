@@ -82,7 +82,7 @@ private[reactivemongo] object CommandCodecs {
       val wcError = decoder.child(doc, "writeConcernError").
         flatMap(readWriteConcernError)
 
-      DefaultWriteResult(
+      new DefaultWriteResult(
         ok = decoder.booleanLike(doc, "ok").getOrElse(true),
         n = decoder.int(doc, "n").getOrElse(0),
         writeErrors = werrors,

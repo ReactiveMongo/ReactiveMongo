@@ -63,8 +63,37 @@ object WriteResult {
     def unapply(result: WriteResult): Option[String] = result.errmsg
   }
 
+  /**
+   * Extracts exception details, if and only if it's
+   * an erroneous [[WriteResult]].
+   *
+   * {{{
+   * import reactivemongo.api.commands.WriteResult
+   *
+   * def printRes(res: WriteResult): Unit = res match {
+   *   case WriteResult.Exception(cause) =>
+   *     cause.printStackTrace()
+   *
+   *   case _ =>
+   *     println(s"OK: " + res)
+   * }
+   * }}}
+   */
+  object Exception {
+    def unapply(result: WriteResult): Option[DatabaseException] =
+      result match {
+        case error: DatabaseException =>
+          Some(error)
+
+        case _ =>
+          None
+      }
+  }
+
   private[reactivemongo] def empty: WriteResult = new DefaultWriteResult(
     true, 0, Seq.empty, Option.empty, Option.empty, Option.empty)
+
+  private[reactivemongo] trait Internal extends WriteResult
 }
 
 private[reactivemongo] trait LastErrorFactory[P <: SerializationPack] {

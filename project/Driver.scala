@@ -17,6 +17,7 @@ final class Driver(core: Project) {
 
   lazy val module = Project("ReactiveMongo", file("driver")).
     settings(Seq(
+        description := "ReactiveMongo is a Scala driver that provides fully non-blocking and asynchronous I/O operations ",
         unmanagedSourceDirectories in Compile ++= {
           val v = scalaBinaryVersion.value
 

@@ -87,7 +87,7 @@ private[reactivemongo] object DatabaseException {
   // ---
 
   private final class DefaultException(
-    val cause: Throwable) extends DatabaseException {
+    val cause: Throwable) extends DatabaseException with NoStackTrace {
 
     val originalDocument = Option.empty[Nothing]
     val code = Option.empty[Int]

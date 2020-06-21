@@ -16,8 +16,8 @@ import reactivemongo.core.protocol.{ RequestMaker, Response, ProtocolMetadata }
  */
 private[reactivemongo] final class ExpectingResponse(
   val requestMaker: RequestMaker,
-  private[reactivemongo] val pinnedNode: Option[String]) {
-  private[actors] val promise: Promise[Response] = Promise()
+  val pinnedNode: Option[String]) {
+  val promise: Promise[Response] = Promise()
 
   /** The future response of this request. */
   val future: Future[Response] = promise.future
