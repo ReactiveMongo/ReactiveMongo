@@ -100,6 +100,16 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
       }.map(_.filename) must beSome(filename2).await(1, timeout)
     }
 
+    lazy val customField = s"foo-${System identityHashCode content2}"
+
+    "update a file metadata" in {
+      val update = document(Seq(elem(f"$$set", document(Seq(
+        elem("_custom", str(customField)))))))
+
+      gfs.update(file2.id, update).
+        map(_.n) must beTypedEqualTo(1).awaitFor(timeout)
+    }
+
     "find the files" in {
       def find(n: String): Future[Option[GFile]] =
         gfs.find[pack.Document, pack.Value](
@@ -145,6 +155,10 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
             }
           }
         }.await(1, timeout + (timeout / 3L))
+      } and {
+        gfs.find[pack.Document, pack.Value](
+          document(Seq(elem("_custom", str(customField))))).
+          headOption.map(_.map(_.id)) must beSome(file2.id).awaitFor(timeout)
       }
     }
 

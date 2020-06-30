@@ -46,6 +46,9 @@ import reactivemongo.api.commands.{
   CommandCodecsWithPack,
   DeleteCommand,
   InsertCommand,
+  UpdateCommand,
+  UpdateWriteResultFactory,
+  UpsertedFactory,
   WriteResult
 }
 
@@ -65,8 +68,9 @@ import reactivemongo.api.gridfs.{ FileToSave => SF, ReadFile => RF }
  * @define readFileParam the file to be read
  * @define fileReader fileReader a file reader automatically resolved if `Id` is a valid value
  */
-sealed trait GridFS[P <: SerializationPack]
-  extends PackSupport[P] with InsertCommand[P] with DeleteCommand[P]
+sealed trait GridFS[P <: SerializationPack] extends PackSupport[P]
+  with InsertCommand[P] with DeleteCommand[P] with UpdateCommand[P]
+  with UpdateWriteResultFactory[P] with UpsertedFactory[P]
   with CommandCodecsWithPack[P] with QueryBuilderFactory[P] { self =>
 
   /* The database where this store is located. */
@@ -315,6 +319,32 @@ sealed trait GridFS[P <: SerializationPack]
       }
 
     go(Chunk(Array.empty, 0, digestInit, 0)).flatMap(_.finish)
+  }
+
+  protected lazy val maxWireVersion =
+    db.connectionState.metadata.maxWireVersion
+
+  /**
+   * Updates the metadata document for the specified file.
+   *
+   * @param id the id of the file to be updated
+   * @param metadata the file new metadata
+   */
+  def update[Id <: pack.Value](id: Id, metadata: pack.Document)(implicit ec: ExecutionContext): Future[WriteResult] = {
+    val updateFileCmd = new Update(
+      firstUpdate = new UpdateElement(
+        q = document(Seq(elem("_id", id))),
+        u = metadata,
+        upsert = false,
+        multi = false,
+        collation = None,
+        arrayFilters = Seq.empty),
+      updates = Seq.empty,
+      ordered = false,
+      writeConcern = defaultWriteConcern,
+      bypassDocumentValidation = false)
+
+    runner(fileColl, updateFileCmd, defaultReadPreference)
   }
 
   /**
