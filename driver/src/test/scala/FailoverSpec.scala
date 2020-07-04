@@ -6,7 +6,7 @@ import org.specs2.concurrent.ExecutionEnv
 import reactivemongo.api.{ FailoverStrategy, MongoConnection }
 import reactivemongo.api.tests._
 
-class FailoverSpec(implicit ee: ExecutionEnv)
+final class FailoverSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
   "Failover" title
@@ -34,10 +34,32 @@ class FailoverSpec(implicit ee: ExecutionEnv)
         future must beTypedEqualTo({}).await(1, timeout)
     }
 
-    "fail" in {
-      _failover2(con, strategy)(() =>
-        Future.failed(new Exception("Foo"))).
-        future must throwA[Exception]("Foo").await(1, timeout)
+    "fail" >> {
+      "with an failed result" in {
+        _failover2(con, strategy)(() =>
+          Future.failed(new Exception("Foo"))).
+          future must throwA[Exception]("Foo").await(1, timeout)
+      }
+
+      "with an erroneous response" in {
+        @volatile var c = 0
+        val s = FailoverStrategy(
+          retries = 10,
+          delayFactor = { i =>
+            c = i
+            1D
+          })
+
+        _failover2(con, s)(() => Future.successful(
+          fakeResponseError(reactivemongo.bson.BSONDocument(
+            "ok" -> 0D,
+            "errmsg" -> "not master",
+            "code" -> 10107,
+            "codeName" -> "NotMaster")))).
+          future must throwA[Exception]("not master").awaitFor(timeout) and {
+            c must_=== 10
+          }
+      }
     }
 
     "handle producer error" in {
