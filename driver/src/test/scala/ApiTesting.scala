@@ -19,9 +19,11 @@ import reactivemongo.io.netty.channel.{
 import reactivemongo.io.netty.channel.Channel
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
+import reactivemongo.core.errors.DatabaseException
 import reactivemongo.core.protocol.{
   Request,
   Response,
+  ResponseInfo,
   ResponseFrameDecoder,
   ResponseDecoder
 }
@@ -132,7 +134,33 @@ package object tests {
       header,
       reply,
       documents = message,
-      info = reactivemongo.core.protocol.ResponseInfo(chanId))
+      info = ResponseInfo(chanId))
+  }
+
+  def fakeResponseError(
+    doc: BSONDocument,
+    reqID: Int = 2,
+    respTo: Int = 1,
+    chanId: ChannelId = DefaultChannelId.newInstance()): Response = {
+    val reply = reactivemongo.core.protocol.Reply(
+      flags = 1,
+      cursorID = 1,
+      startingFrom = 0,
+      numberReturned = 1)
+
+    val message = bufferSeq(doc).merged
+
+    val header = reactivemongo.core.protocol.MessageHeader(
+      messageLength = message.capacity,
+      requestID = reqID,
+      responseTo = respTo,
+      opCode = -1)
+
+    Response.CommandError(
+      _header = header,
+      _reply = reply,
+      _info = ResponseInfo(chanId),
+      cause = DatabaseException(doc))
   }
 
   def foldResponses[T](
