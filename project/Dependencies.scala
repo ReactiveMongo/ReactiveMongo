@@ -6,7 +6,7 @@ object Dependencies {
   val netty = "io.netty" % "netty-handler" % nettyVer
 
   val shaded = Def.setting[Seq[ModuleID]] {
-    val v = "0.20.12" // (version in ThisBuild).value
+    val v = (version in ThisBuild).value
 
     if (Common.useShaded.value || scalaBinaryVersion.value == "2.10") {
       Seq(organization.value % "reactivemongo-shaded" % v)
