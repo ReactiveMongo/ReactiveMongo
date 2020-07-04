@@ -31,4 +31,4 @@ addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.3.7")
 
 addSbtPlugin("cchantep" % "sbt-scaladoc-compiler" % "0.1")
 
-addSbtPlugin("com.dwijnand" % "sbt-dynver" % "4.0.0")
+addSbtPlugin("com.dwijnand" % "sbt-dynver" % "4.1.1")
