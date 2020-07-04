@@ -745,6 +745,7 @@ object Version {
 
   private def shadedNative(arch: String) = Def.setting[ModuleID] {
     if (Common.useShaded.value) {
+      /*
       val v = version.value
       val s = {
         if (v endsWith "-SNAPSHOT") {
@@ -753,6 +754,8 @@ object Version {
           s"${v}-${arch}"
         }
       }
+       */
+      val s = "0.20.12"
 
       organization.value % "reactivemongo-shaded-native" % s
     } else {
