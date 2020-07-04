@@ -10,7 +10,7 @@ Environment variables can be set before `docker-compose run`:
 
     export MONGO_PROFILE=invalid-ssl
 
-> See matrix in the [CI configuration](../../.travis.yml)
+> See matrix in the [CI configuration](../../.circleci/config.yml)
 
 It's also possible to obtain an interactive shell from the test container.
 

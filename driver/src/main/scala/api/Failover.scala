@@ -16,8 +16,6 @@ private[reactivemongo] final class Failover[A](
   failoverStrategy: FailoverStrategy)(implicit ec: ExecutionContext) {
 
   import Failover.logger, logger.trace
-  import reactivemongo.core.errors._
-  import reactivemongo.core.actors.Exceptions._
 
   private val lnm = s"${connection.supervisor}/${connection.name}" // log name
 
@@ -74,6 +72,7 @@ private[reactivemongo] final class Failover[A](
 }
 
 private[api] object RetryableFailure {
+  import reactivemongo.core.protocol.Response
   import reactivemongo.core.errors._
   import reactivemongo.core.actors.Exceptions._
 

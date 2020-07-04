@@ -210,11 +210,10 @@ final class MongoConnection private[reactivemongo] (
   }
 
   private[api] def sendExpectingResponse(
-    expectingResponse: ExpectingResponse): Future[Response] =
-    whenActive {
-      mongosystem ! expectingResponse
-      expectingResponse.future
-    }
+    expectingResponse: ExpectingResponse): Future[Response] = whenActive {
+    mongosystem ! expectingResponse
+    expectingResponse.future
+  }
 
   /** The name of the picked node */
   private[api] def pickNode(readPreference: ReadPreference): Future[String] =
@@ -233,6 +232,9 @@ final class MongoConnection private[reactivemongo] (
   private case class IsPrimaryAvailable(result: Promise[ConnectionState]) {
     override val toString = s"IsPrimaryAvailable#${System identityHashCode this}?"
   }
+
+  /* For testing purpose */
+  private[api] case class IsUnavailable(result: Promise[Unit])
 
   /**
    * Checks whether is unavailable.
@@ -292,6 +294,8 @@ final class MongoConnection private[reactivemongo] (
 
     private val waitingForClose = Queue[ActorRef]()
 
+    private var setUnavailable = Promise[Unit]()
+
     val receive: Receive = {
       case available: PrimaryAvailable => {
         debug(s"A primary is available: ${available.metadata}")
@@ -309,6 +313,10 @@ final class MongoConnection private[reactivemongo] (
       case PrimaryUnavailable => {
         debug("There is no primary available")
 
+        if (!setUnavailable.trySuccess({})) {
+          setUnavailable = Promise.successful({})
+        }
+
         if (primaryAvailable.isCompleted) { // reset availability
           primaryAvailable = Promise[ConnectionState]()
         }
@@ -324,6 +332,10 @@ final class MongoConnection private[reactivemongo] (
 
         if (!setAvailable.trySuccess(state)) {
           setAvailable = Promise.successful(state)
+        }
+
+        if (setUnavailable.isCompleted) {
+          setUnavailable = Promise[Unit]()
         }
       }
 
@@ -342,6 +354,11 @@ final class MongoConnection private[reactivemongo] (
 
       case IsPrimaryAvailable(result) => {
         result.completeWith(primaryAvailable.future)
+        ()
+      }
+
+      case IsUnavailable(result) => {
+        result.completeWith(setUnavailable.future)
         ()
       }
 

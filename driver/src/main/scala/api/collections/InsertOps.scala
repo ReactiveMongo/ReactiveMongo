@@ -90,8 +90,16 @@ trait InsertOps[P <: SerializationPack]
      * }
      * }}}
      */
-    final def one[T](document: T)(implicit ec: ExecutionContext, writer: pack.Writer[T]): Future[WriteResult] = Future(pack.serialize(document, writer)).flatMap { single =>
-      execute(Seq(single))
+    final def one[T](document: T)(implicit ec: ExecutionContext, writer: pack.Writer[T]): Future[WriteResult] = {
+      //TODO: val contextSTE = new Throwable().getStackTrace().drop(3)
+
+      Future(pack.serialize(document, writer)).flatMap { single =>
+        execute(Seq(single))
+      } /*TODO: flag to enable and same for other cases; .recoverWith {
+        case cause =>
+          cause.setStackTrace(contextSTE ++ cause.getStackTrace)
+          Future.failed[WriteResult](cause)
+      }*/
     }
 
     /** Inserts many documents, according the ordered behaviour. */

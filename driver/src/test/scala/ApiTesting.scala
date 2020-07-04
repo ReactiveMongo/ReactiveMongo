@@ -82,6 +82,11 @@ package object tests { self =>
 
   def mongosystem(con: MongoConnection) = con.mongosystem
 
+  def monitor(con: MongoConnection) = con.monitor
+
+  def IsUnavailable(con: MongoConnection, p: Promise[Unit]) =
+    con.IsUnavailable(p)
+
   @inline def md5Hex(bytes: Array[Byte]): String = {
     import reactivemongo.api.bson.Digest
     Digest.hex2Str(Digest.md5(bytes))
@@ -181,7 +186,7 @@ package object tests { self =>
       responseTo = respTo,
       opCode = -1)
 
-    new Response(
+    Response(
       header,
       reply,
       documents = message,
@@ -210,22 +215,9 @@ package object tests { self =>
     Response.CommandError(
       _header = header,
       _reply = reply,
-      _info = ResponseInfo(chanId),
+      _info = new ResponseInfo(chanId),
       cause = DatabaseException(pack)(doc))
   }
-
-/* TODO: Remove
-  def foldResponses[T](
-    makeRequest: ExecutionContext => Future[Response],
-    next: (ExecutionContext, Response) => Future[Option[Response]],
-    killCursors: (Long, String) => Unit,
-    z: => T,
-    maxDocs: Int,
-    suc: (T, Response) => Future[Cursor.State[T]],
-    err: Cursor.ErrorHandler[T])(implicit sys: akka.actor.ActorSystem, ec: ExecutionContext): Future[T] =
-    FoldResponses[T](
-      z, makeRequest, next, killCursors, suc, err, maxDocs)(sys, ec)
-*/
 
   val bsonReadPref: ReadPreference => BSONDocument = {
     val writeReadPref = QueryCodecs.writeReadPref(BSONSerializationPack)

@@ -100,7 +100,7 @@ trait DBSessionSpec { specs: DatabaseSpec =>
                 db.startTransaction(None, failIfAlreadyStarted = false).
                   map(apiTests.session).map {
                     _.flatMap(_.transaction.toOption).map(_.txnNumber)
-                  } must beSome(2L).awaitFor(timeout)
+                  } must beSome(2L).await(1, timeout)
               } and {
                 // Insert a doc in the transaction,
                 // and check the count before & after

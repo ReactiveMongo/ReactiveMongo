@@ -379,7 +379,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
             (for {
               _ <- coll.insert(ordered = false).one(inserted)
               r <- coll.find(base).one[BSONDocument]
-            } yield r) must beSome(inserted).awaitFor(timeout) and {
+            } yield r) must beSome(inserted).await(1, timeout) and {
               (for {
                 _ <- coll.update(false).one(
                   q = base,

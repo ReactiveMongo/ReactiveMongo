@@ -249,7 +249,11 @@ final class DB private[api] (
           Future.failed[DB](new GenericDriverException(s"Transaction ${tx.txnNumber} was already started with session '${s.lsid}'"))
 
         case Success(_) =>
-          Future.successful(this)
+          // Dummy find, to make sure a CRUD command is sent
+          // with 'startTransaction' right now
+          collection(s"startx${Thread.currentThread().getId}").
+            find(pack.newBuilder.document(Seq.empty)).
+            one[pack.Document].map(_ => this)
       }
     }
 

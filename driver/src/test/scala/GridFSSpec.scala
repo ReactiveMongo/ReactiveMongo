@@ -158,14 +158,14 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
       } and {
         gfs.find[pack.Document, pack.Value](
           document(Seq(elem("_custom", str(customField))))).
-          headOption.map(_.map(_.id)) must beSome(file2.id).awaitFor(timeout)
+          headOption.map(_.map(_.id)) must beSome(file2.id).
+          await(1, timeout + (timeout / 3L))
       }
     }
 
     "delete the files from GridFS" in {
-      def spec(id: gfs.pack.Value) = eventually(2, timeout / 2L) {
-        gfs.remove(id).map(_.n) must beTypedEqualTo(1).await(0, timeout * 2L)
-      }
+      def spec(id: gfs.pack.Value) =
+        gfs.remove(id).map(_.n) must beTypedEqualTo(1).awaitFor(timeout)
 
       spec(file1.id) and spec(file2.id)
     }

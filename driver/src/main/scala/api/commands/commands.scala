@@ -83,14 +83,17 @@ private[reactivemongo] object Command {
 
     protected def defaultReadPreference = db.connection.options.readPreference
 
+    /* TODO: Static binding to collect traces
     @inline private def stackTrace() =
-      Thread.currentThread.getStackTrace.drop(4).reverse
+      new Throwable().getStackTrace().drop(3).reverse
+     */
 
     def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = {
       val requestMaker = buildRequestMaker(pack)(
         command, writer, readPreference, db.name)
 
-      val contextSTE = stackTrace()
+      /* TODO: Static binding
+      val contextSTE = stackTrace() */
 
       Failover(db.connection, failover) { () =>
         db.connection.sendExpectingResponse(new ExpectingResponse(
@@ -100,33 +103,39 @@ private[reactivemongo] object Command {
             t <- s.transaction.toOption
             n <- t.pinnedNode
           } yield n))
-      }.future.flatMap {
-        case Response.CommandError(_, _, _, cause) =>
-          cause.originalDocument match {
-            case pack.IsDocument(doc) =>
-              // Error document as result
-              Future(pack.deserialize(doc, reader))
-
-            case _ => Future.failed[T] {
-              cause.setStackTrace(contextSTE)
-              cause
-            }
-          }
-
-        case response @ Response.Successful(_, Reply(_, _, _, 0), _, _) =>
-          Future.failed[T](new GenericDriverException(
-            s"Cannot parse empty response: $response"))
-
-        case response => db.session match {
-          case Some(session) =>
-            Session.updateOnResponse(session, response).map {
-              case (_, resp) => pack.readAndDeserialize(resp, reader)
-            }
-
-          case _ =>
-            Future(pack.readAndDeserialize(response, reader))
+      }.future /* TODO: Static binding; .recoverWith {
+        case cause => Future.failed[Response] {
+          cause.setStackTrace(contextSTE)
+          cause
         }
-      }
+      }*/ .flatMap {
+          case Response.CommandError(_, _, _, cause) =>
+            cause.originalDocument match {
+              case pack.IsDocument(doc) =>
+                // Error document as result
+                Future(pack.deserialize(doc, reader))
+
+              case _ => Future.failed[T] {
+                /* TODO: Static binding
+                cause.setStackTrace(contextSTE) */
+                cause
+              }
+            }
+
+          case response @ Response.Successful(_, Reply(_, _, _, 0), _, _) =>
+            Future.failed[T](new GenericDriverException(
+              s"Cannot parse empty response: $response"))
+
+          case response => db.session match {
+            case Some(session) =>
+              Session.updateOnResponse(session, response).map {
+                case (_, resp) => pack.readAndDeserialize(resp, reader)
+              }
+
+            case _ =>
+              Future(pack.readAndDeserialize(response, reader))
+          }
+        }
     }
 
     def cursor[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T]): DefaultCursor.Impl[T] = {

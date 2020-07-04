@@ -51,7 +51,7 @@ final class FailoverSpec(implicit ee: ExecutionEnv)
           })
 
         _failover2(con, s)(() => Future.successful(
-          fakeResponseError(reactivemongo.bson.BSONDocument(
+          fakeResponseError(reactivemongo.api.bson.BSONDocument(
             "ok" -> 0D,
             "errmsg" -> "not master",
             "code" -> 10107,

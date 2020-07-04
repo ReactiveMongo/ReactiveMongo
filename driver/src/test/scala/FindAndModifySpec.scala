@@ -111,9 +111,9 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
 
         eventually(2, timeout) {
           slowColl.update.one(before, before, upsert = true).
-            map(_.n) must beTypedEqualTo(1).await(1, slowTimeout) and {
+            map(_.n) must beTypedEqualTo(1).awaitFor(slowTimeout) and {
               db(colName).count(None) must beTypedEqualTo(1L).
-                await(1, slowTimeout)
+                awaitFor(slowTimeout)
 
             } and {
               upsertAndFetch(slowColl, before, after.age, slowTimeout) {

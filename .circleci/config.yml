@@ -6,9 +6,10 @@ commands:
     parameters:
       sbt_version:
         type: string
-        default: "1.3.9"
+        default: "1.3.13"
     steps:
       - restore_cache:
+          name: Restore SBT cache
           keys:
             - &sbt_cache_key sbt-{{ arch }}-{{ checksum "project/build.properties" }}
 
@@ -22,12 +23,13 @@ commands:
                     fi
 
       - save_cache:
+          name: Update SBT cache
           paths:
             - ~/sbt
           key: *sbt_cache_key
 
   build_n_tests:
-    description: Build & Run tests
+    description: Build & Test
     parameters:
       jdk_version:
         type: string
@@ -44,15 +46,18 @@ commands:
 
     steps:
       - restore_cache:
+          name: Restore Scala cache
           keys:
             - &scala_cache_key scala-{{ .Environment.CIRCLE_JOB }}-<< parameters.shaded >>-{{ checksum "version.sbt" }}-{{ checksum "build.sbt" }}-{{ checksum "project/Common.scala" }}-{{ checksum "project/Dependencies.scala" }}
 
       - restore_cache:
+          name: Restore compilation cache
           keys:
           - &compile_cache_key compile-{{ arch }}-{{ .Revision }}-<< parameters.jdk_version >>-<< parameters.scala_version >>
 
       - run:
-          name: Build & Run tests
+          name: Build & Test
+          no_output_timeout: 15m
           command: |
                     export PATH=$PATH:~/sbt/bin
                     export SCALA_VERSION="<< parameters.scala_version >>"
@@ -70,18 +75,20 @@ commands:
                     CMD="./.ci_scripts/validate.sh /tmp/integration-env.sh"
 
                     if [ "x$CI_CATEGORY" = "xINTEGRATION_TESTS" ]; then
-                      TEST_TIMEOUT=260s ./.ci_scripts/retry.sh 2 $CMD
+                      TEST_TIMEOUT=420s ./.ci_scripts/retry.sh 2 $CMD
                     else
                       $CMD
                     fi
 
       - save_cache:
+          name: Update compilation cache
           paths:
             - ~/repo/core/target/*shaded/scala-*
             - ~/repo/driver/target/*shaded/scala-*
           key: *compile_cache_key
 
       - save_cache:
+          name: Update Scala cache
           paths:
             - ~/.sbt
             - ~/.ivy2
@@ -101,6 +108,7 @@ commands:
         type: string
     steps:
       - restore_cache:
+          name: Restore MongoDB cache
           keys:
             - &mongo_cache_key mongodb-<< parameters.mongo_version >>-<< parameters.mongo_profile >>
 
@@ -114,6 +122,7 @@ commands:
                     ./.ci_scripts/beforeInstall.sh << parameters.category >> << parameters.mongo_version >> << parameters.mongo_profile >> /tmp/integration-env.sh
 
       - save_cache:
+          name: Update MongoDB cache
           paths:
             - ~/ssl
             - ~/mongodb-linux-x86_64-amazon-<< parameters.mongo_version >>
@@ -312,6 +321,7 @@ jobs:
       - setup_sbt
 
       - restore_cache:
+          name: Restore snapshot cache
           keys:
             - &snapshot_cache_key scala-{{ .Environment.CIRCLE_JOB }}-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}
 
@@ -320,6 +330,7 @@ jobs:
           shaded: false
 
       - save_cache:
+          name: Update snapshot cache
           paths:
             - ~/.sbt
             - ~/.ivy2
@@ -380,31 +391,31 @@ workflows:
           scala_version: 2.13.2
 
       - integration_test_suite:
-          name: integration_openjdk9_scala212_akka26
+          name: integration_openjdk11_scala212_akka26
           akka_version: 2.6.5
+          openjdk_version: 11
 
       - integration_test_suite:
           name: integration_openjdk9_scala212_akka25_invalidssl
           mongo_profile: invalid-ssl
 
       - integration_test_suite:
-          name: integration_openjdk11_scala212_akka25_mutualssl
-          openjdk_version: 11
+          name: integration_openjdk9_scala212_akka25_mutualssl
           mongo_profile: mutual-ssl
 
       - integration_test_suite:
-          name: integration_openjdk9_scala212_akka26_rs
+          name: integration_openjdk10_scala212_akka26_rs
           akka_version: 2.6.5
           mongo_profile: rs
           shaded: false
+          openjdk_version: 10
 
       - integration_test_suite:
           name: integration_openjdk9_scala212_akka25_x509
           mongo_profile: x509
 
       - integration_test_suite:
-          name: integration_openjdk10_scala211_akka25
-          openjdk_version: 10
+          name: integration_openjdk9_scala211_akka25
           scala_version: 2.11.12
 
       - integration_test_suite:
@@ -413,9 +424,10 @@ workflows:
           mongo_profile: mutual-ssl
 
       - integration_test_suite:
-          name: integration_openjdk9_scala211_akka25_rs
+          name: integration_openjdk10_scala211_akka25_rs
           scala_version: 2.11.12
           mongo_profile: rs
+          openjdk_version: 10
 
       - integration_test_suite:
           name: integration_openjdk9_scala211_akka25_x509
@@ -433,14 +445,14 @@ workflows:
             - integration_openjdk8_scala211_akka23
             - integration_openjdk8_scala213_akka25_rs
             - integration_openjdk9_scala213_akka25_x509
-            - integration_openjdk9_scala212_akka26
+            - integration_openjdk11_scala212_akka26
             - integration_openjdk9_scala212_akka25_invalidssl
-            - integration_openjdk11_scala212_akka25_mutualssl
-            - integration_openjdk9_scala212_akka26_rs
+            - integration_openjdk9_scala212_akka25_mutualssl
+            - integration_openjdk10_scala212_akka26_rs
             - integration_openjdk9_scala212_akka25_x509
-            - integration_openjdk10_scala211_akka25
+            - integration_openjdk9_scala211_akka25
             - integration_openjdk9_scala211_akka25_mutualssl
-            - integration_openjdk9_scala211_akka25_rs
+            - integration_openjdk10_scala211_akka25_rs
             - integration_openjdk9_scala211_akka25_x509
 
       - trigger_dependent_builds:
