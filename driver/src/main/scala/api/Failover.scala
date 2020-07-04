@@ -81,10 +81,9 @@ class Failover[T](message: T, connection: MongoConnection, @deprecatedName(Symbo
     case _: NodeSetNotReachable         => true
     case _: ConnectionException         => true
     case _: ConnectionNotInitialized    => true
-    case e: DatabaseException =>
-      e.isNotAPrimaryError || e.isUnauthorized
+    case e: DatabaseException           => e.isNotAPrimaryError || e.isUnauthorized
 
-    case _ => false
+    case _                              => false
   }
 
   send(0)
@@ -115,7 +114,7 @@ private[reactivemongo] class Failover2[A](producer: () => Future[A], connection:
     next().map[Try[A]](Success(_)).recover[Try[A]] {
       case err => Failure(err)
     }.flatMap {
-      case Failure(e) if isRetryable(e) => {
+      case RetryableFailure(e) => {
         if (n < failoverStrategy.retries) {
           val `try` = n + 1
           val delayFactor = failoverStrategy.delayFactor(`try`)
@@ -146,6 +145,22 @@ private[reactivemongo] class Failover2[A](producer: () => Future[A], connection:
       }
     }
 
+  //send(0)
+}
+
+private[api] object RetryableFailure {
+  import reactivemongo.core.errors._
+  import reactivemongo.core.actors.Exceptions._
+
+  def unapply[T](result: Try[T]): Option[Throwable] = result match {
+    case Failure(cause) if isRetryable(cause) =>
+      Some(cause)
+
+    case Success(Response.CommandError(_, _, _, cause: Throwable)) if (
+      isRetryable(cause)) =>
+      Some(cause)
+  }
+
   private def isRetryable(throwable: Throwable) = throwable match {
     case e: ChannelNotFound             => e.retriable
     case _: NotAuthenticatedException   => true
@@ -153,13 +168,12 @@ private[reactivemongo] class Failover2[A](producer: () => Future[A], connection:
     case _: NodeSetNotReachable         => true
     case _: ConnectionException         => true
     case _: ConnectionNotInitialized    => true
+
     case e: DatabaseException =>
       e.isNotAPrimaryError || e.isUnauthorized
 
     case _ => false
   }
-
-  //send(0)
 }
 
 @deprecated("Internal: will be made private", "0.17.0")
