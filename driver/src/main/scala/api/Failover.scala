@@ -159,6 +159,9 @@ private[api] object RetryableFailure {
     case Success(Response.CommandError(_, _, _, cause: Throwable)) if (
       isRetryable(cause)) =>
       Some(cause)
+
+    case _ =>
+      None
   }
 
   private def isRetryable(throwable: Throwable) = throwable match {
