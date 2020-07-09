@@ -301,7 +301,9 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $defaultFo with success" in {
       parseURI(defaultFo) must beLike[ParsedURI] {
         case uri =>
-          strategyStr(uri) must_=== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds"
+          strategyStr(uri) must_=== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds700 milliseconds800 milliseconds1000 milliseconds1100 milliseconds1200 milliseconds" and {
+            parseURI("mongodb://host1?retryWrites=true") must beTypedEqualTo(uri).awaitFor(timeout)
+          }
       }.awaitFor(timeout)
     }
 
@@ -319,7 +321,9 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     s"parse $strictFo with success" in {
       parseURI(strictFo) must beLike[ParsedURI] {
         case uri =>
-          strategyStr(uri) must_=== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds"
+          strategyStr(uri) must_=== "100 milliseconds100 milliseconds200 milliseconds300 milliseconds500 milliseconds600 milliseconds" and {
+            parseURI("mongodb://host1?retryWrites=false&writeConcernJ=true") must beTypedEqualTo(uri).awaitFor(timeout)
+          }
       }.awaitFor(timeout)
     }
 

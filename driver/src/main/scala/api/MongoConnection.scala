@@ -898,6 +898,7 @@ object MongoConnection {
             unsupported -> result.copy(readConcern = c)
 
           case ("rm.failover", "default") => unsupported -> result
+
           case ("rm.failover", "remote") => unsupported -> result.copy(
             failoverStrategy = FailoverStrategy.remote)
 
@@ -920,6 +921,19 @@ object MongoConnection {
 
               result.copy(failoverStrategy = strategy)
             }
+
+          case ("retryWrites", "true") => {
+            logger.info("Connection option 'rm.failover' should be preferred to 'retryWrites'")
+
+            unsupported -> result
+          }
+
+          case ("retryWrites", _) => {
+            logger.info("Connection option 'rm.failover' should be preferred to 'retryWrites'")
+
+            unsupported -> result.copy(
+              failoverStrategy = FailoverStrategy.strict)
+          }
 
           case ("heartbeatFrequencyMS", IntRe(ms)) =>
             make("heartbeatFrequencyMS", ms, unsupported, result) {
