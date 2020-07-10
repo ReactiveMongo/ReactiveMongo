@@ -62,7 +62,7 @@ private[reactivemongo] trait InsertCommand[P <: SerializationPack] { self: PackS
     pack.writer[InsertCmd] { insert =>
       import insert.command
 
-      val documents = builder.array(command.head, command.tail)
+      val documents = builder.array(command.head +: command.tail)
       val ordered = builder.boolean(command.ordered)
       val elements = Seq.newBuilder[pack.ElementProducer]
 

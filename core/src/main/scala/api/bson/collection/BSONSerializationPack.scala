@@ -106,8 +106,7 @@ object BSONSerializationPack extends SerializationPack { self =>
     def document(elements: Seq[ElementProducer]): Document =
       BSONDocument(elements: _*)
 
-    def array(value: Value, values: Seq[Value]): Value =
-      BSONArray(value +: values)
+    def array(values: Seq[Value]): Value = BSONArray(values)
 
     def binary(data: Array[Byte]): Value =
       BSONBinary(data, Subtype.GenericBinarySubtype)

@@ -86,8 +86,7 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
         element("viewOn", string(cmd.collection)))
 
       val pipeline = builder.array(
-        cmd.command.operator.makePipe,
-        cmd.command.pipeline.map(_.makePipe))
+        cmd.command.operator.makePipe +: cmd.command.pipeline.map(_.makePipe))
 
       elements += element("pipeline", pipeline)
 

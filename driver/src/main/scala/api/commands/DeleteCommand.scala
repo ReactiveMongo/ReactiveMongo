@@ -61,8 +61,8 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackS
 
       delete.command.deletes.headOption.foreach { first =>
         elements += element("deletes", builder.array(
-          writeElement(builder, first),
-          delete.command.deletes.map(writeElement(builder, _))))
+          writeElement(builder, first) +:
+            delete.command.deletes.map(writeElement(builder, _))))
       }
 
       builder.document(elements.result())

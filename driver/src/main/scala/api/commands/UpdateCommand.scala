@@ -96,9 +96,9 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
           Collation.serializeWith(pack, c)(builder))
       }
 
-      elmt3.arrayFilters.headOption.foreach { f =>
+      if (elmt3.arrayFilters.nonEmpty) {
         elements += elementProducer(
-          "arrayFilters", builder.array(f, elmt3.arrayFilters.drop(1)))
+          "arrayFilters", builder.array(elmt3.arrayFilters))
       }
 
       document(elements.result())
@@ -129,8 +129,8 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
         element("update", builder.string(update.collection)),
         element("ordered", ordered),
         element("updates", builder.array(
-          writeElement(command.firstUpdate),
-          command.updates.map(writeElement))))
+          writeElement(command.firstUpdate) +:
+            command.updates.map(writeElement))))
 
       session.foreach { s =>
         elements ++= writeSession(s)

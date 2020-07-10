@@ -133,8 +133,7 @@ private[collections] trait AggregationOps[P <: SerializationPack] {
       import agg.{ command => cmd }
 
       val pipeline = builder.array(
-        cmd.operator.makePipe,
-        cmd.pipeline.map(_.makePipe))
+        cmd.operator.makePipe +: cmd.pipeline.map(_.makePipe))
 
       lazy val isOut: Boolean = cmd.pipeline.lastOption.exists {
         case _: AggregationFramework.Out => true

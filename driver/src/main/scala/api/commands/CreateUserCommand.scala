@@ -137,22 +137,14 @@ private[reactivemongo] trait CreateUserCommand[P <: SerializationPack] { _: Pack
     def writeRestriction(restriction: AuthenticationRestriction) = {
       val elmts = Seq.newBuilder[pack.ElementProducer]
 
-      restriction.clientSource match {
-        case head :: tail =>
-          elmts += elmt(
-            "clientSource", builder.array(string(head), tail.map(string)))
+      import restriction.{ clientSource, serverAddress }
 
-        case _ =>
-          ()
+      if (clientSource.nonEmpty) {
+        elmts += elmt("clientSource", builder.array(clientSource.map(string)))
       }
 
-      restriction.serverAddress match {
-        case head :: tail =>
-          elmts += elmt(
-            "serverAddress", builder.array(string(head), tail.map(string)))
-
-        case _ =>
-          ()
+      if (serverAddress.nonEmpty) {
+        elmts += elmt("serverAddress", builder.array(serverAddress.map(string)))
       }
 
       document(elmts.result())
@@ -163,11 +155,11 @@ private[reactivemongo] trait CreateUserCommand[P <: SerializationPack] { _: Pack
         elmt("createUser", string(create.name)),
         elmt("digestPassword", builder.boolean(create.digestPassword)))
 
-      val roles: Seq[pack.ElementProducer] = create.roles match {
-        case head :: tail => Seq(elmt("roles", builder.array(
-          writeRole(head), tail.map(writeRole(_)))))
-
-        case _ => Seq.empty
+      val roles: Seq[pack.ElementProducer] = {
+        if (create.roles.isEmpty) Seq.empty
+        else {
+          Seq(elmt("roles", builder.array(create.roles.map(writeRole(_)))))
+        }
       }
 
       val extra = Seq.newBuilder[pack.ElementProducer]
@@ -184,23 +176,14 @@ private[reactivemongo] trait CreateUserCommand[P <: SerializationPack] { _: Pack
         extra += elmt("writeConcern", writeWriteConcern(wc))
       }
 
-      create.authenticationRestrictions match {
-        case head :: tail =>
-          extra += elmt("authenticationRestrictions", builder.array(
-            writeRestriction(head), tail.map(writeRestriction)))
-
-        case _ =>
-          ()
+      if (create.authenticationRestrictions.nonEmpty) {
+        extra += elmt("authenticationRestrictions", builder.array(
+          create.authenticationRestrictions.map(writeRestriction)))
       }
 
-      if (version >= MongoWireVersion.V40) {
-        create.mechanisms match {
-          case head :: tail =>
-            extra += elmt("mechanisms", builder.array(
-              string(head.name), tail.map { m => string(m.name) }))
-
-          case _ => ()
-        }
+      if (version >= MongoWireVersion.V40 && create.mechanisms.nonEmpty) {
+        extra += elmt("mechanisms", builder.array(
+          create.mechanisms.map { m => string(m.name) }))
       }
 
       document(base ++ roles ++ extra.result())

@@ -26,7 +26,7 @@ private[commands] trait SliceAggregation[P <: SerializationPack] {
       n.foreach { els += _ }
 
       document(Seq(
-        element(f"$$slice", builder.array(array, els.result()))))
+        element(f"$$slice", builder.array(array +: els.result()))))
     }
 
     private lazy val tupled = Tuple3(array, position, n)

@@ -44,7 +44,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
       import builder.{ array, string }
 
       if (next.headOption.nonEmpty) {
-        array(string(head), next.map(string))
+        array(string(head) +: next.map(string))
       } else {
         string(head)
       }
@@ -570,7 +570,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
             _2 => ops
           }
 
-          elms += elm(clauseType, builder.array(docOp(firstOp), ops.map(docOp)))
+          elms += elm(clauseType, builder.array(
+            docOp(firstOp) +: ops.map(docOp)))
 
           ()
         }

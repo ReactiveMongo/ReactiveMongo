@@ -47,7 +47,7 @@ private[reactivemongo] object EndSessions {
     pack.writer[EndSessions] { cmd =>
       document(Seq(element(
         cmd.kind,
-        builder.array(uuid(cmd.id), cmd.ids.map(uuid)))))
+        builder.array(uuid(cmd.id) +: cmd.ids.map(uuid)))))
     }
   }
 }

@@ -90,8 +90,8 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
           case (field, op) => element(field, op.makeFunction)
         }))))
 
-      boundaries.headOption.foreach { first =>
-        opts += element("boundaries", builder.array(first, boundaries.drop(1)))
+      if (boundaries.nonEmpty) {
+        opts += element("boundaries", builder.array(boundaries))
       }
 
       pipe(f"$$bucket", document(opts.result()))
@@ -342,7 +342,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
 
       val specDoc = document(specifications.map {
         case (name, (firstOp, subOps)) => elem(name, builder.array(
-          firstOp.makePipe, subOps.map(_.makePipe)))
+          firstOp.makePipe +: subOps.map(_.makePipe)))
 
       }.toSeq)
 
@@ -908,9 +908,8 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
 
       opts += element("into", string(f"${intoDb}.${intoCollection}"))
 
-      on.headOption.foreach { o1 =>
-        opts += element("on", builder.array(
-          string(o1), on.drop(1).map(string)))
+      if (on.nonEmpty) {
+        opts += element("on", builder.array(on.map(string)))
       }
 
       whenMatched.foreach { wm =>
@@ -1374,7 +1373,7 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
     val otherFields: Seq[String]) extends PipelineOperator {
 
     def makePipe: pack.Document = pipe(f"$$unset", builder.array(
-      builder.string(field), otherFields.map(builder.string)))
+      builder.string(field) +: otherFields.map(builder.string)))
 
     private[api] lazy val tupled = field -> otherFields
 

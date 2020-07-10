@@ -85,8 +85,8 @@ object SerializationPack {
     /** Returns a new document from a sequence of element producers. */
     def document(elements: Seq[pack.ElementProducer]): pack.Document
 
-    /** Returns a new non empty array of values */
-    def array(value: pack.Value, values: Seq[pack.Value]): pack.Value
+    /** Returns a new array of values */
+    def array(values: Seq[pack.Value]): pack.Value
 
     /** Returns a byte array as a serialized value. */
     def binary(data: Array[Byte]): pack.Value

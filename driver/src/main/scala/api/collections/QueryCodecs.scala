@@ -36,18 +36,12 @@ private[reactivemongo] object QueryCodecs {
       elements += element("mode", string(mode))
 
       readPreference match {
-        case ReadPreference.Taggable(first :: tagSet) if tagSet.nonEmpty => {
-          val head = document(first.toSeq.map {
-            case (k, v) => element(k, string(v))
-          })
-
-          elements += element("tags", builder.array(
-            head,
-            tagSet.map { tags =>
-              document(tags.toSeq.map {
-                case (k, v) => element(k, string(v))
-              })
-            }))
+        case ReadPreference.Taggable(tagSet) if tagSet.nonEmpty => {
+          elements += element("tags", builder.array(tagSet.map { tags =>
+            document(tags.toSeq.map {
+              case (k, v) => element(k, string(v))
+            })
+          }))
         }
 
         case _ => ()

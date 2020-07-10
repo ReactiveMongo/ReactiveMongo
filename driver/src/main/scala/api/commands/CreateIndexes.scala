@@ -48,11 +48,8 @@ private[reactivemongo] object CreateIndexes {
 
       elements += element("createIndexes", builder.string(create.collection))
 
-      indexes match {
-        case head :: tail =>
-          elements += element("indexes", builder.array(head, tail))
-
-        case _ =>
+      if (indexes.nonEmpty) {
+        elements += element("indexes", builder.array(indexes))
       }
 
       builder.document(elements.result())

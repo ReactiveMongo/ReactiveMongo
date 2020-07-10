@@ -141,10 +141,8 @@ private[api] trait FindAndModifyCommand[P <: SerializationPack] {
         elements += element("fields", f)
       }
 
-      command.arrayFilters.headOption.foreach { af =>
-        elements += element(
-          "arrayFilters",
-          array(af, command.arrayFilters.drop(1)))
+      if (command.arrayFilters.nonEmpty) {
+        elements += element("arrayFilters", array(command.arrayFilters))
       }
 
       command.modifier match {
