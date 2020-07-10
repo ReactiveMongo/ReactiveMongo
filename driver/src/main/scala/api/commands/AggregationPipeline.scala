@@ -27,10 +27,8 @@ private[commands] trait AggregationPipeline[P <: SerializationPack] {
    *   coll.aggregateWith[BSONDocument]() { agg =>
    *     import agg.PipelineOperator
    *
-   *     val stage = PipelineOperator(BSONDocument(
-   *       f"$$sample" -> BSONDocument("size" -> 2)))
-   *
-   *     stage -> List.empty
+   *     List(PipelineOperator(BSONDocument(
+   *       f"$$sample" -> BSONDocument("size" -> 2))))
    *   }
    * }}}
    */
@@ -46,5 +44,5 @@ private[commands] trait AggregationPipeline[P <: SerializationPack] {
   /**
    * Aggregation pipeline (with at least one stage operator)
    */
-  type Pipeline = (PipelineOperator, List[PipelineOperator])
+  type Pipeline = List[PipelineOperator]
 }

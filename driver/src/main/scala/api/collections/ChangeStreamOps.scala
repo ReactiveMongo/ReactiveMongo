@@ -45,8 +45,7 @@ trait ChangeStreamOps[P <: SerializationPack] { collection: GenericCollection[P]
     fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None)(implicit reader: pack.Reader[T]): WatchBuilder[T] = {
     new WatchBuilder[T] {
       protected val context: AggregatorContext[T] = aggregatorContext[T](
-        firstOperator = new ChangeStream(offset, fullDocumentStrategy),
-        otherOperators = pipeline,
+        pipeline = (new ChangeStream(offset, fullDocumentStrategy)) +: pipeline,
         readConcern = ReadConcern.Majority,
         cursorOptions = CursorOptions.empty.tailable,
         maxTime = maxTime)

@@ -341,8 +341,8 @@ private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
       import builder.{ document, elementProducer => elem }
 
       val specDoc = document(specifications.map {
-        case (name, (firstOp, subOps)) => elem(name, builder.array(
-          firstOp.makePipe +: subOps.map(_.makePipe)))
+        case (name, pipeline) => elem(
+          name, builder.array(pipeline.map(_.makePipe)))
 
       }.toSeq)
 

@@ -684,10 +684,10 @@ trait GenericCollection[P <: SerializationPack]
     reader: pack.Reader[T],
     cp: CursorProducer[T]): cp.ProducedCursor = {
 
-    val (firstOp, otherOps) = f(AggregationFramework)
+    val pipeline = f(AggregationFramework)
 
     val aggregateCursor: Cursor.WithOps[T] = aggregatorContext[T](
-      firstOp, otherOps, explain, allowDiskUse,
+      pipeline, explain, allowDiskUse,
       bypassDocumentValidation, readConcern, readPreference,
       this.writeConcern, batchSize).
       prepared[Cursor.WithOps](CursorProducer.defaultCursorProducer[T]).cursor
@@ -711,8 +711,8 @@ trait GenericCollection[P <: SerializationPack]
    *   import AggregationFramework.{ Group, Match, SumField }
    *
    *   cities.aggregatorContext[BSONDocument](
-   *     Group(BSONString(f"$$state"))(
-   *       "totalPop" -> SumField("population")), List(
+   *     List(Group(BSONString(f"$$state"))(
+   *       "totalPop" -> SumField("population")),
    *         Match(BSONDocument("totalPop" ->
    *           BSONDocument(f"$$gte" -> 10000000L))))
    *   ).prepared.cursor.collect[List](
@@ -744,8 +744,7 @@ trait GenericCollection[P <: SerializationPack]
    */
   @SuppressWarnings(Array("MaxParameters"))
   def aggregatorContext[T](
-    firstOperator: PipelineOperator,
-    otherOperators: List[PipelineOperator] = List.empty,
+    pipeline: List[PipelineOperator] = List.empty,
     explain: Boolean = false,
     allowDiskUse: Boolean = false,
     bypassDocumentValidation: Boolean = false,
@@ -759,8 +758,7 @@ trait GenericCollection[P <: SerializationPack]
     comment: Option[String] = None,
     collation: Option[Collation] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = {
     new AggregatorContext[T](
-      firstOperator,
-      otherOperators,
+      pipeline,
       explain,
       allowDiskUse,
       bypassDocumentValidation,

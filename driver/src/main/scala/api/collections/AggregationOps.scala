@@ -46,8 +46,7 @@ private[collections] trait AggregationOps[P <: SerializationPack] {
   // ---
 
   final class AggregatorContext[T] private[reactivemongo] (
-    val firstOperator: PipelineOperator,
-    val otherOperators: List[PipelineOperator],
+    val pipeline: List[PipelineOperator],
     val explain: Boolean,
     val allowDiskUse: Boolean,
     val bypassDocumentValidation: Boolean,
@@ -80,7 +79,7 @@ private[collections] trait AggregationOps[P <: SerializationPack] {
       implicit def aggReader: pack.Reader[T] = context.reader
 
       val cmd = new Aggregate[T](
-        context.firstOperator, context.otherOperators, context.explain,
+        context.pipeline, context.explain,
         context.allowDiskUse, batchSz, ver,
         context.bypassDocumentValidation,
         context.readConcern, context.writeConcern,
@@ -103,7 +102,6 @@ private[collections] trait AggregationOps[P <: SerializationPack] {
    * @param readConcern the read concern (since MongoDB 3.2)
    */
   private[api] final class Aggregate[T](
-    val operator: PipelineOperator,
     val pipeline: Seq[PipelineOperator],
     val explain: Boolean = false,
     val allowDiskUse: Boolean,
@@ -132,8 +130,7 @@ private[collections] trait AggregationOps[P <: SerializationPack] {
       import builder.{ boolean, document, elementProducer => element }
       import agg.{ command => cmd }
 
-      val pipeline = builder.array(
-        cmd.operator.makePipe +: cmd.pipeline.map(_.makePipe))
+      val pipeline = builder.array(cmd.pipeline.map(_.makePipe))
 
       lazy val isOut: Boolean = cmd.pipeline.lastOption.exists {
         case _: AggregationFramework.Out => true

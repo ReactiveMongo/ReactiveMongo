@@ -54,11 +54,11 @@ private[commands] trait SliceAggregation[P <: SerializationPack] {
    *     import agg.{ Project, Slice }
    *
    *     // Define the pipeline stages
-   *     Project(BSONDocument(
+   *     List(Project(BSONDocument(
    *       "name" -> 1,
    *       "favorites" -> Slice(
    *         array = BSONString(f"$$favorites"),
-   *         n = BSONInteger(3)))) -> List.empty
+   *         n = BSONInteger(3)))))
    *   }
    * }}}
    */
