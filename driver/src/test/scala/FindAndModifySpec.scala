@@ -175,8 +175,13 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
           ds <- db.startSession()
           dt <- ds.startTransaction(None)
           _ <- dt.collectionNames.filter(_ contains colName) // check created
+
           _ <- dt.collection(colName).findAndUpdate(
             selector, james, upsert = true)
+
+          _ <- dt.collection(colName).findAndUpdate(
+            selector ++ BSONDocument("age" -> 27),
+            BSONDocument(f"$$set" -> BSONDocument("age" -> 35)))
         } yield dt) must beLike[reactivemongo.api.DB] {
           case dt =>
             val c = dt.collection(colName)
@@ -190,7 +195,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
             } yield p1 -> p2).andThen {
               case _ => db.killSession()
             } must beLike[(Int, Int)] {
-              case (27, -1 /*not found after rlb*/ ) => ok
+              case (35, -1 /*not found after rlb*/ ) => ok
             }.await(1, timeout)
         }.await(1, slowTimeout)
       }

@@ -49,6 +49,11 @@ services:
     tty: true
     cpus: 0.5
     mem_limit: 4g
+    deploy: # Docker 3.x
+      resources:
+        limits:
+          cpus: 0.5
+          memory: 2G
     healthcheck:
       test: "dockerize -timeout 90s -wait tcp://db:27018"
 
