@@ -79,18 +79,9 @@ object Version {
           commonsCodec,
           shapelessTest % Test, specs.value) ++ logApi,
         mimaBinaryIssueFilters ++= {
-        /*
-          import com.typesafe.tools.mima.core._, ProblemFilters.{ exclude => x }
+          //import com.typesafe.tools.mima.core._, ProblemFilters.{ exclude => x }
 
-          @inline def mmp(s: String) = x[MissingMethodProblem](s)
-          @inline def imt(s: String) = x[IncompatibleMethTypeProblem](s)
-          @inline def irt(s: String) = x[IncompatibleResultTypeProblem](s)
-          @inline def mtp(s: String) = x[MissingTypesProblem](s)
-          @inline def mcp(s: String) = x[MissingClassProblem](s)
-          @inline def isp(s: String) = x[IncompatibleSignatureProblem](s)
-         */
-
-        Seq.empty
+          Seq.empty
         },
         Common.closeableObject in Test := "tests.Common$",
         testOptions in Test += Tests.Cleanup(Common.cleanup.value),

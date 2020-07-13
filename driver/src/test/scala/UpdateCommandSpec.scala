@@ -22,8 +22,6 @@ import reactivemongo.api.commands.{
 final class UpdateCommandSpec extends org.specs2.mutable.Specification {
   "Update command" title
 
-  //private val writer = UpdateCommand.writer(BSONSerializationPack)(Command)
-
   section("unit")
   "Update command" should {
     "be written" >> {

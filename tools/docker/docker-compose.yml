@@ -53,7 +53,7 @@ services:
       resources:
         limits:
           cpus: 0.5
-          memory: 2G
+          memory: 4G
     healthcheck:
       test: "dockerize -timeout 90s -wait tcp://db:27018"
 

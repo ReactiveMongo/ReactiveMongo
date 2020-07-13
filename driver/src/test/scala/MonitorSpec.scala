@@ -364,7 +364,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
           }
         })
       }.awaitFor(timeout * expectFactor)
-    } tag "wip"
+    }
 
     "manage reconnection according heartbeat frequency" >> {
       val expectFactor = 4L
