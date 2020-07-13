@@ -10,14 +10,12 @@ import reactivemongo.api.{
   SerializationPack
 }
 
-import reactivemongo.core.commands.{
-  CommandError,
-  FailedAuthentication,
-  SuccessfulAuthentication
-}
+import reactivemongo.core.errors.CommandException
 
 import reactivemongo.api.commands.{
   Command,
+  FailedAuthentication,
+  SuccessfulAuthentication,
   ScramFinalNegociation,
   ScramInitiate,
   ScramNegociation,
@@ -115,8 +113,7 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
 
   protected final def sendAuthenticate(connection: Connection, nextAuth: Authenticate): Connection = {
     val start = initiate(nextAuth.user)
-
-    val (maker, _) = Command.buildRequestMaker(pack)(
+    val maker = Command.buildRequestMaker(pack)(
       start, initiateWriter, ReadPreference.primary, nextAuth.db)
 
     connection.send(maker(RequestIdGenerator.getNonce.next))
@@ -164,7 +161,7 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
 
           ()
         }, { challenge =>
-          val chanId = resp.info._channelId
+          val chanId = resp.info.channelId
 
           debug(s"Got $mechanism nonce on channel #${chanId}: $challenge")
 
@@ -182,7 +179,7 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
                     { err => handleAuthResponse(ns, resp)(Left(err)) },
                     { sig =>
                       ns.updateConnectionByChannelId(chanId) { con =>
-                        val (maker, _) = Command.buildRequestMaker(pack)(
+                        val maker = Command.buildRequestMaker(pack)(
                           negociation, negociationWriter,
                           ReadPreference.primary, db)
 
@@ -218,11 +215,11 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
     }
 
     case response: Response if RequestIdGenerator.authenticate accepts response => {
-      val chanId = response.info._channelId
+      val chanId = response.info.channelId
 
       debug(s"Got authenticated response #${chanId}!")
 
-      @inline def resp: Either[Either[CommandError, SuccessfulAuthentication], Array[Byte]] = try {
+      @inline def resp: Either[Either[CommandException, SuccessfulAuthentication], Array[Byte]] = try {
         pack.readAndDeserialize(response, negociationReader) match {
           case Left(err)             => Left(Left(err))
           case Right(Left(authed))   => Left(Right(authed))
@@ -244,13 +241,12 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
 
               con.authenticating match {
                 case Some(a @ ScramAuthenticating(
-                  db, _, _, _, _, Some(cid), Some(sig),
-                  1 /* step; TODO#1.1: more retry? */ )) => {
+                  db, _, _, _, _, Some(cid), Some(sig), 1 /* step */ )) => {
 
                   val serverSig: Option[String] =
                     ScramNegociation.parsePayload(payload).get("v")
 
-                  if (!serverSig.exists(_ == Base64.encodeBase64String(sig))) {
+                  if (!serverSig.contains(Base64.encodeBase64String(sig))) {
                     val msg = s"${mechanism} server signature is invalid"
 
                     warn(msg)
@@ -259,7 +255,7 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
                       Left(FailedAuthentication(pack)(msg, None, None)))
 
                   } else {
-                    val (maker, _) = Command.buildRequestMaker(pack)(
+                    val maker = Command.buildRequestMaker(pack)(
                       ScramFinalNegociation(cid, payload), finalWriter,
                       ReadPreference.primary, db)
 

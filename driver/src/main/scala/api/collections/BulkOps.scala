@@ -2,7 +2,6 @@ package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.bson.BSONElementSet
 import reactivemongo.core.errors.GenericDriverException
 
 /** Internal bulk operations */
@@ -67,12 +66,12 @@ private[reactivemongo] object BulkOps {
         val bsz = sz(doc)
 
         // Total minimal size is key '1' size (1 byte) + type prefix (2 bytes)
-        if (bsz + 1 + BSONElementSet.docElementByteOverhead > maxBsonSize) {
+        if (bsz + 1 + 2 /*docElementByteOverhead*/ > maxBsonSize) {
           Left(s"size of document #${offset + docs} exceed the maxBsonSize: $bsz + 3 > $maxBsonSize")
         } else {
           val nc = docs + 1
           val keySize = docs.toString.getBytes.size // string repr. of current index used as key
-          val nsz = bsonSize + bsz + keySize + BSONElementSet.docElementByteOverhead
+          val nsz = bsonSize + bsz + keySize + 2 //docElementByteOverhead
 
           if (nsz > maxBsonSize) {
             Right(BulkStage[I](
@@ -84,10 +83,10 @@ private[reactivemongo] object BulkOps {
             Right(BulkStage[I](
               bulk = (doc +: bulk).reverse,
               next = Some(new BulkProducer[I](
-                offset + nc, input.tail, sz, maxBsonSize, maxBulkSize))))
+                offset + nc, input.drop(1), sz, maxBsonSize, maxBulkSize))))
 
           } else {
-            go(input.tail, nc, nsz, doc +: bulk)
+            go(input.drop(1), nc, nsz, doc +: bulk)
           }
         }
       }
@@ -101,7 +100,7 @@ private[reactivemongo] object BulkOps {
   // ---
 
   private def unorderedApply[I, O](current: BulkProducer[I], tasks: Seq[Future[O]])(f: Iterable[I] => Future[O], recover: Exception => Future[O])(implicit ec: ExecutionContext): Future[Seq[O]] = current() match {
-    case Left(cause) => Future.failed[Seq[O]](GenericDriverException(cause))
+    case Left(cause) => Future.failed[Seq[O]](new GenericDriverException(cause))
 
     case Right(BulkStage(bulk, _)) if bulk.isEmpty =>
       Future.sequence(tasks.reverse)
@@ -119,15 +118,16 @@ private[reactivemongo] object BulkOps {
 
   private def orderedApply[I, O](current: BulkProducer[I], values: Seq[O])(f: Iterable[I] => Future[O])(implicit ec: ExecutionContext): Future[Seq[O]] =
     current() match {
-      case Left(cause) => Future.failed[Seq[O]](GenericDriverException(cause))
+      case Left(cause) => Future.failed[Seq[O]](
+        new GenericDriverException(cause))
 
       case Right(BulkStage(bulk, _)) if bulk.isEmpty =>
         Future.successful(values.reverse)
 
       case Right(BulkStage(bulk, Some(next))) =>
-        f(bulk).flatMap { v => orderedApply(next, v +: values)(f) }
+        f(bulk).flatMap { v1 => orderedApply(next, v1 +: values)(f) }
 
       case Right(BulkStage(bulk, _)) =>
-        f(bulk).map { v => (v +: values).reverse }
+        f(bulk).map { v2 => (v2 +: values).reverse }
     }
 }

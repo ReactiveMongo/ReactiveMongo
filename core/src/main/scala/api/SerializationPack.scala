@@ -2,22 +2,15 @@ package reactivemongo.api
 
 import java.util.UUID
 
-import scala.language.higherKinds
-
 import scala.reflect.ClassTag
 
 import scala.util.Try
 
-import reactivemongo.bson.{ BSONDocument, BSONValue }
-import reactivemongo.bson.buffer.{
-  ReadableBuffer,
-  WritableBuffer => LegacyWritable
-}
+import reactivemongo.api.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
 import reactivemongo.core.protocol.Response
-import reactivemongo.core.netty.ChannelBufferReadableBuffer
 
-trait SerializationPack extends SerializationPackCompat { self: Singleton =>
+trait SerializationPack { self: Singleton =>
   type Value
   type ElementProducer
   type Document <: Value
@@ -29,33 +22,28 @@ trait SerializationPack extends SerializationPackCompat { self: Singleton =>
   private[reactivemongo] val IsDocument: ClassTag[Document]
   private[reactivemongo] val IsValue: ClassTag[Value]
 
-  def IdentityWriter: Writer[Document]
-  def IdentityReader: Reader[Document]
+  val IdentityWriter: Writer[Document]
+  val IdentityReader: Reader[Document]
 
-  @deprecated("Internal: will be made private", "0.19.1")
   def serialize[A](a: A, writer: Writer[A]): Document
 
-  @deprecated("Internal: will be made private", "0.19.1")
   def deserialize[A](document: Document, reader: Reader[A]): A
 
-  @deprecated("Internal: will be made private", "0.19.1")
-  def writeToBuffer(buffer: LegacyWritable, document: Document): LegacyWritable
+  private[reactivemongo] def writeToBuffer(
+    buffer: WritableBuffer,
+    document: Document): WritableBuffer
 
-  @deprecated("Internal: will be made private", "0.19.1")
-  def readFromBuffer(buffer: ReadableBuffer): Document
+  private[reactivemongo] def readFromBuffer(buffer: ReadableBuffer): Document
 
-  @deprecated("Internal: will be made private", "0.19.1")
-  def serializeAndWrite[A](buffer: LegacyWritable, document: A, writer: Writer[A]): LegacyWritable = writeToBuffer(buffer, serialize(document, writer))
+  private[reactivemongo] final def readAndDeserialize[A](buffer: ReadableBuffer, reader: Reader[A]): A = deserialize(readFromBuffer(buffer), reader)
 
-  @deprecated("Internal: will be made private", "0.19.1")
-  def readAndDeserialize[A](buffer: ReadableBuffer, reader: Reader[A]): A =
-    deserialize(readFromBuffer(buffer), reader)
+  private[reactivemongo] def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
+    val channelBuf = ReadableBuffer(response.documents)
 
-  @deprecated("Internal: will be made private", "0.19.1")
-  def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
-    val channelBuf = ChannelBufferReadableBuffer(response.documents)
     readAndDeserialize(channelBuf, reader)
   }
+
+  private[reactivemongo] final def serializeAndWrite[A](buffer: WritableBuffer, document: A, writer: Writer[A]): WritableBuffer = writeToBuffer(buffer, serialize(document, writer))
 
   /** Prepares a writer from the given serialization function. */
   def writer[A](f: A => Document): Writer[A]
@@ -70,35 +58,35 @@ trait SerializationPack extends SerializationPackCompat { self: Singleton =>
   // Returns a Reader from a function
   private[reactivemongo] def reader[A](f: Document => A): Reader[A]
 
-  // Returns a deserialized document as a BSON one (for internal intercompat)
-  private[reactivemongo] def document(doc: BSONDocument): Document
-
-  // Returns a BSON value
-  private[reactivemongo] def bsonValue(value: Value): BSONValue
+  private[reactivemongo] final def readerOpt[A](f: Document => Option[A]): Reader[A] = reader[A] { doc =>
+    f(doc) match {
+      case Some(v) => v
+      case _ => throw reactivemongo.api.bson.exceptions.
+        ValueDoesNotMatchException(pretty(doc))
+    }
+  }
 
   private[reactivemongo] def narrowIdentityReader: NarrowValueReader[Value]
 
-  @com.github.ghik.silencer.silent
-  private[reactivemongo] def bsonSize(value: Value): Int = -1
-  // TODO#1.1: Remove the default value after release
+  private[reactivemongo] def bsonSize(value: Value): Int
 
-  private[reactivemongo] def newBuilder: SerializationPack.Builder[self.type] = null // TODO#1.1: Remove the default value after release
+  private[reactivemongo] def newBuilder: SerializationPack.Builder[self.type]
 
-  private[reactivemongo] def newDecoder: SerializationPack.Decoder[self.type] = null // TODO#1.1: Remove the default value after release
+  private[reactivemongo] def newDecoder: SerializationPack.Decoder[self.type]
 
   private[reactivemongo] def pretty(doc: Document): String = doc.toString
 }
 
 object SerializationPack {
   /** A builder for serialization simple values (useful for the commands) */
-  private[reactivemongo] trait Builder[P <: SerializationPack with Singleton] {
+  private[reactivemongo] trait Builder[P <: SerializationPack] {
     protected[reactivemongo] val pack: P
 
     /** Returns a new document from a sequence of element producers. */
     def document(elements: Seq[pack.ElementProducer]): pack.Document
 
-    /** Returns a new non empty array of values */
-    def array(value: pack.Value, values: Seq[pack.Value]): pack.Value
+    /** Returns a new array of values */
+    def array(values: Seq[pack.Value]): pack.Value
 
     /** Returns a byte array as a serialized value. */
     def binary(data: Array[Byte]): pack.Value
@@ -147,7 +135,7 @@ object SerializationPack {
    *
    * @define returnsNamedElement Returns the named element from the given document
    */
-  private[reactivemongo] trait Decoder[P <: SerializationPack with Singleton] {
+  private[reactivemongo] trait Decoder[P <: SerializationPack] {
     protected[reactivemongo] val pack: P
 
     /** Extract the value, if and only if it's a document. */

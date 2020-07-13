@@ -2,6 +2,8 @@ package reactivemongo.api.commands
 
 import javax.crypto.SecretKeyFactory
 
+import scala.util.control.NonFatal
+
 import akka.util.ByteString
 
 import reactivemongo.api.{
@@ -13,12 +15,7 @@ import reactivemongo.api.{
 
 import reactivemongo.util
 
-import reactivemongo.core.commands.{
-  CommandError => CmdErr,
-  FailedAuthentication,
-  SilentSuccessfulAuthentication,
-  SuccessfulAuthentication
-}
+import reactivemongo.core.errors.{ CommandException => CmdErr }
 
 // --- MongoDB SCRAM authentication ---
 
@@ -133,9 +130,9 @@ private[reactivemongo] object ScramInitiate {
   }
 
   // Request utility
-  private val authChars: Stream[Char] = new Iterator[Char] {
-    val rand = new scala.util.Random(this.hashCode)
-    val chars = rand.shuffle("""!"#$%&'()*+-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~""".toList)
+  private val rand = new scala.util.Random(this.hashCode)
+  private val authChars = util.toStream(new Iterator[Char] {
+    val chars = rand.shuffle("""!"#$%&'()*+-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~""".toIndexedSeq)
 
     val hasNext = true
 
@@ -149,14 +146,14 @@ private[reactivemongo] object ScramInitiate {
         chars(i - 1)
       }
     }
-  }.toStream
+  })
 
   def randomPrefix(seed: Int): String = {
     val pos = ((System.nanoTime() / 1000000L) % 100).toInt // temporal position
     val slice = authChars.slice(pos, pos + 24 /* random str length */ )
-    val rand = new scala.util.Random(seed)
+    val pr = new scala.util.Random(seed)
 
-    rand.shuffle(slice.toList).mkString
+    pr.shuffle(slice.toList).mkString
   }
 }
 
@@ -215,11 +212,19 @@ private[reactivemongo] sealed trait ScramStartNegociation[M <: AuthenticationMod
         toRight(CmdErr(s"invalid $mechanism random prefix")).right
 
       salt <- response.get("s").flatMap[Array[Byte]] { s =>
-        try { Some(Base64 decodeBase64 s) } catch { case _: Throwable => None }
+        try {
+          Some(Base64 decodeBase64 s)
+        } catch {
+          case NonFatal(_) => None
+        }
       }.toRight(CmdErr(s"invalid $mechanism password salt")).right
 
       iter <- response.get("i").flatMap[Int] { i =>
-        try { Some(i.toInt) } catch { case _: Throwable => None }
+        try {
+          Some(i.toInt)
+        } catch {
+          case NonFatal(_) => None
+        }
       }.toRight(CmdErr(s"invalid $mechanism iteration count")).right
 
       hashCredential <- credential.right
@@ -239,8 +244,8 @@ private[reactivemongo] sealed trait ScramStartNegociation[M <: AuthenticationMod
         val clientKey = hmac(saltedPassword, ScramNegociation.ClientKeySeed)
 
         val clientSig = hmac(digest(clientKey), authMsg)
-        val clientProof = (clientKey, clientSig).
-          zipped.map((a, b) => (a ^ b).toByte).toArray
+        val clientProof = util.lazyZip(clientKey, clientSig).map(
+          (a, b) => (a ^ b).toByte).toArray
 
         val message = s"$nonce,p=${Base64 encodeBase64String clientProof}"
         val serverKey = hmac(saltedPassword, ScramNegociation.ServerKeySeed)
@@ -251,7 +256,7 @@ private[reactivemongo] sealed trait ScramStartNegociation[M <: AuthenticationMod
           requestPayload = message)).right
 
       } catch {
-        case err: Throwable => Left(CmdErr(
+        case NonFatal(err) => Left(CmdErr(
           s"fails to negociate $mechanism: ${err.getMessage}")).right
       }
     } yield nego
@@ -395,7 +400,7 @@ private[reactivemongo] object ScramStartNegociation {
           Left(CmdErr(error))
 
         case _ =>
-          if (decoder.booleanLike(doc, "done").exists(_ == true)) {
+          if (decoder.booleanLike(doc, "done") contains true) {
             Right(Left(SilentSuccessfulAuthentication))
           } else {
             decoder.binary(doc, "payload").fold[Result](

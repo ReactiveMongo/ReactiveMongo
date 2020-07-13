@@ -5,8 +5,7 @@ import scala.concurrent.duration._
 
 import reactivemongo.api.{
   AsyncDriver,
-  CrAuthentication,
-  DefaultDB,
+  DB,
   FailoverStrategy,
   MongoConnection,
   MongoConnectionOptions,
@@ -14,7 +13,9 @@ import reactivemongo.api.{
 }
 
 object Common extends CommonAuth {
-  val logger = reactivemongo.util.LazyLogger("tests")
+  val shaded = sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_ != "false")
+
+  val logger = reactivemongo.api.tests.logger("tests")
 
   val replSetOn = sys.props.get("test.replicaSet").fold(false) {
     case "true" => true
@@ -30,7 +31,7 @@ object Common extends CommonAuth {
 
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
 
-  private val timeoutFactor = 1.18D
+  private val timeoutFactor = 1.16D
   def estTimeout(fos: FailoverStrategy): FiniteDuration =
     (1 to fos.retries).foldLeft(fos.initialDelay) { (d, i) =>
       d + (fos.initialDelay * ((timeoutFactor * fos.delayFactor(i)).toLong))
@@ -52,11 +53,12 @@ object Common extends CommonAuth {
         MongoConnectionOptions.KeyStore(
           resource = new java.net.URI(uri), // file://..
           storeType = "PKCS12",
-          password = sys.props.get("test.keyStorePassword").map(_.toCharArray))
+          password = sys.props.get("test.keyStorePassword").map(_.toCharArray),
+          trust = true)
       })
 
     val b = {
-      if (sys.props.get("test.enableSSL").exists(_ == "true")) {
+      if (sys.props.get("test.enableSSL") contains "true") {
         a.copy(sslEnabled = true, sslAllowsInvalidCert = true)
       } else a
     }
@@ -69,7 +71,7 @@ object Common extends CommonAuth {
   lazy val connection =
     Await.result(driver.connect(List(primaryHost), DefaultOptions), timeout)
 
-  val commonDb = "specs2-test-reactivemongo"
+  val commonDb = s"specs2-test-reactivemongo${System.currentTimeMillis()}"
 
   // ---
 
@@ -115,7 +117,11 @@ object Common extends CommonAuth {
   lazy val slowConnection =
     Await.result(driver.connect(List(slowPrimary), SlowOptions), slowTimeout)
 
-  def databases(name: String, con: MongoConnection, slowCon: MongoConnection): (DefaultDB, DefaultDB) = {
+  def databases(
+    name: String,
+    con: MongoConnection,
+    slowCon: MongoConnection,
+    retries: Int = 0): (DB, DB) = {
     import ExecutionContext.Implicits.global
 
     val _db = for {
@@ -123,15 +129,15 @@ object Common extends CommonAuth {
       _ <- d.drop
     } yield d
 
-    Await.result(_db, timeout) -> Await.result((for {
-      _ <- slowProxy.start()
-      resolved <- slowCon.database(name, slowFailover)
-    } yield resolved), timeout + slowTimeout)
-  }
-
-  lazy val foo = {
-    import ExecutionContext.Implicits.global
-    Await.result(connection.database(commonDb, failoverStrategy), timeout)
+    try {
+      Await.result(_db, timeout) -> Await.result((for {
+        _ <- slowProxy.start()
+        resolved <- slowCon.database(name, slowFailover)
+      } yield resolved), timeout + slowTimeout)
+    } catch {
+      case _: java.util.concurrent.TimeoutException if (retries > 0) =>
+        databases(name, con, slowCon, retries - 1)
+    }
   }
 
   lazy val (db, slowDb) = databases(commonDb, connection, slowConnection)
@@ -157,6 +163,8 @@ object Common extends CommonAuth {
   }
 
   lazy val driver = newAsyncDriver()
+
+  lazy val driverSystem = reactivemongo.api.tests.system(driver)
 
   // ---
 
@@ -184,7 +192,6 @@ sealed trait CommonAuth {
 
   def authMode: Option[AuthenticationMode] =
     sys.props.get("test.authenticationMechanism").flatMap {
-      case "cr"   => Some(CrAuthentication)
       case "x509" => Some(X509Authentication)
       case _      => None
     }

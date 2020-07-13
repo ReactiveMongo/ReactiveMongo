@@ -2,9 +2,11 @@ package reactivemongo.core.actors
 
 import reactivemongo.api.ReadPreference
 
-import reactivemongo.api.commands.{ Command, X509Authenticate }
-
-import reactivemongo.core.commands.AuthenticationResult
+import reactivemongo.api.commands.{
+  AuthenticationResult,
+  Command,
+  X509Authenticate
+}
 
 import reactivemongo.core.nodeset.{
   Authenticate,
@@ -21,7 +23,7 @@ private[reactivemongo] trait MongoX509Authentication { system: MongoDBSystem =>
     connection: Connection,
     nextAuth: Authenticate): Connection = {
 
-    val (maker, _) = Command.buildRequestMaker(pack)(
+    val maker = Command.buildRequestMaker(pack)(
       X509Authenticate(Option(nextAuth.user)),
       writer, ReadPreference.primary, db = f"$$external")
 
@@ -35,7 +37,7 @@ private[reactivemongo] trait MongoX509Authentication { system: MongoDBSystem =>
 
   protected val authReceive: Receive = {
     case resp: Response if RequestIdGenerator.authenticate accepts resp => {
-      val chanId = resp.info._channelId
+      val chanId = resp.info.channelId
 
       debug(s"AUTH: got authenticated response #${chanId}!")
 

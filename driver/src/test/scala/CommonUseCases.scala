@@ -18,19 +18,20 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
   "Common use cases" title
 
   sequential
+  stopOnFail
 
   // ---
 
   import Common.{ timeout, slowTimeout }
   import builder.regex
 
-  lazy val (db, slowDb) = Common.databases(s"reactivemongo-usecases-${System identityHashCode this}", Common.connection, Common.slowConnection)
+  lazy val (db, slowDb) = Common.databases(s"reactivemongo-usecases-${System identityHashCode this}", Common.connection, Common.slowConnection, retries = 1)
 
   val colName = s"commonusecases${System identityHashCode this}"
   lazy val collection = db(colName)
   lazy val slowColl = slowDb(colName)
 
-  def afterAll = { db.drop(); () }
+  def afterAll() = { db.drop(); () }
 
   // ---
 
@@ -39,21 +40,25 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
       collection.create() must beTypedEqualTo({}).await(1, timeout)
     }
 
-    "insert some docs from a seq of docs" in {
-      val docs = (18 to 60).toStream.map(i => BSONDocument(
+    "insert some documents" in eventually(2, timeout / 2L) {
+      val docs = (18 to 60).map(i => BSONDocument(
         "age" -> i, "name" -> s"Jack${i}"))
 
-      (for {
-        _ /*result*/ <- collection.insert(ordered = true).many(docs)
-        count <- collection.count(Some(
-          BSONDocument("age" -> BSONDocument(f"$$gte" -> 18, f"$$lte" -> 60))))
-      } yield count) must beEqualTo(43).await(1, timeout)
+      collection.delete.one(BSONDocument.empty).flatMap { _ =>
+        collection.count(Option.empty[BSONDocument])
+      } must beTypedEqualTo(0L).awaitFor(timeout) and {
+        (for {
+          _ /*result*/ <- collection.insert(ordered = true).many(docs)
+          count <- collection.count(Some(BSONDocument(
+            "age" -> BSONDocument(f"$$gte" -> 18, f"$$lte" -> 60))))
+        } yield count) must beEqualTo(43).awaitFor(timeout)
+      }
     }
 
     "find them" in {
       // batchSize (>1) allows us to test cursors ;)
-      val it = collection.find(BSONDocument()).
-        options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
+      val it = collection.find(BSONDocument()).batchSize(2).
+        sort(BSONDocument("age" -> 1)).cursor[BSONDocument]()
 
       //import reactivemongo.core.protocol.{ Response, Reply }
       //import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
@@ -87,10 +92,11 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
 
     "find them with a projection" >> {
       val pjn = BSONDocument("name" -> 1, "age" -> 1, "something" -> 1)
+      val expected = (18 to 60).mkString("")
 
       def findSpec(c: DefaultCollection, t: FiniteDuration) = {
-        def it = c.find(BSONDocument.empty, pjn).
-          options(QueryOpts().batchSize(2)).cursor[BSONDocument]()
+        def it = c.find(BSONDocument.empty, Some(pjn)).
+          batchSize(2).cursor[BSONDocument]()
 
         //import reactivemongo.core.protocol.{ Response, Reply }
         //import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
@@ -98,7 +104,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
         it.collect[List](
           Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).map {
             _.map(doc => decoder.int(doc, "age").mkString).mkString("")
-          } must beTypedEqualTo((18 to 60).mkString("")).await(0, t)
+          } must beTypedEqualTo(expected).await(0, t)
       }
 
       "with the default connection" in {
@@ -106,7 +112,9 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
       }
 
       "with the slow connection" in eventually(2, timeout) {
-        findSpec(slowColl, Common.ifX509(slowTimeout * 5)(slowTimeout * 3))
+        val t = slowTimeout + (timeout / 2L)
+
+        findSpec(slowColl, Common.ifX509(t * 5)(t * 3))
       }
     }
 
@@ -144,7 +152,8 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
     "insert a weird doc" in {
       val doc = BSONDocument("coucou" -> BSONString("coucou"), "plop" -> BSONInteger(1), "plop" -> BSONInteger(2))
 
-      collection.insert.one(doc).map(_.ok) must beTrue.await(1, timeout)
+      collection.insert.one(doc).
+        map(_ => {}) must beTypedEqualTo({}).await(1, timeout)
     }
 
     "find this weird doc" in {

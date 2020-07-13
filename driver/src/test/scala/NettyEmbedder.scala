@@ -26,7 +26,7 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
         }
     }
 
-  private final class EmChannel(
+  private[tests] final class EmChannel(
     chanId: ChannelId,
     initiallyActive: Boolean = false)
     extends EmbeddedChannel(chanId, false, false) {

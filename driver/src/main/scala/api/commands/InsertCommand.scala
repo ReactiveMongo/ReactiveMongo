@@ -1,128 +1,92 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ SerializationPack, Session }
+import reactivemongo.api.{
+  PackSupport,
+  SerializationPack,
+  Session,
+  WriteConcern
+}
 
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/insert/ insert]] command.
  */
-@deprecated("Use the new insert operation", "0.16.0")
-trait InsertCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
+private[reactivemongo] trait InsertCommand[P <: SerializationPack] { self: PackSupport[P] =>
+
   /**
    * @param head the first mandatory document
    * @param tail maybe other documents
    */
-  sealed class Insert(
+  private[reactivemongo] final class Insert(
     val head: pack.Document,
     val tail: Seq[pack.Document],
     val ordered: Boolean,
     val writeConcern: WriteConcern,
-    val bypassDocumentValidation: Boolean) extends CollectionCommand with CommandWithResult[InsertResult] with Mongo26WriteCommand with Serializable with Product {
-
-    @deprecated("Will be removed", "0.19.8")
-    def this(
-      head: pack.Document,
-      tail: Seq[pack.Document],
-      ordered: Boolean,
-      writeConcern: WriteConcern) =
-      this(head, tail, ordered, writeConcern, false)
-
-    @deprecated("No longer a case class", "0.19.8")
-    val productArity = 4
-
-    @deprecated("No longer a case class", "0.19.8")
-    def productElement(n: Int): Any = n match {
-      case 0 => head
-      case 1 => tail
-      case 2 => ordered
-      case 3 => writeConcern
-      case _ => bypassDocumentValidation
-    }
-
-    def canEqual(that: Any): Boolean = that match {
-      case _: Insert => true
-      case _         => false
-    }
+    val bypassDocumentValidation: Boolean) extends CollectionCommand with CommandWithResult[InsertResult] {
 
     private[commands] lazy val tupled =
-      Tuple4(head, tail, ordered, writeConcern)
+      Tuple5(head, tail, ordered, writeConcern, bypassDocumentValidation)
 
-    // TODO#1.1: All fields after release
     override def equals(that: Any): Boolean = that match {
-      case other: Insert =>
+      case other: this.type =>
         other.tupled == this.tupled
 
       case _ => false
     }
 
-    // TODO#1.1: All fields after release
     override def hashCode: Int = tupled.hashCode
-  }
 
-  object Insert {
-    @deprecated("Use factory with bypassDocumentValidation", "0.19.8")
-    def apply(
-      head: pack.Document,
-      tail: Seq[pack.Document],
-      ordered: Boolean,
-      writeConcern: WriteConcern): Insert =
-      apply(head, tail, ordered, writeConcern, false)
+    @inline override lazy val toString: String = {
+      val docs = (head +: tail).map(pack.pretty)
 
-    def apply(
-      head: pack.Document,
-      tail: Seq[pack.Document],
-      ordered: Boolean,
-      writeConcern: WriteConcern,
-      bypassDocumentValidation: Boolean): Insert =
-      new Insert(head, tail, ordered, writeConcern, bypassDocumentValidation)
-
-    @deprecated("No longer a case class", "0.19.8")
-    def unapply(that: Any): Option[(pack.Document, Seq[pack.Document], Boolean, WriteConcern)] = that match {
-      case other: Insert => Option(other).map(_.tupled)
-      case _             => None
+      s"""Insert(${docs.mkString("[", ", ", "]")}, ${ordered.toString}, ${writeConcern.toString}, ${bypassDocumentValidation.toString})"""
     }
   }
 
-  type InsertResult = DefaultWriteResult // for simplified imports
-}
+  private[reactivemongo] type InsertResult = DefaultWriteResult // for simplified imports
 
-@deprecated("Will be removed", "0.19.8")
-private[reactivemongo] object InsertCommand {
-  // TODO#1.1: Remove when BSONInsertCommand is removed
-  def writer[P <: SerializationPack with Singleton](pack: P)(
-    context: InsertCommand[pack.type]): Option[Session] => ResolvedCollectionCommand[context.Insert] => pack.Document = {
+  private[reactivemongo] final type InsertCmd = ResolvedCollectionCommand[Insert]
+
+  private[reactivemongo] def session(): Option[Session]
+
+  implicit private[reactivemongo] final lazy val insertWriter: pack.Writer[InsertCmd] = insertWriter(self.session())
+
+  private[reactivemongo] final def insertWriter(
+    session: Option[Session]): pack.Writer[InsertCmd] = {
+
     val builder = pack.newBuilder
     val writeWriteConcern = CommandCodecs.writeWriteConcern(pack)
     val writeSession = CommandCodecs.writeSession(builder)
 
-    { session: Option[Session] =>
-      import builder.{ elementProducer => element }
+    import builder.{ elementProducer => element }
 
-      { insert =>
-        import insert.command
+    pack.writer[InsertCmd] { insert =>
+      import insert.command
 
-        val documents = builder.array(command.head, command.tail)
-        val ordered = builder.boolean(command.ordered)
-        val elements = Seq.newBuilder[pack.ElementProducer]
+      val documents = builder.array(command.head +: command.tail)
+      val ordered = builder.boolean(command.ordered)
+      val elements = Seq.newBuilder[pack.ElementProducer]
 
-        elements ++= Seq[pack.ElementProducer](
-          element("insert", builder.string(insert.collection)),
-          element("ordered", ordered),
-          element("documents", documents))
+      elements ++= Seq[pack.ElementProducer](
+        element("insert", builder.string(insert.collection)),
+        element("ordered", ordered),
+        element("documents", documents),
+        element(
+          "bypassDocumentValidation",
+          builder.boolean(command.bypassDocumentValidation)))
 
-        session.foreach { s =>
-          elements ++= writeSession(s)
-        }
-
-        if (!session.exists(_.transaction.isSuccess)) {
-          // writeConcern is not allowed within a multi-statement transaction
-          // code=72
-
-          elements += element(
-            "writeConcern", writeWriteConcern(command.writeConcern))
-        }
-
-        builder.document(elements.result())
+      session.foreach { s =>
+        elements ++= writeSession(s)
       }
+
+      if (!session.exists(_.transaction.isSuccess)) {
+        // writeConcern is not allowed within a multi-statement transaction
+        // code=72
+
+        elements += element(
+          "writeConcern", writeWriteConcern(command.writeConcern))
+      }
+
+      builder.document(elements.result())
     }
   }
 }

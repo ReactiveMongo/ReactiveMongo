@@ -3,13 +3,11 @@ import java.io.ByteArrayInputStream
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.bson.utils.Converters
+import reactivemongo.api.{ Cursor, DB, WrappedCursor }
 
-import reactivemongo.api.{ Cursor, DefaultDB, SerializationPack, WrappedCursor }
+import reactivemongo.api.tests.{ pack, newBuilder }
 
-import reactivemongo.api.tests.{ Pack, pack, newBuilder }
-
-import reactivemongo.api.gridfs.{ FileToSave, GridFS }
+import reactivemongo.api.gridfs.FileToSave
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -20,15 +18,16 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
   "GridFS" title
 
   sequential
+  stopOnFail
 
   // ---
 
   import tests.Common
   import Common.{ timeout, slowTimeout }
 
-  lazy val (db, slowDb) = Common.databases(s"reactivemongo-gridfs-${System identityHashCode this}", Common.connection, Common.slowConnection)
+  lazy val (db, slowDb) = Common.databases(s"reactivemongo-gridfs-${System identityHashCode this}", Common.connection, Common.slowConnection, retries = 1)
 
-  def afterAll = { db.drop(); () }
+  def afterAll() = { db.drop(); () }
 
   // ---
 
@@ -47,7 +46,7 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
   // ---
 
   def gridFsSpec(
-    db: DefaultDB,
+    db: DB,
     prefix: String,
     timeout: FiniteDuration)(implicit ev: scala.reflect.ClassTag[pack.Value]) = {
 
@@ -101,6 +100,16 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
       }.map(_.filename) must beSome(filename2).await(1, timeout)
     }
 
+    lazy val customField = s"foo-${System identityHashCode content2}"
+
+    "update a file metadata" in {
+      val update = document(Seq(elem(f"$$set", document(Seq(
+        elem("_custom", str(customField)))))))
+
+      gfs.update(file2.id, update).
+        map(_.n) must beTypedEqualTo(1).awaitFor(timeout)
+    }
+
     "find the files" in {
       def find(n: String): Future[Option[GFile]] =
         gfs.find[pack.Document, pack.Value](
@@ -138,22 +147,27 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
         }
       } and {
         find(filename2) aka "file #2" must beSome[GFile].which { actual =>
-          def expectedMd5 = Converters.hex2Str(Converters.md5(content2))
+          def expectedMd5 = reactivemongo.api.tests.md5Hex(content2)
 
           matchFile(actual, file2, content2) and {
             actual.md5 must beSome[String].which {
               _ aka "MD5" must_=== expectedMd5
             }
           }
-        }.await(1, timeout)
+        }.await(1, timeout + (timeout / 3L))
+      } and {
+        gfs.find[pack.Document, pack.Value](
+          document(Seq(elem("_custom", str(customField))))).
+          headOption.map(_.map(_.id)) must beSome(file2.id).
+          await(1, timeout + (timeout / 3L))
       }
     }
 
     "delete the files from GridFS" in {
-      (for {
-        a <- gfs.remove(file1.id).map(_.n)
-        b <- gfs.remove(file2.id).map(_.n)
-      } yield a + b) must beTypedEqualTo(2).await(1, timeout)
+      def spec(id: gfs.pack.Value) =
+        gfs.remove(id).map(_.n) must beTypedEqualTo(1).awaitFor(timeout)
+
+      spec(file1.id) and spec(file2.id)
     }
   }
 

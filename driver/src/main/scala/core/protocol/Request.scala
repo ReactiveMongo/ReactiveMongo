@@ -15,8 +15,7 @@ import reactivemongo.api.ReadPreference
  * @param documents body of this request, a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents.
  * @param channelIdHint a hint for sending this request on a particular channel.
  */
-@deprecated("Internal: will be made private", "0.20.3")
-case class Request(
+private[reactivemongo] case class Request(
   requestID: Int,
   responseTo: Int,
   op: RequestOp,
@@ -36,7 +35,7 @@ case class Request(
   def size = 16 + op.size + documents.merged.writerIndex
 
   /** Header of this request */
-  lazy val header = MessageHeader(size, requestID, responseTo, op.code)
+  lazy val header = new MessageHeader(size, requestID, responseTo, op.code)
 
   override def toString =
     s"Request($requestID, $responseTo, $op, $readPreference, $channelIdHint)"
@@ -48,8 +47,7 @@ case class Request(
  * @define documentsA body of this request, an Array containing 0, 1, or many documents.
  * @define documentsC body of this request, a [[http://netty.io/4.0/api/io/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents.
  */
-@deprecated("Internal: will be made private", "0.20.3")
-object Request {
+private[reactivemongo] object Request {
   /**
    * Create a request.
    *

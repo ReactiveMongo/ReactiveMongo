@@ -5,13 +5,6 @@ set -e
 echo "[INFO] Clean some IVY cache"
 rm -rf "$HOME/.ivy2/local/org.reactivemongo"
 
-if [ "$OS_NAME" = "osx" ]; then
-  echo "[INFO] Mac OS X setup"
-
-  brew update
-  brew install sbt
-fi
-
 CATEGORY="$1"
 
 if [ "$CATEGORY" = "UNIT_TESTS" ]; then
@@ -39,10 +32,6 @@ if [ "$AKKA_VERSION" = "2.5.23" ]; then
     MONGO_VER="4"
 
     echo "[WARN] Fix MongoDB version to $MONGO_MINOR (due to Akka Stream version)"
-else
-    if [ "$MONGO_VER" = "2_6" ]; then
-        MONGO_MINOR="2.6.12"
-    fi
 fi
 
 # Prepare integration env
@@ -51,12 +40,12 @@ PRIMARY_HOST=`hostname`":27018"
 PRIMARY_SLOW_PROXY=`hostname`":27019"
 
 # OpenSSL
-if [ ! -L "$HOME/ssl/lib/libssl.so.1.0.0" ] && [ ! -f "$HOME/ssl/lib/libssl.so.1.0.0" ]; then
+if [ ! -L "$HOME/ssl/lib/libssl.so.1.0.0" ] && [ ! -f "$HOME/ssl/lib/libcrypto.so.1.0.0" ]; then
   echo "[INFO] Building OpenSSL"
 
   cd /tmp
-  curl -s -o - https://www.openssl.org/source/openssl-1.0.1s.tar.gz | tar -xzf -
-  cd openssl-1.0.1s
+  curl -s -o - https://www.openssl.org/source/old/1.0.1/openssl-1.0.1u.tar.gz | tar -xzf -
+  cd openssl-1.0.1u
   rm -rf "$HOME/ssl" && mkdir "$HOME/ssl"
   ./config -shared enable-ssl2 --prefix="$HOME/ssl" > /dev/null
   make depend > /dev/null
@@ -75,11 +64,6 @@ echo "[INFO] Installing MongoDB ${MONGO_MINOR} ..."
 cd "$HOME"
 
 MONGO_ARCH="x86_64-amazon"
-
-if [ "$MONGO_VER" = "2_6" ]; then
-  MONGO_ARCH="x86_64"
-fi
-
 MONGO_HOME="$HOME/mongodb-linux-$MONGO_ARCH-$MONGO_MINOR"
 
 if [ ! -x "$MONGO_HOME/bin/mongod" ]; then

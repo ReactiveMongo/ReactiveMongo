@@ -9,8 +9,22 @@ import reactivemongo.api.SerializationPack
  */
 private[reactivemongo] sealed abstract class EndSessions(
   val id: UUID,
-  val ids: Seq[UUID]) extends Command with CommandWithResult[UnitBox.type] {
+  val ids: Seq[UUID]) extends Command with CommandWithResult[Unit] {
   protected def kind: String
+
+  private lazy val tupled = Tuple3(kind, id, ids)
+
+  override def hashCode: Int = tupled.hashCode
+
+  override def equals(that: Any): Boolean = that match {
+    case other: EndSessions =>
+      this.tupled == other.tupled
+
+    case _ =>
+      false
+  }
+
+  @inline override def toString: String = s"EndSessions${tupled.toString}"
 }
 
 private[reactivemongo] object EndSessions {
@@ -33,7 +47,7 @@ private[reactivemongo] object EndSessions {
     pack.writer[EndSessions] { cmd =>
       document(Seq(element(
         cmd.kind,
-        builder.array(uuid(cmd.id), cmd.ids.map(uuid)))))
+        builder.array(uuid(cmd.id) +: cmd.ids.map(uuid)))))
     }
   }
 }

@@ -1,9 +1,11 @@
 import scala.concurrent.Await
 import scala.concurrent.duration.FiniteDuration
 
+import reactivemongo.core.errors.DatabaseException
+
 import reactivemongo.api.{ FailoverStrategy, MongoConnection }
 
-import reactivemongo.api.commands.CommandError
+import reactivemongo.api.commands.CommandException
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -13,6 +15,7 @@ final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
   "Database" title
 
   sequential
+  stopOnFail
 
   import tests.Common
   import Common._
@@ -40,86 +43,84 @@ final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
         val estmout = estTimeout(fos2)
 
         con.flatMap(_.database("foo", fos1)).map(_ => List.empty[Int]).
-          recover({ case _ => ws.result() }) must beEqualTo(expected).
+          recover({ case _ => ws.result() }) must beTypedEqualTo(expected).
           await(0, estmout * 2) and {
             val duration = System.currentTimeMillis() - before
 
-            duration must be_<(estmout.toMillis + 2500 /* ms */ )
+            duration must be_<((estmout * 2).toMillis + 1500 /* ms */ )
           }
       } tag "unit"
     }
-
-    section("mongo2", "mongo24", "not_mongo26")
-    "fail with MongoDB < 2.6" in {
-
-      import reactivemongo.core.errors.ConnectionException
-
-      Common.connection.database(Common.commonDb, failoverStrategy).
-        map(_ => {}) aka "database resolution" must (
-          throwA[ConnectionException]("unsupported MongoDB version")).
-          await(0, timeout) and {
-            Await.result(Common.connection.database(Common.commonDb), timeout).
-              aka("database") must throwA[ConnectionException](
-                "unsupported MongoDB version")
-          }
-    }
-    section("mongo2", "mongo24", "not_mongo26")
 
     sessionSpecs
 
     "admin" >> {
       "rename successfully collection if target doesn't exist" in {
-        (for {
-          admin <- connection.database("admin", failoverStrategy)
-          name1 <- {
-            val name = s"foo_${System identityHashCode admin}"
+        eventually(2, timeout) {
+          (for {
+            admin <- connection.database("admin", failoverStrategy)
+            name1 <- {
+              val name = s"foo${System identityHashCode admin}-${System.currentTimeMillis()}"
 
-            db.collection(name).create().map(_ => name)
-          }
-          name = s"renamed_${System identityHashCode name1}"
-          c2 <- admin.renameCollection(db.name, name1, name)
-        } yield name -> c2.name) must beLike[(String, String)] {
-          case (expected, name) => name aka "new name" must_== expected
-        }.await(0, timeout)
+              db.collection(name).create().map(_ => name)
+            }
+            name = s"renamed_${System identityHashCode name1}"
+            c2 <- admin.renameCollection(db.name, name1, name)
+          } yield name -> c2.name) must beLike[(String, String)] {
+            case (expected, name) => name aka "new name" must_=== expected
+          }.awaitFor(timeout)
+        }
       }
 
-      "fail to rename collection if target exists" in {
-        val c1 = db.collection(s"foo_${System identityHashCode ee}")
+      "fail to rename collection if target exists" in eventually(2, timeout) {
+        val colName = s"mv_fail_${System identityHashCode ee}-${System.currentTimeMillis()}"
+
+        val c1 = {
+          val c = db.collection(colName)
+          c.create(failsIfExists = false).map(_ => c)
+        }
 
         (for {
-          _ <- c1.create()
+          _ <- c1
           name = s"renamed_${System identityHashCode c1}"
           c2 = db.collection(name)
-          _ <- c2.create()
+          _ <- c2.create(failsIfExists = false)
         } yield name) must beLike[String] {
-          case name => name must not(beEqualTo(c1.name)) and {
-            Await.result(for {
-              admin <- connection.database("admin", failoverStrategy)
-              _ <- admin.renameCollection(db.name, c1.name, name)
-            } yield {}, timeout) must throwA[Exception].like {
-              case err: CommandError =>
-                err.errmsg aka err.toString must beSome[String].which {
-                  _.indexOf("target namespace exists") != -1
+          case name => name must not(beEqualTo(colName)) and {
+            db.collectionNames.map(
+              _.contains(name)) must beTrue.awaitFor(timeout) and {
+                Await.result(for {
+                  admin <- connection.database("admin", failoverStrategy)
+                  _ <- admin.renameCollection(db.name, colName, name)
+                } yield {}, timeout) must throwA[DatabaseException].like {
+                  case err @ CommandException.Code(48) =>
+                    err.getMessage.indexOf(
+                      "target namespace exists") must not(beEqualTo(-1))
                 }
-            }
+              }
           }
-        }.await(0, timeout)
+        }.await(1, timeout)
       }
     }
 
     {
-      val dbName = s"databasespec-${System identityHashCode ee}"
-
-      def dropSpec(con: MongoConnection, timeout: FiniteDuration) =
+      def dropSpec(
+        con: MongoConnection,
+        dbName: String,
+        timeout: FiniteDuration) =
         con.database(dbName).flatMap(_.drop()).
-          aka("drop") must beTypedEqualTo({}).await(2, timeout)
+          aka("drop") must beTypedEqualTo({}).awaitFor(timeout * 4L)
 
       "be dropped with the default connection" in {
-        dropSpec(connection, timeout)
+        val dbName = s"databasespec-${System identityHashCode ee}"
+
+        dropSpec(connection, dbName, timeout)
       }
 
       "be dropped with the slow connection" in {
-        dropSpec(slowConnection, slowTimeout)
+        val dbName = s"slowdatabasespec-${System identityHashCode ee}"
+
+        dropSpec(slowConnection, dbName, slowTimeout)
       }
     }
   }

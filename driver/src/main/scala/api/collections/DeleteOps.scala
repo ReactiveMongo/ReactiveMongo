@@ -4,16 +4,16 @@ import scala.util.{ Failure, Success, Try }
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.{ Collation, SerializationPack, Session }
+import reactivemongo.api.{ Collation, SerializationPack, WriteConcern }
 import reactivemongo.api.commands.{
-  CommandCodecs,
-  LastError,
-  MultiBulkWriteResult,
+  CommandCodecsWithPack,
+  DeleteCommand,
+  LastErrorFactory,
+  MultiBulkWriteResultFactory,
   ResolvedCollectionCommand,
-  WriteConcern,
+  UpsertedFactory,
   WriteResult
 }
 
@@ -21,15 +21,11 @@ import reactivemongo.api.commands.{
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  * @define orderedParam the ordered behaviour
  */
-trait DeleteOps[P <: SerializationPack with Singleton] {
+trait DeleteOps[P <: SerializationPack]
+  extends DeleteCommand[P] with CommandCodecsWithPack[P]
+  with MultiBulkWriteResultFactory[P] with UpsertedFactory[P]
+  with LastErrorFactory[P] {
   collection: GenericCollection[P] =>
-
-  @deprecated("Internal: will be made private", "0.19.0")
-  object DeleteCommand
-    extends reactivemongo.api.commands.DeleteCommand[collection.pack.type] {
-    val pack: collection.pack.type = collection.pack
-  }
-  import DeleteCommand.{ Delete, DeleteElement }
 
   /**
    * @param ordered $orderedParam
@@ -40,55 +36,6 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     writeConcern: WriteConcern): DeleteBuilder = {
     if (ordered) new OrderedDelete(writeConcern)
     else new UnorderedDelete(writeConcern)
-  }
-
-  private type DeleteCmd = ResolvedCollectionCommand[DeleteCommand.Delete]
-
-  private lazy val deleteWriter: Option[Session] => pack.Writer[DeleteCmd] = {
-    val builder = pack.newBuilder
-    import builder.{ elementProducer => element }
-
-    val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
-    val writeSession = CommandCodecs.writeSession(builder)
-    val writeCollation = Collation.serializeWith(pack, _: Collation)(builder)
-
-    def writeElement(e: DeleteElement): pack.Document = {
-      val elements = Seq.newBuilder[pack.ElementProducer]
-
-      elements ++= Seq(
-        element("q", e.q),
-        element("limit", builder.int(e.limit)))
-
-      e.collation.foreach { c =>
-        elements += element("collation", writeCollation(c))
-      }
-
-      builder.document(elements.result())
-    }
-
-    { session =>
-      pack.writer[DeleteCmd] { delete =>
-        val elements = Seq.newBuilder[pack.ElementProducer]
-
-        elements ++= Seq(
-          element("delete", builder.string(delete.collection)),
-          element("ordered", builder.boolean(delete.command.ordered)),
-          element(
-            "writeConcern",
-            writeWriteConcern(delete.command.writeConcern)))
-
-        session.foreach { s =>
-          elements ++= writeSession(s)
-        }
-
-        delete.command.deletes.headOption.foreach { first =>
-          elements += element("deletes", builder.array(
-            writeElement(first), delete.command.deletes.map(writeElement)))
-        }
-
-        builder.document(elements.result())
-      }
-    }
   }
 
   /**
@@ -108,7 +55,7 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     protected def bulkRecover: Option[Exception => Future[WriteResult]]
 
     /**
-     * Performs a delete with a one single selector (see [[DeleteCommand.DeleteElement]]).
+     * Performs a delete with a one single selector (see [[DeleteElement]]).
      * This will delete all the documents matched by the `q` selector.
      *
      * @param q $queryParam
@@ -118,7 +65,7 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     final def one[Q, U](q: Q, limit: Option[Int] = None, collation: Option[Collation] = None)(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[WriteResult] = element[Q, U](q, limit, collation).flatMap { upd => execute(Seq(upd)) }
 
     /**
-     * Prepares an [[DeleteCommand.DeleteElement]].
+     * Prepares an [[DeleteElement]].
      *
      * @param q $queryParam
      * @param limit $limitParam
@@ -128,7 +75,7 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
      */
     final def element[Q, U](q: Q, limit: Option[Int] = None, collation: Option[Collation] = None)(implicit qw: pack.Writer[Q]): Future[DeleteElement] =
       (Try(pack.serialize(q, qw)).map { query =>
-        DeleteElement(query, limit.getOrElse(0), collation)
+        new DeleteElement(query, limit.getOrElse(0), collation)
       }) match {
         case Success(element) => Future.successful(element)
         case Failure(cause)   => Future.failed[DeleteElement](cause)
@@ -177,8 +124,8 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
     /** The max BSON size, including the size of command envelope */
     private def maxBsonSize = {
       // Command envelope to compute accurate BSON size limit
-      val emptyCmd = ResolvedCollectionCommand(
-        collection.name, Delete(Seq.empty, ordered, writeConcern))
+      val emptyCmd = new ResolvedCollectionCommand(
+        collection.name, new Delete(Seq.empty, ordered, writeConcern))
 
       val doc = pack.serialize(emptyCmd, deleteWriter(None))
 
@@ -196,34 +143,23 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
       pack.bsonSize(builder.document(elements))
     }
 
-    implicit private val resultReader: pack.Reader[DeleteCommand.DeleteResult] =
-      CommandCodecs.defaultWriteResultReader(pack)
-
-    implicit private lazy val writer: pack.Writer[DeleteCmd] =
-      deleteWriter(collection.db.session)
-
     private final def execute(deletes: Seq[DeleteElement])(
       implicit
       ec: ExecutionContext): Future[WriteResult] = {
-      if (metadata.maxWireVersion >= MongoWireVersion.V26) {
-        val cmd = Delete(deletes, ordered, writeConcern)
+      val cmd = new Delete(deletes, ordered, writeConcern)
 
-        Future.successful(cmd).flatMap(
-          runCommand(_, writePreference).flatMap { wr =>
-            val flattened = wr.flatten
+      Future.successful(cmd).flatMap(
+        runCommand(_, writePreference).flatMap { wr =>
+          val flattened = wr.flatten
 
-            if (!flattened.ok) {
-              // was ordered, with one doc => fail if has an error
-              Future.failed(WriteResult.lastError(flattened).
-                getOrElse[Exception](GenericDriverException(
-                  s"fails to delete: $deletes")))
+          if (!flattened.ok) {
+            // was ordered, with one doc => fail if has an error
+            Future.failed(lastError(flattened).
+              getOrElse[Exception](new GenericDriverException(
+                s"fails to delete: $deletes")))
 
-            } else Future.successful(wr)
-          })
-      } else { // Mongo < 2.6
-        Future.failed[WriteResult](GenericDriverException(
-          s"unsupported MongoDB version: $metadata"))
-      }
+          } else Future.successful(wr)
+        })
     }
   }
 
@@ -244,7 +180,7 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
       case lastError: WriteResult =>
         Future.successful(lastError)
 
-      case cause => Future.successful(LastError(
+      case cause => Future.successful(new LastError(
         ok = false,
         errmsg = Option(cause.getMessage),
         code = Option.empty,
@@ -256,7 +192,9 @@ trait DeleteOps[P <: SerializationPack with Singleton] {
         wnote = Option.empty[WriteConcern.W],
         wtimeout = false,
         waited = Option.empty[Int],
-        wtime = Option.empty[Int]))
+        wtime = Option.empty[Int],
+        writeErrors = Seq.empty,
+        writeConcernError = Option.empty))
     }
 
   private final class UnorderedDelete(

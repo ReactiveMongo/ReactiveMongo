@@ -27,14 +27,14 @@ import scala.concurrent.{ ExecutionContext, Future }
  * @define errorHandlerParam The binary operator to be applied when failing to get the next response. Exception or [[reactivemongo.api.Cursor$.Fail Fail]] raised within the `suc` function cannot be recovered by this error handler.
  * @define collect Collects all the documents into a collection of type `M[T]`
  */
-trait CursorCompatAPI[T] { _: Cursor[T] =>
+private[api] trait CursorCompatAPI[T] { _: Cursor[T] =>
   import Cursor.ErrorHandler
 
   /**
    * $collect.
    *
    * @param maxDocs $maxDocsParam.
-   * @param err $errorHandlerParam
+   * @param err $errorHandlerParam (default: [[Cursor.FailOnError]])
    *
    * {{{
    * import scala.concurrent.ExecutionContext
@@ -51,9 +51,14 @@ trait CursorCompatAPI[T] { _: Cursor[T] =>
    * }
    * }}}
    */
-  def collect[M[_]](maxDocs: Int, err: ErrorHandler[M[T]])(implicit cbf: Factory[T, M[T]], ec: ExecutionContext): Future[M[T]]
+  def collect[M[_]](
+    maxDocs: Int = Int.MaxValue,
+    err: ErrorHandler[M[T]] = Cursor.FailOnError[M[T]]())(
+    implicit
+    cbf: Factory[T, M[T]],
+    ec: ExecutionContext): Future[M[T]]
 
   /** '''EXPERIMENTAL:''' The cursor state, if already resolved. */
-  def peek[M[_]](maxDocs: Int)(implicit cbf: Factory[T, M[T]], ec: ExecutionContext): Future[Cursor.Result[M[T]]] = Future.failed(Cursor.NoSuchResultException) // TODO: Remove default impl
+  def peek[M[_]](maxDocs: Int)(implicit cbf: Factory[T, M[T]], ec: ExecutionContext): Future[Cursor.Result[M[T]]]
 
 }

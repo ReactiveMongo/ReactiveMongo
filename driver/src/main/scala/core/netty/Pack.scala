@@ -1,5 +1,7 @@
 package reactivemongo.core.netty
 
+import scala.util.control.NonFatal
+
 import reactivemongo.io.netty.channel.{ Channel, EventLoopGroup }
 
 import reactivemongo.io.netty.channel.nio.NioEventLoopGroup
@@ -34,7 +36,7 @@ private[core] object Pack {
 
     true
   } catch {
-    case _: Throwable => false
+    case NonFatal(_) => false
   }
 
   private val logger = LazyLogger("reactivemongo.core.netty.Pack")
@@ -52,6 +54,7 @@ private[core] object Pack {
     else "io.netty.channel.kqueue"
   }
 
+  @SuppressWarnings(Array("AsInstanceOf"))
   private[core] def kqueue: Option[Pack] = try {
     Some(Class.forName(
       s"${kqueuePkg}.KQueueSocketChannel")).map { cls =>
@@ -67,7 +70,7 @@ private[core] object Pack {
       pack
     }
   } catch {
-    case cause: Exception =>
+    case NonFatal(cause) =>
       logger.debug(s"Cannot use Netty KQueue (shaded: $shaded)", cause)
       None
   }
@@ -77,6 +80,7 @@ private[core] object Pack {
     else "io.netty.channel.epoll"
   }
 
+  @SuppressWarnings(Array("AsInstanceOf"))
   private[core] def epoll: Option[Pack] = try {
     Some(Class.forName(
       s"${epollPkg}.EpollSocketChannel")).map { cls =>
@@ -93,7 +97,7 @@ private[core] object Pack {
       pack
     }
   } catch {
-    case cause: Exception =>
+    case NonFatal(cause) =>
       logger.debug(s"Cannot use Netty EPoll (shaded: $shaded)", cause)
       None
   }

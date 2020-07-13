@@ -57,7 +57,7 @@ private[reactivemongo] final class PlainSession(
   causalConsistency: Boolean = true) extends Session(lsid, causalConsistency) {
 
   lazy val transaction: Try[SessionTransaction] =
-    Failure(GenericDriverException(
+    Failure(new GenericDriverException(
       s"Cannot start transaction for session '$lsid': no replicaset"))
 
 }
@@ -107,7 +107,7 @@ private[reactivemongo] sealed class NodeSetSession(
     Option(txState getAndUpdate Session.EndTxIfStarted).filter(_.isStarted)
 }
 
-private[reactivemongo] sealed class DistributedSession(
+private[reactivemongo] final class DistributedSession(
   lsid: UUID,
   causalConsistency: Boolean = true) extends NodeSetSession(lsid, causalConsistency) {
 
@@ -119,7 +119,7 @@ private[reactivemongo] sealed class DistributedSession(
     }
 
     case _ =>
-      Failure(GenericDriverException(
+      Failure(new GenericDriverException(
         "Cannot start a distributed transaction without a pinned node"))
   }
 

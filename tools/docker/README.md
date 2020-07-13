@@ -10,7 +10,7 @@ Environment variables can be set before `docker-compose run`:
 
     export MONGO_PROFILE=invalid-ssl
 
-> See matrix in the [CI configuration](../../.travis.yml)
+> See matrix in the [CI configuration](../../.circleci/config.yml)
 
 It's also possible to obtain an interactive shell from the test container.
 
@@ -21,6 +21,10 @@ In the interactive shell, you can execute `./.ci_scripts/runIntegration.sh inter
 To check the MongoDB logs:
 
     docker logs -f reactivemongo_db_...
+
+To only run the MongoDB with a test profile (e.g. `rs`):
+
+     MONGO_PROFILE=rs docker-compose -f docker-compose.yml up
 
 Cleanup:
 

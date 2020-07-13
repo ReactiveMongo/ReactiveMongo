@@ -4,38 +4,26 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.commands.{
   AuthenticationRestriction,
+  CreateUserCommand,
+  CommandCodecs,
   RenameCollection
 }
 
 import reactivemongo.api.indexes.IndexesManager
-import reactivemongo.bson.{ BSONDocument => LegacyDoc, BSONDocumentWriter }
 
 import reactivemongo.api.gridfs.GridFS
 
+import Serialization.{ Pack, internalSerializationPack, unitReader }
+
 /** A mixin that provides commands about this database itself. */
-@deprecated("Internal: will be made private", "0.19.8")
-trait DBMetaCommands { self: DB =>
-  import reactivemongo.core.protocol.MongoWireVersion
+private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
   import reactivemongo.api.commands.{
     Command,
-    CreateUserCommand,
     DropDatabase,
     ListCollectionNames,
     PingCommand,
-    ServerStatus,
-    ServerStatusResult,
-    UserRole,
-    WriteConcern => WC
+    UserRole
   }
-  import reactivemongo.api.commands.bson.{
-    CommonImplicits,
-    BSONCreateUserCommand,
-    BSONPingCommandImplicits
-  }
-  import CommonImplicits._
-  import BSONPingCommandImplicits._
-  import Serialization.{ Pack, internalSerializationPack, unitBoxReader }
-
   private implicit lazy val dropWriter =
     DropDatabase.writer(internalSerializationPack)
 
@@ -44,40 +32,34 @@ trait DBMetaCommands { self: DB =>
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    *
-   * def dropDB(db: DefaultDB)(
+   * def dropDB(db: DB)(
    *   implicit ec: ExecutionContext): Future[Unit] = db.drop()
    * }}}
    */
-  def drop()(implicit ec: ExecutionContext): Future[Unit] =
+  final def drop()(implicit ec: ExecutionContext): Future[Unit] =
     Command.run(internalSerializationPack, failoverStrategy).
-      unboxed(self, DropDatabase, ReadPreference.primary)
+      apply(self, DropDatabase, ReadPreference.primary)
 
   /**
    * The GridFS with the default serialization and collection prefix.
    *
    * {{{
-   * import scala.concurrent.ExecutionContext
+   * import reactivemongo.api.DB
+   * import reactivemongo.api.bson.BSONDocument
    *
-   * import scala.reflect.ClassTag
-   *
-   * import reactivemongo.api.DefaultDB
-   * import reactivemongo.api.bson.{ BSONDocument, BSONValue }
-   *
-   * def findFile(db: DefaultDB, query: BSONDocument)(
-   *   implicit ec: ExecutionContext, it: ClassTag[BSONValue]) =
-   *   db.gridfs.find(query)
+   * def findFile(db: DB, query: BSONDocument) = db.gridfs.find(query)
    * }}}
    */
-  @inline def gridfs: GridFS[Serialization.Pack] = gridfs("fs")
+  @inline final def gridfs: GridFS[Serialization.Pack] = gridfs("fs")
 
   /**
    * The GridFS with the default serialization.
    *
    * @param prefix the collection prefix
    */
-  @inline def gridfs(prefix: String): GridFS[Serialization.Pack] =
+  @inline final def gridfs(prefix: String): GridFS[Serialization.Pack] =
     gridfs[Serialization.Pack](
       Serialization.internalSerializationPack, prefix)
 
@@ -88,9 +70,8 @@ trait DBMetaCommands { self: DB =>
    * @param pack the serialization pack
    * @param prefix the collection prefix
    */
-  def gridfs[P <: SerializationPack with Singleton](
-    pack: P, prefix: String): GridFS[P] =
-    GridFS[P](pack, this, prefix)
+  final def gridfs[P <: SerializationPack](
+    pack: P, prefix: String): GridFS[P] = GridFS[P](pack, this, prefix)
 
   /**
    * Returns an index manager for this database.
@@ -98,31 +79,19 @@ trait DBMetaCommands { self: DB =>
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    * import reactivemongo.api.indexes.NSIndex
    *
-   * def listIndexes(db: DefaultDB)(
+   * def listIndexes(db: DB)(
    *   implicit ec: ExecutionContext): Future[List[String]] =
    *   db.indexesManager.list().map(_.flatMap { ni: NSIndex =>
    *     ni.index.name.toList
    *   })
    * }}}
    */
-  def indexesManager(implicit ec: ExecutionContext) = IndexesManager(self)
+  final def indexesManager(implicit ec: ExecutionContext) = IndexesManager(self)
 
-  private[api] def indexesManager[P <: SerializationPack with Singleton](pack: P)(implicit ec: ExecutionContext): IndexesManager.Aux[P] = IndexesManager[P](pack, self)
-
-  private lazy val collectionNameReader = {
-    val prefixLength = name.size + 1
-    val dec = internalSerializationPack.newDecoder
-
-    internalSerializationPack.reader { doc =>
-      dec.string(doc, "name").collect {
-        case value => value.substring(prefixLength)
-      }.getOrElse(throw new Exception(
-        "name is expected on system.namespaces query"))
-    }
-  }
+  private[api] def indexesManager[P <: SerializationPack](pack: P)(implicit ec: ExecutionContext): IndexesManager.Aux[P] = IndexesManager[P](pack, self)
 
   private implicit lazy val colNamesWriter =
     ListCollectionNames.writer(internalSerializationPack)
@@ -135,39 +104,15 @@ trait DBMetaCommands { self: DB =>
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    *
-   * def listCollections(db: DefaultDB)(
+   * def listCollections(db: DB)(
    *   implicit ec: ExecutionContext): Future[List[String]] =
    *   db.collectionNames
    * }}}
    */
-  def collectionNames(implicit ec: ExecutionContext): Future[List[String]] = {
-    val wireVer = connectionState.metadata.maxWireVersion
-
-    if (wireVer >= MongoWireVersion.V30) {
-      Command.run(internalSerializationPack, failoverStrategy)(
-        self, ListCollectionNames, ReadPreference.primary).map(_.names)
-
-    } else {
-      // TODO#1.1: Remove (MongoDB 2.6-)
-      implicit def producer = Serialization.defaultCollectionProducer
-
-      val coll = producer(self, "system.namespaces", self.failoverStrategy)
-      import coll.{ pack => p }
-      val builder = p.newBuilder
-
-      val selector = builder.document(Seq(
-        builder.elementProducer("name", builder.regex("^[^\\$]+$", ""))))
-
-      coll.find(
-        // strip off any indexes
-        selector = selector,
-        projection = Option.empty[p.Document]).cursor(defaultReadPreference)(
-        collectionNameReader, CursorProducer.defaultCursorProducer).
-        collect[List](-1, Cursor.FailOnError[List[String]]())
-    }
-  }
+  final def collectionNames(implicit ec: ExecutionContext): Future[List[String]] = Command.run(internalSerializationPack, failoverStrategy)(
+    self, ListCollectionNames, ReadPreference.primary).map(_.names)
 
   private lazy implicit val renameWriter =
     RenameCollection.writer(internalSerializationPack)
@@ -178,10 +123,10 @@ trait DBMetaCommands { self: DB =>
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    *
    * def addCollSuffix(
-   *   admin: DefaultDB,
+   *   admin: DB,
    *   coll: String,
    *   suffix: String)(implicit ec: ExecutionContext): Future[Unit] =
    *   admin.renameCollection("myDB", coll, coll + suffix).map(_ => {})
@@ -194,71 +139,21 @@ trait DBMetaCommands { self: DB =>
    *
    * @return a failure if the dropExisting option is false and the target collection already exists
    */
-  def renameCollection[C <: Collection](db: String, from: String, to: String, dropExisting: Boolean = false, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit ec: ExecutionContext, producer: CollectionProducer[C] = Serialization.defaultCollectionProducer): Future[C] = {
-    Command.run(internalSerializationPack, failoverStrategy).unboxed(
+  final def renameCollection[C <: Collection](
+    db: String,
+    from: String,
+    to: String,
+    dropExisting: Boolean = false,
+    failoverStrategy: FailoverStrategy = failoverStrategy)(
+    implicit
+    ec: ExecutionContext, producer: CollectionProducer[C] = Serialization.defaultCollectionProducer): Future[C] = {
+    Command.run(internalSerializationPack, failoverStrategy).apply(
       self, RenameCollection(s"${db}.$from", s"${db}.$to", dropExisting),
       ReadPreference.primary).map(_ => self.collection(to))
   }
 
-  private implicit lazy val serverStatusWriter =
-    ServerStatus.writer(internalSerializationPack)
-
-  private implicit lazy val serverStatusReader =
-    ServerStatus.reader(internalSerializationPack)
-
-  /** Returns the server status. */
-  @deprecated("Will be removed (not maintained): use `db.runCommand(BSONDocument(\"serverStatus\" -> 1)` with custom reader", "0.19.4")
-  def serverStatus(implicit ec: ExecutionContext): Future[ServerStatusResult] =
-    Command.run(internalSerializationPack, failoverStrategy)(
-      self, ServerStatus, ReadPreference.primary)
-
-  @deprecated("Use `createUser` with complete authentication options", "0.18.4")
-  def createUser(
-    @deprecatedName(Symbol("name")) user: String,
-    pwd: Option[String],
-    roles: List[UserRole],
-    digestPassword: Boolean = true,
-    writeConcern: WC = connection.options.writeConcern,
-    customData: Option[LegacyDoc] = None)(implicit ec: ExecutionContext): Future[Unit] = createUser(user, pwd, customData, roles, digestPassword, writeConcern, List.empty, List.empty)
-
-  private lazy val createUserWriter: BSONDocumentWriter[CreateUserCommand[BSONSerializationPack.type]#CreateUser] = CreateUserCommand.writer(BSONSerializationPack)
-
-  @deprecated("Use `createUser` with `DBMetaWriter`", "0.19.1")
-  def createUser(
-    user: String,
-    pwd: Option[String],
-    customData: Option[LegacyDoc],
-    roles: List[UserRole],
-    digestPassword: Boolean,
-    writeConcern: WC,
-    restrictions: List[AuthenticationRestriction],
-    mechanisms: List[AuthenticationMode])(implicit ec: ExecutionContext): Future[Unit] = {
-    val command: CreateUserCommand[BSONSerializationPack.type]#CreateUser =
-      new BSONCreateUserCommand.CreateUser(
-        name = user,
-        pwd = pwd,
-        customData = customData,
-        roles = roles,
-        digestPassword = digestPassword,
-        writeConcern = Some(writeConcern),
-        authenticationRestrictions = restrictions,
-        mechanisms = mechanisms)
-
-    implicit def writer = createUserWriter
-
-    Command.run(BSONSerializationPack, failoverStrategy)(
-      self, command, ReadPreference.primary).map(_ => {})
-  }
-
-  /** Type of writer to serialization database metadata */
-  type DBMetaWriter[T] = Pack#Writer[T]
-
-  private object InternalCreateUser extends CreateUserCommand[Pack] {
-    val pack: Pack = internalSerializationPack
-
-    implicit val writer =
-      CreateUserCommand.writer[Pack](InternalCreateUser.pack: Pack)
-  }
+  private implicit lazy val createUserWriter = super.createUserWriter(
+    connectionState.metadata.maxWireVersion)
 
   /**
    * [[https://docs.mongodb.com/manual/reference/command/createUser/ Create the user]] with given properties.
@@ -267,19 +162,18 @@ trait DBMetaCommands { self: DB =>
    * import scala.concurrent.{ ExecutionContext, Future }
    *
    * import reactivemongo.api.{
-   *   DefaultDB,
+   *   DB,
    *   ScramSha256Authentication,
    *   ScramSha1Authentication,
    *   WriteConcern
    * }
    * import reactivemongo.api.commands.UserRole
    *
-   * def createReadWriteUser(db: DefaultDB, name: String)(
+   * def createReadWriteUser(db: DB, name: String)(
    *   implicit ec: ExecutionContext): Future[Unit] =
    *   db.createUser(
    *     user = name,
    *     pwd = None, // no initial password
-   *     customData = None, // no custom data
    *     roles = List(UserRole("readWrite")),
    *     digestPassword = true,
    *     writeConcern = WriteConcern.Default,
@@ -298,31 +192,39 @@ trait DBMetaCommands { self: DB =>
    * @param restrictions the authentication restriction
    * @param mechanisms the authentication mechanisms (e.g. [[ScramSha1Authentication]])
    */
-  def createUser[T](
+  final def createUser[T](
     user: String,
     pwd: Option[String],
-    customData: Option[T],
-    roles: List[UserRole],
-    digestPassword: Boolean,
-    writeConcern: WC,
-    restrictions: List[AuthenticationRestriction],
-    mechanisms: List[AuthenticationMode])(implicit ec: ExecutionContext, w: DBMetaWriter[T]): Future[Unit] = {
-    val command: CreateUserCommand[Pack]#CreateUser =
-      new InternalCreateUser.CreateUser(
-        name = user,
-        pwd = pwd,
-        customData = customData.flatMap(w.writeOpt),
-        roles = roles,
-        digestPassword = digestPassword,
-        writeConcern = Some(writeConcern),
-        authenticationRestrictions = restrictions,
-        mechanisms = mechanisms)
+    customData: Option[T] = Option.empty[Pack#Document],
+    roles: List[UserRole] = List.empty,
+    digestPassword: Boolean = true,
+    writeConcern: WriteConcern = connection.options.writeConcern,
+    restrictions: List[AuthenticationRestriction] = List.empty,
+    mechanisms: List[AuthenticationMode] = List.empty)(implicit ec: ExecutionContext, w: pack.Writer[T]): Future[Unit] = {
+    val command: CreateUser = new CreateUser(
+      name = user,
+      pwd = pwd,
+      customData = customData.flatMap(w.writeOpt),
+      roles = roles,
+      digestPassword = digestPassword,
+      writeConcern = Some(writeConcern),
+      authenticationRestrictions = restrictions,
+      mechanisms = mechanisms)
 
-    import InternalCreateUser.writer
-
-    Command.run(InternalCreateUser.pack, failoverStrategy)(
+    Command.run(pack, failoverStrategy)(
       self, command, ReadPreference.primary).map(_ => {})
   }
+
+  private implicit lazy val pingWriter: pack.Writer[PingCommand.type] = {
+    val builder = internalSerializationPack.newBuilder
+    val cmd = builder.document(Seq(builder.elementProducer(
+      "ping", builder.double(1.0D))))
+
+    pack.writer[PingCommand.type] { _ => cmd }
+  }
+
+  private implicit lazy val pingReader: pack.Reader[Boolean] =
+    CommandCodecs.dealingWithGenericCommandExceptionsReader[Pack, Boolean](internalSerializationPack) { _ => true }
 
   /**
    * Tests if the server, resolved according to the given read preference, responds to commands.
@@ -331,17 +233,18 @@ trait DBMetaCommands { self: DB =>
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    *
-   * def pingDB(db: DefaultDB)(
+   * def pingDB(db: DB)(
    *   implicit ec: ExecutionContext): Future[Boolean] =
    *   db.ping() // with default ReadPreference
    * }}}
    *
    * @return true if successful (even if the server is write locked)
    */
-  def ping(readPreference: ReadPreference = ReadPreference.nearest)(implicit ec: ExecutionContext): Future[Boolean] = {
-    Command.run(BSONSerializationPack, failoverStrategy).
+  final def ping(readPreference: ReadPreference = ReadPreference.nearest)(
+    implicit
+    ec: ExecutionContext): Future[Boolean] =
+    Command.run(internalSerializationPack, failoverStrategy).
       apply(self, PingCommand, readPreference)
-  }
 }

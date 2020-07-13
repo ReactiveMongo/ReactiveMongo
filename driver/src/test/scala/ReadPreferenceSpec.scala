@@ -1,11 +1,11 @@
-import reactivemongo.bson.{ BSONArray, BSONDocument }
+import reactivemongo.api.bson.{ BSONArray, BSONDocument }
 import reactivemongo.api.ReadPreference
 
 import org.specs2.specification.core.Fragments
 
 import reactivemongo.api.tests.{ bsonReadPref => bson }
 
-class ReadPreferenceSpec extends org.specs2.mutable.Specification {
+final class ReadPreferenceSpec extends org.specs2.mutable.Specification {
   "Read preference" title
 
   section("unit")
@@ -16,7 +16,7 @@ class ReadPreferenceSpec extends org.specs2.mutable.Specification {
       ReadPreference.nearest -> "nearest")) {
       case (pref, mode) =>
         s"""be encoded as '{ "mode": "$mode" }'""" in {
-          bson(pref) must_== BSONDocument("mode" -> mode)
+          bson(pref) must_=== BSONDocument("mode" -> mode)
         }
     }
 
@@ -37,7 +37,7 @@ class ReadPreferenceSpec extends org.specs2.mutable.Specification {
           val expected = BSONDocument("mode" -> mode, "tags" -> bsonTags)
 
           s"be encoded as '${BSONDocument pretty expected}'" in {
-            bson(pref) must_== expected
+            bson(pref) must_=== expected
           }
       }
     }

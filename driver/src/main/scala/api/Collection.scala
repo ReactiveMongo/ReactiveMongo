@@ -16,16 +16,12 @@
 package reactivemongo.api
 
 /**
- * Basic information resolved for a MongoDB Collection, resolved from a [[reactivemongo.api.DefaultDB]].
+ * Basic information resolved for a MongoDB Collection, resolved from a [[reactivemongo.api.DB]].
  *
  * For collection operations, you should consider the generic API
  * ([[reactivemongo.api.collections.GenericCollection]]).
- *
- * @define failoverStrategyParam the failover strategy to override the default one
  */
 trait Collection {
-  import collections.bson.BSONCollectionProducer
-
   /** The database which this collection belongs to. */
   def db: DB
 
@@ -33,31 +29,12 @@ trait Collection {
   def name: String
 
   /** The default failover strategy for the methods of this collection. */
-  @deprecated("Internal: will be made private", "0.16.0")
-  def failoverStrategy: FailoverStrategy
+  private[reactivemongo] def failoverStrategy: FailoverStrategy
 
   /** Gets the full qualified name of this collection. */
-  @deprecated("Internal: will be made private", "0.17.0")
-  @inline final def fullCollectionName = db.name + "." + name
+  @inline final private[reactivemongo] def fullCollectionName =
+    db.name + "." + name
 
-  /**
-   * Gets another implementation of this collection.
-   * An implicit CollectionProducer[C] must be present in the scope, or it will be the default implementation ([[reactivemongo.api.collections.bson.BSONCollection]]).
-   *
-   * @param failoverStrategy $failoverStrategyParam
-   */
-  @deprecated("Resolve the collection from DB", "0.13.0")
-  def as[C <: Collection](failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = BSONCollectionProducer): C = producer.apply(db, name, failoverStrategy)
-
-  /**
-   * Gets another collection in the current database.
-   * An implicit CollectionProducer[C] must be present in the scope, or it will be the default implementation ([[reactivemongo.api.collections.bson.BSONCollection]]).
-   *
-   * @param name the name of another collection
-   * @param failoverStrategy $failoverStrategyParam
-   */
-  @deprecated("Use `DB.collection(name)`", "0.19.4")
-  def sibling[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = BSONCollectionProducer): C = producer.apply(db, name, failoverStrategy)
 }
 
 /**

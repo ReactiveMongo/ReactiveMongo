@@ -13,7 +13,7 @@ import reactivemongo.api.commands.{
   ResolvedCollectionCommand
 }
 
-private[api] trait CountOp[P <: SerializationPack with Singleton] {
+private[api] trait CountOp[P <: SerializationPack] {
   collection: GenericCollection[P] =>
 
   implicit private lazy val countWriter: pack.Writer[CountCmd] = commandWriter
@@ -23,7 +23,7 @@ private[api] trait CountOp[P <: SerializationPack with Singleton] {
     query: Option[pack.Document],
     limit: Option[Int],
     skip: Int,
-    hint: Option[Hint[pack.type]],
+    hint: Option[Hint],
     readConcern: ReadConcern,
     readPreference: ReadPreference)(
     implicit
@@ -35,16 +35,15 @@ private[api] trait CountOp[P <: SerializationPack with Singleton] {
     val query: Option[pack.Document],
     val limit: Option[Int],
     val skip: Int,
-    val hint: Option[Hint[pack.type]],
+    val hint: Option[Hint],
     val readConcern: ReadConcern)
     extends CollectionCommand with CommandWithResult[Long]
 
   private type CountCmd = ResolvedCollectionCommand[CountCommand]
 
-  // TODO: Unit test
   private def commandWriter: pack.Writer[CountCmd] = {
     val builder = pack.newBuilder
-    val session = collection.db.session.filter( // TODO#1.1: Remove
+    val session = collection.db.session.filter(
       _ => (version.compareTo(MongoWireVersion.V36) >= 0))
 
     val writeReadConcern =
@@ -90,8 +89,8 @@ private[api] trait CountOp[P <: SerializationPack with Singleton] {
   private def resultReader: pack.Reader[Long] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandErrorsReader(pack) {
-      decoder.long(_, "n").get
+    CommandCodecs.dealingWithGenericCommandExceptionsReaderOpt(pack) {
+      decoder.long(_, "n")
     }
   }
 }

@@ -1,86 +1,74 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{
+  Collation,
+  PackSupport,
+  SerializationPack,
+  Session,
+  WriteConcern
+}
 
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/delete/ delete]] command.
  */
-@deprecated("Use the new `delete` operation", "0.16.0")
-trait DeleteCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
-  case class Delete(
-    deletes: Seq[DeleteElement],
-    ordered: Boolean,
-    writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[DeleteResult]
-    with Mongo26WriteCommand
+private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackSupport[P] =>
 
-  object Delete {
-    def apply(firstDelete: DeleteElement, deletes: DeleteElement*): Delete =
-      apply()(firstDelete, deletes: _*)
+  private[api] final class Delete(
+    val deletes: Seq[DeleteElement],
+    val ordered: Boolean,
+    val writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[DeleteResult]
 
-    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.Default)(firstDelete: DeleteElement, deletes: DeleteElement*): Delete =
-      Delete(firstDelete +: deletes, ordered, writeConcern)
+  /**
+   * @param q the query that matches documents to delete
+   * @param limit the number of matching documents to delete
+   * @param collation the collation to use for the operation
+   */
+  final class DeleteElement private[api] (
+    val q: pack.Document,
+    val limit: Int,
+    val collation: Option[Collation]) {
   }
 
-  sealed trait DeleteElement
-    extends Product2[pack.Document, Int] with Serializable {
+  final type DeleteResult = DefaultWriteResult
 
-    /** The query that matches documents to delete. */
-    def q: pack.Document
+  protected final type DeleteCmd = ResolvedCollectionCommand[Delete]
 
-    /** The number of matching documents to delete. */
-    def limit: Int
+  private[reactivemongo] def session(): Option[Session]
 
-    /** The collation to use for the operation. */
-    def collation: Option[Collation]
+  protected final implicit lazy val deleteWriter: pack.Writer[DeleteCmd] =
+    deleteWriter(self.session)
 
-    final def _1 = q
-    final def _2 = limit
-
-    def canEqual(that: Any): Boolean = that match {
-      case _: DeleteElement => true
-      case _                => false
-    }
-  }
-
-  object DeleteElement {
-    private final class Impl(
-      val q: pack.Document,
-      val limit: Int,
-      val collation: Option[Collation]) extends DeleteElement
-
-    def apply(
-      q: pack.Document,
-      limit: Int,
-      collation: Option[Collation]): DeleteElement =
-      new Impl(q, limit, collation)
-  }
-
-  type DeleteResult = DefaultWriteResult
-
-  // TODO: Remove
-  def serialize(delete: ResolvedCollectionCommand[Delete]): pack.Document = {
+  protected final def deleteWriter(
+    session: Option[Session]): pack.Writer[DeleteCmd] = {
     val builder = pack.newBuilder
+
     import builder.{ elementProducer => element }
 
-    val elements = Seq.newBuilder[pack.ElementProducer]
-
     val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
+    val writeSession = CommandCodecs.writeSession(builder)
 
-    elements ++= Seq(
-      element("delete", builder.string(delete.collection)),
-      element("ordered", builder.boolean(delete.command.ordered)),
-      element("writeConcern", writeWriteConcern(delete.command.writeConcern)))
+    pack.writer[DeleteCmd] { delete =>
+      val elements = Seq.newBuilder[pack.ElementProducer]
 
-    delete.command.deletes.headOption.foreach { first =>
-      elements += element("deletes", builder.array(
-        writeElement(builder, first),
-        delete.command.deletes.map(writeElement(builder, _))))
+      elements ++= Seq(
+        element("delete", builder.string(delete.collection)),
+        element("ordered", builder.boolean(delete.command.ordered)),
+        element("writeConcern", writeWriteConcern(delete.command.writeConcern)))
+
+      session.foreach { s =>
+        elements ++= writeSession(s)
+      }
+
+      delete.command.deletes.headOption.foreach { first =>
+        elements += element("deletes", builder.array(
+          writeElement(builder, first) +:
+            delete.command.deletes.map(writeElement(builder, _))))
+      }
+
+      builder.document(elements.result())
     }
-
-    builder.document(elements.result())
   }
 
-  // TODO: Remove
   private[api] def writeElement(
     builder: SerializationPack.Builder[pack.type],
     e: DeleteElement): pack.Document = {

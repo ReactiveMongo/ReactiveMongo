@@ -10,9 +10,9 @@ import reactivemongo.core.nodeset.{
   Node,
   NodeSet,
   NodeStatus,
-  PingInfo,
-  ProtocolMetadata
+  PingInfo
 }
+import reactivemongo.core.protocol.ProtocolMetadata
 
 import reactivemongo.core.actors.StandardDBSystem
 
@@ -71,7 +71,7 @@ trait ConnectAllTest { _: NodeSetSpec =>
         chanConnected: Boolean,
         status: ConnectionStatus): Future[Node] = {
         NettyEmbedder.simpleChannel(chanId, chanConnected).map { chan =>
-          val con = Connection(
+          val con = new Connection(
             chan, status,
             authenticated = Set.empty,
             authenticating = None,
@@ -83,7 +83,7 @@ trait ConnectAllTest { _: NodeSetSpec =>
             NodeStatus.Unknown,
             Vector(con),
             Set.empty,
-            _tags = Map.empty[String, String],
+            tags = Map.empty[String, String],
             ProtocolMetadata.Default,
             PingInfo(),
             false)

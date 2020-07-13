@@ -33,6 +33,7 @@ private[reactivemongo] object SystemControl {
     def terminate(): Future[Any]
   }
 
+  @SuppressWarnings(Array("AsInstanceOf"))
   def apply(underlying: ActorSystem): Try[SystemControl] =
     Try {
       val legacy = underlying.asInstanceOf[Legacy]

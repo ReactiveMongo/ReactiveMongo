@@ -10,6 +10,8 @@ import akka.actor.ActorRef
 
 import reactivemongo.io.netty.channel.ChannelId
 
+import reactivemongo.core.protocol.ProtocolMetadata
+
 import reactivemongo.core.netty.ChannelFactory
 
 import reactivemongo.api.ReadPreference
@@ -18,13 +20,11 @@ import reactivemongo.api.ReadPreference
  * @param name the replicaSet name
  * @param version the replicaSet version
  */
-@SerialVersionUID(527078726L)
-@deprecated("Internal: will be made private", "0.20.3")
-class NodeSet private[reactivemongo] (
+private[reactivemongo] class NodeSet(
   val name: Option[String],
   val version: Option[Long],
   val nodes: Vector[Node],
-  @transient val authenticates: Set[Authenticate]) extends Product4[Option[String], Option[Long], Vector[Node], Set[Authenticate]] with Serializable {
+  @transient val authenticates: Set[Authenticate]) {
 
   /** The node which is the current primary one. */
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
@@ -52,9 +52,9 @@ class NodeSet private[reactivemongo] (
       fold(ProtocolMetadata.Default)(_.protocolMetadata)
 
   def primary(authenticated: Authenticated): Option[Node] =
-    primary.filter(_.authenticated.exists(_ == authenticated))
+    primary.filter(_.authenticated.contains(authenticated))
 
-  def isReachable = !primary.isEmpty || !_secondaries.isEmpty
+  def isReachable = primary.nonEmpty || _secondaries.nonEmpty
 
   def updateOrAddNode(f: PartialFunction[Node, Node], default: Node): NodeSet = {
     val (maybeUpdatedNodes, updated) = utils.update(nodes)(f)
@@ -62,8 +62,8 @@ class NodeSet private[reactivemongo] (
     else copy(nodes = maybeUpdatedNodes)
   }
 
-  def updateOrAddNodes(f: PartialFunction[Node, Node], nodes: Seq[Node]) =
-    nodes.foldLeft(this)(_.updateOrAddNode(f, _))
+  def updateOrAddNodes(f: PartialFunction[Node, Node], ns: Seq[Node]) =
+    ns.foldLeft(this)(_.updateOrAddNode(f, _))
 
   def updateAll(f: Node => Node): NodeSet = copy(nodes = nodes.map(f))
 
@@ -80,13 +80,6 @@ class NodeSet private[reactivemongo] (
       case (node, Some(con)) if (
         con.status == ConnectionStatus.Connected) => node -> con
     }
-
-  // TODO#1.1: Remove when deprecated `pick` is also removed
-  private val nodeDummyOrdering = Ordering.by[Node, String](_.name)
-
-  @deprecated("", "")
-  def pick(preference: ReadPreference): Option[(Node, Connection)] =
-    pick(preference, 1, _ => true)(nodeDummyOrdering)
 
   // http://docs.mongodb.org/manual/reference/read-preference/
   private[reactivemongo] def pick(
@@ -128,7 +121,7 @@ class NodeSet private[reactivemongo] (
     val p: RoundRobiner[Connection, Vector] => Option[Connection] =
       if (authenticates.isEmpty) _.pickWithFilter(accept)
       else _.pickWithFilter(c =>
-        !c.authenticating.isDefined && !c.authenticated.isEmpty && accept(c))
+        !c.authenticating.isDefined && c.authenticated.nonEmpty && accept(c))
 
     _.flatMap(node => p(node.authenticatedConnections).map(node -> _))
   }
@@ -141,8 +134,8 @@ class NodeSet private[reactivemongo] (
     filter match {
       case Some(f) => {
         val nodeFilter = { n: Node =>
-          if (n._tags.isEmpty) false
-          else f(n._tags)
+          if (n.tags.isEmpty) false
+          else f(n.tags)
         }
 
         if (unpriorised > 1) {
@@ -173,7 +166,7 @@ class NodeSet private[reactivemongo] (
               Failure(cause)
 
             case Success(updated) =>
-              update(ns.tail, updated +: upd)
+              update(ns.drop(1), updated +: upd)
           }
 
         case _ =>
@@ -190,30 +183,15 @@ class NodeSet private[reactivemongo] (
   def info: NodeSetInfo = {
     val ns = nodes.map(_.info)
 
-    NodeSetInfo(name, version, ns, primary.map(_.info),
+    new NodeSetInfo(name, version, ns, primary.map(_.info),
       mongos.map(_.info), ns.filter(_.status == NodeStatus.Secondary),
-      nearest.map(_.info))
+      nearest.map(_.info),
+      awaitingRequests = None,
+      maxAwaitingRequestsPerChannel = None)
+
   }
 
-  @deprecated("No longer case class", "0.20.3")
-  @inline def _1 = name
-
-  @deprecated("No longer case class", "0.20.3")
-  @inline def _2 = version
-
-  @deprecated("No longer case class", "0.20.3")
-  @inline def _3 = nodes
-
-  @deprecated("No longer case class", "0.20.3")
-  @inline def _4 = authenticates
-
-  @deprecated("No longer case class", "0.20.3")
-  def canEqual(that: Any): Boolean = that match {
-    case _: NodeSet => true
-    case _          => false
-  }
-
-  @deprecated("No longer case class", "0.20.3")
+  @SuppressWarnings(Array("VariableShadowing"))
   def copy(
     name: Option[String] = this.name,
     version: Option[Long] = this.version,
@@ -234,17 +212,4 @@ class NodeSet private[reactivemongo] (
   override def hashCode: Int = tupled.hashCode
 
   override def toString = s"NodeSet${tupled.toString}"
-}
-
-@deprecated("Internal: will be made private", "0.20.3")
-object NodeSet extends scala.runtime.AbstractFunction4[Option[String], Option[Long], Vector[Node], Set[Authenticate], NodeSet] {
-
-  def apply(
-    name: Option[String],
-    version: Option[Long],
-    nodes: Vector[Node],
-    authenticates: Set[Authenticate]): NodeSet =
-    new NodeSet(name, version, nodes, authenticates)
-
-  def unapply(nodeSet: NodeSet): Option[Tuple4[Option[String], Option[Long], Vector[Node], Set[Authenticate]]] = Option(nodeSet).map(_.tupled)
 }

@@ -22,9 +22,6 @@ trait CursorOps[T] { cursor: Cursor[T] =>
    */
   private[reactivemongo] def documentIterator(response: Response): Iterator[T]
 
-  @deprecated("Use `killCursor`", "0.16.0")
-  def kill(cursorID: Long): Unit
-
   /**
    * Kills the server resources associated with the specified cursor.
    *
@@ -47,7 +44,7 @@ object CursorOps {
    * Wraps exception that has already been passed to the current error handler
    * and should not be recovered.
    */
-  private[reactivemongo] case class Unrecoverable(cause: Throwable)
+  private[reactivemongo] case class UnrecoverableException(cause: Throwable)
     extends scala.RuntimeException(cause)
     with scala.util.control.NoStackTrace
 

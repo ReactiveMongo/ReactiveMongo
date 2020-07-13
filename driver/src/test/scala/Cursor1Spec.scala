@@ -39,50 +39,77 @@ trait Cursor1Spec { spec: CursorSpec =>
     }
 
     "request for cursor query" in {
-      import reactivemongo.core.protocol.{ Response, Reply }
-      import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
+      import reactivemongo.api.tests.{
+        makeRequest => req,
+        nextResponse,
+        Response
+      }
 
       def cursor(batchSize: Int = 0) =
         coll.find(matchAll("makeReq1")).batchSize(batchSize).cursor()
 
       req(cursor(nDocs + 1), nDocs + 1) must beLike[Response] {
-        case Response(_, Reply(_, id, from, ret), _, _) =>
-          id aka "cursor ID #1" must_== 0 and {
-            from must_== 0 and (ret aka "returned" must_== nDocs)
+        case resp =>
+          val r = resp.reply
+
+          r.cursorID aka "cursor ID #1" must_=== 0 and {
+            r.startingFrom must_=== 0
+          } and {
+            r.numberReturned aka "returned" must_=== nDocs
           }
       }.await(1, timeout) and {
         req(cursor(nDocs), 1) must beLike[Response] {
-          case Response(_, Reply(_, id, from, ret), _, _) =>
-            id aka "cursor ID #2" must_== 0 and {
-              from must_== 0 and (ret must_== 1)
+          case resp =>
+            val r = resp.reply
+
+            r.cursorID aka "cursor ID #2" must_=== 0 and {
+              r.startingFrom must_=== 0
+            } and {
+              r.numberReturned must_=== 1
             }
         }.await(1, timeout)
       } and {
         req(cursor(128), Int.MaxValue) must beLike[Response] {
-          case Response(_, Reply(_, id, from, ret), _, _) =>
-            id aka "cursor ID #3" must not(beEqualTo(0)) and {
-              from must_== 0 and (ret must_== 128)
+          case resp =>
+            val r = resp.reply
+
+            r.cursorID aka "cursor ID #3" must not(beEqualTo(0)) and {
+              r.startingFrom must_=== 0
+            } and {
+              r.numberReturned must_=== 128
             }
         }.await(1, timeout)
       } and {
         req(cursor(), 10) must beLike[Response] {
-          case Response(_, Reply(_, id, from, ret), _, _) =>
-            id aka "cursor ID #4" must_== 0 and {
-              from must_== 0 and (ret must_== 10)
+          case resp =>
+            val r = resp.reply
+
+            r.cursorID aka "cursor ID #4" must_=== 0 and {
+              r.startingFrom must_=== 0
+            } and {
+              r.numberReturned must_=== 10
             }
         }.await(1, timeout)
       } and {
         req(cursor(), 101) must beLike[Response] {
-          case Response(_, Reply(_, id, from, ret), _, _) =>
-            id aka "cursor ID #5" must_== 0 and {
-              from must_== 0 and (ret must_== 101 /* default batch size */ )
+          case resp =>
+            val r = resp.reply
+
+            r.cursorID aka "cursor ID #5" must_== 0 and {
+              r.startingFrom must_=== 0
+            } and {
+              r.numberReturned must_=== 101 /* default batch size */
             }
         }.await(1, timeout)
       } and {
         req(cursor(), Int.MaxValue /* unlimited */ ) must beLike[Response] {
-          case Response(_, Reply(_, id, from, ret), _, _) =>
-            id aka "cursor ID #6" must not(beEqualTo(0)) and {
-              from must_== 0 and (ret must_== 101 /* default batch size */ )
+          case resp =>
+            val r = resp.reply
+
+            r.cursorID aka "cursor ID #6" must not(beEqualTo(0)) and {
+              r.startingFrom must_=== 0
+            } and {
+              r.numberReturned must_=== 101 /* default batch size */
             }
         }.await(1, timeout)
       } and {
@@ -92,20 +119,24 @@ trait Cursor1Spec { spec: CursorSpec =>
         @volatile var r1: Response = null // Workaround to avoid nesting .await
 
         req(cur, max) must beLike[Response] {
-          case r @ Response(_, Reply(_, id1, from1, ret1), _, _) =>
-            id1 aka "cursor ID #7a" must not(beEqualTo(0)) and {
-              from1 must_== 0 and (ret1 must_== batchSize)
+          case r =>
+            val rp1 = r.reply
+            r1 = r
+
+            rp1.cursorID aka "cursor ID #7a" must not(beEqualTo(0)) and {
+              rp1.startingFrom must_=== 0
             } and {
-              r1 = r
-              r1 aka "r1" must not(beNull)
+              rp1.numberReturned must_=== batchSize
             }
         }.await(1, timeout) and {
           nextResponse(cur, max)(ee.ec, r1) must beSome[Response].like {
-            case r2 @ Response(_, Reply(_, id2, from2, ret2), _, _) =>
-              id2 aka "cursor ID #7b" must_== 0 and {
-                from2 aka "from #7b" must_== 128
+            case r2 =>
+              val rp2 = r2.reply
+
+              rp2.cursorID aka "cursor ID #7b" must_=== 0 and {
+                rp2.startingFrom aka "from #7b" must_=== 128
               } and {
-                ret2 must_== (batchSize - 1)
+                rp2.numberReturned must_=== (batchSize - 1)
               } and {
                 nextResponse(cur, 1)(ee.ec, r2) must beNone.await(1, timeout)
               }
@@ -115,7 +146,7 @@ trait Cursor1Spec { spec: CursorSpec =>
     }
 
     { // headOption
-      def headOptionSpec(c: BSONCollection, timeout: FiniteDuration) = {
+      def headOptionSpec(c: => BSONCollection, timeout: FiniteDuration) = {
         "find first document when matching" in {
           c.find(matchAll("headOption1")).cursor().
             headOption must beSome[BSONDocument].await(1, timeout)
@@ -177,7 +208,7 @@ trait Cursor1Spec { spec: CursorSpec =>
             }
         }.await(1, timeout)
       }
-    } tag "not_mongo26"
+    }
 
     // head
     "find first document when matching" in {
@@ -192,7 +223,7 @@ trait Cursor1Spec { spec: CursorSpec =>
         timeout) must throwA[Cursor.NoSuchResultException.type]
     }
 
-    "read one option document with success" in {
+    "read one optional document with success" in {
       coll.find(matchAll("one1")).one[BSONDocument].
         aka("findOne") must beSome[BSONDocument].await(0, timeout)
     }
@@ -213,152 +244,109 @@ trait Cursor1Spec { spec: CursorSpec =>
 
     }
 
-    def foldSpec1(c: BSONCollection, timeout: FiniteDuration) = {
-      "get 10 first docs" in {
-        c.find(matchAll("cursorspec1")).cursor().
-          collect[List](10, Cursor.FailOnError[List[BSONDocument]]()).
-          map(_.size) aka "result size" must beEqualTo(10).await(1, timeout)
-      }
+    { // Fold
+      def foldSpec1(c: => BSONCollection, timeout: FiniteDuration) = {
+        "get 10 first docs" in {
+          c.find(matchAll("cursorspec1")).cursor().
+            collect[List](10, Cursor.FailOnError[List[BSONDocument]]()).
+            map(_.size) must beTypedEqualTo(10).await(1, timeout)
+        }
 
-      { // .fold
-        "fold all the documents" in {
-          c.find(matchAll("cursorspec2a")).batchSize(2096).cursor().fold(0)(
-            { (st, _) => debug(s"fold: $st"); st + 1 }).
-            aka("result size") must beEqualTo(16517).await(1, timeout) and {
-              c.find(matchAll("cursorspec2b")).
-                batchSize(2096).cursor().fold(0, -1)(
-                  { (st, _) => st + 1 }) aka "result size" must beEqualTo(16517).await(1, timeout)
+        { // .fold
+          "fold all the documents" in eventually(2, timeout / 2L) {
+            c.find(matchAll("cursorspec2a")).batchSize(2096).cursor().fold(0)(
+              { (st, _) => debug(s"fold: $st"); st + 1 }).
+              aka("result size") must beTypedEqualTo(16517).
+              await(1, timeout) and {
+                c.find(matchAll("cursorspec2b")).
+                  batchSize(2096).cursor().fold(0, -1)(
+                    { (st, _) => st + 1 }) must beTypedEqualTo(16517).
+                    await(0, timeout * 2L)
+              }
+          }
+
+          "fold only 1024 documents" in eventually(2, timeout / 2L) {
+            c.find(matchAll("cursorspec3")).batchSize(256).
+              cursor().fold(0, 1024)((st, _) => st + 1).
+              aka("result size") must beTypedEqualTo(1024).
+              await(0, timeout)
+          }
+        }
+
+        { // .foldWhile
+          "fold while all the documents" in {
+            c.find(matchAll("cursorspec4a")).
+              batchSize(2096).cursor().foldWhile(0)(
+                { (st, _) => debug(s"foldWhile: $st"); Cursor.Cont(st + 1) }).
+                aka("result size") must beTypedEqualTo(16517).
+                await(1, timeout + (timeout / 2L))
+          }
+
+          "fold while only 1024 documents" in {
+            c.find(matchAll("cursorspec5a")).batchSize(256).
+              cursor().foldWhile(0, 1024)(
+                (st, _) => Cursor.Cont(st + 1)).
+                aka("result size") must beTypedEqualTo(1024).await(1, timeout)
+          }
+
+          "fold while successfully with async function" >> {
+            "all the documents" in {
+              coll.find(matchAll("cursorspec4b")).
+                batchSize(2096).cursor().foldWhileM(0)(
+                  (st, _) => Future.successful(Cursor.Cont(st + 1))).
+                  aka("result size") must beTypedEqualTo(16517).await(1, timeout)
             }
-        }
 
-        "fold only 1024 documents" in {
-          c.find(matchAll("cursorspec3")).batchSize(256).cursor().
-            fold(0, 1024)((st, _) => st + 1).
-            aka("result size") must beEqualTo(1024).await(1, timeout)
-        }
-      }
-
-      { // .foldWhile
-        "fold while all the documents" in {
-          c.find(matchAll("cursorspec4a")).
-            batchSize(2096).cursor().foldWhile(0)(
-              { (st, _) => debug(s"foldWhile: $st"); Cursor.Cont(st + 1) }).
-              aka("result size") must beEqualTo(16517).await(1, timeout)
-        }
-
-        "fold while only 1024 documents" in {
-          c.find(matchAll("cursorspec5a")).batchSize(256).
-            cursor().foldWhile(0, 1024)(
-              (st, _) => Cursor.Cont(st + 1)).
-              aka("result size") must beEqualTo(1024).await(1, timeout)
-        }
-
-        "fold while successfully with async function" >> {
-          "all the documents" in {
-            coll.find(matchAll("cursorspec4b")).
-              batchSize(2096).cursor().foldWhileM(0)(
-                (st, _) => Future.successful(Cursor.Cont(st + 1))).
-                aka("result size") must beEqualTo(16517).await(1, timeout)
-          }
-
-          "only 1024 documents" in {
-            coll.find(matchAll("cursorspec5b")).
-              batchSize(256).cursor().foldWhileM(0, 1024)(
-                (st, _) => Future.successful(Cursor.Cont(st + 1))).
-                aka("result size") must beEqualTo(1024).await(1, timeout)
+            "only 1024 documents" in {
+              coll.find(matchAll("cursorspec5b")).
+                batchSize(256).cursor().foldWhileM(0, 1024)(
+                  (st, _) => Future.successful(Cursor.Cont(st + 1))).
+                  aka("result size") must beTypedEqualTo(1024).await(1, timeout)
+            }
           }
         }
-      }
 
-      { // .foldBulk
-        "fold the bulks for all the documents" in {
-          c.find(matchAll("cursorspec6a")).
-            batchSize(2096).cursor().foldBulks(0)({ (st, bulk) =>
-              debug(s"foldBulk: $st")
-              Cursor.Cont(st + bulk.size)
-            }) aka "result size" must beEqualTo(16517).await(1, timeout)
-        }
-
-        "fold the bulks for 1024 documents" in {
-          c.find(matchAll("cursorspec7a")).
-            batchSize(256).cursor().foldBulks(0, 1024)(
-              (st, bulk) => Cursor.Cont(st + bulk.size)).
-              aka("result size") must beEqualTo(1024).await(1, timeout)
-        }
-
-        "fold the bulks with async function" >> {
-          "for all the documents" in {
-            coll.find(matchAll("cursorspec6b")).
-              batchSize(2096).cursor().foldBulksM(0)(
-                (st, bulk) => Future.successful(Cursor.Cont(st + bulk.size))).
-                aka("result size") must beEqualTo(16517).await(1, timeout)
+        { // .foldBulk
+          "fold the bulks for all the documents" in {
+            c.find(matchAll("cursorspec6a")).
+              batchSize(2096).cursor().foldBulks(0)({ (st, bulk) =>
+                debug(s"foldBulk: $st")
+                Cursor.Cont(st + bulk.size)
+              }) aka "result size" must beTypedEqualTo(16517).await(1, timeout)
           }
 
-          "for 1024 documents" in {
-            coll.find(matchAll("cursorspec7b")).
-              batchSize(256).cursor().foldBulksM(0, 1024)(
-                (st, bulk) => Future.successful(Cursor.Cont(st + bulk.size))).
-                aka("result size") must beEqualTo(1024).await(1, timeout)
+          "fold the bulks for 1024 documents" in {
+            c.find(matchAll("cursorspec7a")).
+              batchSize(256).cursor().foldBulks(0, 1024)(
+                (st, bulk) => Cursor.Cont(st + bulk.size)).
+                aka("result size") must beTypedEqualTo(1024).await(1, timeout)
+          }
+
+          "fold the bulks with async function" >> {
+            "for all the documents" in {
+              coll.find(matchAll("cursorspec6b")).
+                batchSize(2096).cursor().foldBulksM(0)(
+                  (st, bulk) => Future.successful(Cursor.Cont(st + bulk.size))).
+                  aka("result size") must beTypedEqualTo(16517).
+                  await(1, timeout)
+            }
+
+            "for 1024 documents" in {
+              coll.find(matchAll("cursorspec7b")).
+                batchSize(256).cursor().foldBulksM(0, 1024)(
+                  (st, bulk) => Future.successful(Cursor.Cont(st + bulk.size))).
+                  aka("result size") must beTypedEqualTo(1024).await(1, timeout)
+            }
           }
         }
       }
 
-      { // .foldResponse
-        "fold the responses for all the documents" in {
-          c.find(matchAll("cursorspec8a")).
-            batchSize(2096).cursor().foldResponses(0)({ (st, resp) =>
-              debug(s"foldResponses: $st")
-              Cursor.Cont(st + resp.reply.numberReturned)
-            }) aka "result size" must beEqualTo(16517).await(1, timeout)
-        }
-
-        "fold the responses for 1024 documents" in {
-          c.find(matchAll("cursorspec9a")).
-            batchSize(2056).cursor().foldResponses(0, 1024)(
-              (st, resp) => Cursor.Cont(st + resp.reply.numberReturned)).
-              aka("result size") must beEqualTo(1024).await(1, timeout)
-        }
-
-        "fold the responses with async function" >> {
-          "for all the documents" in {
-            coll.find(matchAll("cursorspec8b")).
-              batchSize(2096).cursor().foldResponsesM(0)((st, resp) =>
-                Future.successful(Cursor.Cont(st + resp.reply.numberReturned))).
-              aka("result size") must beEqualTo(16517).await(1, timeout)
-          }
-
-          "for 1024 documents" in {
-            coll.find(matchAll("cursorspec9b")).batchSize(256).cursor().
-              foldResponsesM(0, 1024)(
-                (st, resp) => Future.successful(
-                  Cursor.Cont(st + resp.reply.numberReturned))).
-                aka("result size") must beEqualTo(1024).await(1, timeout)
-          }
-        }
-      }
-    }
-
-    "with the default connection" >> {
-      foldSpec1(coll, timeout)
-    }
-
-    "with the slow connection" >> {
-      foldSpec1(slowColl, slowTimeout * 2L)
-    }
-
-    "fold the responses with async function" >> {
-      "for all the documents" in {
-        coll.find(matchAll("cursorspec8")).
-          batchSize(2096).cursor().foldResponsesM(0)((st, resp) =>
-            Future.successful(Cursor.Cont(st + resp.reply.numberReturned))).
-          aka("result size") must beEqualTo(16517).await(1, timeout)
+      "with the default connection" >> {
+        foldSpec1(coll, timeout)
       }
 
-      "for 1024 documents" in {
-        coll.find(matchAll("cursorspec9")).batchSize(256).cursor().
-          foldResponsesM(0, 1024)((st, resp) =>
-            Future.successful(Cursor.Cont(st + resp.reply.numberReturned))).
-          aka("result size") must beEqualTo(1024).await(1, timeout)
+      "with the slow connection" >> {
+        foldSpec1(slowColl, slowTimeout * 2L)
       }
     }
 
@@ -379,7 +367,7 @@ trait Cursor1Spec { spec: CursorSpec =>
 
       val cursor = coll.find(matchAll("cursorspec10")).cursor[BSONDocument]()
 
-      cursor.foo must_== "Bar" and {
+      cursor.foo must_=== "Bar" and {
         Cursor.flatten(Future.successful(cursor)).foo must_=== "raB"
       } and {
         val extCursor: FooExtCursor[BSONDocument] = new DefaultFooCursor(cursor)

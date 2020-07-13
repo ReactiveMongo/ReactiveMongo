@@ -42,7 +42,7 @@ private[util] final class DefaultSRVResolver(
 
           if (nme.isAbsolute) {
             if (!nme.subdomain(baseName)) {
-              Future.failed[List[SRV]](GenericDriverException(
+              Future.failed[List[SRV]](new GenericDriverException(
                 s"$nme is not subdomain of $baseName"))
 
             } else {
@@ -57,7 +57,7 @@ private[util] final class DefaultSRVResolver(
         }
 
         case Some(rec) => Future.failed[List[SRV]](
-          GenericDriverException(s"Unexpected record: $rec"))
+          new GenericDriverException(s"Unexpected record: $rec"))
 
         case _ => Future.successful(names.reverse)
       }

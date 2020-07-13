@@ -1,8 +1,6 @@
 package reactivemongo.api.gridfs
 
-import reactivemongo.bson.{ BSONDocument, BSONValue }
-
-import reactivemongo.api.{ BSONSerializationPack, SerializationPack }
+import reactivemongo.api.SerializationPack
 
 /**
  * A file read from a GridFS store.
@@ -31,6 +29,7 @@ final class ReadFile[+Id, Metadata] private[api] (
 
   private[api] def tupled = Tuple8((id: Any), contentType, filename, uploadDate, chunkSize, length, md5, metadata)
 
+  @SuppressWarnings(Array("ComparingUnrelatedTypes"))
   override def equals(that: Any): Boolean = that match {
     case other: ReadFile[_, _] =>
       this.tupled == other.tupled
@@ -51,7 +50,7 @@ object ReadFile {
     val builder = pack.newBuilder
     val emptyMetadata = builder.document(Seq.empty[pack.ElementProducer])
 
-    pack.reader[ReadFile[Id, pack.Document]] { doc =>
+    pack.readerOpt[ReadFile[Id, pack.Document]] { doc =>
       (for {
         id <- decoder.value[Id](doc, "_id")
         cz <- decoder.int(doc, "chunkSize")
@@ -63,7 +62,7 @@ object ReadFile {
         m5 = decoder.string(doc, "md5")
         mt = decoder.child(doc, "metadata").getOrElse(emptyMetadata)
       } yield new ReadFile[Id, pack.Document](
-        id, fn, ud, ct, lh, cz, m5, mt)).get
+        id, fn, ud, ct, lh, cz, m5, mt))
 
     }
   }

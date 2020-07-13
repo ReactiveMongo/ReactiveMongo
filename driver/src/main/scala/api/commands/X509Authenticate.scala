@@ -2,12 +2,6 @@ package reactivemongo.api.commands
 
 import reactivemongo.api.SerializationPack
 
-import reactivemongo.core.commands.{
-  FailedAuthentication,
-  AuthenticationResult,
-  SilentSuccessfulAuthentication
-}
-
 private[reactivemongo] case class X509Authenticate(user: Option[String])
   extends Command with CommandWithResult[AuthenticationResult]
 

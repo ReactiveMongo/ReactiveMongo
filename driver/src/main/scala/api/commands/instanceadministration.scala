@@ -1,13 +1,10 @@
 package reactivemongo.api.commands
 
-import scala.util.control.NonFatal
-
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ SerializationPack, WriteConcern }
 
 import reactivemongo.core.errors.GenericDriverException
 
-@deprecated("Internal: will be made private", "0.16.0")
-object DropDatabase extends Command with CommandWithResult[UnitBox.type] {
+private[reactivemongo] object DropDatabase extends Command with CommandWithResult[Unit] {
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[DropDatabase.type] = {
     val builder = pack.newBuilder
     val cmd = builder.document(Seq(
@@ -15,75 +12,12 @@ object DropDatabase extends Command with CommandWithResult[UnitBox.type] {
 
     pack.writer[DropDatabase.type](_ => cmd)
   }
+
+  override val toString = "DropDatabase"
 }
 
-/**
- * @param dropped true if the collection existed and was dropped
- */
-@deprecated("Internal: will be made private", "0.16.0")
-class DropCollectionResult(val dropped: Boolean)
-  extends Product with Serializable {
-
-  val productArity = 1
-
-  def productElement(n: Int) = dropped
-
-  def canEqual(that: Any): Boolean = that match {
-    case _: DropCollectionResult => true
-    case _                       => false
-  }
-
-  override def equals(that: Any): Boolean = that match {
-    case other: DropCollectionResult =>
-      this.dropped == other.dropped
-
-    case _ =>
-      false
-  }
-
-  override def hashCode: Int = dropped.hashCode
-
-  override def toString = s"DropCollectionResult($dropped)"
-}
-
-object DropCollectionResult extends scala.runtime.AbstractFunction1[Boolean, DropCollectionResult] {
-  @inline def apply(dropped: Boolean): DropCollectionResult = new DropCollectionResult(dropped)
-
-  @deprecated("", "0.19.0")
-  def unapply(that: Any): Option[Boolean] = that match {
-    case other: DropCollectionResult =>
-      Option(other).map(_.dropped)
-
-    case _ => None
-  }
-
-  private[api] def reader[P <: SerializationPack](pack: P): pack.Reader[DropCollectionResult] = {
-    val decoder = pack.newDecoder
-    val unitBoxReader = CommandCodecs.unitBoxReader[pack.type](pack)
-
-    pack.reader[DropCollectionResult] { doc =>
-      try {
-        pack.deserialize(doc, unitBoxReader)
-
-        DropCollectionResult(true)
-      } catch {
-        case NonFatal(cause) =>
-          def code = decoder.int(doc, "code")
-          def msg = decoder.string(doc, "errmsg")
-
-          if (code.exists(_ == 26) || msg.exists(_ startsWith "ns not found")) {
-            DropCollectionResult(false)
-          } else {
-            throw cause
-          }
-      }
-    }
-  }
-}
-
-@deprecated("Internal: will be made private", "0.16.0")
-object DropCollection extends CollectionCommand
-  with CommandWithResult[DropCollectionResult] {
+private[reactivemongo] object DropCollection extends CollectionCommand
+  with CommandWithResult[Unit] {
 
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[DropCollection.type]] = {
     val builder = pack.newBuilder
@@ -95,18 +29,13 @@ object DropCollection extends CollectionCommand
   }
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-object EmptyCapped extends CollectionCommand
-  with CommandWithResult[UnitBox.type]
-
-@deprecated("Internal: will be made private", "0.16.0")
-case class RenameCollection(
+private[reactivemongo] case class RenameCollection(
   fullyQualifiedCollectionName: String,
   fullyQualifiedTargetName: String,
-  dropTarget: Boolean = false) extends Command with CommandWithResult[UnitBox.type]
+  dropTarget: Boolean = false) extends Command with CommandWithResult[Unit]
 
-private[api] object RenameCollection extends scala.runtime.AbstractFunction3[String, String, Boolean, RenameCollection] {
-  def writer[P <: SerializationPack with Singleton](pack: P): pack.Writer[RenameCollection] = {
+private[api] object RenameCollection {
+  def writer[P <: SerializationPack](pack: P): pack.Writer[RenameCollection] = {
     val builder = pack.newBuilder
 
     import builder.{ elementProducer => element, string }
@@ -124,26 +53,23 @@ private[api] object RenameCollection extends scala.runtime.AbstractFunction3[Str
   }
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-case class Create(
-  capped: Option[Capped] = None, // if set, "capped" -> true, size -> <int>, max -> <int>
-  autoIndexId: Boolean = true, // optional
-  flags: Int = 1 // defaults to 1
-) extends CollectionCommand with CommandWithResult[UnitBox.type]
+private[api] case class Create(
+  capped: Option[Capped] = None,
+  writeConcern: WriteConcern = WriteConcern.Default) extends CollectionCommand with CommandWithResult[Unit]
 
 private[api] object CreateCollection {
   def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[Create]] = {
     val builder = pack.newBuilder
     import builder.{ boolean, elementProducer => element }
 
+    val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
+
     pack.writer[ResolvedCollectionCommand[Create]] { create =>
       val elms = Seq.newBuilder[pack.ElementProducer]
 
-      elms += element("create", builder.string(create.collection))
-
-      if (create.command.autoIndexId) {
-        elms += element("autoIndexId", boolean(create.command.autoIndexId))
-      }
+      elms ++= Seq(
+        element("create", builder.string(create.collection)),
+        element("writeConcern", writeWriteConcern(create.command.writeConcern)))
 
       create.command.capped.foreach { capped =>
         elms += element("capped", boolean(true))
@@ -156,19 +82,9 @@ private[api] object CreateCollection {
   }
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-class ConvertToCapped(
-  val capped: Capped) extends Product with Serializable
-  with CollectionCommand with CommandWithResult[UnitBox.type] {
-
-  val productArity = 1
-
-  def productElement(n: Int): Any = capped
-
-  def canEqual(that: Any): Boolean = that match {
-    case _: ConvertToCapped => true
-    case _                  => false
-  }
+private[reactivemongo] final class ConvertToCapped(
+  val capped: Capped)
+  extends CollectionCommand with CommandWithResult[Unit] {
 
   override def equals(that: Any): Boolean = that match {
     case other: ConvertToCapped =>
@@ -183,13 +99,8 @@ class ConvertToCapped(
   override def toString: String = s"ConvertToCapped($capped)"
 }
 
-object ConvertToCapped
-  extends scala.runtime.AbstractFunction1[Capped, ConvertToCapped] {
-
-  @inline def apply(capped: Capped): ConvertToCapped =
-    new ConvertToCapped(capped)
-
-  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[ConvertToCapped]] = {
+private[api] object ConvertToCapped {
+  def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[ConvertToCapped]] = {
     val builder = pack.newBuilder
 
     pack.writer[ResolvedCollectionCommand[ConvertToCapped]] { convert =>
@@ -206,15 +117,13 @@ object ConvertToCapped
   }
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-case class CollectionNames(names: List[String])
+private[api] case class CollectionNames(names: List[String])
 
 /** List the names of DB collections. */
-@deprecated("Internal: will be made private", "0.16.0")
-object ListCollectionNames
+private[api] object ListCollectionNames
   extends Command with CommandWithResult[CollectionNames] {
 
-  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ListCollectionNames.type] = {
+  def writer[P <: SerializationPack](pack: P): pack.Writer[ListCollectionNames.type] = {
     val builder = pack.newBuilder
 
     val cmd = builder.document(Seq(
@@ -223,16 +132,16 @@ object ListCollectionNames
     pack.writer[ListCollectionNames.type](_ => cmd)
   }
 
-  private[api] def reader[P <: SerializationPack](pack: P): pack.Reader[CollectionNames] = {
+  def reader[P <: SerializationPack](pack: P): pack.Reader[CollectionNames] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, CollectionNames](pack) { doc =>
+    CommandCodecs.dealingWithGenericCommandExceptionsReaderOpt[pack.type, CollectionNames](pack) { doc =>
       (for {
         cr <- decoder.child(doc, "cursor")
         fb = decoder.children(cr, "firstBatch")
         ns <- wtColNames[pack.type](pack)(decoder, fb, List.empty)
-      } yield CollectionNames(ns)).getOrElse[CollectionNames](
-        throw GenericDriverException("fails to read collection names"))
+      } yield CollectionNames(ns)).orElse[CollectionNames](
+        throw new GenericDriverException("fails to read collection names"))
     }
   }
 
@@ -245,6 +154,8 @@ object ListCollectionNames
 
     case _ => Some(ns.reverse)
   }
+
+  override val toString = "ListCollectionNames"
 }
 
 /**
@@ -265,7 +176,7 @@ object ListCollectionNames
  * @param syncingTo the hostname of the member from which this instance is syncing (only present on the output of `rs.status()` on secondary and recovering members)
  * @param configVersion the configuration version (since MongoDB 3.0)
  */
-class ReplSetMember private[api] (
+final class ReplSetMember private[api] (
   val _id: Long,
   val name: String,
   val health: Int,
@@ -280,58 +191,7 @@ class ReplSetMember private[api] (
   val self: Boolean,
   val pingMs: Option[Long],
   val syncingTo: Option[String],
-  val configVersion: Option[Int]) extends Product15[Long, String, Int, Int, String, Long, Long, Option[Long], Option[Long], Option[String], Option[Long], Boolean, Option[Long], Option[String], Option[Int]] with Serializable {
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _1 = _id
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _2 = name
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _3 = health
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _4 = state
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _5 = stateStr
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _6 = uptime
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _7 = optime
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _8 = lastHeartbeat
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _9 = lastHeartbeatRecv
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _10 = lastHeartbeatMessage
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _11 = electionTime
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _12 = self
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _13 = pingMs
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _14 = syncingTo
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _15 = configVersion
-
-  @deprecated("No longer a case class", "0.20.3")
-  def canEqual(that: Any): Boolean = that match {
-    case _: ReplSetMember => true
-    case _                => false
-  }
+  val configVersion: Option[Int]) {
 
   private[api] def tupled = Tuple15(_id, name, health, state, stateStr, uptime, optime, lastHeartbeat, lastHeartbeatRecv, lastHeartbeatMessage, electionTime, self, pingMs, syncingTo, configVersion)
 
@@ -348,29 +208,6 @@ class ReplSetMember private[api] (
   override def toString = s"ReplSetMember${tupled.toString}"
 }
 
-object ReplSetMember extends scala.runtime.AbstractFunction15[Long, String, Int, Int, String, Long, Long, Option[Long], Option[Long], Option[String], Option[Long], Boolean, Option[Long], Option[String], Option[Int], ReplSetMember] {
-
-  def apply(
-    _id: Long,
-    name: String,
-    health: Int,
-    state: Int,
-    stateStr: String,
-    uptime: Long,
-    optime: Long,
-    lastHeartbeat: Option[Long],
-    lastHeartbeatRecv: Option[Long],
-    lastHeartbeatMessage: Option[String],
-    electionTime: Option[Long],
-    self: Boolean,
-    pingMs: Option[Long],
-    syncingTo: Option[String],
-    configVersion: Option[Int]): ReplSetMember = new ReplSetMember(_id, name, health, state, stateStr, uptime, optime, lastHeartbeat, lastHeartbeatRecv, lastHeartbeatMessage, electionTime, self, pingMs, syncingTo, configVersion)
-
-  @deprecated("No longer a case class", "0.20.3")
-  def unapply(other: ReplSetMember) = Option(other).map(_.tupled)
-}
-
 /**
  * Result from the [[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]].
  *
@@ -379,29 +216,11 @@ object ReplSetMember extends scala.runtime.AbstractFunction15[Long, String, Int,
  * @param state the [[http://docs.mongodb.org/manual/reference/replica-states/ state code]] of the current member
  * @param members the list of the members of this replicate set
  */
-class ReplSetStatus private[api] (
+final class ReplSetStatus private[api] (
   val name: String,
   val time: Long,
   val myState: Int,
-  val members: List[ReplSetMember]) extends Product4[String, Long, Int, List[ReplSetMember]] with Serializable {
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _1 = name
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _2 = time
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _3 = myState
-
-  @deprecated("No longer a case class", "0.20.3")
-  @inline def _4 = members
-
-  @deprecated("No longer a case class", "0.20.3")
-  def canEqual(that: Any): Boolean = that match {
-    case _: ReplSetStatus => true
-    case _                => false
-  }
+  val members: List[ReplSetMember]) {
 
   private[api] lazy val tupled = Tuple4(name, time, myState, members)
 
@@ -418,27 +237,13 @@ class ReplSetStatus private[api] (
   override def toString = s"ReplSetStatus${tupled.toString}"
 }
 
-object ReplSetStatus extends scala.runtime.AbstractFunction4[String, Long, Int, List[ReplSetMember], ReplSetStatus] {
-
-  def apply(
-    name: String,
-    time: Long,
-    myState: Int,
-    members: List[ReplSetMember]): ReplSetStatus =
-    new ReplSetStatus(name, time, myState, members)
-
-  @deprecated("No longer a case class", "0.20.3")
-  def unapply(status: ReplSetStatus) = Option(status).map(_.tupled)
-}
-
 /**
  * The command [[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]]
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case object ReplSetGetStatus
+private[reactivemongo] object ReplSetGetStatus
   extends Command with CommandWithResult[ReplSetStatus] {
 
-  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ReplSetGetStatus.type] = {
+  def writer[P <: SerializationPack](pack: P): pack.Writer[ReplSetGetStatus.type] = {
     val builder = pack.newBuilder
     val cmd = builder.document(Seq(builder.elementProducer(
       "replSetGetStatus", builder.int(1))))
@@ -446,6 +251,7 @@ case object ReplSetGetStatus
     pack.writer[ReplSetGetStatus.type](_ => cmd)
   }
 
+  @SuppressWarnings(Array("UnusedMethodParameter"))
   private def readMember[P <: SerializationPack](pack: P)(decoder: SerializationPack.Decoder[pack.type], doc: pack.Document): Option[ReplSetMember] = {
     import decoder.{ int, long, string }
 
@@ -457,7 +263,7 @@ case object ReplSetGetStatus
       stateStr <- string(doc, "stateStr")
       uptime <- long(doc, "uptime")
       optime <- long(doc, "optimeDate")
-    } yield ReplSetMember(id, name, health, state, stateStr, uptime, optime,
+    } yield new ReplSetMember(id, name, health, state, stateStr, uptime, optime,
       long(doc, "lastHeartbeat"),
       long(doc, "lastHeartbeatRecv"),
       string(doc, "lastHeartbeatMessage"),
@@ -468,10 +274,10 @@ case object ReplSetGetStatus
       int(doc, "configVersion"))
   }
 
-  private[api] def reader[P <: SerializationPack](pack: P): pack.Reader[ReplSetStatus] = {
+  def reader[P <: SerializationPack](pack: P): pack.Reader[ReplSetStatus] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, ReplSetStatus](pack) { doc =>
+    CommandCodecs.dealingWithGenericCommandExceptionsReaderOpt[pack.type, ReplSetStatus](pack) { doc =>
       (for {
         name <- decoder.string(doc, "set")
         time <- decoder.long(doc, "date")
@@ -479,37 +285,15 @@ case object ReplSetGetStatus
         members = decoder.children(doc, "members").flatMap { m =>
           readMember[pack.type](pack)(decoder, m)
         }
-      } yield ReplSetStatus(name, time, myState, members)).get
+      } yield new ReplSetStatus(name, time, myState, members))
     }
   }
-}
-
-sealed trait ServerProcess
-
-object ServerProcess {
-  def unapply(repr: String): Option[ServerProcess] = repr match {
-    case "mongos" => Some(MongosProcess)
-    case "mongod" => Some(MongodProcess)
-    case _        => None
-  }
-}
-
-case object MongodProcess extends ServerProcess {
-  override val toString = "mongod"
-}
-case object MongosProcess extends ServerProcess {
-  override val toString = "mongos"
-}
-
-object ResyncResult extends BoxedAnyVal[Unit] {
-  val value = {}
 }
 
 /**
  * The command [[https://docs.mongodb.org/manual/reference/command/resync/ resync]]
  */
-@deprecated("Internal: will be made private", "0.16.0")
-object Resync extends Command with CommandWithResult[ResyncResult.type]
+private[api] object Resync extends Command with CommandWithResult[Unit]
 
 /**
  * The [[https://docs.mongodb.org/manual/reference/command/replSetMaintenance/ replSetMaintenance]] command.
@@ -517,19 +301,8 @@ object Resync extends Command with CommandWithResult[ResyncResult.type]
  *
  * @param enable if true the the member enters the `RECOVERING` state
  */
-@deprecated("Internal: will be made private", "0.16.0")
-class ReplSetMaintenance(val enable: Boolean = true)
-  extends Product with Serializable
-  with Command with CommandWithResult[UnitBox.type] {
-  val productArity = 1
-
-  def productElement(n: Int) = enable
-
-  def canEqual(that: Any): Boolean = that match {
-    case _: DropCollectionResult => true
-    case _                       => false
-  }
-
+private[reactivemongo] final class ReplSetMaintenance(
+  val enable: Boolean = true) extends Command with CommandWithResult[Unit] {
   override def equals(that: Any): Boolean = that match {
     case other: ReplSetMaintenance =>
       this.enable == other.enable
@@ -543,20 +316,10 @@ class ReplSetMaintenance(val enable: Boolean = true)
   override def toString = s"ReplSetMaintenance($enable)"
 }
 
-@deprecated("Internal: will be made private", "0.19.0")
-object ReplSetMaintenance
-  extends scala.runtime.AbstractFunction1[Boolean, ReplSetMaintenance] {
+private[reactivemongo] object ReplSetMaintenance {
 
   @inline def apply(enable: Boolean): ReplSetMaintenance =
     new ReplSetMaintenance(enable)
-
-  @deprecated("", "0.19.0")
-  def unapply(that: Any): Option[Boolean] = that match {
-    case other: ReplSetMaintenance =>
-      Option(other).map(_.enable)
-
-    case _ => None
-  }
 
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ReplSetMaintenance] = {
     val builder = pack.newBuilder
@@ -571,5 +334,5 @@ object ReplSetMaintenance
 /**
  * The [[https://docs.mongodb.com/manual/reference/command/ping/ ping]] command.
  */
-@deprecated("Internal: will be made private", "0.16.0")
-case object PingCommand extends Command with CommandWithResult[Boolean]
+private[reactivemongo] object PingCommand
+  extends Command with CommandWithResult[Boolean]

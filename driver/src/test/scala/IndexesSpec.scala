@@ -1,20 +1,18 @@
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.bson.{ BSONDocument => LegacyDoc }
-
 import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.{
   Hashed,
   Geo2D,
   Geo2DSpherical
 }
-import reactivemongo.api.commands.CommandError
+import reactivemongo.api.commands.CommandException
 
 import reactivemongo.api.bson.BSONDocument
 
 import reactivemongo.core.errors.DatabaseException
 
-import reactivemongo.api.tests.{ decoder, pack, indexOptions, Pack }
+import reactivemongo.api.tests.{ pack, Pack }
 import reactivemongo.api.TestCompat._
 
 import org.specs2.concurrent.ExecutionEnv
@@ -26,6 +24,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
   "Indexes management" title
 
   sequential
+  stopOnFail
 
   // ---
 
@@ -36,7 +35,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
     s"reactivemongo-gridfs-${System identityHashCode this}",
     Common.connection, Common.slowConnection)
 
-  def afterAll = { db.drop(); () }
+  def afterAll() = { db.drop(); () }
 
   lazy val geo = db(s"geo${System identityHashCode this}")
   lazy val slowGeo = slowDb(s"geo${System identityHashCode slowDb}")
@@ -64,7 +63,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
       def spec(c: DefaultCollection, timeout: FiniteDuration) =
         c.indexesManager.ensure(index(
           List("loc" -> Geo2D),
-          options = LegacyDoc("min" -> -95, "max" -> 95, "bits" -> 28))).
+          options = BSONDocument("min" -> -95, "max" -> 95, "bits" -> 28))).
           aka("index") must beTrue.await(1, timeout * 2)
 
       "be created with the default connection" in {
@@ -82,7 +81,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
         map(_ => false).recover {
           case e: DatabaseException =>
             // MongoError['point not in interval of [ -95, 95 )' (code = 13027)]
-            e.code.exists(_ == 13027)
+            e.code contains 13027
 
           case _ => false
         } must beTrue.await(1, timeout)
@@ -167,9 +166,8 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
   }
 
   "Index manager" should {
-    "drop all indexes in db.geo" in {
-      geo.indexesManager.dropAll() must beEqualTo(2 /* _id and loc */ ).
-        await(1, timeout)
+    "drop all indexes _id and loc in db.geo" in {
+      geo.indexesManager.dropAll() must beTypedEqualTo(2).await(1, timeout)
     }
   }
 
@@ -217,7 +215,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
       Future.sequence(fixturesInsert).
         map(_ => {}) must beEqualTo({}).await(0, timeout)
 
-    } tag "not_mongo26"
+    }
 
     "fail with already inserted documents" in {
       val idx = index(
@@ -225,30 +223,34 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
         unique = true)
 
       val mngr = partial.indexesManager
-      def spec[T](test: => Future[T]) = test must throwA[CommandError].like {
-        case CommandError.Code(11000) => ok
-      }.awaitFor(timeout)
+      def spec[T](test: => Future[T]) =
+        test must throwA[DatabaseException].like {
+          case CommandException.Code(11000) => ok
+        }.awaitFor(timeout)
 
       spec(mngr.ensure(idx)) and spec(mngr.create(idx))
-    } tag "not_mongo26"
+    }
 
     "be created" in {
       partial.indexesManager.create(index(
         key = Seq("username" -> IndexType.Ascending),
         unique = true,
-        partialFilter = Some(LegacyDoc(
-          "age" -> LegacyDoc(f"$$gte" -> 21))))).
-        map(_.ok) must beTrue.awaitFor(timeout)
-    } tag "not_mongo26"
+        partialFilter = Some(BSONDocument(
+          "age" -> BSONDocument(f"$$gte" -> 21))))).
+        map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
+    }
 
     "not have duplicate fixtures" in {
-      Future.fold(fixturesInsert)(false) { (inserted, res) =>
-        if (res.ok) true else inserted
+      @com.github.ghik.silencer.silent("fold")
+      def spec = Future.fold(fixturesInsert)(false) { (inserted, _) =>
+        inserted
       }.recover {
-        case err: DatabaseException => !err.code.exists(_ == 11000)
+        case err: DatabaseException => !err.code.contains(11000)
         case _                      => true
-      } aka "inserted" must beFalse.await(0, timeout)
-    } tag "not_mongo26"
+      }
+
+      spec aka "inserted" must beFalse.await(0, timeout)
+    }
 
     "allow duplicate if the filter doesn't match" in {
       def insertAndCount = for {
@@ -262,8 +264,8 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
         b <- partial.count()
       } yield a -> b
 
-      insertAndCount must beTypedEqualTo(3 -> 6).await(0, timeout)
-    } tag "not_mongo26"
+      insertAndCount must beTypedEqualTo(3L -> 6L).await(0, timeout)
+    }
   }
 
   "Text index" should {
@@ -295,10 +297,9 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
     name: Option[String] = None,
     unique: Boolean = false,
     background: Boolean = false,
-    dropDups: Boolean = false,
     sparse: Boolean = false,
     version: Option[Int] = None, // let MongoDB decide
     partialFilter: Option[BSONDocument] = None,
-    options: BSONDocument = BSONDocument.empty) = Index[Pack](pack)(key, name, unique, background, dropDups, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
+    options: BSONDocument = BSONDocument.empty) = Index[Pack](pack)(key, name, unique, background, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
 
 }

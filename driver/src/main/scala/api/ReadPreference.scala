@@ -27,12 +27,13 @@ object ReadPreference {
     override val toString = "Primary"
   }
 
+  @SuppressWarnings(Array("MethodNames"))
   private[reactivemongo] def TagFilter(
-    tagSet: Seq[Map[String, String]]): Option[Map[String, String] => Boolean] = {
-    if (tagSet.isEmpty) None else Some { tags: Map[String, String] =>
-      val matching = tagSet.find(_.foldLeft(Map.empty[String, String]) {
+    tags: Seq[Map[String, String]]): Option[Map[String, String] => Boolean] = {
+    if (tags.isEmpty) None else Some { ts: Map[String, String] =>
+      val matching = tags.find(_.foldLeft(Map.empty[String, String]) {
         case (ms, (k, v)) =>
-          if (tags.get(k).exists(_ == v)) {
+          if (ts.get(k) contains v) {
             ms + (k -> v)
           } else ms
       }.isEmpty)
@@ -56,18 +57,9 @@ object ReadPreference {
   }
 
   /** Reads from the primary if it is available, or secondaries if it is not. */
-  class PrimaryPreferred private[api] (val tags: List[Map[String, String]])
-    extends ReadPreference with Taggable
-    with Product1[List[Map[String, String]]] with Serializable {
-
-    @deprecated("No longer case class", "0.20.3")
-    @inline def _1 = tags
-
-    @deprecated("No longer case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: PrimaryPreferred => false
-      case _                   => false
-    }
+  final class PrimaryPreferred private[api] (
+    val tags: List[Map[String, String]])
+    extends ReadPreference with Taggable {
 
     override def equals(that: Any): Boolean = that match {
       case other: PrimaryPreferred =>
@@ -82,7 +74,7 @@ object ReadPreference {
     override val toString = s"""PrimaryPreferred(${tags mkString ", "})"""
   }
 
-  object PrimaryPreferred extends scala.runtime.AbstractFunction1[List[Map[String, String]], PrimaryPreferred] {
+  object PrimaryPreferred {
     def apply(tags: List[Map[String, String]]): PrimaryPreferred =
       new PrimaryPreferred(tags)
 
@@ -91,18 +83,8 @@ object ReadPreference {
   }
 
   /** Reads only from any secondary. */
-  class Secondary private[api] (val tags: List[Map[String, String]])
-    extends ReadPreference with Taggable
-    with Product1[List[Map[String, String]]] with Serializable {
-
-    @deprecated("No longer case class", "0.20.3")
-    @inline def _1 = tags
-
-    @deprecated("No longer case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: Secondary => false
-      case _            => false
-    }
+  final class Secondary private[api] (val tags: List[Map[String, String]])
+    extends ReadPreference with Taggable {
 
     override def equals(that: Any): Boolean = that match {
       case other: Secondary =>
@@ -117,7 +99,7 @@ object ReadPreference {
     override val toString = s"""Secondary(${tags mkString ", "})"""
   }
 
-  object Secondary extends scala.runtime.AbstractFunction1[List[Map[String, String]], Secondary] {
+  object Secondary {
     def apply(tags: List[Map[String, String]]): Secondary =
       new Secondary(tags)
 
@@ -129,18 +111,9 @@ object ReadPreference {
    * Reads from any secondary,
    * or from the primary if they are not available.
    */
-  class SecondaryPreferred private[api] (val tags: List[Map[String, String]])
-    extends ReadPreference with Taggable
-    with Product1[List[Map[String, String]]] with Serializable {
-
-    @deprecated("No longer case class", "0.20.3")
-    @inline def _1 = tags
-
-    @deprecated("No longer case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: SecondaryPreferred => false
-      case _                     => false
-    }
+  final class SecondaryPreferred private[api] (
+    val tags: List[Map[String, String]])
+    extends ReadPreference with Taggable {
 
     override def equals(that: Any): Boolean = that match {
       case other: SecondaryPreferred =>
@@ -155,7 +128,7 @@ object ReadPreference {
     override val toString = s"""SecondaryPreferred(${tags mkString ", "})"""
   }
 
-  object SecondaryPreferred extends scala.runtime.AbstractFunction1[List[Map[String, String]], SecondaryPreferred] {
+  object SecondaryPreferred {
     def apply(tags: List[Map[String, String]]): SecondaryPreferred =
       new SecondaryPreferred(tags)
 
@@ -167,18 +140,8 @@ object ReadPreference {
    * Reads from the faster node (e.g. the node which replies faster than
    * all others), regardless its status (primary or secondary).
    */
-  class Nearest private[api] (val tags: List[Map[String, String]])
-    extends ReadPreference with Taggable
-    with Product1[List[Map[String, String]]] with Serializable {
-
-    @deprecated("No longer case class", "0.20.3")
-    @inline def _1 = tags
-
-    @deprecated("No longer case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: Nearest => false
-      case _          => false
-    }
+  final class Nearest private[api] (val tags: List[Map[String, String]])
+    extends ReadPreference with Taggable {
 
     override def equals(that: Any): Boolean = that match {
       case other: Nearest =>
@@ -193,7 +156,7 @@ object ReadPreference {
     override val toString = s"""Nearest(${tags mkString ", "})"""
   }
 
-  object Nearest extends scala.runtime.AbstractFunction1[List[Map[String, String]], Nearest] {
+  object Nearest {
     def apply(tags: List[Map[String, String]]): Nearest = new Nearest(tags)
 
     def unapply(pref: Nearest): Option[List[Map[String, String]]] =
@@ -206,21 +169,21 @@ object ReadPreference {
   /** Reads from the [[https://docs.mongodb.com/manual/reference/read-preference/#primaryPreferred primary if it is available]], or secondaries if it is not. */
   val primaryPreferred: PrimaryPreferred = new PrimaryPreferred(List.empty)
 
-  /** Reads from any node that has the given `tagSet` in the replica set (preferably the primary). */
-  def primaryPreferred(tagSet: List[Map[String, String]]): PrimaryPreferred = new PrimaryPreferred(tagSet)
+  /** Reads from any node that has the given `tags` in the replica set (preferably the primary). */
+  def primaryPreferred(tags: List[Map[String, String]]): PrimaryPreferred = new PrimaryPreferred(tags)
 
   /** [[https://docs.mongodb.com/manual/reference/read-preference/#secondary Reads only from any secondary]]. */
   val secondary: Secondary = new Secondary(List.empty)
 
-  /** Reads from a secondary that has the given `tagSet` in the replica set. */
-  def secondary(tagSet: List[Map[String, String]]): Secondary = new Secondary(tagSet)
+  /** Reads from a secondary that has the given `tags` in the replica set. */
+  def secondary(tags: List[Map[String, String]]): Secondary = new Secondary(tags)
 
   /** [[https://docs.mongodb.com/manual/reference/read-preference/#secondaryPreferred Reads from any secondary]], or from the primary if they are not available. */
   val secondaryPreferred: SecondaryPreferred =
     new SecondaryPreferred(List.empty)
 
-  /** Reads from any node that has the given `tagSet` in the replica set (preferably a secondary). */
-  def secondaryPreferred(tagSet: List[Map[String, String]]): SecondaryPreferred = new SecondaryPreferred(tagSet)
+  /** Reads from any node that has the given `tags` in the replica set (preferably a secondary). */
+  def secondaryPreferred(tags: List[Map[String, String]]): SecondaryPreferred = new SecondaryPreferred(tags)
 
   /**
    * Reads from the [[https://docs.mongodb.com/manual/reference/read-preference/#nearest nearest node]] (the node which replies faster than all others), regardless its status (primary or secondary).
@@ -228,7 +191,7 @@ object ReadPreference {
   val nearest: Nearest = new Nearest(List.empty)
 
   /**
-   * Reads from the fastest node (e.g. the node which replies faster than all others) that has the given `tagSet`, regardless its status (primary or secondary).
+   * Reads from the fastest node (e.g. the node which replies faster than all others) that has the given `tags`, regardless its status (primary or secondary).
    */
-  def nearest[T](tagSet: List[Map[String, String]]): Nearest = new Nearest(tagSet)
+  def nearest[T](tags: List[Map[String, String]]): Nearest = new Nearest(tags)
 }

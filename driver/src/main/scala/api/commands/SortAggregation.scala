@@ -28,20 +28,10 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
   }
 
   /** Ascending sort order */
-  class Ascending private[api] (val field: String)
-    extends SortOrder with Product1[String] with Serializable {
-
-    @deprecated("No longer a case class", "0.20.3")
-    @inline def _1 = field
-
-    @deprecated("No longer a case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: Ascending => true
-      case _            => false
-    }
-
+  final class Ascending private (val field: String) extends SortOrder {
+    @SuppressWarnings(Array("NullParameter"))
     override def equals(that: Any): Boolean = that match {
-      case other: Ascending =>
+      case other: this.type =>
         (this.field == null && other.field == null) || (
           this.field != null && this.field.equals(other.field))
 
@@ -49,34 +39,25 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
     override def toString: String = s"Ascending(${field})"
   }
 
-  object Ascending extends scala.runtime.AbstractFunction1[String, Ascending] {
+  object Ascending {
     def apply(field: String): Ascending = new Ascending(field)
 
-    def unapply(ascending: Ascending): Option[String] =
+    private[api] def unapply(ascending: Ascending): Option[String] =
       Option(ascending).map(_.field)
   }
 
   /** Descending sort order */
-  class Descending private[api] (val field: String)
-    extends SortOrder with Product1[String] with Serializable {
-
-    @deprecated("No longer a case class", "0.20.3")
-    @inline def _1 = field
-
-    @deprecated("No longer a case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: Descending => true
-      case _             => false
-    }
-
+  final class Descending private (val field: String) extends SortOrder {
+    @SuppressWarnings(Array("NullParameter"))
     override def equals(that: Any): Boolean = that match {
-      case other: Descending =>
+      case other: this.type =>
         (this.field == null && other.field == null) || (
           this.field != null && this.field.equals(other.field))
 
@@ -84,18 +65,17 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
         false
     }
 
+    @SuppressWarnings(Array("NullParameter"))
     override def hashCode: Int =
       if (field == null) -1 else field.hashCode
 
     override def toString: String = s"Descending(${field})"
   }
 
-  object Descending
-    extends scala.runtime.AbstractFunction1[String, Descending] {
-
+  object Descending {
     def apply(field: String): Descending = new Descending(field)
 
-    def unapply(descending: Descending): Option[String] =
+    private[api] def unapply(descending: Descending): Option[String] =
       Option(descending).map(_.field)
   }
 
@@ -104,27 +84,14 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
    *
    * @param keyword the metadata keyword to sort by
    */
-  class MetadataSort private[api] (
+  final class MetadataSort private (
     val field: String,
-    val keyword: MetadataKeyword) extends SortOrder
-    with Product2[String, MetadataKeyword] with Serializable {
-
-    @deprecated("No longer a case class", "0.20.3")
-    @inline def _1 = field
-
-    @deprecated("No longer a case class", "0.20.3")
-    @inline def _2 = keyword
-
-    @deprecated("No longer a case class", "0.20.3")
-    def canEqual(that: Any): Boolean = that match {
-      case _: MetadataSort => true
-      case _               => false
-    }
+    val keyword: MetadataKeyword) extends SortOrder {
 
     private[api] lazy val tupled = field -> keyword
 
     override def equals(that: Any): Boolean = that match {
-      case other: MetadataSort =>
+      case other: this.type =>
         this.tupled == other.tupled
 
       case _ => false
@@ -135,14 +102,11 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
     override def toString = s"MetadataSort${tupled.toString}"
   }
 
-  object MetadataSort
-    extends scala.runtime.AbstractFunction2[String, MetadataKeyword, MetadataSort] {
-
+  object MetadataSort {
     def apply(field: String, keyword: MetadataKeyword): MetadataSort =
       new MetadataSort(field, keyword)
 
-    def unapply(other: MetadataSort): Option[(String, MetadataKeyword)] =
-      Option(other).map { i => i.field -> i.keyword }
+    private[api] def unapply(other: MetadataSort): Option[(String, MetadataKeyword)] = Option(other).map { i => i.field -> i.keyword }
 
   }
 }

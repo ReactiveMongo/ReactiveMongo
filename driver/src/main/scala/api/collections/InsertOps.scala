@@ -4,16 +4,17 @@ import scala.util.{ Failure, Success, Try }
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.{ SerializationPack, Session }
+import reactivemongo.api.{ SerializationPack, WriteConcern }
+
 import reactivemongo.api.commands.{
-  CommandCodecs,
-  LastError,
-  MultiBulkWriteResult,
+  CommandCodecsWithPack,
+  InsertCommand,
+  LastErrorFactory,
+  MultiBulkWriteResultFactory,
   ResolvedCollectionCommand,
-  WriteConcern,
+  UpsertedFactory,
   WriteResult
 }
 
@@ -22,13 +23,10 @@ import reactivemongo.api.commands.{
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.insert/#perform-an-unordered-insert ordered]] behaviour
  * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
  */
-trait InsertOps[P <: SerializationPack with Singleton] {
-  collection: GenericCollection[P] =>
-
-  private object InsertCommand
-    extends reactivemongo.api.commands.InsertCommand[collection.pack.type] {
-    val pack: collection.pack.type = collection.pack
-  }
+trait InsertOps[P <: SerializationPack]
+  extends InsertCommand[P] with CommandCodecsWithPack[P]
+  with MultiBulkWriteResultFactory[P] with UpsertedFactory[P]
+  with LastErrorFactory[P] { collection: GenericCollection[P] =>
 
   /**
    * @param ordered $orderedParam
@@ -46,51 +44,8 @@ trait InsertOps[P <: SerializationPack with Singleton] {
     }
   }
 
-  private type InsertCmd = ResolvedCollectionCommand[InsertCommand.Insert]
-
-  private def insertWriter(session: Option[Session]): pack.Writer[InsertCmd] = {
-    val builder = pack.newBuilder
-    val writeWriteConcern = CommandCodecs.writeWriteConcern(pack)
-    val writeSession = CommandCodecs.writeSession(builder)
-
-    import builder.{ elementProducer => element }
-
-    pack.writer[InsertCmd] { insert =>
-      import insert.command
-
-      val documents = builder.array(command.head, command.tail)
-      val ordered = builder.boolean(command.ordered)
-      val elements = Seq.newBuilder[pack.ElementProducer]
-
-      elements ++= Seq[pack.ElementProducer](
-        element("insert", builder.string(insert.collection)),
-        element("ordered", ordered),
-        element(
-          "bypassDocumentValidation",
-          builder.boolean(command.bypassDocumentValidation)))
-
-      session.foreach { s =>
-        elements ++= writeSession(s)
-      }
-
-      if (!session.exists(_.transaction.isSuccess)) {
-        // writeConcern is not allowed within a multi-statement transaction
-        // code=72
-
-        elements += element(
-          "writeConcern", writeWriteConcern(command.writeConcern))
-      }
-
-      elements += element("documents", documents)
-
-      builder.document(elements.result())
-    }
-  }
-
   /** Builder for insert operations. */
   sealed trait InsertBuilder {
-    //implicit protected def writer: pack.Writer[T]
-
     @inline private def metadata = db.connectionState.metadata
 
     /** The max BSON size, including the size of command envelope */
@@ -98,9 +53,9 @@ trait InsertOps[P <: SerializationPack with Singleton] {
       // Command envelope to compute accurate BSON size limit
       val emptyDoc: pack.Document = pack.newBuilder.document(Seq.empty)
 
-      val emptyCmd = ResolvedCollectionCommand(
+      val emptyCmd = new ResolvedCollectionCommand(
         collection.name,
-        InsertCommand.Insert(
+        new Insert(
           emptyDoc, Seq.empty[pack.Document], ordered, writeConcern, false))
 
       val doc = pack.serialize(emptyCmd, insertWriter(None))
@@ -135,8 +90,16 @@ trait InsertOps[P <: SerializationPack with Singleton] {
      * }
      * }}}
      */
-    final def one[T](document: T)(implicit ec: ExecutionContext, writer: pack.Writer[T]): Future[WriteResult] = Future(pack.serialize(document, writer)).flatMap { single =>
-      execute(Seq(single))
+    final def one[T](document: T)(implicit ec: ExecutionContext, writer: pack.Writer[T]): Future[WriteResult] = {
+      //TODO: val contextSTE = new Throwable().getStackTrace().drop(3)
+
+      Future(pack.serialize(document, writer)).flatMap { single =>
+        execute(Seq(single))
+      } /*TODO: flag to enable and same for other cases; .recoverWith {
+        case cause =>
+          cause.setStackTrace(contextSTE ++ cause.getStackTrace)
+          Future.failed[WriteResult](cause)
+      }*/
     }
 
     /** Inserts many documents, according the ordered behaviour. */
@@ -183,41 +146,27 @@ trait InsertOps[P <: SerializationPack with Singleton] {
         }
       })
 
-    implicit private val resultReader: pack.Reader[InsertCommand.InsertResult] =
-      CommandCodecs.defaultWriteResultReader(pack)
+    private final def execute(documents: Seq[pack.Document])(implicit ec: ExecutionContext): Future[WriteResult] = documents.headOption match {
+      case Some(head) => {
+        val cmd = new Insert(
+          head, documents.drop(1), ordered, writeConcern,
+          bypassDocumentValidation)
 
-    implicit private lazy val writer: pack.Writer[InsertCmd] =
-      insertWriter(collection.db.session)
+        runCommand(cmd, writePreference).flatMap { wr =>
+          val flattened = wr.flatten
 
-    private final def execute(documents: Seq[pack.Document])(
-      implicit
-      ec: ExecutionContext): Future[WriteResult] =
-      documents.headOption match {
-        case Some(head) => {
-          if (metadata.maxWireVersion >= MongoWireVersion.V26) {
-            val cmd = InsertCommand.Insert(
-              head, documents.tail, ordered, writeConcern,
-              bypassDocumentValidation)
+          if (!flattened.ok) {
+            // was ordered, with one doc => fail if has an error
+            Future.failed(lastError(flattened).
+              getOrElse[Exception](new GenericDriverException(
+                s"fails to insert: $documents")))
 
-            runCommand(cmd, writePreference).flatMap { wr =>
-              val flattened = wr.flatten
-
-              if (!flattened.ok) {
-                // was ordered, with one doc => fail if has an error
-                Future.failed(WriteResult.lastError(flattened).
-                  getOrElse[Exception](GenericDriverException(
-                    s"fails to insert: $documents")))
-
-              } else Future.successful(wr)
-            }
-          } else { // Mongo < 2.6
-            Future.failed[WriteResult](GenericDriverException(
-              s"unsupported MongoDB version: $metadata"))
-          }
+          } else Future.successful(wr)
         }
-
-        case _ => Future.successful(WriteResult.empty) // No doc to insert
       }
+
+      case _ => Future.successful(WriteResult.empty) // No doc to insert
+    }
   }
 
   // ---
@@ -237,7 +186,7 @@ trait InsertOps[P <: SerializationPack with Singleton] {
       case lastError: WriteResult =>
         Future.successful(lastError)
 
-      case cause => Future.successful(LastError(
+      case cause => Future.successful(new LastError(
         ok = false,
         errmsg = Option(cause.getMessage),
         code = Option.empty,
@@ -249,7 +198,9 @@ trait InsertOps[P <: SerializationPack with Singleton] {
         wnote = Option.empty[WriteConcern.W],
         wtimeout = false,
         waited = Option.empty[Int],
-        wtime = Option.empty[Int]))
+        wtime = Option.empty[Int],
+        writeErrors = Seq.empty,
+        writeConcernError = Option.empty))
     }
 
   private final class UnorderedInsert(

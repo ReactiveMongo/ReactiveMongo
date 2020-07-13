@@ -15,7 +15,10 @@ version in ThisBuild := {
               val suffix = descr.commitSuffix.sha
               s"${maj}.${min}.${nextPatch}-${suffix}-SNAPSHOT"
             }).getOrElse {
-              sys.error("Fails to determine qualified snapshot version")
+              println(
+                s"Fails to determine qualified snapshot version: $previousVer")
+
+              previousVer
             }
 
             current

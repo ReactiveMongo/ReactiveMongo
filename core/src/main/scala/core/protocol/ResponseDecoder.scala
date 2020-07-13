@@ -3,19 +3,14 @@ package reactivemongo.core.protocol
 import java.util.{ List => JList }
 
 import scala.util.{ Failure, Success, Try }
+import scala.util.control.NonFatal
 
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 import reactivemongo.io.netty.channel.ChannelHandlerContext
 
-import reactivemongo.api.BSONSerializationPack
+import reactivemongo.api.bson.BSONDocument
+import reactivemongo.api.bson.collection.BSONSerializationPack
 
-import reactivemongo.bson.{
-  BSONBooleanLike,
-  BSONDocument => LegacyDoc,
-  BSONNumberLike
-}
-
-import reactivemongo.core.netty.ChannelBufferReadableBuffer
 import reactivemongo.core.errors.DatabaseException
 
 private[reactivemongo] class ResponseDecoder
@@ -41,7 +36,7 @@ private[reactivemongo] class ResponseDecoder
     val header: MessageHeader = try {
       MessageHeader(frame)
     } catch {
-      case cause: Throwable =>
+      case NonFatal(cause) =>
         frame.discardReadBytes()
 
         throw new IllegalStateException("Invalid message header", cause)
@@ -65,9 +60,8 @@ private[reactivemongo] class ResponseDecoder
 
     val reply = Reply(frame)
     val chanId = Option(context).map(_.channel.id).orNull
-    def info = ResponseInfo(chanId)
+    def info = new ResponseInfo(chanId)
 
-    @com.github.ghik.silencer.silent(".*ResponseDecoder\\ is\\ deprecated.*")
     def response = if (reply.cursorID == 0 && reply.numberReturned > 0) {
       // Copy as unpooled (non-derived) buffer
       val docs = Unpooled.buffer(frame.readableBytes)
@@ -81,27 +75,26 @@ private[reactivemongo] class ResponseDecoder
         }
 
         case Success(doc) => {
-          val ok = doc.getAs[BSONBooleanLike]("ok")
+          val ok = doc.booleanLike("ok") getOrElse false
 
-          @com.github.ghik.silencer.silent(".*BSONSerializationPack\\ in\\ package\\ api\\ is\\ deprecated.*")
           def failed = {
             val r = {
               if (reply.inError) reply
               else reply.copy(flags = reply.flags | 0x02)
             }
 
-            // TODO
             Response.CommandError(
               header, r, info, DatabaseException(BSONSerializationPack)(doc))
           }
 
-          doc.getAs[LegacyDoc]("cursor") match {
-            case Some(cursor) if ok.exists(_.toBoolean) => {
+          doc.getAsOpt[BSONDocument]("cursor") match {
+            case Some(cursor) if ok => {
               val withCursor: Option[Response] = for {
-                id <- cursor.getAs[BSONNumberLike]("id").map(_.toLong)
-                ns <- cursor.getAs[String]("ns")
-                batch <- cursor.getAs[Seq[LegacyDoc]]("firstBatch").orElse(
-                  cursor.getAs[Seq[LegacyDoc]]("nextBatch"))
+                id <- cursor.long("id")
+                ns <- cursor.string("ns")
+
+                batch <- cursor.getAsOpt[Seq[BSONDocument]]("firstBatch").
+                  orElse(cursor.getAsOpt[Seq[BSONDocument]]("nextBatch"))
               } yield {
                 val r = reply.copy(cursorID = id, numberReturned = batch.size)
 
@@ -118,7 +111,7 @@ private[reactivemongo] class ResponseDecoder
             case _ => {
               docs.resetReaderIndex()
 
-              if (ok.forall(_.toBoolean)) {
+              if (ok) {
                 Response(header, reply, docs, info)
               } else { // !ok
                 failed
@@ -147,8 +140,7 @@ private[reactivemongo] class ResponseDecoder
 }
 
 private[reactivemongo] object ResponseDecoder {
-  @deprecated("Internal: will be made private", "0.19.0")
-  @inline private[reactivemongo] def first(buf: ByteBuf) = Try[LegacyDoc] {
+  @inline def first(buf: ByteBuf) = Try[BSONDocument] {
     val sz = buf.getIntLE(buf.readerIndex)
     val bytes = Array.ofDim[Byte](sz)
 
@@ -156,8 +148,9 @@ private[reactivemongo] object ResponseDecoder {
     // (which would require to manage its release)
     buf.readBytes(bytes)
 
-    val docBuf = ChannelBufferReadableBuffer(Unpooled wrappedBuffer bytes)
+    val docBuf = reactivemongo.api.bson.buffer.ReadableBuffer(bytes)
 
-    reactivemongo.api.BSONSerializationPack.readFromBuffer(docBuf)
+    reactivemongo.api.bson.collection.
+      BSONSerializationPack.readFromBuffer(docBuf)
   }
 }

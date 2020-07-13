@@ -5,181 +5,132 @@ package reactivemongo.api
  *
  * {{{
  * import scala.concurrent.ExecutionContext
- * import reactivemongo.api.{ DefaultDB, WriteConcern }
+ * import reactivemongo.api.{ DB, WriteConcern }
  * import reactivemongo.api.bson.BSONDocument
  *
- * def foo(db: DefaultDB)(implicit ec: ExecutionContext) =
+ * def foo(db: DB)(implicit ec: ExecutionContext) =
  *   db.collection("myColl").
  *     insert(ordered = false, WriteConcern.Acknowledged).
  *     one(BSONDocument("foo" -> "bar"))
  * }}}
  */
-sealed trait WriteConcern {
-  def w: WriteConcern.W
-  def j: Boolean
-  def fsync: Boolean
-  def wtimeout: Option[Int]
+final class WriteConcern private[api] (
+  val w: WriteConcern.W,
+  val j: Boolean,
+  val fsync: Boolean,
+  val wtimeout: Option[Int]) {
+
+  @SuppressWarnings(Array("VariableShadowing"))
+  def copy(
+    w: WriteConcern.W = this.w,
+    j: Boolean = this.j,
+    fsync: Boolean = this.fsync,
+    wtimeout: Option[Int] = this.wtimeout): WriteConcern =
+    new WriteConcern(w, j, fsync, wtimeout)
+
+  override def equals(that: Any): Boolean = that match {
+    case other: WriteConcern => tupled == other.tupled
+    case _                   => false
+  }
+
+  override def hashCode: Int = tupled.hashCode
+
+  override def toString = s"WriteConcern${tupled.toString}"
+
+  private lazy val tupled = Tuple4(w, j, fsync, wtimeout)
 }
 
 /** [[WriteConcern]] utilities. */
 object WriteConcern {
-  import reactivemongo.api.commands.GetLastError
+  /**
+   * @param j the journal flag
+   * @param wtimeout specifies a time limit, in milliseconds (only applicable for `w` values greater than 1)
+   */
+  def apply(
+    w: WriteConcern.W,
+    j: Boolean,
+    fsync: Boolean,
+    wtimeout: Option[Int]): WriteConcern =
+    new WriteConcern(w, j, fsync, wtimeout)
+
+  // ---
 
   /** [[https://docs.mongodb.com/manual/reference/write-concern/index.html#w-option Acknowledgment]] specification (w) */
   sealed trait W
 
   /** [[https://docs.mongodb.com/manual/reference/write-concern/index.html#writeconcern._dq_majority_dq_ Majority]] acknowledgment */
-  sealed trait Majority extends W
+  object Majority extends W {
+    override def toString = "Majority"
+  }
 
   /** [[https://docs.mongodb.com/manual/reference/write-concern/index.html#writeconcern.%3Ccustom-write-concern-name%3E Tagged]] acknowledgment */
-  sealed class TagSet(val tag: String) extends W
+  final class TagSet private[api] (val tag: String) extends W {
+    override def equals(that: Any): Boolean = that match {
+      case other: TagSet =>
+        (tag == null && other.tag == null) || (tag != null && tag == other.tag)
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = tag.hashCode
+
+    override def toString = s"TagSet($tag)"
+  }
+
+  object TagSet {
+    @inline def apply(tag: String): TagSet = new TagSet(tag)
+
+    private[api] def unapply(that: W): Option[String] = that match {
+      case other: TagSet => Option(other.tag)
+      case _             => None
+    }
+  }
 
   /** Requests acknowledgment [[https://docs.mongodb.com/manual/reference/write-concern/index.html#writeconcern.%3Cnumber%3E by at least]] `i` nodes. */
-  sealed class WaitForAcknowledgments(val i: Int) extends W
+  final class WaitForAcknowledgments private[api] (val i: Int) extends W {
+    override def equals(that: Any): Boolean = that match {
+      case other: WaitForAcknowledgments => i == other.i
+      case _                             => false
+    }
+
+    override def hashCode: Int = i
+
+    override def toString = s"WaitForAcknowledgments($i)"
+  }
+
+  object WaitForAcknowledgments {
+    @inline def apply(i: Int): WaitForAcknowledgments =
+      new WaitForAcknowledgments(i)
+
+    private[api] def unapply(that: W): Option[Int] = that match {
+      case other: WaitForAcknowledgments => Some(other.i)
+      case _                             => None
+    }
+  }
 
   /** [[WriteConcern]] with no acknowledgment required. */
-  val Unacknowledged: GetLastError with WriteConcern =
-    GetLastError(GetLastError.WaitForAcknowledgments(0), false, false, None)
+  val Unacknowledged: WriteConcern =
+    WriteConcern(new WaitForAcknowledgments(0), false, false, None)
 
   /** [[WriteConcern]] with one acknowledgment required. */
-  val Acknowledged: GetLastError with WriteConcern =
-    GetLastError(GetLastError.WaitForAcknowledgments(1), false, false, None)
+  val Acknowledged: WriteConcern =
+    WriteConcern(new WaitForAcknowledgments(1), false, false, None)
 
   /**
    * [[WriteConcern]] with one acknowledgment and operation
    * written to the [[https://docs.mongodb.com/manual/reference/write-concern/index.html#j-option on-disk journal]].
    */
-  val Journaled: GetLastError with WriteConcern =
-    GetLastError(GetLastError.WaitForAcknowledgments(1), true, false, None)
+  val Journaled: WriteConcern =
+    WriteConcern(new WaitForAcknowledgments(1), true, false, None)
 
-  def ReplicaAcknowledged(n: Int, timeout: Int, journaled: Boolean): GetLastError with WriteConcern = GetLastError(GetLastError.WaitForAcknowledgments(if (n < 2) 2 else n), journaled, false, (if (timeout <= 0) None else Some(timeout)))
+  @SuppressWarnings(Array("MethodNames"))
+  def ReplicaAcknowledged(n: Int, timeout: Int, journaled: Boolean): WriteConcern = WriteConcern(new WaitForAcknowledgments(if (n < 2) 2 else n), journaled, false, (if (timeout <= 0) None else Some(timeout)))
 
-  def TagReplicaAcknowledged(tag: String, timeout: Int, journaled: Boolean): GetLastError with WriteConcern = GetLastError(GetLastError.TagSet(tag), journaled, false, (if (timeout <= 0) None else Some(timeout)))
+  @SuppressWarnings(Array("MethodNames"))
+  def TagReplicaAcknowledged(tag: String, timeout: Int, journaled: Boolean): WriteConcern = WriteConcern(new TagSet(tag), journaled, false, (if (timeout <= 0) None else Some(timeout)))
 
   /** The default [[WriteConcern]] */
-  def Default: GetLastError with WriteConcern = Acknowledged
-}
-
-package commands {
-  import reactivemongo.api.{ WriteConcern => WC }
-
-  /**
-   * @param wtimeout the [[http://docs.mongodb.org/manual/reference/write-concern/#wtimeout time limit]]
-   */
-  @deprecated("Will be replaced by `reactivemongo.api.commands.WriteConcern`", "0.16.0")
-  case class GetLastError(
-    w: GetLastError.W,
-    j: Boolean,
-    fsync: Boolean,
-    wtimeout: Option[Int] = None) extends Command with WC
-    with CommandWithResult[LastError]
-
-  @deprecated("Will be replaced by `reactivemongo.api.commands.WriteConcern`", "0.16.0")
-  object GetLastError {
-    sealed trait W extends WC.W
-    case object Majority extends WC.Majority with W
-
-    class TagSet private[api] (override val tag: String)
-      extends WC.TagSet(tag) with W
-      with Product1[String] with Serializable {
-
-      @deprecated("No longer a case class", "0.20.3")
-      @inline def _1 = tag
-
-      @deprecated("No longer a case class", "0.20.3")
-      def canEqual(that: Any): Boolean = that match {
-        case _: TagSet => true
-        case _         => false
-      }
-
-      override def equals(that: Any): Boolean = that match {
-        case other: TagSet =>
-          this.tag == other.tag
-
-        case _ =>
-          false
-      }
-
-      override def hashCode: Int = tag.hashCode
-
-      override def toString = s"TagSet($tag)"
-    }
-
-    object TagSet extends scala.runtime.AbstractFunction1[String, TagSet] {
-      def apply(tag: String): TagSet = new TagSet(tag)
-
-      @deprecated("No longer a case class", "0.20.3")
-      def unapply(set: TagSet): Option[String] = Option(set).map(_.tag)
-    }
-
-    @deprecated(message = "Use `WaitForAcknowledgments`", since = "0.12.4")
-    case class WaitForAknowledgments(override val i: Int)
-      extends WC.WaitForAcknowledgments(i) with W
-
-    class WaitForAcknowledgments private[api] (override val i: Int)
-      extends WC.WaitForAcknowledgments(i) with W
-      with Product1[Int] with Serializable {
-
-      @deprecated("No longer a case class", "0.20.3")
-      @inline def _1 = i
-
-      @deprecated("No longer a case class", "0.20.3")
-      def canEqual(that: Any): Boolean = that match {
-        case _: WaitForAcknowledgments => true
-        case _                         => false
-      }
-
-      override def equals(that: Any): Boolean = that match {
-        case other: WaitForAcknowledgments =>
-          this.i == other.i
-
-        case _ =>
-          false
-      }
-
-      override def hashCode: Int = i
-
-      override def toString = s"WaitForAcknowledgments($i)"
-    }
-
-    object WaitForAcknowledgments extends scala.runtime.AbstractFunction1[Int, WaitForAcknowledgments] {
-      def apply(i: Int): WaitForAcknowledgments = new WaitForAcknowledgments(i)
-
-      @deprecated("No longer a case class", "0.20.3")
-      def unapply(set: WaitForAcknowledgments): Option[Int] = Option(set).map(_.i)
-    }
-
-    object W {
-      @deprecated(message = "Use `W(s)`", since = "0.12.7")
-      def strToTagSet(s: String): W = apply(s)
-
-      /** Factory */
-      def apply(s: String): W = TagSet(s)
-
-      @deprecated(message = "Use `intToWaitForAcknowledgments`", since = "0.12.4")
-      def intToWaitForAknowledgments(i: Int): W =
-        WaitForAknowledgments(i)
-
-      @deprecated(message = "Use `W(i)`", since = "0.12.7")
-      def intToWaitForAcknowledgments(i: Int): W = apply(i)
-
-      /** Factory */
-      def apply(i: Int): W = WaitForAcknowledgments(i)
-    }
-
-    val Unacknowledged: GetLastError =
-      GetLastError(WaitForAcknowledgments(0), false, false, None)
-
-    val Acknowledged: GetLastError =
-      GetLastError(WaitForAcknowledgments(1), false, false, None)
-
-    val Journaled: GetLastError =
-      GetLastError(WaitForAcknowledgments(1), true, false, None)
-
-    def ReplicaAcknowledged(n: Int, timeout: Int, journaled: Boolean): GetLastError = GetLastError(WaitForAcknowledgments(if (n < 2) 2 else n), journaled, false, (if (timeout <= 0) None else Some(timeout)))
-
-    def TagReplicaAcknowledged(tag: String, timeout: Int, journaled: Boolean): GetLastError = GetLastError(TagSet(tag), journaled, false, (if (timeout <= 0) None else Some(timeout)))
-
-    def Default: GetLastError = Acknowledged
-  }
+  @SuppressWarnings(Array("MethodNames"))
+  def Default: WriteConcern = Acknowledged
 }

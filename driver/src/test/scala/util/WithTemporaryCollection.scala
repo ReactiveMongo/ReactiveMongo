@@ -5,18 +5,17 @@ import scala.concurrent.duration.FiniteDuration
 
 import scala.util.Random
 
-import reactivemongo.api.{
-  Collection,
-  CollectionMetaCommands,
-  CollectionProducer,
-  DefaultDB
-}
+import reactivemongo.api.{ CollectionProducer, DB }
+
+import reactivemongo.api.collections.GenericCollection
 
 object WithTemporaryCollection {
 
-  def withTmpCollection[C <: Collection with CollectionMetaCommands, A](
-    db: DefaultDB,
-    timeout: FiniteDuration = tests.Common.timeout)(f: C => A)(implicit producer: CollectionProducer[C], ec: ExecutionContext): A = {
+  def withTmpCollection[C <: GenericCollection[_], A](
+    db: DB,
+    timeout: FiniteDuration = tests.Common.timeout)(f: C => A)(
+    implicit
+    producer: CollectionProducer[C], ec: ExecutionContext): A = {
     val collectionName = s"tmp-${System identityHashCode this}-${Random.alphanumeric.take(10).mkString("")}"
     val collection = db[C](collectionName)
     // we won't drop the collection in case of exceptions, so that it can be debugged

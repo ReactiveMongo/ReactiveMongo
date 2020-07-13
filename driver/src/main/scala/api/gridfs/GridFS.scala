@@ -32,25 +32,29 @@ import reactivemongo.api.{
   DB,
   DBMetaCommands,
   FailingCursor,
-  FailoverStrategy,
-  QueryOpts,
+  PackSupport,
   ReadPreference,
-  Serialization,
-  SerializationPack
+  SerializationPack,
+  Session
 }
 
 import reactivemongo.api.commands.{
   CollStats,
   Command,
-  CommandError,
+  CommandException,
   CommandCodecs,
-  ResolvedCollectionCommand,
+  CommandCodecsWithPack,
+  DeleteCommand,
+  InsertCommand,
+  UpdateCommand,
+  UpdateWriteResultFactory,
+  UpsertedFactory,
   WriteResult
 }
 
-import reactivemongo.core.errors.ReactiveMongoException
+import reactivemongo.core.errors.GenericDriverException
 
-import reactivemongo.api.collections.{ GenericCollection, GenericQueryBuilder }
+import reactivemongo.api.collections.QueryBuilderFactory
 
 import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.Ascending
 
@@ -63,8 +67,11 @@ import reactivemongo.api.gridfs.{ FileToSave => SF, ReadFile => RF }
  * @define fileSelector the query to find the files
  * @define readFileParam the file to be read
  * @define fileReader fileReader a file reader automatically resolved if `Id` is a valid value
- */ // TODO: Remove 'with Singleton'
-sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
+ */
+sealed trait GridFS[P <: SerializationPack] extends PackSupport[P]
+  with InsertCommand[P] with DeleteCommand[P] with UpdateCommand[P]
+  with UpdateWriteResultFactory[P] with UpsertedFactory[P]
+  with CommandCodecsWithPack[P] with QueryBuilderFactory[P] { self =>
 
   /* The database where this store is located. */
   protected def db: DB with DBMetaCommands
@@ -76,7 +83,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
    */
   protected def prefix: String
 
-  private[reactivemongo] val pack: P
+  private[reactivemongo] def session(): Option[Session] = db.session
 
   /* The `files` collection */
   private lazy val fileColl = new Collection {
@@ -91,6 +98,18 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
     val name = s"${self.prefix}.chunks"
     val failoverStrategy = db.failoverStrategy
   }
+
+  private lazy val fileQueryBuilder = new QueryBuilder(
+    collection = fileColl,
+    failoverStrategy = db.failoverStrategy,
+    readConcern = db.connection.options.readConcern,
+    readPreference = db.defaultReadPreference)
+
+  private lazy val chunkQueryBuilder = new QueryBuilder(
+    collection = chunkColl,
+    failoverStrategy = db.failoverStrategy,
+    readConcern = db.connection.options.readConcern,
+    readPreference = db.defaultReadPreference)
 
   private lazy val runner = Command.run[pack.type](pack, db.failoverStrategy)
 
@@ -147,7 +166,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
    */
   def find[S, Id <: pack.Value](selector: S)(implicit w: pack.Writer[S], r: FileReader[Id], cp: CursorProducer[ReadFile[Id]]): cp.ProducedCursor = try {
     val q = pack.serialize(selector, w)
-    val query = new QueryBuilder(fileColl, db.failoverStrategy, Some(q), None)
+    val query = fileQueryBuilder.filter(q)
 
     import r.reader
 
@@ -168,14 +187,14 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
    *
    * import reactivemongo.api.gridfs.GridFS
    *
-   * import reactivemongo.api.bson.{ BSONDocument, BSONValue }
+   * import reactivemongo.api.bson.BSONDocument
    * import reactivemongo.api.bson.collection.{ BSONSerializationPack => Pack }
    *
    * def foo(gfs: GridFS[Pack.type], n: String)(implicit ec: ExecutionContext) =
    *   gfs.find(BSONDocument("filename" -> n)).headOption
    * }}}
    */
-  def find(selector: pack.Document)(implicit ec: ExecutionContext, cp: CursorProducer[ReadFile[pack.Value]]): cp.ProducedCursor = {
+  def find(selector: pack.Document)(implicit cp: CursorProducer[ReadFile[pack.Value]]): cp.ProducedCursor = {
     implicit def w = pack.IdentityWriter
     implicit def r = FileReader.default(pack.IsValue)
 
@@ -195,8 +214,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
     val sortOpts = document(Seq(elem("n", builder.int(1))))
     implicit def reader = chunkReader
 
-    val query = new QueryBuilder(
-      chunkColl, db.failoverStrategy, Some(selectorOpts), Some(sortOpts))
+    val query = chunkQueryBuilder.filter(selectorOpts).sort(sortOpts)
 
     query.cursor[Array[Byte]](readPreference)
   }
@@ -209,8 +227,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
   def readToOutputStream[Id <: pack.Value](file: ReadFile[Id], out: OutputStream, readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[Unit] = {
     val selectorOpts = chunkSelector(file)
     val sortOpts = document(Seq(elem("n", builder.int(1))))
-    val query = new QueryBuilder(
-      chunkColl, db.failoverStrategy, Some(selectorOpts), Some(sortOpts))
+    val query = chunkQueryBuilder.filter(selectorOpts).sort(sortOpts)
 
     implicit def r: pack.Reader[pack.Document] = pack.IdentityReader
 
@@ -225,7 +242,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
           val errmsg = s"not a chunk! failed assertion: data field is missing: ${pack pretty doc}"
 
           logger.error(errmsg)
-          Cursor.Fail(ReactiveMongoException(errmsg))
+          Cursor.Fail(new GenericDriverException(errmsg))
         }
       }
 
@@ -281,12 +298,13 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
           finalizeFile[Id](file, previous, n, chunkSize, length.toLong, md5Hex)
         }
 
-      @inline def writeChunk(n: Int, bytes: Array[Byte]) =
-        self.writeChunk(file.id, n, bytes)
+      @inline def writeChunk(cn: Int, bytes: Array[Byte]) =
+        self.writeChunk(file.id, cn, bytes)
     }
 
     val buffer = Array.ofDim[Byte](chunkSize)
 
+    @SuppressWarnings(Array("VariableShadowing"))
     def go(previous: Chunk): Future[Chunk] =
       Future(input read buffer).flatMap {
         case n if n > 0 => {
@@ -303,6 +321,32 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
     go(Chunk(Array.empty, 0, digestInit, 0)).flatMap(_.finish)
   }
 
+  protected lazy val maxWireVersion =
+    db.connectionState.metadata.maxWireVersion
+
+  /**
+   * Updates the metadata document for the specified file.
+   *
+   * @param id the id of the file to be updated
+   * @param metadata the file new metadata
+   */
+  def update[Id <: pack.Value](id: Id, metadata: pack.Document)(implicit ec: ExecutionContext): Future[WriteResult] = {
+    val updateFileCmd = new Update(
+      firstUpdate = new UpdateElement(
+        q = document(Seq(elem("_id", id))),
+        u = metadata,
+        upsert = false,
+        multi = false,
+        collation = None,
+        arrayFilters = Seq.empty),
+      updates = Seq.empty,
+      ordered = false,
+      writeConcern = defaultWriteConcern,
+      bypassDocumentValidation = false)
+
+    runner(fileColl, updateFileCmd, defaultReadPreference)
+  }
+
   /**
    * Removes a file from this store.
    * Note that if the file does not actually exist,
@@ -311,18 +355,14 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
    * @param id the file id to remove from this store
    */
   def remove[Id <: pack.Value](id: Id)(implicit ec: ExecutionContext): Future[WriteResult] = {
-    import DeleteCommand.{ Delete, DeleteElement }
-
-    implicit def resultReader = deleteReader
-
-    val deleteChunkCmd = Delete(
-      Seq(DeleteElement(
+    val deleteChunkCmd = new Delete(
+      Seq(new DeleteElement(
         q = document(Seq(elem("files_id", id))), 1, None)),
       ordered = false,
       writeConcern = defaultWriteConcern)
 
-    val deleteFileCmd = Delete(
-      Seq(DeleteElement(
+    val deleteFileCmd = new Delete(
+      Seq(new DeleteElement(
         q = document(Seq(elem("_id", id))), 1, None)),
       ordered = false,
       writeConcern = defaultWriteConcern)
@@ -343,6 +383,7 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
    *
    * @return A future containing true if the index was created, false if it already exists.
    */
+  @SuppressWarnings(Array("VariableShadowing"))
   def ensureIndex()(implicit ec: ExecutionContext): Future[Boolean] = {
     val indexMngr = db.indexesManager[P](pack)(ec)
 
@@ -353,7 +394,6 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
         name = None,
         unique = true,
         background = false,
-        dropDups = false,
         sparse = false,
         expireAfterSeconds = None,
         storageEngine = None,
@@ -378,7 +418,6 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
         name = None,
         unique = false,
         background = false,
-        dropDups = false,
         sparse = false,
         expireAfterSeconds = None,
         storageEngine = None,
@@ -403,9 +442,10 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
    * Returns whether the data related to this GridFS instance
    * exists on the database.
    */
+  @SuppressWarnings(Array("VariableShadowing"))
   def exists(implicit ec: ExecutionContext): Future[Boolean] = (for {
-    _ <- stats(chunkColl).filter { s => s.size > 0 || s.nindexes > 0 }
-    _ <- stats(fileColl).filter { s => s.size > 0 || s.nindexes > 0 }
+    _ <- stats(chunkColl).filter { c => c.size > 0 || c.nindexes > 0 }
+    _ <- stats(fileColl).filter { f => f.size > 0 || f.nindexes > 0 }
   } yield true).recover {
     case _ => false
   }
@@ -455,13 +495,12 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
       elem("n", builder.int(n)),
       elem("data", builder.binary(bytes))))
 
-    val insertChunkCmd = InsertCommand.Insert(
-      chunkDoc,
-      Seq.empty[pack.Document],
+    val insertChunkCmd = new Insert(
+      head = chunkDoc,
+      tail = Seq.empty[pack.Document],
       ordered = false,
-      writeConcern = defaultWriteConcern)
-
-    implicit def resultReader = insertReader
+      writeConcern = defaultWriteConcern,
+      bypassDocumentValidation = false)
 
     runner(chunkColl, insertChunkCmd, defaultReadPreference)
   }
@@ -486,32 +525,30 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
       elem("uploadDate", builder.dateTime(uploadDate)),
       elem("metadata", file.metadata))
 
-    file.filename.foreach { n =>
-      fileProps += elem("filename", builder.string(n))
+    file.filename.foreach { fn =>
+      fileProps += elem("filename", builder.string(fn))
     }
 
-    file.contentType.foreach { t =>
-      fileProps += elem("contentType", builder.string(t))
+    file.contentType.foreach { ct =>
+      fileProps += elem("contentType", builder.string(ct))
     }
 
     md5Hex.foreach { hex =>
       fileProps += elem("md5", builder.string(hex))
     }
 
-    for {
-      _ <- writeChunk(file.id, n, previous)
+    writeChunk(file.id, n, previous).flatMap { _ =>
+      val fileDoc = document(fileProps.result())
 
-      res <- {
-        val fileDoc = document(fileProps.result())
+      val insertFileCmd = new Insert(
+        head = fileDoc,
+        tail = Seq.empty[pack.Document],
+        ordered = false,
+        writeConcern = defaultWriteConcern,
+        bypassDocumentValidation = false)
 
-        val insertFileCmd = InsertCommand.Insert(
-          fileDoc,
-          Seq.empty[pack.Document],
-          ordered = false,
-          writeConcern = defaultWriteConcern)
-
-        implicit def resultReader = insertReader
-
+      @SuppressWarnings(Array("VariableShadowing"))
+      @inline def run =
         runner(fileColl, insertFileCmd, defaultReadPreference).map { _ =>
           new ReadFile[Id](
             id = file.id,
@@ -523,8 +560,9 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
             metadata = file.metadata,
             md5 = md5Hex)
         }
-      }
-    } yield res
+
+      run
+    }
   }
 
   @inline private def chunkSelector[Id <: pack.Value](
@@ -538,10 +576,10 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
             if (file.length % file.chunkSize > 0) 1 else 0))))))))
 
   private lazy val chunkReader: pack.Reader[Array[Byte]] = {
-    val decoder = pack.newDecoder
+    val dec = pack.newDecoder
 
-    pack.reader[Array[Byte]] { doc =>
-      decoder.binary(doc, "data").get
+    pack.readerOpt[Array[Byte]] { doc =>
+      dec.binary(doc, "data")
     }
   }
 
@@ -554,17 +592,17 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
 
   private lazy val createCollCmd = reactivemongo.api.commands.Create()
 
-  private implicit lazy val unitBoxReader =
-    CommandCodecs.unitBoxReader[pack.type](pack)
+  private implicit lazy val unitReader =
+    CommandCodecs.unitReader[pack.type](pack)
 
   private implicit lazy val createWriter =
     reactivemongo.api.commands.CreateCollection.writer[pack.type](pack)
 
   private def create(coll: Collection)(implicit ec: ExecutionContext) =
-    runner.unboxed(coll, createCollCmd, defaultReadPreference).recover {
-      case CommandError.Code(48 /* already exists */ ) => ()
+    runner(coll, createCollCmd, defaultReadPreference).recover {
+      case CommandException.Code(48 /* already exists */ ) => ()
 
-      case CommandError.Message(
+      case CommandException.Message(
         "collection already exists") => ()
     }
 
@@ -578,65 +616,6 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
 
   @inline private def stats(coll: Collection)(implicit ec: ExecutionContext) =
     runner(coll, collStatsCmd, defaultReadPreference)
-
-  // Insert command
-
-  private object InsertCommand
-    extends reactivemongo.api.commands.InsertCommand[pack.type] {
-    val pack: self.pack.type = self.pack
-  }
-
-  private type InsertCmd = ResolvedCollectionCommand[InsertCommand.Insert]
-
-  implicit private lazy val insertWriter: pack.Writer[InsertCmd] = {
-    val underlying = reactivemongo.api.commands.InsertCommand.
-      writer(pack)(InsertCommand)(db.session)
-
-    pack.writer[InsertCmd](underlying)
-  }
-
-  private lazy val insertReader: pack.Reader[InsertCommand.InsertResult] =
-    CommandCodecs.defaultWriteResultReader(pack)
-
-  // Delete command
-
-  private object DeleteCommand
-    extends reactivemongo.api.commands.DeleteCommand[self.pack.type] {
-    val pack: self.pack.type = self.pack
-  }
-
-  private type DeleteCmd = ResolvedCollectionCommand[DeleteCommand.Delete]
-
-  implicit private lazy val deleteWriter: pack.Writer[DeleteCmd] =
-    pack.writer(DeleteCommand.serialize)
-
-  private lazy val deleteReader: pack.Reader[DeleteCommand.DeleteResult] =
-    CommandCodecs.defaultWriteResultReader(pack)
-
-  // ---
-
-  private final class QueryBuilder(
-    override val collection: Collection,
-    val failoverStrategy: FailoverStrategy,
-    val queryOption: Option[pack.Document],
-    val sortOption: Option[pack.Document]) extends GenericQueryBuilder[pack.type] {
-    type Self = QueryBuilder
-    val pack: self.pack.type = self.pack
-
-    protected lazy val version =
-      collection.db.connectionState.metadata.maxWireVersion
-
-    val projectionOption = Option.empty[pack.Document]
-    val hintOption = Option.empty[pack.Document]
-    val explainFlag = false
-    val snapshotFlag = false
-    val commentString = Option.empty[String]
-    val maxTimeMsOption = Option.empty[Long]
-
-    def options = QueryOpts()
-
-    def copy(queryOption: Option[pack.Document], sortOption: Option[pack.Document], projectionOption: Option[pack.Document], hintOption: Option[pack.Document], explainFlag: Boolean, snapshotFlag: Boolean, commentString: Option[String], options: QueryOpts, failoverStrategy: FailoverStrategy, maxTimeMsOption: Option[Long]) = new QueryBuilder(this.collection, failoverStrategy, queryOption, sortOption)
-  }
 
   // ---
 
@@ -659,12 +638,13 @@ sealed trait GridFS[P <: SerializationPack with Singleton] { self =>
 }
 
 object GridFS {
-  private[api] def apply[P <: SerializationPack with Singleton](
+  @SuppressWarnings(Array("VariableShadowing"))
+  private[api] def apply[P <: SerializationPack](
     _pack: P,
     db: DB with DBMetaCommands,
     prefix: String): GridFS[P] = {
-    def _prefix = prefix
-    def _db = db
+    @SuppressWarnings(Array("MethodNames")) def _prefix = prefix
+    @SuppressWarnings(Array("MethodNames")) def _db = db
 
     new GridFS[P] {
       val db = _db

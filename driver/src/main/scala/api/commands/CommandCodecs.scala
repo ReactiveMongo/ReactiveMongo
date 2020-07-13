@@ -6,48 +6,83 @@ import reactivemongo.api.{
   ReadConcern,
   Session,
   SerializationPack,
-  WriteConcern => WC
+  WriteConcern
 }
 
+import reactivemongo.core.errors.{ CommandException => CmdErr }
+
 private[reactivemongo] object CommandCodecs {
-  /**
-   * Helper to read a command result, with error handling.
-   */
-  def dealingWithGenericCommandErrorsReader[P <: SerializationPack, A](pack: P)(readResult: pack.Document => A): pack.Reader[A] = {
-    val decoder = pack.newDecoder
-
-    pack.reader[A] { doc: pack.Document =>
-      decoder.booleanLike(doc, "ok") match {
-        case Some(true) => {
-          decoder.string(doc, "note").foreach { note =>
-            Command.logger.info(s"${note}: ${pack pretty doc}")
-          }
-
-          readResult(doc)
+  private def foldResult[P <: SerializationPack, A](
+    decoder: SerializationPack.Decoder[P])(
+    ko: decoder.pack.Document => A,
+    ok: decoder.pack.Document => A): decoder.pack.Document => A = { doc =>
+    decoder.booleanLike(doc, "ok") match {
+      case Some(true) => {
+        decoder.string(doc, "note").foreach { note =>
+          Command.logger.info(s"${note}: ${decoder.pack pretty doc}")
         }
 
-        case _ => throw CommandError(pack)(
-          code = decoder.int(doc, "code"),
-          errmsg = decoder.string(doc, "errmsg"),
-          originalDocument = doc)
+        ok(doc)
       }
+
+      case _ => ko(doc)
     }
   }
 
-  @inline def defaultWriteResultReader[P <: SerializationPack with Singleton](pack: P): pack.Reader[DefaultWriteResult] = writeResultReader[DefaultWriteResult, pack.type](pack)
+  /**
+   * Helper to read a command result, with error handling.
+   */
+  def dealingWithGenericCommandExceptionsReader[P <: SerializationPack, A](pack: P)(readResult: pack.Document => A): pack.Reader[A] = {
+    val decoder = pack.newDecoder
+    val foldRes = foldResult[pack.type, A](decoder) _
 
-  def writeResultReader[WR >: DefaultWriteResult, P <: SerializationPack with Singleton](pack: P): pack.Reader[WR] = {
+    pack.reader[A] {
+      foldRes(
+        { doc =>
+          throw CmdErr(pack)(
+            _message = decoder.string(doc, "errmsg").getOrElse(""),
+            _originalDocument = Some(doc),
+            _code = decoder.int(doc, "code"))
+        },
+        readResult)
+    }
+  }
+
+  /**
+   * Helper to read a command result, with error handling.
+   */
+  def dealingWithGenericCommandExceptionsReaderOpt[P <: SerializationPack, A](pack: P)(readResult: pack.Document => Option[A]): pack.Reader[A] = {
+    val decoder = pack.newDecoder
+    val foldRes = foldResult[pack.type, Option[A]](decoder) _
+
+    pack.readerOpt[A] {
+      foldRes(
+        { doc =>
+          throw CmdErr(pack)(
+            _message = decoder.string(doc, "errmsg").getOrElse(""),
+            _originalDocument = Some(doc),
+            _code = decoder.int(doc, "code"))
+        },
+        readResult)
+    }
+  }
+
+  @inline def defaultWriteResultReader[P <: SerializationPack](pack: P): pack.Reader[DefaultWriteResult] = writeResultReader[DefaultWriteResult, pack.type](pack)
+
+  def writeResultReader[WR >: DefaultWriteResult, P <: SerializationPack](pack: P): pack.Reader[WR] = {
     val decoder = pack.newDecoder
     val readWriteError = CommandCodecs.readWriteError(decoder)
     val readWriteConcernError = CommandCodecs.readWriteConcernError(decoder)
 
-    dealingWithGenericCommandErrorsReader[pack.type, WR](pack) { doc =>
-      val werrors = decoder.children(doc, "writeErrors").map(readWriteError)
+    dealingWithGenericCommandExceptionsReader[pack.type, WR](pack) { doc =>
+      val werrors = decoder.children(doc, "writeErrors").flatMap { e =>
+        readWriteError(e).toSeq
+      }
 
       val wcError = decoder.child(doc, "writeConcernError").
-        map(readWriteConcernError)
+        flatMap(readWriteConcernError)
 
-      DefaultWriteResult(
+      new DefaultWriteResult(
         ok = decoder.booleanLike(doc, "ok").getOrElse(true),
         n = decoder.int(doc, "n").getOrElse(0),
         writeErrors = werrors,
@@ -58,13 +93,11 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
-  def unitBoxReader[P <: SerializationPack](pack: P): pack.Reader[UnitBox.type] = dealingWithGenericCommandErrorsReader[pack.type, UnitBox.type](pack) { _ => UnitBox }
+  def unitReader[P <: SerializationPack](pack: P): pack.Reader[Unit] = dealingWithGenericCommandExceptionsReader[pack.type, Unit](pack) { _ => () }
 
-  //def writeReadConcern[P <: SerializationPack with Singleton](pack: P): ReadConcern => pack.Document = writeReadConcern[pack.type](pack.newBuilder)
+  def writeReadConcern[P <: SerializationPack](builder: SerializationPack.Builder[P]): ReadConcern => Seq[builder.pack.ElementProducer] = { c: ReadConcern => Seq(builder.elementProducer("level", builder.string(c.level))) }
 
-  def writeReadConcern[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): ReadConcern => Seq[builder.pack.ElementProducer] = { c: ReadConcern => Seq(builder.elementProducer("level", builder.string(c.level))) }
-
-  def writeSessionReadConcern[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): Option[Session] => ReadConcern => Seq[builder.pack.ElementProducer] = {
+  def writeSessionReadConcern[P <: SerializationPack](builder: SerializationPack.Builder[P]): Option[Session] => ReadConcern => Seq[builder.pack.ElementProducer] = {
     import builder.{ document, elementProducer => element, pack }
 
     val simpleReadConcern = writeReadConcern(builder)
@@ -91,8 +124,8 @@ private[reactivemongo] object CommandCodecs {
                 elements.result()
               }
 
-              case _ => { c: ReadConcern =>
-                elements += simpleRead(c)
+              case _ => { rc: ReadConcern =>
+                elements += simpleRead(rc)
 
                 elements.result()
               }
@@ -110,21 +143,20 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
-  @inline def writeWriteConcern[P <: SerializationPack with Singleton](pack: P): WC => pack.Document = writeWriteConcern[pack.type](pack.newBuilder)
+  @inline def writeWriteConcern[P <: SerializationPack](pack: P): WriteConcern => pack.Document = writeWriteConcern[pack.type](pack.newBuilder)
 
-  def writeGetLastErrorWWriter[P <: SerializationPack with Singleton](
-    builder: SerializationPack.Builder[P]): WC.W => builder.pack.Value = {
-    case GetLastError.TagSet(tagSet)            => builder.string(tagSet)
-    case GetLastError.WaitForAcknowledgments(n) => builder.int(n)
-    case GetLastError.WaitForAknowledgments(n)  => builder.int(n)
+  def writeWriteConcernWWriter[P <: SerializationPack](
+    builder: SerializationPack.Builder[P]): WriteConcern.W => builder.pack.Value = {
+    case WriteConcern.TagSet(tagSet)            => builder.string(tagSet)
+    case WriteConcern.WaitForAcknowledgments(n) => builder.int(n)
     case _                                      => builder.string("majority")
   }
 
-  def writeWriteConcern[P <: SerializationPack with Singleton](
-    builder: SerializationPack.Builder[P]): WC => builder.pack.Document = {
-    val writeGLEW = writeGetLastErrorWWriter(builder)
+  def writeWriteConcern[P <: SerializationPack](
+    builder: SerializationPack.Builder[P]): WriteConcern => builder.pack.Document = {
+    val writeGLEW = writeWriteConcernWWriter(builder)
 
-    { writeConcern: WC =>
+    { writeConcern: WriteConcern =>
       import builder.{ elementProducer => element, int }
 
       val elements = Seq.newBuilder[builder.pack.ElementProducer]
@@ -140,7 +172,7 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
-  def writeSession[P <: SerializationPack with Singleton](builder: SerializationPack.Builder[P]): Session => Seq[builder.pack.ElementProducer] = {
+  def writeSession[P <: SerializationPack](builder: SerializationPack.Builder[P]): Session => Seq[builder.pack.ElementProducer] = {
     import builder.{ elementProducer => element }
 
     { session: Session =>
@@ -155,7 +187,7 @@ private[reactivemongo] object CommandCodecs {
             element("lsid", idElmt),
             element("txnNumber", builder.long(transaction.txnNumber)))
 
-          if (!session.transactionToFlag()) {
+          if (!session.transactionToFlag) {
             elms += element("startTransaction", builder.boolean(true))
           }
 
@@ -169,25 +201,18 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
-  def readWriteError[P <: SerializationPack with Singleton](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => WriteError = { doc =>
+  def readWriteError[P <: SerializationPack](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => Option[WriteError] = { doc =>
     (for {
       index <- decoder.int(doc, "index")
       code <- decoder.int(doc, "code")
       err <- decoder.string(doc, "errmsg")
-    } yield WriteError(index, code, err)).get
+    } yield WriteError(index, code, err))
   }
 
-  def readWriteConcernError[P <: SerializationPack with Singleton](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => WriteConcernError = { doc =>
+  def readWriteConcernError[P <: SerializationPack](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => Option[WriteConcernError] = { doc =>
     (for {
       code <- decoder.int(doc, "code")
       err <- decoder.string(doc, "errmsg")
-    } yield WriteConcernError(code, err)).get
-  }
-
-  def readUpserted[P <: SerializationPack with Singleton](decoder: SerializationPack.Decoder[P]): decoder.pack.Document => Upserted.Aux[P] = { document =>
-    (for {
-      index <- decoder.int(document, "index")
-      id <- decoder.get(document, "_id")
-    } yield Upserted.init[P](index, id)).get
+    } yield new WriteConcernError(code, err))
   }
 }

@@ -1,7 +1,5 @@
 package reactivemongo.api
 
-import scala.language.higherKinds
-
 import scala.collection.generic.CanBuildFrom
 
 import scala.collection.mutable.Builder
@@ -38,8 +36,6 @@ private[api] trait CursorCompat[T] {
     } else {
       makeRequest(maxDocs).map { resp =>
         def builder = documentIterator(resp).foldLeft(cbf()) { _ += _ }
-
-        println(s"numberToReturn = ${this.numberToReturn}")
 
         val ref = new Cursor.Reference(
           collectionName = fullCollectionName,

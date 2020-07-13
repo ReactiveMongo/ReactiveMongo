@@ -5,7 +5,7 @@ import reactivemongo.io.netty.buffer.ByteBuf
 /**
  * Something that can be written into a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]].
  */
-trait ChannelBufferWritable { // TODO: Private or remove
+private[reactivemongo] trait ChannelBufferWritable {
   /** Write this instance into the given [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]]. */
   def writeTo: ByteBuf => Unit
 
@@ -18,10 +18,10 @@ trait ChannelBufferWritable { // TODO: Private or remove
  *
  * @tparam T type which instances can be constructed with this.
  */
-trait ChannelBufferReadable[T] { // TODO: Private or remove
+private[reactivemongo] trait ChannelBufferReadable[T] {
   /** Makes an instance of T from the data from the given buffer. */
   def readFrom(buffer: ByteBuf): T
 
   /** @see readFrom */
-  def apply(buffer: ByteBuf): T = readFrom(buffer)
+  final def apply(buffer: ByteBuf): T = readFrom(buffer)
 }

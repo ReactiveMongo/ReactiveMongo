@@ -2,11 +2,7 @@ import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.ReadPreference
 
-import reactivemongo.api.commands.{
-  UpdateWriteResult,
-  WriteResult,
-  Upserted
-}
+import reactivemongo.api.commands.WriteResult
 
 import reactivemongo.api.bson.{ BSONDocument, BSONString }
 
@@ -26,14 +22,9 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
     s"slowup2${System identityHashCode slowDb}")
 
   def updateSpecs = {
-    implicit val personReader = PersonReader
-    implicit val personWriter = PersonWriter
-
     // with fixtures ...
     val jack3 = Person3("Jack", "London", 27, BigDecimal("12.345"))
-    val jack = Person("Jack London", 27)
     val jane3 = Person3("Jane", "London", 18, BigDecimal("3.45"))
-    val jane = Person("Jack London", 18)
 
     {
       def spec[T](c: DefaultCollection, timeout: FiniteDuration, f: => T)(upd: T => T)(implicit w: pack.Writer[T], r: pack.Reader[T]) = {
@@ -42,32 +33,16 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
         c.update.one(
           q = person,
           u = BSONDocument(f"$$set" -> BSONDocument("age" -> 33)),
-          upsert = true) must beLike[UpdateWriteResult]({
-            case result => result.upserted.toList must beLike[List[Upserted]] {
-              case Upserted(0, id: BSONObjectID) :: Nil =>
-                c.find(
+          upsert = true) must beLike[c.UpdateWriteResult]({
+            case result =>
+              result.upserted.toList must beLike[List[c.Upserted]] {
+                case c.Upserted(0, id: BSONObjectID) :: Nil => c.find(
                   selector = BSONDocument("_id" -> id),
-                  projection = Option.empty[BSONDocument]).one[T] must beSome(upd(person)).await(1, timeout)
-            }
+                  projection = Option.empty[BSONDocument]).
+                  one[T] must beSome(upd(person)).await(1, timeout)
+              }
           }).await(1, timeout)
       }
-
-      section("mongo2", "mongo24", "not_mongo26")
-      "upsert with MongoDB < 3" >> {
-        "a person with the default connection" in {
-          spec(updCol1, timeout, jack)(_.copy(age = 33))
-        }
-
-        "a person with the slow connection and Secondary preference" in {
-          val coll = slowUpdCol1.withReadPreference(
-            ReadPreference.secondaryPreferred)
-
-          coll.readPreference must_=== ReadPreference.secondaryPreferred and {
-            spec(coll, slowTimeout, jane)(_.copy(age = 33))
-          }
-        }
-      }
-      section("mongo2", "mongo24", "not_mongo26")
 
       section("gt_mongo32")
       "upsert with MongoDB 3.4+" >> {
@@ -92,8 +67,8 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
         val doc = BSONDocument("_id" -> "foo", "bar" -> 2)
 
         c.update.one(q = BSONDocument.empty, u = doc, upsert = true).
-          map(_.upserted.toList) must beLike[List[Upserted]] {
-            case Upserted(0, BSONString("foo")) :: Nil =>
+          map(_.upserted.toList) must beLike[List[c.Upserted]] {
+            case c.Upserted(0, BSONString("foo")) :: Nil =>
               c.find(
                 selector = BSONDocument("_id" -> "foo"),
                 projection = Option.empty[BSONDocument]).one[BSONDocument].
@@ -120,7 +95,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
 
         c.update.one(
           q = person,
-          u = BSONDocument(f"$$set" -> BSONDocument("age" -> 66))) must beLike[UpdateWriteResult] {
+          u = BSONDocument(f"$$set" -> BSONDocument("age" -> 66))) must beLike[c.UpdateWriteResult] {
             case result => result.nModified must_=== 1 and {
               c.find(
                 selector = BSONDocument("age" -> 66),
@@ -129,22 +104,6 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
             }
           }.await(1, timeout)
       }
-
-      section("mongo2", "mongo24", "not_mongo26")
-      "update with MongoDB < 3" >> {
-        "a person with the default connection" in {
-          val person = jack.copy(age = 33) // as after previous upsert test
-
-          spec(updCol1, timeout, person)(_.copy(age = 66))
-        }
-
-        "a person with the slow connection" in {
-          val person = jane.copy(age = 33) // as after previous upsert test
-
-          spec(slowUpdCol1, slowTimeout, person)(_.copy(age = 66))
-        }
-      }
-      section("mongo2", "mongo24", "not_mongo26")
 
       section("gt_mongo32")
       "update with MongoDB 3.4+" >> {

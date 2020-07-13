@@ -5,19 +5,21 @@ import scala.util.{ Failure, Success }
 import scala.util.control.NonFatal
 
 import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.duration.{ Duration, FiniteDuration }
 
 import akka.actor.ActorSystem
 
 import reactivemongo.core.protocol.Response
 
 private[api] final class FoldResponses[T](
+  failoverStrategy: FailoverStrategy,
   nextResponse: (ExecutionContext, Response) => Future[Option[Response]],
   killCursors: (Long, String) => Unit,
   maxDocs: Int,
   suc: (T, Response) => Future[Cursor.State[T]],
   err: Cursor.ErrorHandler[T])(implicit actorSys: ActorSystem, ec: ExecutionContext) { self =>
   import Cursor.{ Cont, Done, Fail, State, logger }
-  import CursorOps.Unrecoverable
+  import CursorOps.UnrecoverableException
 
   private val promise = scala.concurrent.Promise[T]()
   lazy val result: Future[T] = promise.future
@@ -61,7 +63,7 @@ private[api] final class FoldResponses[T](
     val handled: Future[State[T]] = try {
       suc(cur, last)
     } catch {
-      case unsafe: Exception /* see makeIterator */ =>
+      case NonFatal(unsafe) /* see makeIterator */ =>
         Future.failed[State[T]](unsafe)
     }
 
@@ -76,7 +78,7 @@ private[api] final class FoldResponses[T](
   @inline
   private def onError(last: Response, cur: T, error: Throwable, c: Int): Unit =
     error match {
-      case Unrecoverable(e) =>
+      case UnrecoverableException(e) =>
         ko(last, e) // already marked recoverable
 
       case _ => err(cur, error) match {
@@ -91,13 +93,13 @@ private[api] final class FoldResponses[T](
 
   @inline private def fetch(
     c: Int,
-    ec: ExecutionContext,
-    r: Response): Future[Option[Response]] = {
+    fec: ExecutionContext,
+    fr: Response): Future[Option[Response]] = {
     // Enforce maxDocs check as r.reply.startingFrom (checked in hasNext),
     // will always be set to 0 by the server for tailable cursor/capped coll
     if (c < maxDocs) {
       // nextResponse will take care of cursorID, ...
-      nextResponse(ec, r)
+      nextResponse(fec, fr)
     } else {
       Future.successful(Option.empty[Response])
     }
@@ -126,11 +128,13 @@ private[api] final class FoldResponses[T](
       err(cur, error) match {
         case Done(v) => {
           if (lastID > 0) kill(lastID)
+
           promise.success(v)
         }
 
         case Fail(e) => {
           if (lastID > 0) kill(lastID)
+
           promise.failure(e)
         }
 
@@ -146,10 +150,8 @@ private[api] final class FoldResponses[T](
   /**
    * Enqueues a `message` to be processed while fold the cursor results.
    */
-  def !(message: Any): Unit = {
-    actorSys.scheduler.scheduleOnce(
-      // TODO#1.1: on retry, add some delay according FailoverStrategy
-      scala.concurrent.duration.Duration.Zero)(handle(message))(ec)
+  private def ![M](message: M)(implicit delay: Delay.Aux[M]): Unit = {
+    actorSys.scheduler.scheduleOnce(delay.value)(handle(message))(ec)
 
     ()
   }
@@ -190,10 +192,51 @@ private[api] final class FoldResponses[T](
    * @param c $cParam
    */
   private case class OnError(last: Response, cur: T, error: Throwable, c: Int)
+
+  // ---
+
+  private sealed trait Delay {
+    type Message
+
+    def value: FiniteDuration
+
+    final override def equals(that: Any): Boolean = that match {
+      case other: Delay =>
+        this.value == other.value
+
+      case _ => false
+    }
+
+    final override def hashCode: Int = value.hashCode
+
+    final override def toString = s"Delay(${value.toString})"
+  }
+
+  private object Delay extends LowPriorityDelay {
+    type Aux[M] = Delay { type Message = M }
+
+    implicit val errorDelay: Delay.Aux[OnError] = new Delay {
+      type Message = OnError
+      val value = failoverStrategy.initialDelay
+    }
+  }
+
+  private sealed trait LowPriorityDelay { _: Delay.type =>
+    private val unsafe = new Delay {
+      type Message = Nothing
+      val value = Duration.Zero
+    }
+
+    // @com.github.ghik.silencer.silent
+    @SuppressWarnings(Array("AsInstanceOf"))
+    implicit def defaultDelay[M]: Delay.Aux[M] =
+      unsafe.asInstanceOf[Delay.Aux[M]]
+  }
 }
 
 private[api] object FoldResponses {
   def apply[T](
+    failoverStrategy: FailoverStrategy,
     z: => T,
     makeRequest: ExecutionContext => Future[Response],
     nextResponse: (ExecutionContext, Response) => Future[Option[Response]],
@@ -204,7 +247,8 @@ private[api] object FoldResponses {
     Future(z)(ec).flatMap({ v =>
       val max = if (maxDocs > 0) maxDocs else Int.MaxValue
       val f = new FoldResponses[T](
-        nextResponse, killCursors, max, suc, err)(actorSys, ec)
+        failoverStrategy, nextResponse, killCursors, max, suc, err)(
+        actorSys, ec)
 
       f ! f.ProcResponses(() => makeRequest(ec), v, 0, -1L)
 

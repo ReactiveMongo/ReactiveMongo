@@ -16,6 +16,8 @@ private[reactivemongo] object StartSession
         builder.elementProducer("startSession", builder.int(1))))
     }
   }
+
+  override val toString = "StartSession"
 }
 
 private[reactivemongo] case class StartSessionResult(
@@ -23,7 +25,7 @@ private[reactivemongo] case class StartSessionResult(
   timeoutMinutes: Int)
 
 private[reactivemongo] object StartSessionResult {
-  import CommandCodecs.{ dealingWithGenericCommandErrorsReader => cmdReader }
+  import CommandCodecs.{ dealingWithGenericCommandExceptionsReaderOpt => cmdReader }
 
   def reader[P <: SerializationPack](pack: P): pack.Reader[StartSessionResult] = {
     val decoder = pack.newDecoder
@@ -33,7 +35,7 @@ private[reactivemongo] object StartSessionResult {
         idCont <- decoder.child(doc, "id")
         uuid <- decoder.uuid(idCont, "id")
         timeout <- decoder.int(doc, "timeoutMinutes")
-      } yield StartSessionResult(uuid, timeout)).get
+      } yield StartSessionResult(uuid, timeout))
     }
   }
 }

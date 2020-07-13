@@ -3,8 +3,7 @@ import scala.collection.immutable.{ ListSet, Set }
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
-// TODO: bison
-import reactivemongo.bson.{
+import reactivemongo.api.bson.{
   BSONArray,
   BSONDocument,
   BSONDocumentHandler,
@@ -12,14 +11,13 @@ import reactivemongo.bson.{
   BSONInteger,
   BSONLong,
   BSONNull,
-  BSONNumberLike,
   BSONString,
+  BSONTimestamp,
   Macros,
   array,
   document
 }
 import reactivemongo.api.{
-  BSONSerializationPack,
   Cursor,
   CursorOps,
   CursorProducer,
@@ -29,7 +27,7 @@ import reactivemongo.api.{
 }
 import reactivemongo.api.indexes._, IndexType._
 
-import reactivemongo.api.collections.bson.BSONCollection
+import reactivemongo.api.bson.collection.BSONCollection
 
 import reactivemongo.api.tests.{ builder, pack }
 
@@ -43,15 +41,19 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   "Aggregation framework" title
 
   sequential
+  stopOnFail
 
   // ---
 
-  import tests.Common
-  import Common.{ timeout, slowTimeout }
+  import tests.Common, Common.{ timeout, slowTimeout }
 
-  lazy val (db, slowDb) = Common.databases(s"reactivemongo-agg-${System identityHashCode this}", Common.connection, Common.slowConnection)
+  @volatile private var integration = false
+  lazy val (db, slowDb) = {
+    integration = true
+    Common.databases(s"reactivemongo-agg-${System identityHashCode this}", Common.connection, Common.slowConnection)
+  }
 
-  def afterAll: Unit = { db.drop(); () }
+  def afterAll(): Unit = if (integration) { db.drop(); () }
 
   val zipColName = s"zipcodes${System identityHashCode this}"
   lazy val coll: BSONCollection = {
@@ -80,28 +82,27 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
   "Zip codes collection" should {
     "expose the index stats" in {
-      import reactivemongo.api.commands.{ bson => bsoncommands }
-      import bsoncommands.BSONAggregationFramework.IndexStatsResult
-      import bsoncommands.BSONAggregationResultImplicits.BSONIndexStatsReader
+      import coll.AggregationFramework.IndexStatsResult
+      //import coll.AggregationResultImplicits.BSONIndexStatsReader
 
-      val result = coll.aggregateWith1[IndexStatsResult]() { framework =>
+      val idxAgg = coll.aggregateWith[IndexStatsResult]() { framework =>
         import framework._
 
-        IndexStats -> List(Sort(Ascending("name")))
+        List(IndexStats, Sort(Ascending("name")))
       }.collect[List](
         Int.MaxValue, Cursor.FailOnError[List[IndexStatsResult]]()).
         map(_.find(_.name != "_id_"))
 
-      result must beLike[Option[IndexStatsResult]] {
+      idxAgg must beLike[Option[IndexStatsResult]] {
         case Some(IndexStatsResult("_id_", k2, _, _)) =>
           sys.error(s"--> ${BSONDocument pretty k2}")
 
         case Some(IndexStatsResult("city_text_state_text", k2, _, _)) =>
-          k2.getAs[String]("_fts") must beSome("text") and {
-            k2.getAs[BSONNumberLike]("_ftsx").map(_.toInt) must beSome(1)
+          k2.string("_fts") must beSome("text") and {
+            k2.int("_ftsx") must beSome(1)
           }
-      }.await(0, timeout)
-    } tag "not_mongo26"
+      }.await(1, timeout)
+    }
 
     "be inserted" in {
       def insert(data: List[ZipCode]): Future[Unit] = data.headOption match {
@@ -110,9 +111,10 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       }
 
       insert(zipCodes) must beTypedEqualTo({}).await(1, timeout) and {
-        coll.count() aka "c#1" must beTypedEqualTo(4).await(1, slowTimeout)
+        coll.count() aka "c#1" must beTypedEqualTo(4L).await(1, slowTimeout)
       } and {
-        slowZipColl.count() aka "c#2" must beEqualTo(4).await(1, slowTimeout)
+        slowZipColl.count() aka "c#2" must beTypedEqualTo(4L).
+          await(1, slowTimeout)
       }
     }
 
@@ -123,13 +125,14 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         document("_id" -> "NY", "totalPop" -> 19746227L))
 
       def withRes[T](c: BSONCollection)(f: Future[List[BSONDocument]] => T): T = {
-        f(c.aggregateWith1[BSONDocument]() { framework =>
+        f(c.aggregateWith[BSONDocument]() { framework =>
           import framework.{ Ascending, Group, Match, Sort, SumField }
 
-          Group(BSONString(f"$$state"))(
-            "totalPop" -> SumField("population")) -> List(
-              Match(document("totalPop" -> document(f"$$gte" -> 10000000L))),
-              Sort(Ascending("_id")))
+          List(
+            Group(BSONString(f"$$state"))(
+              "totalPop" -> SumField("population")),
+            Match(document("totalPop" -> document(f"$$gte" -> 10000000L))),
+            Sort(Ascending("_id")))
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()))
       }
 
@@ -142,8 +145,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       }
 
       "using a view" in {
-        import coll.aggregationFramework
-        import aggregationFramework.{ Ascending, Group, Match, Sort, SumField }
+        import coll.AggregationFramework
+        import AggregationFramework.{ Ascending, Group, Match, Sort, SumField }
 
         val viewName = s"pop10m${System identityHashCode this}"
 
@@ -166,11 +169,13 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       } tag "gt_mongo32"
 
       "with expected count" in {
-        import coll.aggregationFramework
-        import aggregationFramework.{ Group, SumAll }
+        import coll.AggregationFramework
+        import AggregationFramework.{ Group, SumAll }
+
         val result = coll.aggregatorContext[BSONDocument](
-          Group(BSONString(f"$$state"))("count" -> SumAll)).prepared.cursor
-          .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]())
+          List(Group(BSONString(f"$$state"))("count" -> SumAll))).
+          prepared.cursor.collect[Set](
+            Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]())
 
         result must beTypedEqualTo(Set(
           document("_id" -> "JP", "count" -> 2),
@@ -180,17 +185,19 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     }
 
     "explain simple result" in {
-      val result = coll.aggregateWith1[BSONDocument](explain = true) {
+      val result = coll.aggregateWith[BSONDocument](explain = true) {
         framework =>
           import framework.{ Group, Match, SumField }
 
-          Group(BSONString(f"$$state"))(
-            "totalPop" -> SumField("population")) -> List(
-              Match(document("totalPop" -> document(f"$$gte" -> 10000000L))))
+          List(
+            Group(BSONString(f"$$state"))(
+              "totalPop" -> SumField("population")),
+            Match(document("totalPop" -> document(f"$$gte" -> 10000000L))))
       }.headOption
 
       result aka "results" must beLike[Option[BSONDocument]] {
-        case Some(explainResult) => explainResult.getAs[BSONArray]("stages") must beSome
+        case Some(explainResult) =>
+          explainResult.getAsOpt[BSONArray]("stages") must beSome
       }.await(1, timeout)
     }
 
@@ -201,9 +208,9 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         document("_id" -> "JP", "avgCityPop" -> 6592851D),
         document("_id" -> "NY", "avgCityPop" -> 19746227D))
 
-      def withCtx[T](c: BSONCollection)(f: (c.BatchCommands.AggregationFramework.Group, List[c.PipelineOperator]) => T): T = {
-        import c.aggregationFramework
-        import aggregationFramework.{ Ascending, Group, Sort, SumField }
+      def withCtx[T](c: BSONCollection)(f: (c.AggregationFramework.Group, List[c.PipelineOperator]) => T): T = {
+        import c.AggregationFramework
+        import AggregationFramework.{ Ascending, Group, Sort, SumField }
 
         val firstOp = Group(document(
           "state" -> f"$$state", "city" -> f"$$city"))(
@@ -211,7 +218,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
         val pipeline = List(
           Group(BSONString(f"$$_id.state"))(
-            "avgCityPop" -> aggregationFramework.AvgField("pop")),
+            "avgCityPop" -> AggregationFramework.AvgField("pop")),
           Sort(Ascending("_id")))
 
         f(firstOp, pipeline)
@@ -219,20 +226,18 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
       "successfully as a single batch" in {
         withCtx(coll) { (firstOp, pipeline) =>
-          val result = coll.aggregateWith1[BSONDocument]() { _ =>
-            firstOp -> pipeline
-          }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]())
-
-          result aka "results" must beTypedEqualTo(expected).await(1, timeout)
+          coll.aggregateWith[BSONDocument]() { _ =>
+            firstOp +: pipeline
+          }.collect[List]() must beTypedEqualTo(expected).await(1, timeout)
         }
       }
 
       "with cursor" >> {
         def collect(c: BSONCollection, upTo: Int = Int.MaxValue) =
           withCtx(c) { (firstOp, pipeline) =>
-            c.aggregateWith1[BSONDocument](batchSize = Some(1)) { _ =>
-              firstOp -> pipeline
-            }.collect[List](upTo, Cursor.FailOnError[List[BSONDocument]]())
+            c.aggregateWith[BSONDocument](batchSize = Some(1)) { _ =>
+              firstOp +: pipeline
+            }.collect[List](upTo)
           }
 
         "without limit (maxDocs)" in {
@@ -245,7 +250,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         }
 
         "with metadata sort" in {
-          coll.aggregateWith1[ZipCode]() { framework =>
+          coll.aggregateWith[ZipCode]() { framework =>
             import framework.{
               Descending,
               Match,
@@ -259,7 +264,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
             val pipeline = List(Sort(
               MetadataSort("score", TextScore), Descending("city")))
 
-            firstOp -> pipeline
+            firstOp +: pipeline
           }.collect[List](4, Cursor.FailOnError[List[ZipCode]]()).
             aka("aggregated") must beTypedEqualTo(jpCodes).await(1, timeout)
 
@@ -269,7 +274,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       "with produced cursor" >> {
         "without limit (maxDocs)" in withCtx(coll) { (firstOp, pipeline) =>
           val cursor = coll.aggregatorContext[BSONDocument](
-            firstOp, pipeline, batchSize = Some(1)).prepared.cursor
+            (firstOp +: pipeline), batchSize = Some(1)).prepared.cursor
 
           cursor.collect[List](
             Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected).await(1, timeout)
@@ -297,7 +302,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
           // Aggregation itself
           val aggregator = coll.aggregatorContext[BSONDocument](
-            firstOp, pipeline, batchSize = Some(1)).prepared[FooCursor]
+            (firstOp +: pipeline), batchSize = Some(1)).prepared[FooCursor]
 
           aggregator.cursor.isInstanceOf[FooCursor[BSONDocument]] must beTrue
         }
@@ -306,8 +311,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
     "return largest and smallest cities by state" in {
       // See http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-largest-and-smallest-cities-by-state
-      import coll.aggregationFramework
-      import aggregationFramework.{
+      import coll.AggregationFramework
+      import AggregationFramework.{
         FirstField,
         Group,
         LastField,
@@ -358,15 +363,15 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
             "name" -> f"$$smallestCity", "population" -> f"$$smallestPop"))),
         Sort(Ascending("state")))
 
-      coll.aggregateWith1[BSONDocument]() { _ =>
-        primGroup -> groupPipeline
+      coll.aggregateWith[BSONDocument]() { _ =>
+        primGroup +: groupPipeline
       }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected).await(1, timeout) and {
-        coll.aggregateWith1[BSONDocument]() { _ =>
-          primGroup -> (groupPipeline :+ Limit(2))
+        coll.aggregateWith[BSONDocument]() { _ =>
+          primGroup +: (groupPipeline :+ Limit(2))
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected take 2).await(1, timeout)
       } and {
-        coll.aggregateWith1[BSONDocument]() { _ =>
-          primGroup -> (groupPipeline :+ Skip(2))
+        coll.aggregateWith[BSONDocument]() { _ =>
+          primGroup +: (groupPipeline :+ Skip(2))
         }.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()) must beTypedEqualTo(expected drop 2).await(1, timeout)
       }
     }
@@ -391,8 +396,10 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   }
 
   "Inventory #1" should {
-    val orders: BSONCollection = db.collection(s"agg-orders-1-${System identityHashCode this}")
-    val inventory: BSONCollection = db.collection(
+    lazy val orders: BSONCollection =
+      db.collection(s"agg-orders-1-${System identityHashCode this}")
+
+    lazy val inventory: BSONCollection = db.collection(
       s"agg-inv-1-${System identityHashCode orders}")
 
     "be provided with order fixtures" in {
@@ -420,7 +427,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
           BSONDocument("_id" -> 6)))
 
       } yield ()) must beTypedEqualTo({}).await(0, timeout)
-    } tag "not_mongo26"
+    }
 
     "perform a simple lookup so the joined documents are returned" in {
       // See https://docs.mongodb.com/master/reference/operator/aggregation/lookup/#examples
@@ -436,15 +443,15 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         InventoryReport(3, docs = List(
           Product(5, None, Some("Incomplete")), Product(6))))
 
-      import coll.aggregationFramework.Lookup
+      import orders.AggregationFramework.Lookup
 
       orders.aggregatorContext[InventoryReport](
-        Lookup(inventory.name, "item", "sku", "docs")).
+        List(Lookup(inventory.name, "item", "sku", "docs"))).
         prepared.cursor.collect[List](
           Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()).
           aka("result") must beTypedEqualTo(expected).await(0, timeout)
 
-    } tag "not_mongo26"
+    }
 
     "perform a graph lookup so the joined documents are returned" in {
       // See https://docs.mongodb.com/manual/reference/operator/aggregation/graphLookup/#examples
@@ -459,11 +466,12 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
           List(Product(4, Some("jkl"), Some("product 4"), Some(70)))),
         InventoryReport(3, docs = List.empty))
 
-      import coll.aggregationFramework.GraphLookup
+      import orders.AggregationFramework.GraphLookup
 
       orders.aggregatorContext[InventoryReport](
-        GraphLookup(
-          inventory.name, BSONString(f"$$item"), "item", "sku", "docs")).prepared.cursor.collect[List](
+        List(GraphLookup(
+          inventory.name, BSONString(f"$$item"), "item", "sku", "docs"))).
+        prepared.cursor.collect[List](
           Int.MaxValue, Cursor.FailOnError[List[InventoryReport]]()).
           aka("result") must beTypedEqualTo(expected).await(0, timeout)
 
@@ -471,8 +479,10 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   }
 
   "Inventory #2" should {
-    val orders: BSONCollection = db.collection(s"agg-order-2-${System identityHashCode this}")
-    val inventory: BSONCollection = db.collection(
+    lazy val orders: BSONCollection =
+      db.collection(s"agg-order-2-${System identityHashCode this}")
+
+    lazy val inventory: BSONCollection = db.collection(
       s"agg-inv-2-${System identityHashCode orders}")
 
     "be provided the fixtures" in {
@@ -496,10 +506,10 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
             "displayType" -> "LED")))
 
       } yield ()) must beTypedEqualTo({}).await(0, timeout)
-    } tag "not_mongo26"
+    }
 
     "so the joined documents are returned" in {
-      import orders.aggregationFramework.{ Lookup, Match }
+      import orders.AggregationFramework.{ Lookup, Match }
 
       def expected = document(
         "_id" -> 1,
@@ -520,25 +530,25 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         Lookup(inventory.name, "specs", "size", "docs"),
         Match(document("docs" -> document(f"$$ne" -> BSONArray()))))
 
-      orders.aggregateWith1[BSONDocument]() { framework =>
+      orders.aggregateWith[BSONDocument]() { framework =>
         import framework._
 
-        UnwindField("specs") -> afterUnwind
+        UnwindField("specs") +: afterUnwind
       }.headOption must beSome(expected).await(0, timeout) and {
-        orders.aggregateWith1[BSONDocument]() {
-          framework =>
-            import framework._
+        orders.aggregateWith[BSONDocument]() { framework =>
+          import framework._
 
-            Unwind("specs", None, Some(true)) -> afterUnwind
+          Unwind("specs", None, Some(true)) +: afterUnwind
         }.headOption must beSome(expected).await(0, timeout)
       }
-    } tag "not_mongo26"
+    }
   }
 
   f"Aggregation result for '$$out'" should {
     // https://docs.mongodb.com/master/reference/operator/aggregation/out/#example
 
-    val books: BSONCollection = db.collection(s"books-1-${System identityHashCode this}")
+    lazy val books: BSONCollection = db.collection(
+      s"books-1-${System identityHashCode this}")
 
     "with valid fixtures" in {
       val fixtures = Seq(
@@ -573,10 +583,11 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         } yield id -> books).get
       }
 
-      books.aggregateWith1[Author]() { framework =>
+      books.aggregateWith[Author]() { framework =>
         import framework._
 
-        Sort(Ascending("title")) -> List(
+        List(
+          Sort(Ascending("title")),
           Group(BSONString(f"$$author"))("books" -> PushField("title")),
           Out(outColl))
       }.collect[List](Int.MaxValue, Cursor.FailOnError[List[Author]]()).map(_ => {}) must beEqualTo({}).await(0, timeout) and {
@@ -595,7 +606,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   "Aggregation result for '$stdDevPop'" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/#examples
 
-    val contest: BSONCollection = db.collection(s"contest-1-${System identityHashCode this}")
+    lazy val contest: BSONCollection =
+      db.collection(s"contest-1-${System identityHashCode this}")
 
     "with valid fixtures" in {
       /*
@@ -632,20 +644,22 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     }
 
     "return the standard deviation of each quiz" in {
-      implicit val reader: BSONDocumentReader[QuizStdDev] = Macros.reader[QuizStdDev]
+      implicit val reader: BSONDocumentReader[QuizStdDev] =
+        Macros.reader[QuizStdDev]
 
       /*
        db.contest.aggregate([
          { $group: { _id: "$quiz", stdDev: { $stdDevPop: "$score" } } }
        ])
       */
-      contest.aggregateWith1[QuizStdDev]() {
+      contest.aggregateWith[QuizStdDev]() {
         framework =>
           import framework._
 
-          Group(BSONString(f"$$quiz"))(
-            "stdDev" -> StdDevPopField("score")) -> List(
-              Sort(Ascending("_id")))
+          List(
+            Group(BSONString(f"$$quiz"))(
+              "stdDev" -> StdDevPopField("score")),
+            Sort(Ascending("_id")))
       }.collect[List](Int.MaxValue, Cursor.FailOnError[List[QuizStdDev]]()).aka(f"$$stdDevPop results") must beTypedEqualTo(List(
         QuizStdDev(1, 8.04155872120988D), QuizStdDev(2, 8.04155872120988D))).await(0, timeout)
 
@@ -653,61 +667,61 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
        { "_id" : 1, "stdDev" : 8.04155872120988 }
        { "_id" : 2, "stdDev" : 8.04155872120988 }
        */
-    } tag "not_mongo26"
+    }
 
     "return a sum as hash per quiz" in {
-      import coll.aggregationFramework.{ Group, Sum }
+      import contest.AggregationFramework.{ Group, Sum }
 
       contest.aggregatorContext[BSONDocument](
-        Group(BSONString(f"$$quiz"))(
+        List(Group(BSONString(f"$$quiz"))(
           "hash" -> Sum(document(
-            f"$$multiply" -> array(f"$$_id", f"$$score"))))).prepared.cursor
+            f"$$multiply" -> array(f"$$_id", f"$$score")))))).prepared.cursor
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beTypedEqualTo(Set(
           document("_id" -> 2, "hash" -> 1261),
           document("_id" -> 1, "hash" -> 478))).await(1, timeout)
     }
 
     "return the maximum score per quiz" in {
-      import coll.aggregationFramework.{ Group, MaxField }
+      import contest.AggregationFramework.{ Group, MaxField }
 
       contest.aggregatorContext[BSONDocument](
-        Group(BSONString(f"$$quiz"))(
-          "maxScore" -> MaxField("score"))).prepared.cursor
+        List(Group(BSONString(f"$$quiz"))(
+          "maxScore" -> MaxField("score")))).prepared.cursor
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beTypedEqualTo(Set(
           document("_id" -> 2, "maxScore" -> 96),
           document("_id" -> 1, "maxScore" -> 90))).await(1, timeout)
     }
 
     "return a max as hash per quiz" in {
-      import coll.aggregationFramework.{ Group, Max }
+      import contest.AggregationFramework.{ Group, Max }
 
       contest.aggregatorContext[BSONDocument](
-        Group(BSONString(f"$$quiz"))(
+        List(Group(BSONString(f"$$quiz"))(
           "maxScore" -> Max(document(
-            f"$$multiply" -> array(f"$$_id", f"$$score"))))).prepared.cursor
+            f"$$multiply" -> array(f"$$_id", f"$$score")))))).prepared.cursor
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beTypedEqualTo(Set(
           document("_id" -> 2, "maxScore" -> 492),
           document("_id" -> 1, "maxScore" -> 213))).await(1, timeout)
     }
 
     "return the minimum score per quiz" in {
-      import coll.aggregationFramework.{ Group, MinField }
+      import contest.AggregationFramework.{ Group, MinField }
 
       contest.aggregatorContext[BSONDocument](
-        Group(BSONString(f"$$quiz"))(
-          "minScore" -> MinField("score"))).prepared.cursor
+        List(Group(BSONString(f"$$quiz"))(
+          "minScore" -> MinField("score")))).prepared.cursor
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beTypedEqualTo(Set(
           document("_id" -> 2, "minScore" -> 77),
           document("_id" -> 1, "minScore" -> 71))).await(1, timeout)
     }
 
     "return a min as hash per quiz" in {
-      import coll.aggregationFramework.{ Group, Min }
+      import contest.AggregationFramework.{ Group, Min }
 
       contest.aggregatorContext[BSONDocument](
-        Group(BSONString(f"$$quiz"))(
+        List(Group(BSONString(f"$$quiz"))(
           "minScore" -> Min(document(
-            f"$$multiply" -> array(f"$$_id", f"$$score"))))).prepared.cursor
+            f"$$multiply" -> array(f"$$_id", f"$$score")))))).prepared.cursor
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]()) must beTypedEqualTo(Set(
           document("_id" -> 2, "minScore" -> 384),
           document("_id" -> 1, "minScore" -> 85))).await(1, timeout)
@@ -720,12 +734,12 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         QuizScores(1, Set(
           Score("dave123", 85), Score("dave2", 90), Score("ahn", 71))))
 
-      import coll.aggregationFramework.{ Group, Push }
+      import contest.AggregationFramework.{ Group, Push }
 
       contest.aggregatorContext[QuizScores](
-        Group(BSONString(f"$$quiz"))(
+        List(Group(BSONString(f"$$quiz"))(
           "scores" -> Push(
-            document("name" -> f"$$name", "score" -> f"$$score")))).
+            document("name" -> f"$$name", "score" -> f"$$score"))))).
         prepared.cursor
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[QuizScores]]()) must beTypedEqualTo(expected).await(1, timeout)
     }
@@ -737,12 +751,12 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         QuizScores(1, Set(
           Score("dave123", 85), Score("dave2", 90), Score("ahn", 71))))
 
-      import coll.aggregationFramework.{ Group, AddToSet }
+      import contest.AggregationFramework.{ Group, AddToSet }
 
       contest.aggregatorContext[QuizScores](
-        Group(BSONString(f"$$quiz"))(
+        List(Group(BSONString(f"$$quiz"))(
           "scores" -> AddToSet(document(
-            "name" -> f"$$name", "score" -> f"$$score")))).prepared.cursor
+            "name" -> f"$$name", "score" -> f"$$score"))))).prepared.cursor
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[QuizScores]]()) must beTypedEqualTo(expected).await(1, timeout)
     }
   }
@@ -750,7 +764,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   "Aggregation result '$stdDevSamp'" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/#example
 
-    val contest: BSONCollection = db.collection(s"contest-2-${System identityHashCode this}")
+    lazy val contest: BSONCollection =
+      db.collection(s"contest-2-${System identityHashCode this}")
 
     "with valid fixtures" in {
       /*
@@ -765,7 +780,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
       contest.insert.many(fixtures).map(_ => {}).
         aka("fixtures") must beTypedEqualTo({}).await(0, timeout)
-    } tag "not_mongo26"
+    }
 
     "return the standard deviation of user ages" in {
       // { "_id" : null, "ageStdDev" : 11.135528725660043 }
@@ -778,19 +793,20 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
        ])
       */
 
-      contest.aggregateWith1[BSONDocument]() { framework =>
+      contest.aggregateWith[BSONDocument]() { framework =>
         import framework._
 
-        Sample(100) -> List(Group(BSONNull)(
+        List(Sample(100), Group(BSONNull)(
           "ageStdDev" -> StdDevSamp(BSONString(f"$$age"))))
       }.headOption must beSome(expected).await(0, timeout)
-    } tag "not_mongo26"
+    }
   }
 
   "Geo-indexed documents" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/geoNear/#example
 
-    val places: BSONCollection = db(s"places${System identityHashCode this}")
+    lazy val places: BSONCollection =
+      db(s"places${System identityHashCode this}")
 
     "must be inserted" in {
       import reactivemongo.api.indexes._, IndexType._
@@ -853,23 +869,25 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
       implicit val pointReader: BSONDocumentReader[GeoPoint] = Macros.reader[GeoPoint]
       implicit val distanceReader: BSONDocumentReader[GeoDistance] = BSONDocumentReader[GeoDistance] { doc =>
         (for {
-          calc <- doc.getAsTry[BSONNumberLike]("calculated").map(_.toInt)
-          loc <- doc.getAsTry[GeoPoint]("loc")
+          calc <- doc.double("calculated").map(_.toInt)
+          loc <- doc.getAsOpt[GeoPoint]("loc")
         } yield GeoDistance(calc, loc)).get
       }
       implicit val placeReader: BSONDocumentReader[GeoPlace] = Macros.reader[GeoPlace]
 
-      import coll.aggregationFramework.{ GeoNear, Limit }
+      import places.AggregationFramework.{ GeoNear, Limit }
 
       places.aggregatorContext[GeoPlace](
-        GeoNear(document(
-          "type" -> "Point",
-          "coordinates" -> array(-73.9667, 40.78)), distanceField = Some("dist.calculated"),
+        List(GeoNear(
+          document(
+            "type" -> "Point",
+            "coordinates" -> array(-73.9667, 40.78)),
+          distanceField = Some("dist.calculated"),
           minDistance = Some(1000),
           maxDistance = Some(5000),
           query = Some(document("type" -> "public")),
           includeLocs = Some("dist.loc"),
-          spherical = true), List(Limit(5))).prepared.cursor
+          spherical = true), Limit(5))).prepared.cursor
         .collect[List](Int.MaxValue, Cursor.FailOnError[List[GeoPlace]]()) aka "places" must beTypedEqualTo(List(
           GeoPlace(
             loc = GeoPoint(List(-73.97D, 40.77D)),
@@ -885,7 +903,8 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
 
   "Forecasts" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/redact/
-    val forecasts: BSONCollection = db(s"forecasts${System identityHashCode this}")
+    lazy val forecasts: BSONCollection =
+      db(s"forecasts${System identityHashCode this}")
 
     "be inserted" in {
       /*
@@ -941,8 +960,11 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     }
 
     "be redacted" in {
-      implicit val subsectionReader: BSONDocumentHandler[Subsection] = Macros.handler[Subsection]
-      implicit val reader: BSONDocumentHandler[Redaction] = Macros.handler[Redaction]
+      implicit val subsectionReader: BSONDocumentHandler[Subsection] =
+        Macros.handler[Subsection]
+
+      implicit val reader: BSONDocumentHandler[Redaction] =
+        Macros.handler[Redaction]
 
       /*
 var userAccess = [ "STLW", "G" ];
@@ -960,10 +982,11 @@ db.forecasts.aggregate(
    ]
 );
  */
-      val result = forecasts.aggregateWith1[Redaction]() { framework =>
+      val result = forecasts.aggregateWith[Redaction]() { framework =>
         import framework.{ Match, Redact }
 
-        Match(document("year" -> 2014)) -> List(
+        List(
+          Match(document("year" -> 2014)),
           Redact(document(f"$$cond" -> document(
             "if" -> document(
               f"$$gt" -> array(document(
@@ -1014,7 +1037,8 @@ db.forecasts.aggregate(
 
   "Customer accounts" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/redact/
-    val customers: BSONCollection = db(s"customers${System identityHashCode this}")
+    lazy val customers: BSONCollection =
+      db(s"customers${System identityHashCode this}")
 
     "be inserted" in {
       /*
@@ -1089,10 +1113,11 @@ db.accounts.aggregate([
     }
   ])
  */
-      val result = customers.aggregateWith1[BSONDocument]() { framework =>
+      val result = customers.aggregateWith[BSONDocument]() { framework =>
         import framework.{ Match, Redact }
 
-        Match(document("status" -> "A")) -> List(
+        List(
+          Match(document("status" -> "A")),
           Redact(document(
             f"$$cond" -> document(
               "if" -> document(f"$$eq" -> array(f"$$level", 5)),
@@ -1112,7 +1137,8 @@ db.accounts.aggregate([
   section("gt_mongo32")
   "Produce" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/#replaceroot-with-an-embedded-document
-    val fruits: BSONCollection = db(s"fruits${System identityHashCode this}")
+    lazy val fruits: BSONCollection =
+      db(s"fruits${System identityHashCode this}")
 
     "be inserted" in {
       /*
@@ -1135,11 +1161,11 @@ db.accounts.aggregate([
         map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
     }
 
-    "and reshaped using $replaceRoot" in {
-      val result = fruits.aggregateWith1[BSONDocument]() { framework =>
+    f"and reshaped using $$replaceRoot" in {
+      val result = fruits.aggregateWith[BSONDocument]() { framework =>
         import framework.{ Match, ReplaceRootField }
 
-        Match(document("_id" -> 1)) -> List(ReplaceRootField("in_stock"))
+        List(Match(document("_id" -> 1)), ReplaceRootField("in_stock"))
       }.headOption
 
       result must beSome(document("oranges" -> 20, "apples" -> 60)).
@@ -1149,7 +1175,8 @@ db.accounts.aggregate([
 
   "Contacts" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/#replaceroot-with-a-newly-created-document
-    val contacts: BSONCollection = db(s"contacts${System identityHashCode this}")
+    lazy val contacts: BSONCollection =
+      db(s"contacts${System identityHashCode this}")
 
     "be inserted" in {
       /*
@@ -1164,10 +1191,10 @@ db.accounts.aggregate([
     }
 
     "and reshaped using $replaceRoot" in {
-      val result = contacts.aggregateWith1[BSONDocument]() { framework =>
+      val result = contacts.aggregateWith[BSONDocument]() { framework =>
         import framework.{ Match, ReplaceRoot }
 
-        Match(document("_id" -> 1)) -> List(ReplaceRoot(document(
+        List(Match(document("_id" -> 1)), ReplaceRoot(document(
           "full_name" -> document(
             f"$$concat" -> array(f"$$first_name", " ", f"$$last_name")))))
 
@@ -1185,14 +1212,14 @@ db.accounts.aggregate([
       contacts.aggregateWith[Int]() { framework =>
         import framework.{ Count, Match }
 
-        Match(document("first_name" -> "Gary")) -> List(Count("foo"))
+        List(Match(document("first_name" -> "Gary")), Count("foo"))
       }.head must beTypedEqualTo(1).await(0, timeout)
     }
   }
 
   "Students" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/
-    val students: BSONCollection =
+    lazy val students: BSONCollection =
       db(s"students${System identityHashCode this}")
 
     "be inserted" in {
@@ -1212,7 +1239,7 @@ db.accounts.aggregate([
         map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
     }
 
-    "be aggregated with $$sum on array fields" in {
+    f"be aggregated with $$sum on array fields" in {
       val expectedResults = Set(
         document(
           "_id" -> 1,
@@ -1233,12 +1260,13 @@ db.accounts.aggregate([
           "totalQuiz" -> 16,
           "totalScore" -> 40))
 
-      students.aggregateWith1[BSONDocument]() { framework =>
+      students.aggregateWith[BSONDocument]() { framework =>
         import framework.AddFields
 
-        AddFields(document(
-          "totalHomework" -> document(f"$$sum" -> f"$$homework"),
-          "totalQuiz" -> document(f"$$sum" -> f"$$quiz"))) -> List(
+        List(
+          AddFields(document(
+            "totalHomework" -> document(f"$$sum" -> f"$$homework"),
+            "totalQuiz" -> document(f"$$sum" -> f"$$quiz"))),
           AddFields(document(
             "totalScore" -> document(f"$$add" -> array(
               f"$$totalHomework", f"$$totalQuiz", f"$$extraCredit")))))
@@ -1252,7 +1280,7 @@ db.accounts.aggregate([
     implicit val userHandler: BSONDocumentHandler[User] = Macros.handler[User]
 
     // See https://docs.mongodb.com/manual/reference/operator/aggregation/slice/#example
-    val users: BSONCollection =
+    lazy val users: BSONCollection =
       db(s"users${System identityHashCode userHandler}")
 
     "be inserted" in {
@@ -1268,14 +1296,14 @@ db.accounts.aggregate([
     }
 
     f"be aggregated using $$slice and $$count" in {
-      users.aggregateWith1[User]() { framework =>
+      users.aggregateWith[User]() { framework =>
         import framework.{ Project, Slice }
 
-        Project(BSONDocument(
+        List(Project(BSONDocument(
           "name" -> 1,
           "favorites" -> Slice(
             array = BSONString(f"$$favorites"),
-            n = BSONInteger(3)).makePipe)) -> List.empty
+            n = BSONInteger(3)))))
 
       }.collect[Seq](4, Cursor.FailOnError[Seq[User]]()).
         aka("top favorites") must beTypedEqualTo(Seq(
@@ -1290,26 +1318,30 @@ db.accounts.aggregate([
   }
   section("gt_mongo32")
 
+  section("unit")
   "Stage" should {
-    import coll.aggregationFramework
+    import reactivemongo.api.tests.{ AggFramework => AggregationFramework }
+
+    val makePipe = reactivemongo.api.tests.makePipe(AggregationFramework)(_)
 
     f"be $$addFields" in {
-      import aggregationFramework.AddFields
+      import AggregationFramework.AddFields
 
       val specs = BSONDocument("foo" -> 1, "bar" -> 2L)
 
-      AddFields(specs).
-        makePipe must_=== BSONDocument(f"$$addFields" -> BSONDocument(specs))
+      makePipe(AddFields(specs)) must_=== BSONDocument(
+        f"$$addFields" -> BSONDocument(specs))
     }
 
     f"be $$facet" in {
       // See https://docs.mongodb.com/manual/reference/operator/aggregation/facet/
 
-      import aggregationFramework.{ Count, Facet, Out, UnwindField }
+      import AggregationFramework.{ Count, Facet, Out, UnwindField }
 
-      Facet(Seq(
-        "foo" -> (UnwindField("bar") -> List(Count("c"))),
-        "lorem" -> (Out("ipsum") -> List.empty))).makePipe must_=== BSONDocument(
+      makePipe(Facet(
+        Seq(
+          "foo" -> List(UnwindField("bar"), Count("c")),
+          "lorem" -> List(Out("ipsum"))))) must_=== BSONDocument(
         f"$$facet" -> BSONDocument(
           "foo" -> BSONArray(
             BSONDocument(f"$$unwind" -> f"$$bar"),
@@ -1319,63 +1351,116 @@ db.accounts.aggregate([
     }
 
     f"be $$bucket" in {
-      import aggregationFramework.{ Bucket, SumField }
+      import AggregationFramework.{ Bucket, SumField }
 
-      Bucket(
+      makePipe(Bucket(
         groupBy = BSONString(f"$$foo"),
         boundaries = Seq(BSONInteger(10), BSONLong(20), BSONInteger(30)),
-        default = "literal")("totalPop" -> SumField("population")).
-        makePipe must_=== BSONDocument(
-          f"$$bucket" -> BSONDocument(
-            "groupBy" -> f"$$foo",
-            "default" -> "literal",
-            "output" -> BSONDocument(
-              "totalPop" -> BSONDocument(f"$$sum" -> f"$$population")),
-            "boundaries" -> BSONArray(
-              BSONInteger(10), BSONLong(20), BSONInteger(30))))
+        default = "literal")("totalPop" -> SumField("population"))) must_=== BSONDocument(
+        f"$$bucket" -> BSONDocument(
+          "groupBy" -> f"$$foo",
+          "default" -> "literal",
+          "output" -> BSONDocument(
+            "totalPop" -> BSONDocument(f"$$sum" -> f"$$population")),
+          "boundaries" -> BSONArray(
+            BSONInteger(10), BSONLong(20), BSONInteger(30))))
 
     }
 
     f"be $$bucketAuto" in {
       // https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/
 
-      import aggregationFramework.BucketAuto
+      import AggregationFramework.BucketAuto
 
-      BucketAuto(BSONString(f"$$price"), 3, None)().
-        makePipe must_=== BSONDocument(f"$$bucketAuto" -> BSONDocument(
-          "groupBy" -> f"$$price",
-          "buckets" -> 3,
-          "output" -> BSONDocument.empty))
+      makePipe(BucketAuto(BSONString(f"$$price"), 3, None)()) must_=== BSONDocument(f"$$bucketAuto" -> BSONDocument(
+        "groupBy" -> f"$$price",
+        "buckets" -> 3,
+        "output" -> BSONDocument.empty))
+    }
+
+    f"be $$changeStream" >> {
+      import reactivemongo.api.ChangeStreams.{ FullDocumentStrategy => St }
+      import AggregationFramework.ChangeStream
+
+      "when empty" in {
+        makePipe(ChangeStream()) must_=== BSONDocument(
+          f"$$changeStream" -> BSONDocument.empty)
+      }
+
+      "with fullDocument strategy" >> {
+        Fragments.foreach[St](Seq(St.Default, St.UpdateLookup)) { st =>
+          st.name in {
+            makePipe(ChangeStream(
+              fullDocumentStrategy = Some(st))) must_=== BSONDocument(
+              f"$$changeStream" -> BSONDocument("fullDocument" -> st.name))
+          }
+        }
+      }
+
+      "with offset" >> {
+        "that startAfter" in {
+          makePipe(ChangeStream(offset = Some(ChangeStream.
+            StartAfter(BSONString("offset"))))) must_=== BSONDocument(
+            f"$$changeStream" -> BSONDocument("startAfter" -> "offset"))
+
+        }
+
+        "that startAtOperationTime" in {
+          makePipe(ChangeStream(
+            offset = Some(ChangeStream.StartAt(1234L)))) must_=== BSONDocument(
+            f"$$changeStream" -> BSONDocument(
+              "startAtOperationTime" -> BSONTimestamp(1234L)))
+
+        }
+
+        "that resumeAfter" in {
+          makePipe(ChangeStream(offset = Some(ChangeStream.
+            ResumeAfter(BSONString("offset"))))) must_=== BSONDocument(
+            f"$$changeStream" -> BSONDocument("resumeAfter" -> "offset"))
+
+        }
+      }
+
+      "with both fullDocument strategy and offset" in {
+        makePipe(ChangeStream(
+          offset = Some(ChangeStream.StartAt(1234L)),
+          fullDocumentStrategy = Some(St.Default))) must_=== BSONDocument(
+          f"$$changeStream" -> BSONDocument(
+            "startAtOperationTime" -> BSONTimestamp(1234L),
+            "fullDocument" -> "default"))
+
+      }
     }
 
     f"be $$collStats" in {
-      import aggregationFramework.CollStats
+      import AggregationFramework.CollStats
 
-      CollStats(
+      makePipe(CollStats(
         latencyStatsHistograms = true,
         storageStatsScale = Some(1.23D),
-        count = true).makePipe must_=== BSONDocument(
-          f"$$collStats" -> BSONDocument(
-            "latencyStats" -> BSONDocument("histograms" -> true),
-            "storageStats" -> BSONDocument("scale" -> 1.23D),
-            "count" -> BSONDocument.empty))
+        count = true)) must_=== BSONDocument(
+        f"$$collStats" -> BSONDocument(
+          "latencyStats" -> BSONDocument("histograms" -> true),
+          "storageStats" -> BSONDocument("scale" -> 1.23D),
+          "count" -> BSONDocument.empty))
     }
 
     f"be $$currentOp" in {
-      import aggregationFramework.CurrentOp
+      import AggregationFramework.CurrentOp
 
-      CurrentOp().makePipe must_=== BSONDocument(f"$$currentOp" -> BSONDocument(
-        "allUsers" -> false,
-        "idleConnections" -> false,
-        "idleCursors" -> false,
-        "idleSessions" -> true,
-        "localOps" -> false))
+      makePipe(CurrentOp()) must_=== BSONDocument(
+        f"$$currentOp" -> BSONDocument(
+          "allUsers" -> false,
+          "idleConnections" -> false,
+          "idleCursors" -> false,
+          "idleSessions" -> true,
+          "localOps" -> false))
     }
 
-    f"$$graphLookup" in {
-      import aggregationFramework.GraphLookup
+    f"be $$graphLookup" in {
+      import AggregationFramework.GraphLookup
 
-      GraphLookup(
+      makePipe(GraphLookup(
         from = "foo",
         startWith = BSONInteger(1),
         connectFromField = "bar",
@@ -1383,100 +1468,100 @@ db.accounts.aggregate([
         as = "ipsum",
         maxDepth = Some(2),
         depthField = Some("depth"),
-        restrictSearchWithMatch = Some(BSONDocument.empty)).makePipe must_=== BSONDocument(f"$$graphLookup" -> BSONDocument(
-          "from" -> "foo",
-          "startWith" -> 1,
-          "connectFromField" -> "bar",
-          "connectToField" -> "lorem",
-          "as" -> "ipsum",
-          "maxDepth" -> 2,
-          "depthField" -> "depth",
-          "restrictSearchWithMatch" -> BSONDocument.empty))
+        restrictSearchWithMatch = Some(BSONDocument.empty))) must_=== BSONDocument(f"$$graphLookup" -> BSONDocument(
+        "from" -> "foo",
+        "startWith" -> 1,
+        "connectFromField" -> "bar",
+        "connectToField" -> "lorem",
+        "as" -> "ipsum",
+        "maxDepth" -> 2,
+        "depthField" -> "depth",
+        "restrictSearchWithMatch" -> BSONDocument.empty))
 
     }
 
     f"be $$listLocalSessions" in {
-      import aggregationFramework.ListLocalSessions
+      import AggregationFramework.ListLocalSessions
 
-      ListLocalSessions(BSONDocument("allUsers" -> true)).
-        makePipe must_=== BSONDocument(
-          f"$$listLocalSessions" -> BSONDocument("allUsers" -> true))
+      makePipe(ListLocalSessions(
+        BSONDocument("allUsers" -> true))) must_=== BSONDocument(
+        f"$$listLocalSessions" -> BSONDocument("allUsers" -> true))
     }
 
     f"be $$listSessions" in {
-      import aggregationFramework.ListSessions
+      import AggregationFramework.ListSessions
 
-      ListSessions(BSONDocument("allUsers" -> true)).
-        makePipe must_=== BSONDocument(
-          f"$$listSessions" -> BSONDocument("allUsers" -> true))
+      makePipe(ListSessions(
+        BSONDocument("allUsers" -> true))) must_=== BSONDocument(
+        f"$$listSessions" -> BSONDocument("allUsers" -> true))
     }
 
     f"be $$merge" in {
-      import aggregationFramework.Merge
+      import AggregationFramework.Merge
 
-      Merge(
+      makePipe(Merge(
         intoDb = "foo",
         intoCollection = "bar",
         on = Seq("lorem", "ipsum"),
         whenMatched = Some("replace"),
         let = Some(BSONDocument("var" -> "v")),
-        whenNotMatched = None).makePipe must_=== BSONDocument(
-          f"$$merge" -> BSONDocument(
-            "into" -> "foo.bar",
-            "on" -> Seq("lorem", "ipsum"),
-            "whenMatched" -> "replace",
-            "let" -> BSONDocument("var" -> "v")))
+        whenNotMatched = None)) must_=== BSONDocument(
+        f"$$merge" -> BSONDocument(
+          "into" -> "foo.bar",
+          "on" -> Seq("lorem", "ipsum"),
+          "whenMatched" -> "replace",
+          "let" -> BSONDocument("var" -> "v")))
 
     }
 
     f"be $$planCacheStats" in {
-      aggregationFramework.PlanCacheStats.makePipe must_=== BSONDocument(
+      makePipe(AggregationFramework.PlanCacheStats) must_=== BSONDocument(
         f"$$planCacheStats" -> BSONDocument.empty)
 
     }
 
     f"be $$replaceWith" in {
-      import aggregationFramework.ReplaceWith
+      import AggregationFramework.ReplaceWith
 
-      ReplaceWith(BSONDocument("foo" -> 1)).makePipe must_=== BSONDocument(
+      makePipe(ReplaceWith(BSONDocument("foo" -> 1))) must_=== BSONDocument(
         f"$$replaceWith" -> BSONDocument("foo" -> 1))
     }
 
     f"be $$set" in {
-      import aggregationFramework.Set
+      import AggregationFramework.Set
 
-      Set(BSONDocument("foo" -> 1)).makePipe must_=== BSONDocument(
+      makePipe(Set(BSONDocument("foo" -> 1))) must_=== BSONDocument(
         f"$$set" -> BSONDocument("foo" -> 1))
     }
 
     f"be $$sortByCount" in {
-      import aggregationFramework.{ SortByCount, SortByFieldCount }
+      import AggregationFramework.{ SortByCount, SortByFieldCount }
 
       val expected = BSONDocument(f"$$sortByCount" -> f"$$foo")
 
-      SortByCount(BSONString(f"$$foo")).makePipe must_=== expected and {
-        SortByFieldCount("foo").makePipe must_=== expected
+      makePipe(SortByCount(BSONString(f"$$foo"))) must_=== expected and {
+        makePipe(SortByFieldCount("foo")) must_=== expected
       }
     }
 
     f"be $$unset" in {
-      import aggregationFramework.Unset
+      import AggregationFramework.Unset
 
-      Unset("foo", List("bar", "lorem")).makePipe must_=== BSONDocument(
+      makePipe(Unset("foo", List("bar", "lorem"))) must_=== BSONDocument(
         f"$$unset" -> List("foo", "bar", "lorem"))
 
     }
 
     f"be $$sample" in {
-      import aggregationFramework.Sample
+      import AggregationFramework.Sample
 
-      Sample(2).makePipe must_=== BSONDocument(
+      makePipe(Sample(2)) must_=== BSONDocument(
         f"$$sample" -> BSONDocument("size" -> 2))
     }
   }
 
-  "Group accumulator" >> { // TODO: tag as unit
-    import coll.aggregationFramework._
+  "Group accumulator" >> {
+    import reactivemongo.api.tests.AggFramework, AggFramework._
 
     Fragments.foreach(Seq[(GroupFunction, BSONDocument)](
       AvgField("foo") -> BSONDocument(f"$$avg" -> f"$$foo"),
@@ -1505,10 +1590,436 @@ db.accounts.aggregate([
       SumField("foo") -> BSONDocument(f"$$sum" -> f"$$foo"),
       Sum(BSONString(f"$$bar")) -> BSONDocument(f"$$sum" -> f"$$bar"))) {
       case (gfun, expected) => gfun.getClass.getSimpleName in {
-        gfun.makeFunction must_=== expected
+        reactivemongo.api.tests.makeFunction(
+          AggFramework)(gfun) must_=== expected
       }
     }
   }
+
+  "Atlas Search" >> {
+    import reactivemongo.api.tests.{
+      AggFramework,
+      scoreDocument,
+      makeSearch
+    }, AggFramework._, AtlasSearch.{ Score => AtlasScore, _ }
+
+    "serialize score for term search" >> {
+      val doc = scoreDocument(AggFramework) _
+
+      Fragments.foreach[(AtlasScore, BSONDocument)](Seq(
+        AtlasScore.constant(1.23D) -> BSONDocument("constant" -> 1.23D),
+        AtlasScore.boost(45.6D) -> BSONDocument("boost" -> 45.6D))) {
+        case (score, expected) => score.toString in {
+          doc(score) must_=== expected
+        }
+      }
+    }
+
+    // ---
+
+    val term1 = Term(
+      query = "foo",
+      path = "title" -> Seq("description", "tags"))
+
+    val text1 = Text(
+      query = "foo",
+      path = "title" -> Seq("description", "tags"))
+
+    val phrase1 = Phrase(
+      query = "foo",
+      path = "title" -> Seq("description", "tags"))
+
+    "support operator" >> {
+      val doc = makeSearch(AggFramework) _
+
+      "<custom>" in {
+        val expected = BSONDocument("foo" -> "bar")
+        val op = Operator("custom", expected)
+
+        op.name must_=== "custom" and (doc(op) must_=== expected)
+      }
+
+      "term" >> {
+        "with minimal options" in {
+          term1.name must_=== "term" and {
+            doc(term1) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> Seq("title", "description", "tags"))
+          }
+        }
+
+        "with score" in {
+          doc(Term(
+            query = "foo" -> Seq("bar"),
+            path = "title" -> Nil,
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "query" -> Seq("foo", "bar"),
+            "path" -> "title",
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+
+        Fragments.foreach[(Term.Modifier, String)](Seq(
+          Term.Wildcard -> "wildcard",
+          Term.Regex -> "regex",
+          Term.Prefix -> "prefix")) {
+          case (mod, flag) => s"with simple modifier ${flag}" in {
+            doc(Term(
+              query = "foo",
+              path = "title",
+              modifier = Some(mod),
+              score = Some(AtlasScore.constant(3.45D)))) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> "title",
+              flag -> true,
+              "score" -> BSONDocument("constant" -> 3.45D))
+          }
+        }
+
+        "with fuzzy modifier" in {
+          doc(Term(
+            query = "foo",
+            path = "title",
+            modifier = Some(Term.Fuzzy(
+              maxEdits = 3,
+              prefixLength = 2)))) must_=== BSONDocument(
+            "query" -> "foo",
+            "path" -> "title",
+            "fuzzy" -> BSONDocument(
+              "maxEdits" -> 3,
+              "prefixLength" -> 2))
+
+        }
+      }
+
+      "text" >> {
+        "with minimal options" in {
+          text1.name must_=== "text" and {
+            doc(text1) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> Seq("title", "description", "tags"))
+          }
+        }
+
+        "with score" in {
+          doc(Text(
+            query = "foo" -> Seq("bar"),
+            path = "title" -> Nil,
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "query" -> Seq("foo", "bar"),
+            "path" -> "title",
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+
+        "with fuzzy" in {
+          doc(Text(
+            query = "foo" -> Seq.empty,
+            path = "title" -> Nil,
+            fuzzy = Some(Text.Fuzzy(
+              maxEdits = 3,
+              prefixLength = 2,
+              maxExpansions = 5)))) must_=== BSONDocument(
+            "query" -> "foo",
+            "path" -> "title",
+            "fuzzy" -> BSONDocument(
+              "maxEdits" -> 3,
+              "prefixLength" -> 2,
+              "maxExpansions" -> 5))
+
+        }
+      }
+
+      "phrase" >> {
+        "with minimal options" in {
+          phrase1.name must_=== "phrase" and {
+            doc(phrase1) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> Seq("title", "description", "tags"),
+              "slop" -> 0)
+          }
+        }
+
+        "with score" in {
+          doc(Phrase(
+            query = "foo" -> Seq("bar"),
+            path = "title",
+            slop = 5,
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "query" -> Seq("foo", "bar"),
+            "path" -> "title",
+            "slop" -> 5,
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+      }
+
+      "compound" >> {
+        import Compound.newBuilder
+
+        val builder1 = newBuilder(Compound.must, term1)
+
+        "with minimal options" in {
+          val op = builder1.result()
+
+          op.name must_=== "compound" and {
+            doc(op) must_=== BSONDocument(
+              "must" -> Seq(BSONDocument("term" -> doc(term1))))
+          } and {
+            val expected = BSONDocument(
+              "must" -> Seq(BSONDocument("term" -> doc(term1))),
+              "minimumShouldMatch" -> 2)
+
+            doc(builder1.minimumShouldMatch(2).
+              result()) must_=== expected and {
+              doc(newBuilder(
+                Compound.must, term1, 2).result()) must_=== expected
+            }
+          }
+        }
+
+        "with multiple 'must' operators" in {
+          val builder = newBuilder(Compound.must, term1, Seq(text1))
+          val expected1 = BSONDocument("must" -> Seq(
+            BSONDocument("term" -> doc(term1)),
+            BSONDocument("text" -> doc(text1))))
+
+          doc(builder.result()) must_=== expected1 and {
+            doc(newBuilder(Compound.must, term1 -> Seq(text1)).
+              result()) must_=== expected1
+          } and {
+            val expected2 = expected1 ++ BSONDocument("minimumShouldMatch" -> 3)
+
+            doc(builder.minimumShouldMatch(3).
+              result()) must_=== expected2 and {
+              doc(newBuilder(
+                Compound.must, term1, Seq(text1), 3).
+                result()) must_=== expected2
+            } and {
+              doc(newBuilder(
+                Compound.must, term1 -> Seq(text1), 3).
+                result()) must_=== expected2
+            }
+          }
+        }
+
+        "with multiple clauses" in {
+          doc(builder1.append(Compound.mustNot, phrase1).
+            result()) must_=== BSONDocument(
+            "must" -> Seq(BSONDocument("term" -> doc(term1))),
+            "mustNot" -> Seq(BSONDocument("phrase" -> doc(phrase1)))) and {
+              val expected = BSONDocument(
+                "must" -> Seq(BSONDocument("term" -> doc(term1))),
+                "mustNot" -> Seq(
+                  BSONDocument("text" -> doc(text1)),
+                  BSONDocument("phrase" -> doc(phrase1))))
+
+              doc(builder1.append(
+                Compound.mustNot, text1, Seq(phrase1)).
+                result()) must_=== expected and {
+                doc(builder1.append(
+                  Compound.mustNot, text1 -> Seq(phrase1)).
+                  result()) must_=== expected
+              }
+            }
+        }
+
+        "with overriden clause" in {
+          doc(builder1.append(Compound.must, phrase1).
+            result()) must_=== BSONDocument(
+            "must" -> Seq(BSONDocument("phrase" -> doc(phrase1))))
+        }
+      }
+
+      "exists" in {
+        val op = Exists("title" -> Nil)
+
+        op.name must_=== "exists" and {
+          doc(op) must_=== BSONDocument(
+            "path" -> "title") and {
+              doc(Exists("title" -> Seq(
+                "description", "tags"))) must_=== BSONDocument(
+                "path" -> Seq("title", "description", "tags"))
+            }
+        }
+      }
+
+      "near" >> {
+        "with minimal options" in {
+          val op = Near(
+            query = "foo" -> Seq.empty,
+            path = "title" -> Seq("description", "tags"))
+
+          op.name must_=== "near" and {
+            doc(op) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> Seq("title", "description", "tags"))
+          }
+        }
+
+        "with pivot and score" in {
+          doc(Near(
+            query = "foo" -> Seq("bar"),
+            path = "title" -> Nil,
+            pivot = Some(0.5D),
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "query" -> Seq("foo", "bar"),
+            "path" -> "title",
+            "pivot" -> 0.5D,
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+      }
+
+      "wildcard" >> {
+        "with minimal options" in {
+          val op = Wildcard(
+            query = "foo" -> Seq.empty,
+            path = "title" -> Seq(
+              "description", "tags"))
+
+          op.name must_=== "wildcard" and {
+            doc(op) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> Seq("title", "description", "tags"),
+              "allowAnalyzedField" -> false)
+          }
+        }
+
+        "with pivot and score" in {
+          doc(Wildcard(
+            query = "foo" -> Seq("bar"),
+            path = "title" -> Nil,
+            allowAnalyzedField = true,
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "query" -> Seq("foo", "bar"),
+            "path" -> "title",
+            "allowAnalyzedField" -> true,
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+      }
+
+      "regex" >> {
+        "with minimal options" in {
+          val op = Regex(
+            query = "foo" -> Seq.empty,
+            path = "title" -> Seq("description", "tags"))
+
+          op.name must_=== "regex" and {
+            doc(op) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> Seq("title", "description", "tags"),
+              "allowAnalyzedField" -> false)
+          }
+        }
+
+        "with pivot and score" in {
+          doc(Regex(
+            query = "foo" -> Seq("bar"),
+            path = "title",
+            allowAnalyzedField = true,
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "query" -> Seq("foo", "bar"),
+            "path" -> "title",
+            "allowAnalyzedField" -> true,
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+      }
+
+      "range" >> {
+        "with minimal options" in {
+          val op = Range(
+            path = "foo" -> Seq("bar"),
+            start = Range.greaterThan(2),
+            end = Range.lessThanOrEqual(7.5D))
+
+          op.name must_=== "range" and {
+            doc(op) must_=== BSONDocument(
+              "path" -> Seq("foo", "bar"),
+              "gt" -> 2,
+              "lte" -> 7.5D)
+          }
+        }
+
+        "with score" in {
+          doc(Range(
+            path = "foo",
+            start = Range.greaterThan(2),
+            end = Range.lessThanOrEqual(7.5D),
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "path" -> "foo",
+            "gt" -> 2,
+            "lte" -> 7.5D,
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+      }
+
+      "query string" >> {
+        "with minimal options" in {
+          val op = QueryString(
+            defaultPath = "title",
+            query = "Rocky AND (IV OR 4 OR Four)")
+
+          op.name must_=== "queryString" and {
+            doc(op) must_=== BSONDocument(
+              "defaultPath" -> "title",
+              "query" -> "Rocky AND (IV OR 4 OR Four)")
+          }
+        }
+
+        "with score" in {
+          doc(QueryString(
+            defaultPath = "title",
+            query = "Rocky AND (IV OR 4 OR Four)",
+            score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
+            "defaultPath" -> "title",
+            "query" -> "Rocky AND (IV OR 4 OR Four)",
+            "score" -> BSONDocument("boost" -> 2.1D))
+
+        }
+      }
+    }
+
+    f"be serialized as $$search" >> {
+      val doc = makeSearch(AggFramework) _
+      val makePipe = reactivemongo.api.tests.makePipe(AggFramework)(_)
+
+      Fragments.foreach(Seq[(Operator, BSONDocument)](
+        term1 -> BSONDocument(
+          "query" -> "foo",
+          "path" -> Seq("title", "description", "tags")),
+        text1 -> BSONDocument(
+          "query" -> "foo",
+          "path" -> Seq("title", "description", "tags")),
+        phrase1 -> BSONDocument(
+          "query" -> "foo",
+          "path" -> Seq("title", "description", "tags"),
+          "slop" -> 0))) {
+        case (sop, doc) => s"with ${sop.name} operator" in {
+          makePipe(AtlasSearch(sop)) must_=== BSONDocument(
+            f"$$search" -> BSONDocument(sop.name -> doc))
+        }
+      }
+
+      "with compound operator" in {
+        val builder = Compound.newBuilder(Compound.must, term1).
+          append(Compound.mustNot, text1 -> Seq(phrase1))
+
+        makePipe(AtlasSearch(builder.result())) must_=== BSONDocument(
+          f"$$search" -> BSONDocument("compound" -> BSONDocument(
+            "must" -> Seq(BSONDocument("term" -> doc(term1))),
+            "mustNot" -> Seq(
+              BSONDocument("text" -> doc(text1)),
+              BSONDocument("phrase" -> doc(phrase1))))))
+
+      }
+    }
+  }
+
+  section("unit")
 
   // ---
 
@@ -1517,11 +2028,10 @@ db.accounts.aggregate([
     name: Option[String] = None,
     unique: Boolean = false,
     background: Boolean = false,
-    dropDups: Boolean = false,
     sparse: Boolean = false,
     version: Option[Int] = None, // let MongoDB decide
     partialFilter: Option[pack.Document] = None,
-    options: pack.Document = builder.document(Seq.empty)) = Index(pack)(key, name, unique, background, dropDups, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
+    options: pack.Document = builder.document(Seq.empty)) = Index(pack)(key, name, unique, background, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
 
   case class User(
     _id: Int,

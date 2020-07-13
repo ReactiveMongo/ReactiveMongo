@@ -6,8 +6,7 @@ private[commands] trait SliceAggregation[P <: SerializationPack] {
   aggregation: AggregationFramework[P] =>
 
   /**
-   * Returns a subset of an array.
-   * https://docs.mongodb.com/manual/reference/operator/aggregation/slice/
+   * Returns a [[https://docs.mongodb.com/manual/reference/operator/aggregation/slice/ slice]]/subset of an array.
    *
    * @param array any valid expression that resolves to an array
    * @param position any valid expression that resolves to an integer
@@ -20,36 +19,47 @@ private[commands] trait SliceAggregation[P <: SerializationPack] {
 
     import builder.{ document, elementProducer => element }
 
-    val makePipe: pack.Document = {
+    protected[reactivemongo] val makePipe: pack.Document = {
       val els = Seq.newBuilder[pack.Value]
 
       position.foreach { els += _ }
       n.foreach { els += _ }
 
       document(Seq(
-        element(f"$$slice", builder.array(array, els.result()))))
+        element(f"$$slice", builder.array(array +: els.result()))))
     }
+
+    private lazy val tupled = Tuple3(array, position, n)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        other.tupled == this.tupled
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"Slice${tupled.toString}"
   }
 
   /**
    * {{{
-   * import scala.concurrent.ExecutionContext
-   *
    * import reactivemongo.api.bson.{ BSONDocument, BSONInteger, BSONString }
    * import reactivemongo.api.bson.collection.BSONCollection
    *
-   * def foo(coll: BSONCollection)(implicit ec: ExecutionContext) = {
+   * def foo(coll: BSONCollection) =
    *   coll.aggregateWith[BSONDocument]() { agg =>
    *     import agg.{ Project, Slice }
    *
    *     // Define the pipeline stages
-   *     Project(BSONDocument(
+   *     List(Project(BSONDocument(
    *       "name" -> 1,
    *       "favorites" -> Slice(
    *         array = BSONString(f"$$favorites"),
-   *         n = BSONInteger(3)).makePipe)) -> List.empty
+   *         n = BSONInteger(3)))))
    *   }
-   * }
    * }}}
    */
   object Slice {

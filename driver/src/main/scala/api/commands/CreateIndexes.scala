@@ -10,22 +10,10 @@ import reactivemongo.api.indexes.{ Index, IndexesManager, NSIndex }
  * @param db the database name
  * @param indexes the indexes to be created
  */
-@deprecated("Internal: will be made private", "0.16.0")
-class CreateIndexes(val db: String, val indexes: List[Index])
-  extends Product with Serializable // TODO: Remove
-  with CollectionCommand with CommandWithResult[WriteResult] {
-
-  val productArity = 2
-
-  def productElement(n: Int): Any = n match {
-    case 0 => db
-    case _ => indexes
-  }
-
-  def canEqual(that: Any): Boolean = that match {
-    case _: CreateIndexes => true
-    case _                => false
-  }
+private[reactivemongo] final class CreateIndexes(
+  val db: String,
+  val indexes: List[Index])
+  extends CollectionCommand with CommandWithResult[WriteResult] {
 
   override def equals(that: Any): Boolean = that match {
     case other: CreateIndexes =>
@@ -42,11 +30,7 @@ class CreateIndexes(val db: String, val indexes: List[Index])
   private[commands] def tupled = db -> indexes
 }
 
-@deprecated("Internal: will be made private", "0.16.0")
-object CreateIndexes extends scala.runtime.AbstractFunction2[String, List[Index], CreateIndexes] {
-
-  @inline def apply(db: String, indexes: List[Index]): CreateIndexes = new CreateIndexes(db, indexes)
-
+private[reactivemongo] object CreateIndexes {
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[Command[P]]] = {
     val builder = pack.newBuilder
     val nsIndexWriter = IndexesManager.nsIndexWriter[P](pack)
@@ -55,7 +39,7 @@ object CreateIndexes extends scala.runtime.AbstractFunction2[String, List[Index]
 
     pack.writer[ResolvedCollectionCommand[Command[P]]] { create =>
       val indexes = create.command.indexes.map { i =>
-        val nsi = NSIndex.at[P](create.command.db + "." + create.collection, i)
+        val nsi = NSIndex[P](create.command.db + "." + create.collection, i)
 
         pack.serialize(nsi, nsIndexWriter)
       }
@@ -64,11 +48,8 @@ object CreateIndexes extends scala.runtime.AbstractFunction2[String, List[Index]
 
       elements += element("createIndexes", builder.string(create.collection))
 
-      indexes match {
-        case head :: tail =>
-          elements += element("indexes", builder.array(head, tail))
-
-        case _ =>
+      if (indexes.nonEmpty) {
+        elements += element("indexes", builder.array(indexes))
       }
 
       builder.document(elements.result())

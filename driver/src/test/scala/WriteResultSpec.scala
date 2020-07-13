@@ -1,6 +1,8 @@
-import reactivemongo.api.commands.{ CommandError, DefaultWriteResult }
+package reactivemongo
 
-class WriteResultSpec extends org.specs2.mutable.Specification {
+import reactivemongo.api.commands.{ CommandException, DefaultWriteResult }
+
+final class WriteResultSpec extends org.specs2.mutable.Specification {
   "Write result" title
 
   section("unit")
@@ -13,17 +15,17 @@ class WriteResultSpec extends org.specs2.mutable.Specification {
       code = Some(23),
       errmsg = Some("Foo"))
 
-    "be matched as a CommandError when failed" in {
+    "be matched as a CommandException when failed" in {
       error must beLike {
-        case CommandError.Code(code) => code must_== 23
+        case CommandException.Code(code) => code must_== 23
       } and (error must beLike {
-        case CommandError.Message(msg) => msg must_== "Foo"
+        case CommandException.Message(msg) => msg must_== "Foo"
       })
     }
 
-    "not be matched as a CommandError when successful" in {
+    "not be matched as a CommandException when successful" in {
       (error.copy(ok = true) match {
-        case CommandError.Code(_) | CommandError.Message(_) => true
+        case CommandException.Code(_) | CommandException.Message(_) => true
         case _ => false
       }) must beFalse
     }

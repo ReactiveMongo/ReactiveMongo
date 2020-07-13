@@ -1,37 +1,32 @@
 import scala.concurrent.{ Await, Future, Promise }
-import scala.concurrent.duration._
 
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
 
 import reactivemongo.api.{
   AuthenticationMode,
-  DefaultDB,
+  DB,
   FailoverStrategy,
   MongoConnectionOptions,
   ScramSha1Authentication,
   ScramSha256Authentication,
+  WriteConcern,
   X509Authentication
 }
 
 import reactivemongo.api.bson.BSONDocument
 
-import reactivemongo.core.actors.{
-  PrimaryAvailable,
-  RegisterMonitor,
-  SetAvailable
-}
 import reactivemongo.core.actors.Exceptions.{
   InternalState,
   PrimaryUnavailableException
 }
 
-import reactivemongo.core.nodeset.ProtocolMetadata
-import reactivemongo.core.commands.{
+import reactivemongo.core.protocol.ProtocolMetadata
+
+import reactivemongo.api.commands.{
+  DBUserRole,
   FailedAuthentication,
   SuccessfulAuthentication
 }
-
-import reactivemongo.api.commands.{ DBUserRole, WriteConcern }
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -82,7 +77,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
       con.flatMap(_.database(commonDb)).map(_.failoverStrategy).
         aka("strategy") must beTypedEqualTo(FailoverStrategy.remote).
         await(1, timeout) and {
-          con.flatMap(_.askClose()(timeout)) must not(
+          con.flatMap(_.close()(timeout)) must not(
             throwA[Exception]).await(1, timeout)
         }
     }
@@ -93,14 +88,15 @@ final class DriverSpec(implicit ee: ExecutionEnv)
       val priAvailable = Promise[ProtocolMetadata]()
 
       val setMon = testMonitor(setAvailable) {
-        case msg: SetAvailable =>
-          SetAvailable.unapply(msg)
+        case reactivemongo.api.tests.PrimaryAvailable(metadata) =>
+          Some(metadata)
+
         case _ => None
       }
 
       val priMon = testMonitor(priAvailable) {
-        case msg: PrimaryAvailable =>
-          PrimaryAvailable.unapply(msg)
+        case reactivemongo.api.tests.PrimaryAvailable(metadata) =>
+          Some(metadata)
 
         case _ => None
       }
@@ -112,8 +108,8 @@ final class DriverSpec(implicit ee: ExecutionEnv)
           // Database is resolved (so NodeSet and Primary is reachable) ...
 
           // ... register monitors after
-          setMon ! c.mongosystem
-          priMon ! c.mongosystem
+          setMon ! reactivemongo.api.tests.mongosystem(c)
+          priMon ! reactivemongo.api.tests.mongosystem(c)
 
           Future.sequence(Seq(setAvailable.future, priAvailable.future))
         }
@@ -128,6 +124,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
       val before = System.currentTimeMillis()
       val unresolved = con.flatMap(_.database(commonDb))
       val after = System.currentTimeMillis()
+      val failTimeout = Common.estTimeout(FailoverStrategy.remote)
 
       (after - before) aka "invocation" must beBetween(0L, 75L) and {
         unresolved.map(_ => Option.empty[Throwable] -> -1L).recover {
@@ -148,105 +145,12 @@ final class DriverSpec(implicit ee: ExecutionEnv)
               } and {
                 (duration must be_>=(17000L)) and (duration must be_<(28500L))
               }
-        }.await(0, 22.seconds) and {
-          con.flatMap(_.askClose()(timeout)) must not(
-            throwA[Exception]).await(0, timeout)
+        }.await(0, failTimeout + (failTimeout / 3L)) and {
+          con.flatMap(_.close()(timeout)) must not(
+            throwA[Exception]).awaitFor(timeout)
         }
       }
     }
-  }
-
-  "CR Authentication" should {
-    section("cr_auth")
-
-    lazy val drv = newAsyncDriver()
-    lazy val connection = drv.connect(
-      List(primaryHost),
-      options = DefaultOptions.copy(
-        authenticationMechanism = reactivemongo.api.CrAuthentication, // enforce
-        nbChannelsPerNode = 1))
-
-    val dbName = s"specs2-test-cr${System identityHashCode drv}"
-    lazy val db_ = connection.flatMap(_.database(dbName, failoverStrategy))
-
-    val id = System.identityHashCode(drv)
-
-    section("mongo2")
-
-    "be the default mode" in {
-      db_.flatMap(_.drop()).
-        map(_ => {}) must beTypedEqualTo({}).await(1, timeout)
-    }
-
-    "create a user" in {
-      db_.flatMap(_.createUser(s"test-$id", Some(s"password-$id"),
-        roles = List(DBUserRole("readWrite", dbName)))).
-        aka("creation") must beTypedEqualTo({}).await(0, timeout)
-    }
-
-    "not be successful with wrong credentials" in {
-      connection.flatMap(
-        _.authenticate(dbName, "foo", "bar", failoverStrategy)).
-        aka("authentication") must throwA[FailedAuthentication].
-        await(0, timeout) and {
-          // With credential in initial connection options
-          val con = drv.connect(
-            List(primaryHost),
-            options = DefaultOptions.copy(
-              authenticationMechanism = reactivemongo.api.CrAuthentication,
-              credentials = Map(dbName -> MongoConnectionOptions.
-                Credential("foo", Some("bar"))),
-              nbChannelsPerNode = 1))
-
-          con.flatMap(_.database(dbName, failoverStrategy)).
-            map(_ => {}) must throwA[PrimaryUnavailableException].
-            await(0, timeout)
-        }
-    }
-
-    "be successful with right credentials" in {
-      connection.flatMap(_.authenticate(
-        dbName, s"test-$id", s"password-$id", failoverStrategy)).
-        aka("authentication") must beAnInstanceOf[SuccessfulAuthentication].
-        await(1, timeout) and {
-          db_.flatMap {
-            _("testcol").insert.one(BSONDocument("foo" -> "bar")).map(_ => {})
-          } must beTypedEqualTo({}).await(0, timeout)
-        } and {
-          // With credential in initial connection options
-          val con = drv.connect(
-            List(primaryHost),
-            options = DefaultOptions.copy(
-              authenticationMechanism = reactivemongo.api.CrAuthentication,
-              credentials = Map(dbName -> MongoConnectionOptions.
-                Credential(s"test-$id", Some(s"password-$id"))),
-              nbChannelsPerNode = 1))
-
-          con.flatMap(_.database(dbName, failoverStrategy)).
-            map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
-
-        }
-    }
-
-    "driver shutdown" in { // mainly to ensure the test driver is closed
-      drv.close(timeout) must not(throwA[Exception])
-    }
-
-    "fail on DB without authentication" in {
-      def con = driver.connect(
-        List(primaryHost),
-        options = DefaultOptions.copy(
-          nbChannelsPerNode = 1,
-          credentials = Map(commonDb -> MongoConnectionOptions.
-            Credential("test", Some("password")))))
-
-      Await.result(con.flatMap(_.database(
-        commonDb, failoverStrategy)), timeout).
-        aka("database resolution") must throwA[PrimaryUnavailableException]
-    }
-    section("mongo2")
-
-    section("cr_auth")
   }
 
   section("scram_auth")
@@ -280,13 +184,13 @@ final class DriverSpec(implicit ee: ExecutionEnv)
           _ <- d.createUser(
             user = userName,
             pwd = Some(s"password-$id"),
-            customData = None,
+            customData = Option.empty[BSONDocument],
             roles = List(DBUserRole("readWrite", dbName)),
             digestPassword = true,
             writeConcern = WriteConcern.Default,
             restrictions = List.empty,
             mechanisms = List(mechanism))
-        } yield ()) must beTypedEqualTo({}).await(0, timeout * 2)
+        } yield ()) must beTypedEqualTo({}).await(2, timeout * 2)
       }
 
       "not be successful with wrong credentials" >> {
@@ -294,15 +198,15 @@ final class DriverSpec(implicit ee: ExecutionEnv)
           connection.flatMap(_.authenticate(
             dbName, "foo", "bar", failoverStrategy)).
             aka("authentication") must throwA[FailedAuthentication].
-            await(0, timeout)
+            await(1, timeout)
 
         }
 
-        "with the slow connection" in {
+        "with the slow connection" in eventually(2, timeout) {
           slowConnection.flatMap(_.authenticate(
             dbName, "foo", "bar", slowFailover)).
             aka("authentication") must throwA[FailedAuthentication].
-            await(1, slowTimeout)
+            await(2, slowTimeout + (slowTimeout / 2L))
         }
       }
 
@@ -315,7 +219,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
             await(1, timeout) and {
               db_.flatMap {
                 _("testcol").insert.one(BSONDocument("foo" -> "bar"))
-              }.map(_ => {}) must beTypedEqualTo({}).await(1, timeout * 2)
+              }.map(_ => {}) must beTypedEqualTo({}).await(1, timeout * 2L)
             }
         }
 
@@ -325,7 +229,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
               _.authenticate(
                 dbName,
                 userName, s"password-$id", slowFailover)) must beAnInstanceOf[SuccessfulAuthentication].
-              awaitFor(slowTimeout)
+              awaitFor(slowTimeout + timeout)
           }
         }
       }
@@ -343,30 +247,29 @@ final class DriverSpec(implicit ee: ExecutionEnv)
             timeout)
 
           con.database(dbName, failoverStrategy).
-            aka("authed DB") must beLike[DefaultDB] {
+            aka("authed DB") must beLike[DB] {
               case rdb => rdb.collection("testcol").insert.one(
                 BSONDocument("foo" -> "bar")).map(_ => {}).
-                aka("insertion") must beTypedEqualTo({}).await(1, timeout)
+                aka("insertion") must beTypedEqualTo({}).awaitFor(timeout)
 
             }.await(1, timeout) and {
-              con.askClose()(timeout).
-                aka("close") must not(throwA[Exception]).await(1, timeout)
+              con.close()(timeout).
+                aka("close") must not(throwA[Exception]).awaitFor(timeout)
             }
         }
 
-        "with the slow connection" in {
-          val con = Await.result(
-            drv.connect(
-              List(slowPrimary),
-              options = slowOpts.copy(credentials = rightCreds)),
-            slowTimeout)
+        "with the slow connection" in eventually(2, timeout) {
+          (for {
+            con <- drv.connect(
+              nodes = List(slowPrimary),
+              options = slowOpts.copy(credentials = rightCreds))
 
-          con.database(dbName, slowFailover).
-            aka("authed DB") must beAnInstanceOf[DefaultDB].
-            await(1, slowTimeout) and {
-              con.askClose()(slowTimeout) must not(throwA[Exception]).
+            db <- con.database(dbName, slowFailover)
+          } yield db) must beLike[DB] {
+            case db =>
+              db.connection.close()(slowTimeout) must not(throwA[Exception]).
                 await(1, slowTimeout)
-            }
+          }.await(1, slowTimeout + (slowTimeout / 4L))
         }
       }
 
@@ -446,13 +349,13 @@ final class DriverSpec(implicit ee: ExecutionEnv)
 
       conOpts.credentials must not(beEmpty) and {
         con.database(dbName, failoverStrategy).
-          aka("authed DB") must beLike[DefaultDB] {
+          aka("authed DB") must beLike[DB] {
             case rdb => rdb.collection("testcol").insert.one(
               BSONDocument("foo" -> "bar")).map(_ => {}).
               aka("insertion") must beTypedEqualTo({}).await(1, timeout)
 
           }.await(1, timeout) and {
-            con.askClose()(timeout).
+            con.close()(timeout).
               aka("close") must not(throwA[Exception]).await(1, timeout)
           }
       }
@@ -477,7 +380,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
         c <- con
         db <- c.database(commonDb, failoverStrategy)
         _ <- db.collectionNames
-      } yield {}) must beTypedEqualTo({}).await(0, timeout)
+      } yield {}) must beTypedEqualTo({}).awaitFor(timeout)
     }
 
     "fail without a valid credential" in {
@@ -510,7 +413,9 @@ final class DriverSpec(implicit ee: ExecutionEnv)
 
   // ---
 
-  def testMonitor[T](result: Promise[T], actorSys: ActorSystem = driver.system)(test: Any => Option[T]): ActorRef = actorSys.actorOf(Props(new Actor {
+  def testMonitor[T](
+    result: Promise[T],
+    actorSys: ActorSystem = reactivemongo.api.tests.system(driver))(test: Any => Option[T]): ActorRef = actorSys.actorOf(Props(new Actor {
     private object Msg {
       def unapply(that: Any): Option[T] = test(that)
     }
@@ -518,7 +423,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
     val receive: Receive = {
       case sys: akka.actor.ActorRef => {
         // Manually register this as connection/system monitor
-        sys ! RegisterMonitor
+        sys ! reactivemongo.api.tests.RegisterMonitor
       }
 
       case Msg(v) => {

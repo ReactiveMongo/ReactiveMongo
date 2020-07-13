@@ -1,3 +1,5 @@
+package reactivemongo
+
 import scala.concurrent.Promise
 
 import akka.actor.Actor
@@ -9,20 +11,6 @@ import reactivemongo.io.netty.channel.{
   ChannelFuture,
   ChannelFutureListener
 }
-
-import reactivemongo.core.protocol.{
-  MessageHeader,
-  Reply,
-  Response,
-  ResponseInfo
-}
-
-import reactivemongo.api.BSONSerializationPack
-import reactivemongo.api.commands.bson.{
-  BSONIsMasterCommand,
-  BSONIsMasterCommandImplicits
-}, BSONIsMasterCommandImplicits.IsMasterResultReader
-import BSONIsMasterCommand.IsMasterResult
 
 import org.specs2.specification.AfterAll
 import org.specs2.concurrent.ExecutionEnv
@@ -39,12 +27,20 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
     getBytes,
     initChannel,
     isMasterRequest,
-    isMasterResponse,
+    IsMasterCommand,
+    IsMasterResponse,
+    pack,
     releaseChannelFactory,
-    createChannel
-  }
+    responseInfo,
+    createChannel,
+    messageHeader,
+    reply,
+    response => _response,
+    Response
+  }, IsMasterCommand.IsMasterResult
+
   import Common.timeout
-  implicit def actorSys = Common.driver.system
+  implicit def actorSys = Common.driverSystem
 
   val factory = channelFactory("sup-1", "con-2", Common.DefaultOptions)
 
@@ -61,15 +57,15 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
 
         documents.writeBytes(isMasterRespBytes)
 
-        Response(
-          MessageHeader(205, 13, 0, 1), Reply(8, 0, 0, 1),
-          documents, ResponseInfo(cid))
+        _response(
+          messageHeader(205, 13, 0, 1), reply(8, 0, 0, 1),
+          documents, responseInfo(cid))
       }
 
       val response = Promise[Response]()
       def actor = new Actor {
         val receive: Receive = {
-          case resp: Response if isMasterResponse(resp) => {
+          case IsMasterResponse(resp) => {
             response.success(resp)
             ()
           }
@@ -112,9 +108,9 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
         // ---
 
         chan.isRegistered and {
-          sentRequest.future must beEqualTo(reqBytes).await(1, timeout)
+          sentRequest.future must beTypedEqualTo(reqBytes).await(1, timeout)
         } and {
-          response.future must beEqualTo(expectedResp).await(1, timeout)
+          response.future must beTypedEqualTo(expectedResp).await(1, timeout)
         }
       }
     }
@@ -122,6 +118,11 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
 
   Common.nettyNativeArch.foreach { arch =>
     s"Netty native support for $arch" should {
+      val basePkg: String = {
+        if (Common.shaded) "reactivemongo.io.netty.channel"
+        else "io.netty.channel"
+      }
+
       "be loaded" in {
         def actor = new Actor {
           val receive: Receive = {
@@ -136,11 +137,11 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
             case chan => arch must beLike[String] {
               case "osx" =>
                 chan.close(); chan.getClass.getName must startWith(
-                  "reactivemongo.io.netty.channel.kqueue.KQueue")
+                  s"${basePkg}.kqueue.KQueue")
 
               case "linux" =>
                 chan.close(); chan.getClass.getName must startWith(
-                  "reactivemongo.io.netty.channel.epoll.Epoll")
+                  s"${basePkg}.epoll.Epoll")
             }
           }
       }
@@ -154,18 +155,17 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
       val chanConnected = Promise[Unit]()
 
       def actor = new Actor {
+        val isMasterReader = IsMasterCommand.reader(pack)
         val receive: Receive = {
           case msg if (msg.toString startsWith "ChannelConnected(") =>
             chanConnected.success(Common.logger.info(s"NIO $msg")); ()
 
-          case resp: Response if (
-            chanConnected.isCompleted && isMasterResponse(resp)) => {
-
+          case IsMasterResponse(resp) if (chanConnected.isCompleted) => {
             result.tryComplete(scala.util.Try {
-              val bson = BSONSerializationPack.readAndDeserialize(
-                resp, BSONSerializationPack.IdentityReader)
+              val bson = pack.readAndDeserialize(
+                resp, pack.IdentityReader)
 
-              IsMasterResultReader.read(bson)
+              pack.deserialize(bson, isMasterReader)
             })
 
             Common.logger.info(s"NIO isMasterResponse: $resp")
@@ -188,7 +188,8 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
 
               result.future must beLike[IsMasterResult] {
                 case IsMasterResult(true, 16777216, 48000000, _,
-                  Some(_), min, max, _, _) => min must be_<(max)
+                  Some(_), _, min, max, _, _, _, _, _) => min must be_<(max)
+
               }.await(1, timeout) and {
                 if (!chan.closeFuture.isDone) {
                   chan.close()

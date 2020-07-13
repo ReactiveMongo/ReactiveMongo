@@ -2,11 +2,15 @@ import scala.concurrent._, duration.FiniteDuration
 
 import reactivemongo.api.bson.BSONDocument
 
-import reactivemongo.api.{ Cursor, DefaultDB, ReadConcern, ReadPreference }
+import reactivemongo.api.{
+  Cursor,
+  DB,
+  ReadConcern,
+  ReadPreference,
+  WriteConcern
+}
 
-import reactivemongo.api.commands.{ CommandError, WriteConcern }
-
-import reactivemongo.api.collections.Hint
+import reactivemongo.api.commands.CommandException
 
 import org.specs2.concurrent.ExecutionEnv
 
@@ -23,29 +27,30 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
   "Collection" title
 
   sequential
+  stopOnFail
 
   // ---
 
   import Common.{ timeout, slowTimeout }
 
-  lazy val (db, slowDb) = Common.databases(s"reactivemongo-${System identityHashCode this}", Common.connection, Common.slowConnection)
+  lazy val (db, slowDb) = Common.databases(s"reactivemongo-${System identityHashCode this}", Common.connection, Common.slowConnection, retries = 2)
 
-  def afterAll = { db.drop(); () }
+  def afterAll() = { db.drop(); () }
 
   // ---
 
   "BSON collection" should {
     "support creation" >> {
       "successfully when not exist" in {
-        collection.create() must beTypedEqualTo({}).awaitFor(timeout)
+        collection.create() must beTypedEqualTo({}).await(1, timeout)
       }
 
       "with error when already exists (failsIfExists = true)" in {
         def test(create: => Future[Unit]): Future[Boolean] =
           create.map(_ => true).recover {
-            case CommandError.Code(48 /*already exists */ ) => false
+            case CommandException.Code(48 /*already exists */ ) => false
 
-            case CommandError.Message(
+            case CommandException.Message(
               "collection already exists") => false
           }
 
@@ -78,15 +83,14 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
       implicit val writer = PersonWriter
 
       "with insert" in {
-        collection.insert.
-          one(person).map(_.ok) must beTrue.await(1, timeout) and {
+        collection.insert.one(person).
+          map(_ => {}) must beTypedEqualTo({}).await(1, timeout) and {
             val coll = slowColl.withReadPreference(ReadPreference.secondary)
 
             coll.readPreference must_=== ReadPreference.secondary and {
               // Anyway use ReadPreference.Primary for insert op
-              coll.insert.one(person2).map { r =>
-                r.ok -> r.n
-              } must beTypedEqualTo(true -> 1).await(1, timeout)
+              coll.insert.one(person2).
+                map(_.n) must beTypedEqualTo(1).await(1, timeout)
             }
           } and {
             slowColl.find(BSONDocument.empty).cursor[BSONDocument]().
@@ -108,7 +112,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
         selector: Option[BSONDocument] = None,
         limit: Option[Int] = None,
         skip: Int = 0,
-        hint: Option[Hint[pack.type]] = None,
+        hint: Option[collection.Hint] = None,
         readConcern: ReadConcern = ReadConcern.Local) =
         collection.count(selector, limit, skip, hint, readConcern)
 
@@ -150,7 +154,8 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
       }
 
       "successfully with 'name' projection using collect" in {
-        collection.find(BSONDocument("age" -> 25), BSONDocument("name" -> 1)).
+        collection.find(
+          BSONDocument("age" -> 25), Some(BSONDocument("name" -> 1))).
           one[BSONDocument] must beSome[BSONDocument].which { doc =>
             doc.elements.size must_=== 2 /* _id+name */ and {
               decoder.string(doc, "name") aka "name" must beSome("Jack")
@@ -158,31 +163,18 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
           }.await(1, timeout)
       }
 
-      "explain query result" >> {
-        "when MongoDB > 2.6" in {
-          findAll(collection).explain().one[BSONDocument].
-            aka("explanation") must beSome[BSONDocument].which { result =>
-              decoder.child(result, "queryPlanner").
-                aka("queryPlanner") must beSome and {
-                  decoder.child(result, "executionStats").
-                    aka("stats") must beSome
-                } and {
-                  decoder.child(result, "serverInfo").
-                    aka("serverInfo") must beSome
-                }
-            }.await(1, timeout)
-        } tag "not_mongo26"
-
-        "when MongoDB = 2.6" in {
-          findAll(collection).explain().one[BSONDocument].
-            aka("explanation") must beSome[BSONDocument].which { result =>
-              decoder.children(result, "allPlans").
-                aka("plans") must beLike[List[BSONDocument]] {
-                  case _ => decoder.string(result, "server").
-                    aka("server") must beSome[String]
-                }
-            }.await(1, timeout)
-        } tag "mongo2"
+      "explain query result" in {
+        findAll(collection).explain().one[BSONDocument].
+          aka("explanation") must beSome[BSONDocument].which { result =>
+            decoder.child(result, "queryPlanner").
+              aka("queryPlanner") must beSome and {
+                decoder.child(result, "executionStats").
+                  aka("stats") must beSome
+              } and {
+                decoder.child(result, "serverInfo").
+                  aka("serverInfo") must beSome
+              }
+          }.await(1, timeout)
       }
     }
 
@@ -196,7 +188,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
       cursor.foldWhile(Nil: Seq[Person])({ (s, p) =>
         if (p.name == "John") Cursor.Done(s :+ p)
         else Cursor.Cont(s :+ p)
-      }, (_, e) => Cursor.Fail(e)) must beEqualTo(persons).await(1, timeout)
+      }, (_, e) => Cursor.Fail(e)) must beTypedEqualTo(persons).await(1, timeout)
     }
 
     "read a document with error" in {
@@ -225,7 +217,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
             }
 
           collect aka "first collect" must not(throwA[Exception]).
-            await(1, timeout) and (collect must beEqualTo(-1).await(1, timeout))
+            await(1, timeout) and (collect must beTypedEqualTo(-1).await(1, timeout))
         }
 
         "using foldWhile" in {
@@ -238,13 +230,14 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
         "fallbacking to final value using foldWhile" in {
           cursor.foldWhile(0)(
             (i, _) => Cursor.Cont(i + 1),
-            (_, _) => Cursor.Done(-1)) must beEqualTo(-1).await(1, timeout)
+            (_, _) => Cursor.Done(-1)) must beTypedEqualTo(-1).await(1, timeout)
         }
 
         "skiping failure using foldWhile" in {
           cursor.foldWhile(0)(
             (i, _) => Cursor.Cont(i + 1),
-            (_, _) => Cursor.Cont(-3)) must beEqualTo(-2).await(1, timeout)
+            (_, _) => Cursor.Cont(-3)) must beTypedEqualTo(-2).
+            await(1, timeout)
         }
       }
 
@@ -286,7 +279,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
           case e =>
             e.printStackTrace()
             -2
-        } aka "write result" must beEqualTo(-1).await(1, timeout)
+        } aka "write result" must beTypedEqualTo(-1).await(1, timeout)
 
       "with the default connection" in {
         writeSpec(collection, timeout)
@@ -369,7 +362,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
       import builder.{ elementProducer => elm, int }
 
       "start & end" in {
-        Common.db.startSession() must beLike[DefaultDB] {
+        Common.db.startSession() must beLike[DB] {
           case db =>
             val coll = db.collection(s"session_${System identityHashCode this}")
             val id = System.identityHashCode(db)
@@ -386,7 +379,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
             (for {
               _ <- coll.insert(ordered = false).one(inserted)
               r <- coll.find(base).one[BSONDocument]
-            } yield r) must beSome(inserted).awaitFor(timeout) and {
+            } yield r) must beSome(inserted).await(1, timeout) and {
               (for {
                 _ <- coll.update(false).one(
                   q = base,
@@ -416,7 +409,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
                 awaitFor(timeout)
 
             } and {
-              db.endSession().map(_ => {}) must beEqualTo({}).awaitFor(timeout)
+              db.endSession().map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
             }
         }.awaitFor(timeout)
       }
@@ -439,7 +432,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
           n: Int,
           e: Int,
           timeout: FiniteDuration) = {
-          @inline def docs = (0 until n).toStream.map { i =>
+          @inline def docs = (0 until n).map { i =>
             if (i == 0 || i == 1529 || i == 3026 || i == 19862) {
               // duplicate plop -3
               BSONDocument("bulk" -> true, "i" -> i, "plop" -> -3)
@@ -453,7 +446,6 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
               name = None,
               unique = true,
               background = false,
-              dropDups = false,
               sparse = false,
               expireAfterSeconds = None,
               storageEngine = None,
@@ -502,10 +494,8 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
         lazy val coll = db(s"bulked${System identityHashCode this}_2")
 
         "to insert" in {
-          val docs = Stream.empty[BSONDocument]
-
-          coll.insert(ordered = true).many(docs).
-            map(_.n) must beEqualTo(0).await(1, timeout)
+          coll.insert(ordered = true).many(List.empty[BSONDocument]).
+            map(_.n) must beTypedEqualTo(0).await(1, timeout)
         }
 
         "to update" in {
@@ -523,7 +513,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
               upsert = false,
               multi = true))).flatMap(builder.many(_)).map { r =>
             (r.n, r.nModified, r.upserted.size)
-          } must beEqualTo((2, 0, 1)).await(0, timeout)
+          } must beTypedEqualTo((2, 0, 1)).await(0, timeout)
         }
       }
     }

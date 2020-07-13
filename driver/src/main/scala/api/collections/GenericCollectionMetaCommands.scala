@@ -8,12 +8,11 @@ import reactivemongo.api.commands.{
   CollectionCommand,
   Command,
   CommandWithResult,
-  ResolvedCollectionCommand,
-  UnitBox
+  ResolvedCollectionCommand
 }
 
 /** The meta commands for collection that require the serialization pack. */
-private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPack with Singleton] { self: GenericCollection[P] =>
+private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPack] { self: GenericCollection[P] =>
 
   /**
    * [[https://docs.mongodb.com/manual/reference/method/db.createView/ Creates a view]] on this collection, using an aggregation pipeline.
@@ -27,8 +26,8 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
    * import reactivemongo.api.bson.collection.BSONCollection
    *
    * def foo(coll: BSONCollection)(implicit ec: ExecutionContext) = {
-   *   import coll.aggregationFramework
-   *   import aggregationFramework.{ Group, Match, SumField }
+   *   import coll.AggregationFramework
+   *   import AggregationFramework.{ Group, Match, SumField }
    *
    *   // See http://docs.mongodb.org/manual/tutorial/aggregation-zip-code-data-set/#return-states-with-populations-above-10-million
    *
@@ -42,7 +41,7 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
    *
    *   // Then the view can be resolved as any collection
    *   // (but won't be writeable)
-   *   val view: BSONCollection = coll.db("myview")
+   *   val _: BSONCollection = coll.db[BSONCollection]("myview")
    * }
    * }}}
    *
@@ -62,7 +61,7 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
     // Command codecs
     implicit def writer = createViewWriter
 
-    command.unboxed(self, cmd, writePreference)
+    command(self, cmd, writePreference)
   }
 
   // ---
@@ -71,7 +70,7 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
     val viewName: String,
     val operator: PipelineOperator,
     val pipeline: Seq[PipelineOperator],
-    val collation: Option[Collation]) extends CollectionCommand with CommandWithResult[UnitBox.type]
+    val collation: Option[Collation]) extends CollectionCommand with CommandWithResult[Unit]
 
   private type CreateViewCommand = ResolvedCollectionCommand[CreateView]
 
@@ -87,8 +86,7 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
         element("viewOn", string(cmd.collection)))
 
       val pipeline = builder.array(
-        cmd.command.operator.makePipe,
-        cmd.command.pipeline.map(_.makePipe))
+        cmd.command.operator.makePipe +: cmd.command.pipeline.map(_.makePipe))
 
       elements += element("pipeline", pipeline)
 

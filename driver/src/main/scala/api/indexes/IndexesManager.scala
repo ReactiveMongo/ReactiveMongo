@@ -15,32 +15,20 @@
  */
 package reactivemongo.api.indexes
 
-import reactivemongo.core.protocol.MongoWireVersion
-
 import reactivemongo.api.{
   DB,
   DBMetaCommands,
-  BSONSerializationPack => LegacyPack,
   Collation,
-  Collection,
-  Cursor,
-  CursorProducer,
-  FailoverStrategy,
-  QueryOpts,
   ReadPreference,
   Serialization,
-  SerializationPack,
-  WriteConcern
+  SerializationPack
 }
-import reactivemongo.api.collections.GenericQueryBuilder
 
 import reactivemongo.api.commands.{
   Command,
   CommandCodecs,
-  CommandError,
+  CommandException,
   DropIndexes,
-  InsertCommand,
-  ResolvedCollectionCommand,
   WriteResult
 }
 
@@ -56,7 +44,7 @@ import scala.concurrent.{ Future, ExecutionContext }
  * @define droppedCount The number of indexes that were dropped.
  */
 sealed trait IndexesManager {
-  type Pack <: SerializationPack with Singleton
+  type Pack <: SerializationPack
 
   final type NSIndex = reactivemongo.api.indexes.NSIndex.Aux[Pack]
 
@@ -66,10 +54,10 @@ sealed trait IndexesManager {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    * import reactivemongo.api.indexes.NSIndex
    *
-   * def listIndexes(db: DefaultDB)(
+   * def listIndexes(db: DB)(
    *   implicit ec: ExecutionContext): Future[List[String]] =
    *   db.indexesManager.list().map(_.flatMap { ni: NSIndex =>
    *     ni.index.name.toList
@@ -88,11 +76,11 @@ sealed trait IndexesManager {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    * import reactivemongo.api.indexes.NSIndex
    *
    * def ensureIndexes(
-   *   db: DefaultDB, is: Seq[NSIndex.Default])(
+   *   db: DB, is: Seq[NSIndex.Default])(
    *   implicit ec: ExecutionContext): Future[Unit] =
    *   Future.sequence(
    *     is.map(idx => db.indexesManager.ensure(idx))).map(_ => {})
@@ -113,11 +101,11 @@ sealed trait IndexesManager {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    * import reactivemongo.api.indexes.NSIndex
    *
    * def createIndexes(
-   *   db: DefaultDB, is: Seq[NSIndex.Default])(
+   *   db: DB, is: Seq[NSIndex.Default])(
    *   implicit ec: ExecutionContext): Future[Unit] =
    *   Future.sequence(
    *     is.map(idx => db.indexesManager.create(idx))).map(_ => {})
@@ -137,10 +125,10 @@ sealed trait IndexesManager {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    * import reactivemongo.api.indexes.NSIndex
    *
-   * def dropIndex(db: DefaultDB, idx: NSIndex.Default)(
+   * def dropIndex(db: DB, idx: NSIndex.Default)(
    *   implicit ec: ExecutionContext): Future[Int] =
    *   db.indexesManager.drop(idx)
    * }}}
@@ -155,9 +143,9 @@ sealed trait IndexesManager {
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    *
-   * def dropIndex(db: DefaultDB, name: String)(
+   * def dropIndex(db: DB, name: String)(
    *   implicit ec: ExecutionContext): Future[Int] =
    *   db.indexesManager.drop("myColl", name)
    * }}}
@@ -173,9 +161,9 @@ sealed trait IndexesManager {
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    *
-   * def dropAllIndexes(db: DefaultDB)(
+   * def dropAllIndexes(db: DB)(
    *   implicit ec: ExecutionContext): Future[Int] =
    *   db.indexesManager.dropAll("myColl")
    * }}}
@@ -190,180 +178,16 @@ sealed trait IndexesManager {
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.DefaultDB
+   * import reactivemongo.api.DB
    *
-   * def countCollIndexes(db: DefaultDB, collName: String)(
+   * def countCollIndexes(db: DB, collName: String)(
    *   implicit ec: ExecutionContext): Future[Int] =
    *   db.indexesManager.onCollection(collName).list().map(_.size)
    * }}}
    *
    * @param collectionName $collectionNameParam
    */
-  def onCollection(@deprecatedName(Symbol("name")) collectionName: String): CollectionIndexesManager.Aux[Pack]
-}
-
-/**
- * A helper class to manage the indexes on a Mongo 2.x database.
- *
- * @param db The subject database.
- */
-@deprecated("Internal: will be made private", "0.20.3")
-private[api] sealed abstract class AbstractLegacyManager(db: DB)( // TODO: Remove
-  implicit
-  ec: ExecutionContext) extends IndexesManager { self =>
-
-  protected val pack: Pack
-
-  protected lazy val collection: Collection =
-    db("system.indexes")(Serialization.defaultCollectionProducer)
-
-  private lazy val builder = pack.newBuilder
-
-  def list(): Future[List[NSIndex]] = {
-    val query = new QueryBuilder(None)
-    val reader = IndexesManager.nsIndexReader[Pack](query.pack)
-
-    query.cursor(db.connection.options.readPreference)(
-      reader,
-      CursorProducer.defaultCursorProducer).
-      collect[List](-1, Cursor.FailOnError[List[NSIndex]]())
-  }
-
-  def ensure(nsIndex: NSIndex): Future[Boolean] = {
-    import builder.string
-
-    val query = new QueryBuilder(Some(
-      builder.document(Seq(
-        builder.elementProducer("ns", string(nsIndex.namespace)),
-        builder.elementProducer("name", string(nsIndex.index.eventualName))))))
-
-    val reader = IndexesManager.nsIndexReader[Pack](query.pack)
-
-    query.one(reader, ec).flatMap { idx =>
-      if (!idx.isDefined) {
-        create(nsIndex).map(_ => true)
-      } else {
-        Future.successful(false)
-      }
-    }
-  }
-
-  private[reactivemongo] lazy val nsIndexWriter =
-    IndexesManager.nsIndexWriter[Pack](pack)
-
-  private lazy val runner = Command.run[Pack](pack, FailoverStrategy.default)
-
-  private object InsertCmd extends InsertCommand[pack.type] {
-    val pack: self.pack.type = self.pack
-  }
-
-  private implicit lazy val insertWriter = {
-    val w = InsertCommand.writer[Pack](pack)(InsertCmd)(None)
-    pack.writer[ResolvedCollectionCommand[InsertCmd.Insert]](w)
-  }
-
-  private implicit lazy val insertReader: pack.Reader[InsertCmd.InsertResult] =
-    CommandCodecs.defaultWriteResultReader[Pack](pack)
-
-  def create(nsIndex: NSIndex): Future[WriteResult] =
-    Future(pack.serialize(nsIndex, nsIndexWriter)).flatMap { doc =>
-      runner(collection, new InsertCmd.Insert(
-        head = doc,
-        tail = Seq.empty,
-        ordered = false,
-        writeConcern = WriteConcern.Default,
-        bypassDocumentValidation = false),
-        ReadPreference.primary)
-    }
-
-  private implicit def dropWriter = DropIndexes.writer[Pack](pack)
-  private implicit def dropReader = DropIndexes.reader[Pack](pack)
-
-  def drop(collectionName: String, indexName: String): Future[Int] =
-    runner.unboxed(
-      db.collection(collectionName),
-      DropIndexes(indexName),
-      ReadPreference.primary)
-
-  def dropAll(collectionName: String): Future[Int] = drop(collectionName, "*")
-
-  def onCollection(@deprecatedName(Symbol("name")) collectionName: String): CollectionIndexesManager.Aux[Pack] = new CollectionManager(collectionName)
-
-  // ---
-
-  private final class QueryBuilder(
-    query: Option[pack.Document])
-    extends GenericQueryBuilder[self.pack.type] {
-
-    val pack: self.pack.type = self.pack
-    override type Self = GenericQueryBuilder[pack.type]
-
-    @inline def queryOption: Option[pack.Document] = query
-    val sortOption = Option.empty[pack.Document]
-    val projectionOption = Option.empty[pack.Document]
-    val hintOption = Option.empty[pack.Document]
-    val explainFlag: Boolean = false
-    val snapshotFlag: Boolean = false
-    val commentString = Some("LegacyIndexesManager")
-    val options = QueryOpts()
-    val failoverStrategy = FailoverStrategy.default
-    val maxTimeMsOption = Option.empty[Long]
-    val version = self.db.connectionState.metadata.maxWireVersion
-
-    @inline override def collection: Collection = self.collection
-
-    def copy( // TODO: Remove
-      queryOption: Option[pack.Document],
-      sortOption: Option[pack.Document],
-      projectionOption: Option[pack.Document],
-      hintOption: Option[pack.Document],
-      explainFlag: Boolean,
-      snapshotFlag: Boolean,
-      commentString: Option[String],
-      options: QueryOpts,
-      failoverStrategy: FailoverStrategy,
-      maxTimeMsOption: Option[Long]): Self = this
-
-  }
-
-  private final class CollectionManager(collectionName: String)
-    extends CollectionIndexesManager {
-
-    type Pack = self.Pack
-
-    protected val pack: Pack = self.pack
-
-    lazy val fqName = self.db.name + "." + collectionName
-
-    def list(): Future[List[Index]] =
-      self.list.map(_.filter(_.namespace == fqName).map(_.idx))
-
-    def ensure(index: Index): Future[Boolean] =
-      self.ensure(NSIndex.at[Pack](fqName, index))
-
-    def create(index: Index): Future[WriteResult] =
-      self.create(NSIndex.at[Pack](fqName, index))
-
-    def drop(indexName: String): Future[Int] =
-      self.drop(collectionName, indexName)
-
-    def dropAll(): Future[Int] = self.dropAll(collectionName)
-  }
-}
-
-/**
- * A helper class to manage the indexes on a Mongo 2.x database.
- *
- * @param db The subject database.
- */
-@deprecated("Internal: will be made private", "0.20.3")
-class LegacyIndexesManager(db: DB)( // TODO: Remove
-  implicit
-  ec: ExecutionContext) extends AbstractLegacyManager(db) { self =>
-
-  type Pack = Serialization.Pack
-
-  protected val pack: Pack = Serialization.internalSerializationPack
+  def onCollection(collectionName: String): CollectionIndexesManager.Aux[Pack]
 }
 
 private[api] sealed abstract class AbstractIndexesManager(
@@ -375,7 +199,7 @@ private[api] sealed abstract class AbstractIndexesManager(
 
   private def listIndexes(collections: List[String], indexes: List[NSIndex]): Future[List[NSIndex]] = collections match {
     case c :: cs => onCollection(c).list().flatMap(ix =>
-      listIndexes(cs, indexes ++ ix.map(NSIndex.at[Pack](s"${db.name}.$c", _))))
+      listIndexes(cs, indexes ++ ix.map(NSIndex[Pack](s"${db.name}.$c", _))))
 
     case _ => Future.successful(indexes)
   }
@@ -384,10 +208,10 @@ private[api] sealed abstract class AbstractIndexesManager(
     db.collectionNames.flatMap(listIndexes(_, Nil))
 
   def ensure(nsIndex: NSIndex): Future[Boolean] =
-    onCollection(nsIndex.collectionName).ensure(nsIndex.idx)
+    onCollection(nsIndex.collectionName).ensure(nsIndex.index)
 
   def create(nsIndex: NSIndex): Future[WriteResult] =
-    onCollection(nsIndex.collectionName).create(nsIndex.idx)
+    onCollection(nsIndex.collectionName).create(nsIndex.index)
 
   def drop(collectionName: String, indexName: String): Future[Int] =
     onCollection(collectionName).drop(indexName)
@@ -395,7 +219,7 @@ private[api] sealed abstract class AbstractIndexesManager(
   def dropAll(collectionName: String): Future[Int] =
     onCollection(collectionName).dropAll()
 
-  def onCollection(@deprecatedName(Symbol("name")) collectionName: String): CollectionIndexesManager.Aux[self.Pack] = new CollectionManager(collectionName)
+  def onCollection(collectionName: String): CollectionIndexesManager.Aux[self.Pack] = new CollectionManager(collectionName)
 
   // ---
 
@@ -422,7 +246,7 @@ private[api] sealed abstract class AbstractIndexesManager(
 
     def list(): Future[List[Index]] =
       runner(collection, listCommand, ReadPreference.primary).recoverWith {
-        case CommandError.Code(26 /* no database or collection */ ) =>
+        case CommandException.Code(26 /* no database or collection */ ) =>
           Future.successful(List.empty[Index])
 
         case err => Future.failed(err)
@@ -430,7 +254,7 @@ private[api] sealed abstract class AbstractIndexesManager(
 
     def ensure(index: Index): Future[Boolean] = list().flatMap { indexes =>
       val idx = index.name match {
-        case Some(n) => indexes.find(_.name.exists(_ == n))
+        case Some(n) => indexes.find(_.name contains n)
         case _       => indexes.find(_.key == index.key)
       }
 
@@ -469,8 +293,7 @@ private[api] sealed abstract class AbstractIndexesManager(
  *
  * @param db the subject database
  */
-@deprecated("Internal: will be made private", "0.20.3")
-class DefaultIndexesManager(db: DB with DBMetaCommands)(
+private[reactivemongo] class DefaultIndexesManager(db: DB with DBMetaCommands)(
   implicit
   ec: ExecutionContext) extends AbstractIndexesManager(db) {
 
@@ -494,9 +317,9 @@ sealed trait CollectionIndexesManager {
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.collections.GenericCollection
    *
-   * def listIndexes(coll: CollectionMetaCommands)(
+   * def listIndexes(coll: GenericCollection[_])(
    *   implicit ec: ExecutionContext): Future[List[String]] =
    *   coll.indexesManager.list().map(_.flatMap { idx =>
    *     idx.name.toList
@@ -515,11 +338,11 @@ sealed trait CollectionIndexesManager {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.collections.GenericCollection
    * import reactivemongo.api.indexes.Index
    *
    * def ensureIndexes(
-   *   coll: CollectionMetaCommands, is: Seq[Index.Default])(
+   *   coll: GenericCollection[_], is: Seq[Index.Default])(
    *   implicit ec: ExecutionContext): Future[Unit] =
    *   Future.sequence(
    *     is.map(idx => coll.indexesManager.ensure(idx))).map(_ => {})
@@ -541,11 +364,11 @@ sealed trait CollectionIndexesManager {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.collections.GenericCollection
    * import reactivemongo.api.indexes.Index
    *
    * def createIndexes(
-   *   coll: CollectionMetaCommands, is: Seq[Index.Default])(
+   *   coll: GenericCollection[_], is: Seq[Index.Default])(
    *   implicit ec: ExecutionContext): Future[Unit] =
    *   Future.sequence(
    *     is.map(idx => coll.indexesManager.create(idx))).map(_ => {})
@@ -565,9 +388,9 @@ sealed trait CollectionIndexesManager {
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    *
-   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.collections.GenericCollection
    *
-   * def dropIndex(coll: CollectionMetaCommands, name: String)(
+   * def dropIndex(coll: GenericCollection[_], name: String)(
    *   implicit ec: ExecutionContext): Future[Int] =
    *   coll.indexesManager.drop(name)
    * }}}
@@ -582,9 +405,9 @@ sealed trait CollectionIndexesManager {
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
-   * import reactivemongo.api.CollectionMetaCommands
+   * import reactivemongo.api.collections.GenericCollection
    *
-   * def dropAllIndexes(coll: CollectionMetaCommands)(
+   * def dropAllIndexes(coll: GenericCollection[_])(
    *   implicit ec: ExecutionContext): Future[Int] =
    *   coll.indexesManager.dropAll()
    * }}}
@@ -592,39 +415,6 @@ sealed trait CollectionIndexesManager {
    * @return $droppedCount
    */
   def dropAll(): Future[Int]
-}
-
-// TODO: Remove
-private sealed abstract class LegacyCollectionIndexesManager
-  extends CollectionIndexesManager { self =>
-
-  protected val pack: Pack
-
-  //override type Index = reactivemongo.api.indexes.Index.Aux[Pack]
-
-  protected def db: String
-
-  protected def collectionName: String
-
-  protected def legacy: LegacyIndexesManager { type Pack = self.Pack }
-
-  implicit protected def ec: ExecutionContext
-
-  lazy val fqName = db + "." + collectionName
-
-  def list(): Future[List[Index]] =
-    legacy.list.map(_.filter(_.namespace == fqName).map(_.idx))
-
-  def ensure(index: Index): Future[Boolean] =
-    legacy.ensure(NSIndex.at[Pack](fqName, index))
-
-  def create(index: Index): Future[WriteResult] =
-    legacy.create(NSIndex.at[Pack](fqName, index))
-
-  def drop(indexName: String): Future[Int] =
-    legacy.drop(collectionName, indexName)
-
-  def dropAll(): Future[Int] = legacy.dropAll(collectionName)
 }
 
 private class DefaultCollectionIndexesManager(
@@ -660,7 +450,7 @@ private class DefaultCollectionIndexesManager(
 
   def list(): Future[List[Index]] =
     runner(collection, listCommand, ReadPreference.primary).recoverWith {
-      case CommandError.Code(26 /* no database or collection */ ) =>
+      case CommandException.Code(26 /* no database or collection */ ) =>
         Future.successful(List.empty[Index])
 
       case err => Future.failed(err)
@@ -668,7 +458,7 @@ private class DefaultCollectionIndexesManager(
 
   def ensure(index: Index): Future[Boolean] = list().flatMap { indexes =>
     val idx = index.name match {
-      case Some(n) => indexes.find(_.name.exists(_ == n))
+      case Some(n) => indexes.find(_.name contains n)
       case _       => indexes.find(_.key == index.key)
     }
 
@@ -687,8 +477,11 @@ private class DefaultCollectionIndexesManager(
       new CreateIndexes.Command[Pack](db.name, List(index)),
       ReadPreference.primary)
 
-  private implicit def dropWriter = IndexesManager.dropWriter
-  private implicit def dropReader = IndexesManager.dropReader
+  private implicit def dropWriter =
+    DropIndexes.writer(Serialization.internalSerializationPack)
+
+  private implicit def dropReader =
+    DropIndexes.reader(Serialization.internalSerializationPack)
 
   def drop(indexName: String): Future[Int] = {
     runner(
@@ -708,15 +501,7 @@ object CollectionIndexesManager {
    * @param db the database
    * @param collectionName the collection name
    */
-  def apply(db: DB, collectionName: String)(implicit ec: ExecutionContext): CollectionIndexesManager.Aux[Serialization.Pack] = {
-    val wireVer = db.connectionState.metadata.maxWireVersion
-
-    if (wireVer >= MongoWireVersion.V30) {
-      new DefaultCollectionIndexesManager(db, collectionName)
-    } else {
-      new LegacyIndexesManager(db)(ec).onCollection(collectionName)
-    }
-  }
+  def apply(db: DB, collectionName: String)(implicit ec: ExecutionContext): CollectionIndexesManager.Aux[Serialization.Pack] = new DefaultCollectionIndexesManager(db, collectionName)
 }
 
 object IndexesManager {
@@ -727,12 +512,7 @@ object IndexesManager {
    *
    * @param db the database
    */
-  def apply(db: DB with DBMetaCommands)(implicit ec: ExecutionContext): IndexesManager.Aux[Serialization.Pack] = {
-    val wireVer = db.connectionState.metadata.maxWireVersion
-
-    if (wireVer >= MongoWireVersion.V30) new DefaultIndexesManager(db)
-    else new LegacyIndexesManager(db)
-  }
+  def apply(db: DB with DBMetaCommands)(implicit ec: ExecutionContext): IndexesManager.Aux[Serialization.Pack] = new DefaultIndexesManager(db)
 
   /**
    * Returns an indexes manager for specified database.
@@ -740,28 +520,14 @@ object IndexesManager {
    * @param pack the serialization pack
    * @param db the database
    */
-  def apply[P <: SerializationPack with Singleton](pack: P, db: DB with DBMetaCommands)(implicit ec: ExecutionContext): IndexesManager.Aux[P] = {
-    val wireVer = db.connectionState.metadata.maxWireVersion
+  @SuppressWarnings(Array("VariableShadowing"))
+  def apply[P <: SerializationPack](pack: P, db: DB with DBMetaCommands)(implicit ec: ExecutionContext): IndexesManager.Aux[P] = {
     @inline def p: P = pack
 
-    if (wireVer >= MongoWireVersion.V30) {
-      new AbstractIndexesManager(db) {
-        override type Pack = P
-        override val pack: P = p
-      }
-    } else new AbstractLegacyManager(db) {
+    new AbstractIndexesManager(db) {
       override type Pack = P
       override val pack: P = p
     }
-  }
-
-  @deprecated("Internal: will be made private", "0.19.0")
-  object NSIndexWriter extends reactivemongo.bson.BSONDocumentWriter[NSIndex.Aux[LegacyPack.type]] {
-
-    private val underlying = nsIndexWriter(LegacyPack)
-
-    def write(nsIndex: NSIndex.Aux[LegacyPack.type]): reactivemongo.bson.BSONDocument = underlying.write(nsIndex)
-
   }
 
   private[reactivemongo] def nsIndexWriter[P <: SerializationPack](pack: P): pack.Writer[NSIndex.Aux[P]] = {
@@ -775,7 +541,7 @@ object IndexesManager {
     pack.writer[NSIndex.Aux[P]] { nsIndex =>
       //import nsIndex.{ idx => index }
 
-      @inline def index: Index.Aux[P] = nsIndex.idx //index
+      @inline def index: Index.Aux[P] = nsIndex.index
 
       if (index.key.isEmpty) {
         throw new RuntimeException("the key should not be empty!")
@@ -820,16 +586,16 @@ object IndexesManager {
         elements += element("default_language", builder.string(lang))
       }
 
-      index.languageOverride.foreach { lang =>
-        elements += element("language_override", builder.string(lang))
+      index.languageOverride.foreach { langOver =>
+        elements += element("language_override", builder.string(langOver))
       }
 
-      index.textIndexVersion.foreach { ver =>
-        elements += element("textIndexVersion", builder.int(ver))
+      index.textIndexVersion.foreach { txtVer =>
+        elements += element("textIndexVersion", builder.int(txtVer))
       }
 
-      index._2dsphereIndexVersion.foreach { ver =>
-        elements += element("2dsphereIndexVersion", builder.int(ver))
+      index._2dsphereIndexVersion.foreach { sphereVer =>
+        elements += element("2dsphereIndexVersion", builder.int(sphereVer))
       }
 
       index.bits.foreach { bits =>
@@ -863,28 +629,25 @@ object IndexesManager {
         elements += element("unique", boolean(true))
       }
 
-      index.partialFilter.foreach { partialFilter =>
-        elements += element(
-          "partialFilterExpression", pack.document(partialFilter))
+      index.partialFilter.foreach {
+        case pack.IsDocument(partialFilter) =>
+          elements += element("partialFilterExpression", partialFilter)
+
+        case _ => ()
       }
 
-      val opts = pack.document(index.options)
-      decoder.names(opts).foreach { nme =>
-        decoder.get(opts, nme).foreach { v =>
-          elements += element(nme, v)
+      index.options match {
+        case pack.IsDocument(opts) => decoder.names(opts).foreach { nme =>
+          decoder.get(opts, nme).foreach { v =>
+            elements += element(nme, v)
+          }
         }
+
+        case _ => ()
       }
 
       document(elements.result())
     }
-  }
-
-  @deprecated("Internal: will be made private", "0.19.0")
-  object IndexReader extends reactivemongo.bson.BSONDocumentReader[Index] {
-    private val underlying =
-      indexReader(reactivemongo.api.BSONSerializationPack)
-
-    def read(doc: reactivemongo.bson.BSONDocument): Index = underlying.read(doc)
   }
 
   private[reactivemongo] def indexReader[P <: SerializationPack](pack: P): pack.Reader[Index.Aux[P]] = {
@@ -898,15 +661,13 @@ object IndexesManager {
       child(doc, "key").fold[Index.Aux[P]](
         throw new Exception("the key must be defined")) { k =>
           val ks = decoder.names(k).flatMap { nme =>
-            decoder.get(k, nme).map { v =>
-              nme -> IndexType(pack.bsonValue(v))
-            }
+            IndexType.read(pack)(k, nme).map(nme -> _)
           }
 
           val key = child(doc, "weights").fold(ks) { w =>
             val fields = decoder.names(w)
 
-            (ks, fields).zipped.map {
+            reactivemongo.util.lazyZip(ks, fields).map {
               case ((_, tpe), name) => name -> tpe
             }
           }.toSeq
@@ -914,7 +675,6 @@ object IndexesManager {
           val name = string(doc, "name")
           val unique = booleanLike(doc, "unique").getOrElse(false)
           val background = booleanLike(doc, "background").getOrElse(false)
-          val dropDups = booleanLike(doc, "dropDups").getOrElse(false)
           val sparse = booleanLike(doc, "sparse").getOrElse(false)
           val expireAfterSeconds = int(doc, "expireAfterSeconds")
           val storageEngine = child(doc, "storageEngine")
@@ -933,7 +693,7 @@ object IndexesManager {
 
           val options = builder.document(decoder.names(doc).flatMap {
             case "ns" | "key" | "name" | "unique" | "background" |
-              "dropDups" | "sparse" | "v" | "partialFilterExpression" |
+              "sparse" | "v" | "partialFilterExpression" |
               "expireAfterSeconds" | "storageEngine" | "weights" |
               "defaultLanguage" | "languageOverride" | "textIndexVersion" |
               "2dsphereIndexVersion" | "bits" | "min" | "max" |
@@ -949,22 +709,13 @@ object IndexesManager {
           val partialFilter =
             child(doc, "partialFilterExpression")
 
-          Index[P](pack)(key, name, unique, background, dropDups,
+          Index[P](pack)(key, name, unique, background,
             sparse, expireAfterSeconds, storageEngine, weights,
             defaultLanguage, languageOverride, textIndexVersion,
             sphereIndexVersion, bits, min, max, bucketSize, collation,
             wildcardProjection, version, partialFilter, options)
         }
     }
-  }
-
-  @deprecated("Internal: will be made private", "0.19.0")
-  object NSIndexReader extends reactivemongo.bson.BSONDocumentReader[NSIndex] {
-    private val underlying =
-      nsIndexReader(reactivemongo.api.BSONSerializationPack)
-
-    def read(doc: reactivemongo.bson.BSONDocument): NSIndex =
-      underlying.read(doc)
   }
 
   private[reactivemongo] def nsIndexReader[P <: SerializationPack](pack: P): pack.Reader[NSIndex.Aux[P]] = {
@@ -974,18 +725,12 @@ object IndexesManager {
     pack.reader[NSIndex.Aux[P]] { doc =>
       decoder.string(doc, "ns").fold[NSIndex.Aux[P]](
         throw new Exception("the namespace ns must be defined")) { ns =>
-          NSIndex.at[P](ns, pack.deserialize(doc, indexReader))
+          NSIndex[P](ns, pack.deserialize(doc, indexReader))
         }
     }
   }
 
   private[api] implicit lazy val nsIndexReader =
     nsIndexReader[Serialization.Pack](Serialization.internalSerializationPack)
-
-  private[api] lazy val dropWriter = // TODO: Remove
-    DropIndexes.writer(Serialization.internalSerializationPack)
-
-  private[api] lazy val dropReader = // TODO: Remove
-    DropIndexes.reader(Serialization.internalSerializationPack)
 
 }

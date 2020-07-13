@@ -15,18 +15,28 @@
  */
 package reactivemongo
 
-import scala.collection.immutable.{ ListSet, Map }
+import scala.collection.immutable.{ ListSet, Map, Set }
 
 import scala.concurrent.ExecutionContext
 
 private[reactivemongo] trait UtilCompat {
   import scala.collection.breakOut
 
+  /** Compatibility type alias */
+  type TraversableOnce[T] = scala.collection.TraversableOnce[T]
+
   @inline private[reactivemongo] def toListSet[A, B](in: Iterable[A])(f: A => B): ListSet[B] = in.map(f)(breakOut)
 
   @inline private[reactivemongo] def toMap[T, K, V](in: Iterable[T])(f: T => (K, V)): Map[K, V] = in.map(f)(breakOut)
 
   @inline private[reactivemongo] def toFlatMap[T, K, V](in: Iterable[T])(f: T => Iterable[(K, V)]): Map[K, V] = in.flatMap(f)(breakOut)
+
+  @inline private[reactivemongo] def toStream[T](in: TraversableOnce[T]) =
+    in.toStream
+
+  @inline private[reactivemongo] def lazyZip[A, B](a: Set[A], b: Set[B]) = (a -> b).zipped
+
+  @inline private[reactivemongo] def lazyZip[A, B](a: Iterable[A], b: Iterable[B]) = (a -> b).zipped
 
   private[reactivemongo] type ArrayOps[T] = scala.collection.mutable.ArrayOps[T]
 

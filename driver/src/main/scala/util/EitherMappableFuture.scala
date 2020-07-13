@@ -15,37 +15,19 @@
  */
 package reactivemongo.util
 
-import scala.language.implicitConversions
+//import scala.language.implicitConversions
 
 import scala.concurrent.{
-  ExecutionContext,
   Future,
   Promise,
   duration
 }, duration.Duration
 
-@deprecated("Unused: will be removed", "0.19.8")
-case class EitherMappableFuture[A](future: Future[A]) {
-  def mapEither[E <: Throwable, B](f: A => Either[E, B])(implicit ec: ExecutionContext) = {
-    future.flatMap(
-      f(_) match {
-        case Left(e)  => Future.failed(e)
-        case Right(b) => Future.successful(b)
-      })
-  }
-}
-
-@deprecated("Unused: will be removed", "0.19.8")
-object EitherMappableFuture {
-  implicit def futureToEitherMappable[A](future: Future[A]): EitherMappableFuture[A] = new EitherMappableFuture[A](future)
-}
-
-@deprecated("Internal: will be made private", "0.19.8")
-object ExtendedFutures {
+private[reactivemongo] object ExtendedFutures {
   import akka.actor.ActorSystem
 
   // better way to this?
-  def DelayedFuture(millis: Long, system: ActorSystem): Future[Unit] = {
+  def delayedFuture(millis: Long, system: ActorSystem): Future[Unit] = {
     implicit val ec = system.dispatcher
     val promise = Promise[Unit]()
 

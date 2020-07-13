@@ -2,61 +2,39 @@ package reactivemongo.api.commands
 
 import reactivemongo.core.protocol.MongoWireVersion
 
-import reactivemongo.api.{ Session, SerializationPack }
+import reactivemongo.api.{
+  Collation,
+  PackSupport,
+  Session,
+  SerializationPack,
+  WriteConcern
+}
 
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/update/ update]] command.
  */
-@deprecated("Use the new update operation", "0.16.0")
-trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
-  val pack: P
+private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
+  self: PackSupport[P] with UpdateWriteResultFactory[P] with UpsertedFactory[P] =>
 
-  sealed class Update(
+  private[reactivemongo] final class Update(
     val firstUpdate: UpdateElement,
     val updates: Seq[UpdateElement],
     val ordered: Boolean,
     val writeConcern: WriteConcern,
-    val bypassDocumentValidation: Boolean) extends CollectionCommand with CommandWithResult[UpdateResult] with Mongo26WriteCommand with Serializable with Product {
-    @deprecated("Use constructor with bypassDocumentValidation", "0.19.8")
-    def this(
-      updates: Seq[UpdateElement],
-      ordered: Boolean,
-      writeConcern: WriteConcern) = this(
-      updates.head, updates.tail, ordered, writeConcern, false)
+    val bypassDocumentValidation: Boolean) extends CollectionCommand with CommandWithResult[UpdateWriteResult] {
 
-    @deprecated(message = "Use [[updates]]", since = "0.12.7")
-    def documents = updates
-
-    @deprecated("No longer a case class", "0.19.8")
-    val productArity = 3
-
-    @deprecated("No longer a case class", "0.19.8")
-    def productElement(n: Int): Any = n match {
-      case 0 => updates
-      case 1 => ordered
-      case 2 => writeConcern
-      case _ => bypassDocumentValidation
-    }
-
-    @deprecated("No longer a case class", "0.19.8")
-    def canEqual(that: Any): Boolean = that match {
-      case _: Update => true
-      case _         => false
-    }
-
-    // TODO#1.1: All fields after release
-    private[commands] lazy val tupled = Tuple3(updates, ordered, writeConcern)
+    private[commands] lazy val tupled = Tuple5(
+      firstUpdate, updates, ordered, writeConcern, bypassDocumentValidation)
 
     override def equals(that: Any): Boolean = that match {
-      case other: Update => other.tupled == this.tupled
-      case _             => false
+      case other: this.type => other.tupled == this.tupled
+      case _                => false
     }
 
     @inline override def hashCode: Int = tupled.hashCode
-
   }
 
-  type UpdateResult = UpdateWriteResult
+  final protected[reactivemongo] type UpdateCmd = ResolvedCollectionCommand[Update]
 
   /**
    * @param q the query that matches the documents to update
@@ -66,207 +44,133 @@ trait UpdateCommand[P <: SerializationPack] extends ImplicitCommandHelpers[P] {
    * @param collation the collation to use for the operation
    * @param arrayFilters an array of filter documents that determines which array elements to modify for an update operation on an array field
    */
-  class UpdateElement @deprecated("Internal: will be made private/internal", "0.17.0") (
+  final class UpdateElement(
     val q: pack.Document,
     val u: pack.Document,
     val upsert: Boolean,
     val multi: Boolean,
     val collation: Option[Collation],
-    val arrayFilters: Seq[pack.Document]) extends Serializable with Product4[pack.Document, pack.Document, Boolean, Boolean] {
-    @deprecated("Use `q`", "0.17.0") val _1 = q
-    @deprecated("Use `u`", "0.17.0") val _2 = u
-    @deprecated("Use `upsert`", "0.17.0") val _3 = upsert
-    @deprecated("Use `multi`", "0.17.0") val _4 = multi
+    val arrayFilters: Seq[pack.Document]) {
 
     private val data = (q, u, upsert, multi, collation, arrayFilters)
 
     override def hashCode: Int = data.hashCode
 
     override def equals(that: Any): Boolean = that match {
-      case other: UpdateElement => data == other.data
-      case _                    => false
-    }
-
-    def canEqual(that: Any): Boolean = that match {
-      case _: UpdateElement => true
+      case other: this.type => data == other.data
       case _                => false
     }
 
     override def toString: String = s"UpdateElement${data.toString}"
   }
 
-  @deprecated("Internal: will be made private/internal", "0.17.0")
-  object UpdateElement {
-    def apply(q: ImplicitlyDocumentProducer, u: ImplicitlyDocumentProducer, upsert: Boolean = false, multi: Boolean = false): UpdateElement =
-      new UpdateElement(
-        q = q.produce,
-        u = u.produce,
-        upsert = upsert,
-        multi = multi,
-        collation = None,
-        arrayFilters = Seq.empty)
+  final protected[reactivemongo] def writeElement(
+    builder: SerializationPack.Builder[pack.type]): UpdateElement => pack.Document = {
+    import builder.{ boolean, document, elementProducer }
 
-    def unapply(that: Any): Option[(pack.Document, pack.Document, Boolean, Boolean)] = that match {
-      case other: UpdateElement =>
-        Some(Tuple4(other.q, other.u, other.upsert, other.multi))
-
-      case _ =>
-        None
-    }
-  }
-
-  object Update {
-    @deprecated("Use factory with bypassDocumentValidation", "0.19.8")
-    def apply(
-      @deprecatedName(Symbol("documents")) updates: Seq[UpdateElement],
-      ordered: Boolean,
-      writeConcern: WriteConcern): Update =
-      new Update(updates, ordered, writeConcern)
-
-    @deprecated("Use factory with bypassDocumentValidation", "0.19.8")
-    def apply(firstUpdate: UpdateElement, updates: UpdateElement*): Update =
-      new Update(
-        firstUpdate +: updates,
-        ordered = true,
-        writeConcern = WriteConcern.Default)
-
-    @deprecated("Use factory with bypassDocumentValidation", "0.19.8")
-    def apply(ordered: Boolean = true, writeConcern: WriteConcern = WriteConcern.Default)(firstUpdate: UpdateElement, updates: UpdateElement*): Update =
-      new Update(
-        firstUpdate,
-        updates,
-        ordered,
-        writeConcern,
-        bypassDocumentValidation = false)
-
-    def apply(
-      ordered: Boolean,
-      writeConcern: WriteConcern,
-      bypassDocumentValidation: Boolean,
-      firstUpdate: UpdateElement,
-      updates: UpdateElement*): Update =
-      new Update(
-        firstUpdate,
-        updates,
-        ordered,
-        writeConcern,
-        bypassDocumentValidation)
-
-    @deprecated("No longer a case class", "0.19.8")
-    def unapply(that: Any): Option[(Seq[UpdateElement], Boolean, WriteConcern)] = that match {
-      case up: Update => Option(up).map(_.tupled)
-      case _          => None
-    }
-  }
-}
-
-private[reactivemongo] object UpdateCommand {
-  def writeElement[P <: SerializationPack with Singleton](
-    context: UpdateCommand[P], ver: MongoWireVersion)(
-    builder: SerializationPack.Builder[context.pack.type]): context.UpdateElement => context.pack.Document = {
-    import builder.{ boolean, document, elementProducer, pack }
-
-    def base(element: context.UpdateElement) =
-      Seq.newBuilder[pack.ElementProducer] += (
+    def base(element: UpdateElement) =
+      Seq.newBuilder[pack.ElementProducer] ++= Seq(
         elementProducer("q", element.q),
         elementProducer("u", element.u),
         elementProducer("upsert", boolean(element.upsert)),
         elementProducer("multi", boolean(element.multi)))
 
-    if (ver < MongoWireVersion.V34) { element =>
-      document(base(element).result())
-    } else if (ver < MongoWireVersion.V36) { element =>
-      val elements = base(element)
+    if (maxWireVersion < MongoWireVersion.V34) { elmt1 =>
+      document(base(elmt1).result())
+    } else if (maxWireVersion < MongoWireVersion.V36) { elmt2 =>
+      val elements = base(elmt2)
 
-      element.collation.foreach { c =>
+      elmt2.collation.foreach { c =>
         elements += elementProducer(
           "collation",
           Collation.serializeWith(pack, c)(builder))
       }
 
       document(elements.result())
-    } else { element => // > 3.4
-      val elements = base(element)
+    } else { elmt3 => // > 3.4
+      val elements = base(elmt3)
 
-      element.collation.foreach { c =>
+      elmt3.collation.foreach { c =>
         elements += elementProducer(
           "collation",
           Collation.serializeWith(pack, c)(builder))
       }
 
-      element.arrayFilters.headOption.foreach { f =>
+      if (elmt3.arrayFilters.nonEmpty) {
         elements += elementProducer(
-          "arrayFilters", builder.array(f, element.arrayFilters.tail))
+          "arrayFilters", builder.array(elmt3.arrayFilters))
       }
 
       document(elements.result())
     }
   }
 
-  // TODO: Unit test
-  def writer[P <: SerializationPack with Singleton](pack: P)(
-    context: UpdateCommand[pack.type]): (Option[Session], MongoWireVersion) => ResolvedCollectionCommand[context.Update] => pack.Document = {
+  private[reactivemongo] def session(): Option[Session]
+
+  protected def maxWireVersion: MongoWireVersion
+
+  implicit final private[reactivemongo] lazy val updateWriter: pack.Writer[UpdateCmd] = updateWriter(self.session)
+
+  final private[reactivemongo] def updateWriter(session: Option[Session]): pack.Writer[UpdateCmd] = {
     val builder = pack.newBuilder
-    val writeWriteConcern = CommandCodecs.writeWriteConcern(pack)
     val writeSession = CommandCodecs.writeSession(builder)
+    val writeElement = this.writeElement(builder)
+    val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
 
-    { (session: Option[Session], ver: MongoWireVersion) =>
-      import builder.{ elementProducer => element }
+    import builder.{ elementProducer => element }
 
-      val writeElement = UpdateCommand.writeElement(context, ver)(builder)
+    pack.writer[UpdateCmd] { update =>
+      import update.command
 
-      { update =>
-        import update.command
+      val ordered = builder.boolean(command.ordered)
+      val elements = Seq.newBuilder[pack.ElementProducer]
 
-        val ordered = builder.boolean(command.ordered)
-        val elements = Seq.newBuilder[pack.ElementProducer]
-
-        elements ++= Seq[pack.ElementProducer](
-          element("update", builder.string(update.collection)),
-          element("ordered", ordered),
-          element("updates", builder.array(
-            writeElement(command.firstUpdate),
+      elements ++= Seq[pack.ElementProducer](
+        element("update", builder.string(update.collection)),
+        element("ordered", ordered),
+        element("updates", builder.array(
+          writeElement(command.firstUpdate) +:
             command.updates.map(writeElement))))
 
-        session.foreach { s =>
-          elements ++= writeSession(s)
-        }
-
-        if (!session.exists(_.transaction.isSuccess)) {
-          // writeConcern is not allowed within a multi-statement transaction
-          // code=72
-
-          elements += element(
-            "writeConcern", writeWriteConcern(command.writeConcern))
-        }
-
-        builder.document(elements.result())
+      session.foreach { s =>
+        elements ++= writeSession(s)
       }
+
+      if (!session.exists(_.transaction.isSuccess)) {
+        // writeConcern is not allowed within a multi-statement transaction
+        // code=72
+
+        elements += element(
+          "writeConcern", writeWriteConcern(command.writeConcern))
+      }
+
+      builder.document(elements.result())
     }
   }
 
-  def reader[P <: SerializationPack with Singleton](pack: P)(
-    context: UpdateCommand[pack.type]): pack.Reader[context.UpdateResult] = {
+  final protected implicit def updateReader: pack.Reader[UpdateWriteResult] = {
     val decoder = pack.newDecoder
     val readWriteError = CommandCodecs.readWriteError(decoder)
     val readWriteConcernError = CommandCodecs.readWriteConcernError(decoder)
-    val readUpserted = CommandCodecs.readUpserted(decoder)
+    val readUpserted = Upserted.readUpserted(decoder)
 
-    CommandCodecs.dealingWithGenericCommandErrorsReader[pack.type, UpdateWriteResult](pack) { doc =>
-      val werrors = decoder.children(doc, "writeErrors").map(readWriteError)
+    CommandCodecs.dealingWithGenericCommandExceptionsReader[pack.type, UpdateWriteResult](pack) { doc =>
+      val werrors = decoder.children(doc, "writeErrors").flatMap { e =>
+        readWriteError(e).toSeq
+      }
 
       val wcError = decoder.child(doc, "writeConcernError").
-        map(readWriteConcernError)
+        flatMap(readWriteConcernError)
 
       val upserted = decoder.array(doc, "upserted").map(_.flatMap { v =>
-        decoder.asDocument(v).map(readUpserted)
+        decoder.asDocument(v).flatMap(readUpserted)
       })
 
-      UpdateWriteResult(
+      new UpdateWriteResult(
         ok = decoder.booleanLike(doc, "ok").getOrElse(true),
         n = decoder.int(doc, "n").getOrElse(0),
         nModified = decoder.int(doc, "nModified").getOrElse(0),
-        upserted = upserted.getOrElse(Seq.empty[Upserted]),
+        upserted = upserted.getOrElse(Seq.empty[self.Upserted]),
         writeErrors = werrors,
         writeConcernError = wcError,
         code = decoder.int(doc, "code"),

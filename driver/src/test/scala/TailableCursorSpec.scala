@@ -1,9 +1,7 @@
 import scala.concurrent.{ Await, Future, Promise }
 import scala.concurrent.duration._
 
-import reactivemongo.core.protocol.Response
-
-import reactivemongo.api.{ Cursor, DB, QueryOpts }
+import reactivemongo.api.{ Cursor, DB }
 import reactivemongo.api.bson.BSONDocument
 
 import _root_.tests.Common
@@ -12,28 +10,25 @@ import reactivemongo.api.tests.{ decoder, reader => docReader }
 
 trait TailableCursorSpec { specs: CursorSpec =>
   def tailableSpec = {
-    lazy val legacyIdReader = reactivemongo.bson.BSONDocumentReader[Int] {
-      _.getAs[Int]("id").get
-    }
-
     "read from capped collection" >> {
       def collection(n: String, database: DB) = {
         val col = database(s"somecollection_captail_$n")
 
         col.createCapped(4096, Some(10)).flatMap { _ =>
-          val sched = Common.driver.system.scheduler
+          val sched = Common.driverSystem.scheduler
 
           (0 until 10).foldLeft(Future successful {}) { (f, id) =>
-            f.flatMap(_ => col.insert(BSONDocument("id" -> id)).flatMap { _ =>
-              val pause = Promise[Unit]()
+            f.flatMap(_ => col.insert.one(
+              BSONDocument("id" -> id)).flatMap { _ =>
+                val pause = Promise[Unit]()
 
-              sched.scheduleOnce(200.milliseconds) {
-                pause.trySuccess({})
-                ()
-              }
+                sched.scheduleOnce(200.milliseconds) {
+                  pause.trySuccess({})
+                  ()
+                }
 
-              pause.future
-            })
+                pause.future
+              })
           }.map(_ => info(s"All fixtures inserted in test collection '$n'"))
         }
 
@@ -43,39 +38,20 @@ trait TailableCursorSpec { specs: CursorSpec =>
       @inline def tailable(n: String, database: DB = db) = {
         implicit val reader = docReader[Int] { decoder.int(_, "id").get }
 
-        collection(n, database).find(matchAll("cursorspec50")).options(
-          QueryOpts().tailable).batchSize(512).cursor[Int]()
+        collection(n, database).find(matchAll("cursorspec50")).
+          tailable.batchSize(512).cursor[Int]()
       }
 
       "using tailable" >> {
-        "to fold responses" in {
-          implicit val reader = legacyIdReader
-
-          tailable("foldr0").foldResponses(List.empty[Int], 6) { (s, resp) =>
-            val bulk = Response.parse(resp).flatMap(_.asOpt[Int].toList)
-
-            Cursor.Cont(s ++ bulk)
-          } must beEqualTo(List(0, 1, 2, 3, 4, 5)).await(1, timeout)
-        }
-
-        "to fold responses with async function" in {
-          implicit val reader = legacyIdReader
-          tailable("foldr0").foldResponsesM(List.empty[Int], 6) { (s, resp) =>
-            val bulk = Response.parse(resp).flatMap(_.asOpt[Int].toList)
-
-            Future.successful(Cursor.Cont(s ++ bulk))
-          } must beEqualTo(List(0, 1, 2, 3, 4, 5)).await(1, timeout)
-        }
-
         "to fold bulks" in {
           tailable("foldw0a").foldBulks(List.empty[Int], 6)(
-            (s, bulk) => Cursor.Cont(s ++ bulk)) must beEqualTo(List(
+            (s, bulk) => Cursor.Cont(s ++ bulk)) must beTypedEqualTo(List(
               0, 1, 2, 3, 4, 5)).await(1, timeout)
         }
 
         "to fold bulks with async function" in {
           tailable("foldw0b").foldBulksM(List.empty[Int], 6)((s, bulk) =>
-            Future.successful(Cursor.Cont(s ++ bulk))) must beEqualTo(List(
+            Future.successful(Cursor.Cont(s ++ bulk))) must beTypedEqualTo(List(
             0, 1, 2, 3, 4, 5)).await(1, timeout)
         }
       }
@@ -83,13 +59,13 @@ trait TailableCursorSpec { specs: CursorSpec =>
       "using tailable foldWhile" >> {
         "successfully" in {
           tailable("foldw1a").foldWhile(List.empty[Int], 5)(
-            (s, i) => Cursor.Cont(i :: s)) must beEqualTo(List(
+            (s, i) => Cursor.Cont(i :: s)) must beTypedEqualTo(List(
               4, 3, 2, 1, 0)).await(1, timeout)
         }
 
         "successfully with async function" in {
           tailable("foldw1b").foldWhileM(List.empty[Int], 5)((s, i) =>
-            Future.successful(Cursor.Cont(i :: s))) must beEqualTo(List(
+            Future.successful(Cursor.Cont(i :: s))) must beTypedEqualTo(List(
             4, 3, 2, 1, 0)).await(1, timeout)
         }
 
@@ -108,7 +84,7 @@ trait TailableCursorSpec { specs: CursorSpec =>
             "specs2-test-reactivemongo", failoverStrategy)).flatMap { d =>
             tailable("foldw3", d).foldWhile(List.empty[Int])((s, i) => {
               if (i == 1) { // Force connection close
-                Await.result(con.flatMap(_.askClose()(timeout)), timeout)
+                Await.result(con.flatMap(_.close()(timeout)), timeout)
               }
 
               Cursor.Cont(i :: s)

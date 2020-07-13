@@ -15,7 +15,9 @@ import reactivemongo.api.{
   ReadPreference
 }
 
-import reactivemongo.core.nodeset.{ Authenticate, NodeSet, ProtocolMetadata }
+import reactivemongo.core.protocol.ProtocolMetadata
+
+import reactivemongo.core.nodeset.NodeSet
 
 import reactivemongo.core.actors.{
   PrimaryAvailable,
@@ -33,6 +35,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
   "Node set" title
 
   sequential // for ConnectAllSpec
+  stopOnFail
 
   import reactivemongo.api.tests._
   import tests.Common
@@ -40,7 +43,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
   @inline def failoverStrategy = Common.failoverStrategy
   @inline def timeout = Common.timeout
   lazy val md = Common.newAsyncDriver()
-  lazy val actorSystem = md.system
+  lazy val actorSystem = reactivemongo.api.tests.system(md)
 
   protected val nodes = Seq(
     "nodesetspec.node1:27017", "nodesetspec.node2:27017")
@@ -156,7 +159,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
     unresponsiveSecondarySpec
 
     "discover node2 and create signaling channels" in {
-      def isPrim = reactivemongo.bson.BSONDocument(
+      def isPrim = reactivemongo.api.bson.BSONDocument(
         "ok" -> 1,
         "ismaster" -> true,
         "minWireVersion" -> 4,
@@ -225,7 +228,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
     val supervisorName = s"withConAndSys-sup-${System identityHashCode ee}"
     val poolName = s"withConAndSys-con-${System identityHashCode f}"
 
-    @inline implicit def sys = drv.system
+    @inline implicit def sys = reactivemongo.api.tests.system(drv)
 
     val auths = Seq(Authenticate(
       Common.commonDb, "test", Some("password")))
@@ -238,7 +241,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
 
     connection.flatMap { con =>
       f(con, mongosystem).flatMap { res =>
-        con.askClose()(timeout).recover { case _ => {} }.map(_ => res)
+        con.close()(timeout).recover { case _ => {} }.map(_ => res)
       }
     }
   }
@@ -248,13 +251,13 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
     val con = md.connect(
       nodes, options = opts.copy(credentials = Map(
       Common.commonDb -> MongoConnectionOptions.Credential(
-        "test", Some("password")))), name = Some(name))
+        "test", Some("password")))), name = name)
 
     val res = con.flatMap { c =>
       actorSystem.actorSelection(s"/user/Monitor-$name").
         resolveOne(timeout).map(test(name, c, _)).andThen {
           case _ => try {
-            Await.result(c.askClose()(timeout), timeout); ()
+            Await.result(c.close()(timeout), timeout); ()
           } catch {
             case cause: Exception => cause.printStackTrace()
           }

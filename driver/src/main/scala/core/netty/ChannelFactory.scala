@@ -66,7 +66,7 @@ private[reactivemongo] final class ChannelFactory(
 
       info(msg)
 
-      Failure(GenericDriverException(s"$msg ($supervisor/$connection)"))
+      Failure(new GenericDriverException(s"$msg ($supervisor/$connection)"))
     } else {
       // Create a channel bootstrap from config, with state as attributes
       // so available for the coming init (event before calling connect)
@@ -141,7 +141,8 @@ private[reactivemongo] final class ChannelFactory(
           resource = new java.io.File(path).toURI,
           storeType = sys.props.getOrElse("javax.net.ssl.keyStoreType", "JKS"),
           password = sys.props.get(
-            "javax.net.ssl.keyStorePassword").map(_.toCharArray))
+            "javax.net.ssl.keyStorePassword").map(_.toCharArray),
+          trust = true)
 
       }
     }
@@ -179,7 +180,8 @@ private[reactivemongo] final class ChannelFactory(
         kmf.getKeyManagers
     }
 
-    val sslCtx = {
+    @SuppressWarnings(Array("AsInstanceOf"))
+    def sslCtx = {
       val res = javax.net.ssl.SSLContext.getInstance("SSL")
 
       val tm: Array[TrustManager] = {
@@ -224,7 +226,7 @@ private[reactivemongo] final class ChannelFactory(
         def operationComplete(f: Future[Any]): Unit = {
           childGroup.shutdownGracefully().
             addListener(new GenericFutureListener[Future[Any]] {
-              def operationComplete(f: Future[Any]): Unit = {
+              def operationComplete(g: Future[Any]): Unit = {
                 callback.success({}); ()
               }
             })

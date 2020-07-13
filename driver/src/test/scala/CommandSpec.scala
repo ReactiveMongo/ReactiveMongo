@@ -1,25 +1,21 @@
+package reactivemongo
+
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.api.{ DefaultDB, ReadPreference }
+import reactivemongo.api.{ DB, ReadPreference }
 import reactivemongo.api.bson.BSONDocument
 
+import reactivemongo.core.errors.DatabaseException
+
 import reactivemongo.api.commands.{
-  Command,
-  CommandError,
-  IsMasterCommand,
-  MongodProcess,
+  CommandException,
   ReplSetGetStatus,
-  ReplSetMaintenance,
-  ReplSetStatus,
-  ServerStatus,
-  ServerStatusResult
+  ReplSetMaintenance
 }
 
 import org.specs2.concurrent.ExecutionEnv
 
-import reactivemongo.api.tests.{ commands, decoder, pack }
-
-import reactivemongo.api.TestCompat._
+import reactivemongo.api.tests.{ commands, decoder }
 
 final class CommandSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
@@ -31,12 +27,10 @@ final class CommandSpec(implicit ee: ExecutionEnv)
 
   "Raw command" should {
     "re-index test collection with command as document" >> {
-      lazy val runner = Command.run(pack, db.failoverStrategy)
-
-      def reindexSpec(db: DefaultDB, coll: String, t: FiniteDuration) = {
+      def reindexSpec(db: DB, coll: String, t: FiniteDuration) = {
         val reIndexDoc = BSONDocument("reIndex" -> coll)
 
-        db(coll).create() must beEqualTo({}).await(0, t) and {
+        db(coll).create() must beTypedEqualTo({}).await(1, t) and {
           db.runCommand(reIndexDoc, db.failoverStrategy).
             one[BSONDocument](ReadPreference.primary) must beLike[BSONDocument] {
               case doc => decoder.double(doc, "ok") must beSome(1)
@@ -44,124 +38,61 @@ final class CommandSpec(implicit ee: ExecutionEnv)
         }
       }
 
-      "with the default connection" in {
-        reindexSpec(
-          db, s"rawcommandspec${System identityHashCode db}", timeout)
+      "with the default connection" in eventually(2, timeout) {
+        reindexSpec(db, s"commandspec${System identityHashCode db}", timeout)
       }
 
-      "with the slow connection" in {
+      "with the slow connection" in eventually(retries = 2, sleep = timeout) {
         reindexSpec(
-          slowDb, s"rawcommandspec${System identityHashCode slowDb}",
+          slowDb, s"commandspec${System identityHashCode slowDb}",
           slowTimeout)
+
       }
-    }
-
-    "check isMaster" in {
-      val runner = Command.run(pack, db.failoverStrategy)
-      implicit val dr = dateReader
-
-      val isMaster = new IsMasterCommand[pack.type] {}
-      import isMaster._
-
-      import scala.language.reflectiveCalls
-      implicit val w = commands.isMasterWriter(isMaster).get[IsMaster.type]
-      implicit val r = commands.isMasterReader(isMaster).get
-
-      runner(db, IsMaster, ReadPreference.primary).
-        map(_ => {}) must beEqualTo({}).await(1, timeout)
     }
   }
 
   "Admin" should {
     "execute replSetGetStatus" in {
       if (replSetOn) {
-        replSetGetStatusTest must beLike[ReplSetStatus] {
-          case ReplSetStatus(_, _, _, _ :: Nil) => ok
-        }.await(0, timeout)
+        replSetGetStatusTest.map(_.members.size) must beTypedEqualTo(1).
+          awaitFor(timeout)
       } else {
-        replSetGetStatusTest must throwA[CommandError].await(0, timeout)
-      }
-    }
-
-    "expose serverStatus" >> {
-      import commands.{ serverStatusReader, serverStatusWriter }
-
-      "using raw command" in {
-        db.runCommand(ServerStatus, Common.failoverStrategy).
-          aka("result") must beLike[ServerStatusResult]({
-            case ServerStatusResult(_, _, MongodProcess,
-              _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-              //println(s"Server status: $status")
-              ok
-          }).await(0, timeout)
-      }
-
-      "using operation" in {
-        db.serverStatus must beLike[ServerStatusResult]({
-          case ServerStatusResult(_, _, MongodProcess,
-            _, _, _, _, _, _, _, _, _, _, _, _, _) =>
-            //println(s"Server status: $status")
-            ok
-        }).await(0, timeout)
+        replSetGetStatusTest must throwA[DatabaseException].awaitFor(timeout)
       }
     }
 
     "execute ReplSetMaintenance" in {
-      import commands.{
-        replSetMaintenanceWriter,
-        unitBoxReader
-      }
+      import commands.{ replSetMaintenanceWriter, unitReader }
 
       // MongoDB 3
       if (!replSetOn) {
         "fail outside replicaSet (MongoDB 3+)" in {
           connection.database("admin").flatMap(_.runCommand(
             ReplSetMaintenance(true),
-            Common.failoverStrategy)) must throwA[CommandError].like {
-            case CommandError.Code(code) => code aka "error code" must_== 76
-          }.await(0, timeout)
-        } tag "not_mongo26"
+            Common.failoverStrategy)) must throwA[DatabaseException].like {
+            case CommandException.Code(code) => code aka "error code" must_== 76
+          }.awaitFor(timeout)
+        }
       } else {
         "fail with replicaSet (MongoDB 3+)" in {
           connection.database("admin").flatMap(_.runCommand(
             ReplSetMaintenance(true),
-            Common.failoverStrategy)) must throwA[CommandError].like {
-            case CommandError.Code(code) => code aka "error code" must_== 95
-          }.await(0, timeout)
-        } tag "not_mongo26"
-      }
-
-      // MongoDB 2.6
-      if (!replSetOn) {
-        "fail outside replicaSet (MongoDB 2.6)" in {
-          connection.database("admin").flatMap(_.runCommand(
-            ReplSetMaintenance(true),
-            Common.failoverStrategy)) must throwA[CommandError].
-            await(0, timeout)
-        } tag "mongo2"
-      } else {
-        "fail with replicaSet (MongoDB 2.6)" in {
-          connection.database("admin").flatMap(_.runCommand(
-            ReplSetMaintenance(true),
-            Common.failoverStrategy)) must throwA[CommandError].like {
-            case CommandError.Message(msg) =>
-              msg aka "message" must beTypedEqualTo(
-                "primaries can't modify maintenance mode")
-
-          }.await(0, timeout)
-        } tag "mongo2"
+            Common.failoverStrategy)) must throwA[DatabaseException].like {
+            case CommandException.Code(code) => code aka "error code" must_== 95
+          }.awaitFor(timeout)
+        }
       }
     }
 
     "response to ping with ok/1.0" in {
       "with the default connection" in {
         connection.database("admin").
-          flatMap(_.ping()) must beTrue.await(0, timeout)
+          flatMap(_.ping()) must beTrue.awaitFor(timeout)
       }
 
       "with the slow connection" in {
         slowConnection.database("admin").
-          flatMap(_.ping()) must beTrue.await(0, timeout)
+          flatMap(_.ping()) must beTrue.await(1, timeout)
       }
     }
   }

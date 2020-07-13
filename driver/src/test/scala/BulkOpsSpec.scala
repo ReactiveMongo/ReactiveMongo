@@ -1,12 +1,14 @@
 package reactivemongo
 
 import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.duration._
 
-import org.specs2.concurrent.ExecutionEnv
-import reactivemongo.bson.{ BSONArray, BSONDocument, BSONElementSet }
+import reactivemongo.api.bson.{ BSONArray, BSONDocument }
 import reactivemongo.api.collections.BulkOps._
 
-class BulkOpsSpec(implicit ee: ExecutionEnv)
+import org.specs2.concurrent.ExecutionEnv
+
+final class BulkOpsSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
   "Bulk operations" title
@@ -91,9 +93,10 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
     "take into account the fact that keys increase in size in a larger array" in {
       val ExpectedFirstBulk = List.fill(10)(doc1)
       val ExpectedSecondBulk = List(doc1)
+
       bulks[BSONDocument](
         documents = Seq.fill(11)(doc1),
-        maxBsonSize = (doc1.byteSize + 1 + BSONElementSet.docElementByteOverhead) * 11,
+        maxBsonSize = (doc1.byteSize + 1 + 2 /*docElementByteOverhead*/ ) * 11,
         maxBulkSize = 11)(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
           case prod1 =>
             prod1() must beRight.like {
@@ -156,7 +159,7 @@ class BulkOpsSpec(implicit ee: ExecutionEnv)
       }
     }
 
-    "be failed on the first failure for producer2" in {
+    "be failed on the first failure for producer2" in eventually(2, 1.seconds) {
       val app = bulkApply[BSONDocument, Iterable[BSONDocument]](
         _: BulkProducer[BSONDocument])(foo, None)(_: ExecutionContext)
 

@@ -20,38 +20,9 @@ import reactivemongo.io.netty.channel.{ ChannelHandlerContext, ChannelId }
 
 import reactivemongo.core.netty.BufferSequence
 
-import reactivemongo.api.commands.GetLastError
-
 import reactivemongo.api.ReadPreference
 
 // concrete classes
-
-/**
- * A helper to build write request which result needs to be checked (by sending a [[reactivemongo.api.commands.GetLastError]] command after).
- *
- * @param op write operation.
- * @param documents body of this request, a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents.
- * @param getLastError a `GetLastError` command message.
- */
-@deprecated("Unused", "0.16.0")
-case class CheckedWriteRequest(
-  op: WriteRequestOp,
-  documents: BufferSequence,
-  getLastError: GetLastError) {
-
-  import reactivemongo.api.BSONSerializationPack
-  import reactivemongo.api.commands.Command
-  import reactivemongo.api.commands.bson.
-    BSONGetLastErrorImplicits.GetLastErrorWriter
-
-  def apply(): (RequestMaker, RequestMaker) = {
-    val (gleRequestMaker, _) =
-      Command.buildRequestMaker(BSONSerializationPack)(
-        getLastError, GetLastErrorWriter, ReadPreference.primary, op.db)
-
-    RequestMaker(op, documents) -> gleRequestMaker
-  }
-}
 
 /**
  * A helper to build requests.
@@ -60,14 +31,13 @@ case class CheckedWriteRequest(
  * @param documents body of this request, a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents.
  * @param channelIdHint a hint for sending this request on a particular channel.
  */
-@deprecated("Internal: will be made private", "0.19.1")
-case class RequestMaker(
+private[reactivemongo] case class RequestMaker(
   op: RequestOp,
   documents: BufferSequence = BufferSequence.empty,
   readPreference: ReadPreference = ReadPreference.primary,
   channelIdHint: Option[ChannelId] = None) {
 
-  def apply(@deprecatedName(Symbol("id")) requestID: Int) = Request(
+  def apply(requestID: Int) = Request(
     requestID, 0, op, documents, readPreference, channelIdHint)
 }
 

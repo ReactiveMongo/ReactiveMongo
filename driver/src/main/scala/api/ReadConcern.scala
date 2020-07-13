@@ -6,8 +6,6 @@ package reactivemongo.api
  * from replica sets.
  *
  * {{{
- * import scala.concurrent.ExecutionContext
- *
  * import reactivemongo.api.ReadConcern
  * import reactivemongo.api.bson.BSONDocument
  * import reactivemongo.api.bson.collection.BSONCollection
@@ -22,14 +20,14 @@ sealed trait ReadConcern {
   /** The read concern level */
   def level: String
 
-  override def equals(that: Any): Boolean = that match {
+  final override def equals(that: Any): Boolean = that match {
     case other: ReadConcern => other.level == level
     case _                  => false
   }
 
-  override def hashCode: Int = level.hashCode
+  final override def hashCode: Int = level.hashCode
 
-  override def toString = s"ReadConcern($level)"
+  final override def toString = s"ReadConcern($level)"
 }
 
 object ReadConcern {

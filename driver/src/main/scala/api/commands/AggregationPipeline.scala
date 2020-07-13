@@ -11,7 +11,7 @@ private[commands] trait AggregationPipeline[P <: SerializationPack] {
    * and clients should not have custom operators.
    */
   trait PipelineOperator {
-    def makePipe: pack.Value
+    protected[reactivemongo] def makePipe: pack.Document
   }
 
   /**
@@ -20,30 +20,29 @@ private[commands] trait AggregationPipeline[P <: SerializationPack] {
    * For example for `{ \$sample: { size: 2 } }`
    *
    * {{{
-   * import scala.concurrent.ExecutionContext
-   *
-   * import reactivemongo.api.bson.{ BSONDocument, BSONInteger, BSONString }
+   * import reactivemongo.api.bson.BSONDocument
    * import reactivemongo.api.bson.collection.BSONCollection
    *
-   * def foo(coll: BSONCollection)(implicit ec: ExecutionContext) =
+   * def foo(coll: BSONCollection) =
    *   coll.aggregateWith[BSONDocument]() { agg =>
    *     import agg.PipelineOperator
    *
-   *     val stage = PipelineOperator(BSONDocument(
-   *       f"$$sample" -> BSONDocument("size" -> 2)))
-   *
-   *     stage -> List.empty
+   *     List(PipelineOperator(BSONDocument(
+   *       f"$$sample" -> BSONDocument("size" -> 2))))
    *   }
    * }}}
    */
   object PipelineOperator {
-    def apply(pipe: => pack.Value): PipelineOperator = new PipelineOperator {
+    def apply(pipe: => pack.Document): PipelineOperator = new PipelineOperator {
       val makePipe = pipe
     }
+
+    implicit def writer[Op <: PipelineOperator]: pack.Writer[Op] =
+      pack.writer[Op](_.makePipe)
   }
 
   /**
    * Aggregation pipeline (with at least one stage operator)
    */
-  type Pipeline = (PipelineOperator, List[PipelineOperator])
+  type Pipeline = List[PipelineOperator]
 }

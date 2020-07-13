@@ -1,9 +1,5 @@
 package reactivemongo.api.gridfs
 
-import reactivemongo.bson.{ BSONDocument, BSONObjectID, BSONValue }
-
-import reactivemongo.api.{ BSONSerializationPack, SerializationPack }
-
 /**
  * A file that will be saved in a GridFS store.
  * @tparam Id Type of the id of this file (generally BSON ObjectID).
@@ -14,6 +10,8 @@ final class FileToSave[Id, Document] private[api] (
   val contentType: Option[String],
   val uploadDate: Option[Long],
   val metadata: Document) extends FileMetadata[Id, Document] {
+
+  @SuppressWarnings(Array("ComparingUnrelatedTypes"))
   override def equals(that: Any): Boolean = that match {
     case other: FileToSave[_, _] =>
       this.tupled == other.tupled

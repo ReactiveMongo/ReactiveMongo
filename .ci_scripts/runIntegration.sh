@@ -10,22 +10,23 @@ SBT_OPTS="$SBT_OPTS -Dtest.slowProxyDelay=300 -Dtest.slowFailoverRetries=12"
 
 TEST_OPTS=""
 
+echo "[INFO] Running integration tests ..."
+
 # MongoDB
 echo "- MongoDB major: $MONGO_VER"
 
 if [ "$MONGO_VER" = "3" ]; then
-    TEST_OPTS="exclude mongo2,gt_mongo32,ge_mongo4,unit"
+    TEST_OPTS="exclude gt_mongo32,ge_mongo4,unit"
 elif [ "$MONGO_VER" = "4" ]; then
-    TEST_OPTS="exclude mongo2,unit"
+    TEST_OPTS="exclude unit"
 else
-    TEST_OPTS="exclude not_mongo26,gt_mongo32,ge_mongo4,unit"
-    SBT_OPTS="$SBT_OPTS -Dtest.authenticationMechanism=cr"
+    TEST_OPTS="exclude gt_mongo32,ge_mongo4,unit"
 fi
 
 if [ ! "$MONGO_PROFILE" = "x509" ]; then
     TEST_OPTS="$TEST_OPTS,x509" # exclude x509 tests for all other profiles
 else
-    TEST_OPTS="$TEST_OPTS,scram_auth,cr_auth" # exclude other auth types for x509 tests
+    TEST_OPTS="$TEST_OPTS,scram_auth" # exclude other auth types for x509 tests
 
     # See outputs from {full|self}SslCert.sh
     if [ "x${CLIENT_CERT_SUBJECT}" = "x" ]; then
@@ -62,6 +63,7 @@ cat > /dev/stdout <<EOF
 - JVM options: $JVM_OPTS
 - SBT options: $SBT_OPTS
 - Test options: $TEST_OPTS
+
 EOF
 
 export JVM_OPTS
@@ -73,12 +75,10 @@ if [ $# -ge 1 ]; then
     MODE="$1"
 fi
 
-perl -pe "s/"-deprecation", //;s|resolvers |resolvers += Resolver.sonatypeRepo(\"staging\"),\r\n    resolvers |" < "project/Common.scala" > /tmp/Common.scala && mv /tmp/Common.scala "project/Common.scala"
-
 if [ "x$MODE" = "xinteractive" ]; then
     sbt #++$SCALA_VERSION
 else
     TEST_ARGS=";project ReactiveMongo ;testQuick -- $TEST_OPTS"
 
-    sbt ++$SCALA_VERSION "$TEST_ARGS"
+    sbt ++$SCALA_VERSION ";warn ;update ;info $TEST_ARGS"
 fi

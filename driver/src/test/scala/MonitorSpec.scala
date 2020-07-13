@@ -20,7 +20,7 @@ import org.specs2.concurrent.ExecutionEnv
 
 import reactivemongo.core.actors.StandardDBSystem
 import reactivemongo.core.nodeset.{ Authenticate, Connection, Node, NodeSet }
-import reactivemongo.core.protocol.{ Response, ResponseInfo }
+import reactivemongo.core.protocol.Response
 
 import reactivemongo.api.{
   AsyncDriver,
@@ -164,7 +164,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
               aka("channel #1") must beSome[(Node, Connection)]
           } and { // #2
             val respWithNulls = Response(null, null, null,
-              ResponseInfo(DefaultChannelId.newInstance()))
+              responseInfo(DefaultChannelId.newInstance()))
 
             dbsystem.receive(respWithNulls).
               aka("invalid response") must throwA[NullPointerException] and {
@@ -173,7 +173,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
           } and eventually(1, 3.seconds) {
             // #3 Akka Restart on unhandled exception (see issue 558)
 
-            tryUntil[Traversable[(Long, String)]](
+            tryUntil[Iterable[(Long, String)]](
               List(125, 250, 500, 1000, 2125, 4096))(
                 history(dbsystem), _.exists(_._2 startsWith "Restart")).
                 aka("history #3") must beTrue
@@ -199,8 +199,8 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
       }.await(0, timeout * expectFactor)
     }
 
-    "manage channel disconnection while probing isMaster" in {
-      val expectFactor = 4L
+    "manage channel disconnection while probing isMaster" in eventually(2, timeout) {
+      val expectFactor = 10L
       val opts = Common.DefaultOptions.copy(
         nbChannelsPerNode = 2,
         heartbeatFrequencyMS = 3600000 // disable refreshAll/connectAll during test
@@ -212,28 +212,26 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
 
         //println(s"MonitorSpec_1: ${System.currentTimeMillis()}")
 
-        Future.successful(eventually(2, timeout) {
-          isAvailable(con, timeout) must beTrue.await(0, timeout)
+        Future.successful({
+          isAvailable(con, timeout) must beTrue.awaitFor(timeout)
         } and {
           @volatile var connections1 = Vector.empty[Connection]
 
           //println("MonitorSpec_2")
 
-          eventually(2, timeout) {
-            nodeSet(dbsystem).nodes aka "nodes #1" must beLike[Vector[Node]] {
-              // #1 - Fully available with expected connection count (1)
+          nodeSet(dbsystem).nodes aka "nodes #1" must beLike[Vector[Node]] {
+            // #1 - Fully available with expected connection count (1)
 
-              case nodes1 => nodes1.size must_=== 1 and {
-                isAvailable(con, 1.seconds) must beTrue.await(0, timeout)
-              } and {
-                nodes1.flatMap(_.connections) must beLike[Vector[Connection]] {
-                  case cons =>
-                    // 1 op channel + 1 signaling
-                    cons.size aka "connections #1" must_=== 2 and {
-                      connections1 = cons
-                      ok
-                    }
-                }
+            case nodes1 => nodes1.size must_=== 1 and {
+              isAvailable(con, 1.seconds) must beTrue.awaitFor(timeout)
+            } and {
+              nodes1.flatMap(_.connections) must beLike[Vector[Connection]] {
+                case cons =>
+                  // 1 op channel + 1 signaling
+                  cons.size aka "connections #1" must_=== 2 and {
+                    connections1 = cons
+                    ok
+                  }
               }
             }
           } and {
@@ -339,24 +337,30 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
             // (only remaining) connection is back online.
             val connections6 = nodeSet(dbsystem).nodes.flatMap(_.connections)
 
-            signaling.future must beTypedEqualTo({}).await and {
-              connections6.size must_=== 1
-            } and {
-              /*
+            signaling.future must beTypedEqualTo({}).
+              awaitFor(timeout * 2L) and {
+                //println("MonitorSpec_6a")
+
+                connections6.size must_=== 1
+              } and {
+                /*
               connections6.foreach { c =>
                 dbsystem.receive(channelConnected(c.channel.id))
               }
                */
 
-              isAvailable(con, 1.seconds) must beTrue.await(1, timeout)
-            } and {
-              nodeSet(dbsystem).nodes.
-                flatMap(_.connections) must beLike[Vector[Connection]] {
-                  case cons => cons.size must be_>=(1) and {
-                    cons.find(_.signaling) must beSome[Connection]
+                isAvailable(con, 1.seconds) must beTrue.await(1, timeout)
+              } and {
+                //println("MonitorSpec_6b")
+
+                nodeSet(dbsystem).nodes.
+                  flatMap(_.connections) must beLike[Vector[Connection]] {
+                    case cons => cons.size must be_>=(1) and {
+                      //println(s"MonitorSpec_6c: ${timeout * expectFactor}")
+                      cons.find(_.signaling) must beSome[Connection]
+                    }
                   }
-                }
-            }
+              }
           }
         })
       }.awaitFor(timeout * expectFactor)
@@ -365,7 +369,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
     "manage reconnection according heartbeat frequency" >> {
       val expectFactor = 4L
 
-      def withClosedChannels[T](ms: Int)(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Result): Result = {
+      def withClosedChannels[T](ms: Int, timeout: FiniteDuration)(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Result): Result = {
         val opts = Common.DefaultOptions.copy(
           nbChannelsPerNode = 2,
           heartbeatFrequencyMS = ms)
@@ -374,47 +378,58 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
           @inline def dbsystem = sysRef.underlyingActor
 
           Future.successful(eventually(1, timeout) {
-            isAvailable(con, timeout) must beTrue.await(0, timeout)
+            isAvailable(con, timeout) must beTrue.awaitFor(timeout)
           } and {
-            @volatile var closed = 0
             @volatile var count = 0
+            val allClosed = Promise[Unit]()
 
-            nodeSet(dbsystem).nodes.flatMap {
-              _.connections.map { c =>
+            nodeSet(dbsystem).nodes.foreach { n =>
+              n.connections.foreach { c =>
                 count = count + 1
 
                 c.channel.close().addListener(new ChannelFutureListener {
                   def operationComplete(op: ChannelFuture): Unit = {
-                    if (op.isSuccess) {
-                      closed = closed + 1
+                    if (op.isSuccess && count == opts.nbChannelsPerNode) {
+                      allClosed.trySuccess({})
                     }
+
+                    ()
                   }
                 })
               }
             }
 
-            count must be_<=(opts.nbChannelsPerNode + 1 /*signaling*/ ) and {
-              eventually(2, timeout) {
-                closed must_=== count
-              }
+            allClosed.future must beTypedEqualTo({}).awaitFor(timeout) and {
+              count must_=== opts.nbChannelsPerNode
+            } and {
+              val monRef = reactivemongo.api.tests.monitor(con)
+              val p = Promise[Unit]()
+
+              monRef ! reactivemongo.api.tests.IsUnavailable(con, p)
+
+              p.future must beTypedEqualTo({}).awaitFor(timeout)
             }
-          } and {
-            eventually(1, timeout) {
-              f(con, sysRef)
-            }
+          } and eventually(1, timeout) {
+            f(con, sysRef)
           })
         }.awaitFor(timeout * expectFactor)
       }
 
       "so re-connect quickly with a short heartbeat (500ms)" in {
-        withClosedChannels(500) {
-          (con, _) => isAvailable(con, timeout) must beTrue.await(0, timeout)
+        eventually(Common.ifX509(3)(2), timeout / 2L) {
+          withClosedChannels(500, timeout) { (con, _) =>
+            isAvailable(con, timeout) must beTrue.awaitFor(timeout)
+          }
         }
       }
 
       "so doesn't re-connect with a long heartbeat (1h)" in {
-        withClosedChannels(3600000) {
-          (con, _) => isAvailable(con, timeout) must beFalse.await(0, timeout)
+        import Common.slowTimeout
+
+        eventually(Common.ifX509(4)(2), timeout / 2L) {
+          withClosedChannels(3600000, slowTimeout) { (con, _) =>
+            isAvailable(con, slowTimeout) must beFalse.awaitFor(slowTimeout)
+          }
         }
       }
     }
@@ -431,7 +446,9 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
     val supervisorName = s"monitorspec-sup-${System identityHashCode ee}"
     val poolName = s"monitorspec-con-${System identityHashCode f}"
 
-    implicit def sys: akka.actor.ActorSystem = drv.system
+    implicit def sys: akka.actor.ActorSystem =
+      reactivemongo.api.tests.system(drv)
+
     lazy val mongosystem = TestActorRef[StandardDBSystem](
       standardDBSystem(
         supervisorName, poolName, nodes, authentications, options), poolName)
@@ -442,7 +459,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
     for {
       con <- connection
       res <- f(con, mongosystem)
-      _ <- con.askClose()(timeout).recover { case _ => () }
+      _ <- con.close()(timeout).recover { case _ => () }
     } yield res
   }
 }

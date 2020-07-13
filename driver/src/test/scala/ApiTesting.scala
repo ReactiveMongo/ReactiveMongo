@@ -1,27 +1,26 @@
 package reactivemongo.api
 
-import java.util.UUID
-
 import scala.util.Try
 
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ FiniteDuration, SECONDS }
 
+import scala.collection.immutable.ListSet
+
 import akka.util.Timeout
 import akka.actor.ActorRef
 
-import reactivemongo.io.netty.channel.{
-  Channel,
-  ChannelId,
-  DefaultChannelId
-}
+import reactivemongo.io.netty.channel.{ ChannelId, DefaultChannelId }
 
 import reactivemongo.io.netty.channel.Channel
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
 import reactivemongo.core.errors.DatabaseException
 import reactivemongo.core.protocol.{
+  Query,
+  MessageHeader,
   Request,
+  Reply,
   Response,
   ResponseInfo,
   ResponseFrameDecoder,
@@ -38,18 +37,62 @@ import reactivemongo.core.actors, actors.{
   StandardDBSystem
 }
 
-import reactivemongo.bson.BSONDocument
+import reactivemongo.api.bson.BSONDocument
+import reactivemongo.api.bson.collection.BSONSerializationPack
 
-import reactivemongo.api.collections.{ GenericQueryBuilder, QueryCodecs }
+import reactivemongo.api.collections.QueryCodecs
 
-import reactivemongo.api.indexes.Index
-
-package object tests {
+package object tests { self =>
   type Pack = Serialization.Pack
   val pack: Pack = Serialization.internalSerializationPack
 
+  object PrimaryAvailable {
+    def unapply(msg: Any) = msg match {
+      case reactivemongo.core.actors.PrimaryAvailable(metadata) =>
+        Some(metadata)
+
+      case _ => None
+    }
+  }
+
+  def Authenticate(
+    db: String,
+    user: String,
+    password: Option[String]) =
+    reactivemongo.core.nodeset.Authenticate(db, user, password)
+
+  def maxWireVersion(db: DB) = db.connectionState.metadata.maxWireVersion
+
+  type ParsedURI = reactivemongo.api.MongoConnection.ParsedURI
+
+  def ParsedURI(
+    hosts: ListSet[(String, Int)],
+    options: MongoConnectionOptions,
+    ignoredOptions: List[String],
+    db: Option[String]) = new reactivemongo.api.MongoConnection.ParsedURI(hosts, options, ignoredOptions, db)
+
+  @inline def RegisterMonitor = reactivemongo.core.actors.RegisterMonitor
+
+  @inline def SimpleRing[T](capacity: Int)(implicit cls: scala.reflect.ClassTag[T]) = new reactivemongo.util.SimpleRing[T](capacity)
+
   lazy val decoder = pack.newDecoder
   lazy val builder = pack.newBuilder
+
+  def system(drv: AsyncDriver) = drv.system
+
+  def mongosystem(con: MongoConnection) = con.mongosystem
+
+  def monitor(con: MongoConnection) = con.monitor
+
+  def IsUnavailable(con: MongoConnection, p: Promise[Unit]) =
+    con.IsUnavailable(p)
+
+  @inline def md5Hex(bytes: Array[Byte]): String = {
+    import reactivemongo.api.bson.Digest
+    Digest.hex2Str(Digest.md5(bytes))
+  }
+
+  def logger(category: String) = reactivemongo.util.LazyLogger(category)
 
   def newBuilder[P <: SerializationPack](pack: P) = pack.newBuilder
 
@@ -59,8 +102,25 @@ package object tests {
 
   def numConnections(d: AsyncDriver): Int = d.numConnections
 
+  type Response = reactivemongo.core.protocol.Response
+
+  import reactivemongo.api.commands.AggregationFramework
+
+  object AggFramework extends PackSupport[Pack]
+    with AggregationFramework[Pack] {
+    val pack = self.pack
+  }
+
+  def makePipe[P <: SerializationPack](a: AggregationFramework[P])(o: a.PipelineOperator) = o.makePipe
+
+  def makeFunction[P <: SerializationPack](a: AggregationFramework[P])(f: a.GroupFunction) = f.makeFunction
+
+  def scoreDocument[P <: SerializationPack](a: AggregationFramework[P])(score: a.AtlasSearch.Score) = score.document
+
+  def makeSearch[P <: SerializationPack](a: AggregationFramework[P])(search: a.AtlasSearch.Operator) = search.document
+
   // Test alias
-  def _failover2[A](c: MongoConnection, s: FailoverStrategy)(p: () => Future[A])(implicit ec: ExecutionContext): Failover2[A] = Failover2.apply(c, s)(p)(ec)
+  def _failover2[A](c: MongoConnection, s: FailoverStrategy)(p: () => Future[A])(implicit ec: ExecutionContext): Failover[A] = Failover.apply(c, s)(p)(ec)
 
   def isAvailable(con: MongoConnection, timeout: FiniteDuration)(implicit ec: ExecutionContext): Future[Boolean] = con.probe(timeout).map(_ => true).recover {
     case _ => false
@@ -79,7 +139,7 @@ package object tests {
     d.supervisorActor ? message
   }
 
-  def history(sys: MongoDBSystem): Traversable[(Long, String)] = {
+  def history(sys: MongoDBSystem): Iterable[(Long, String)] = {
     val snap = sys.history.synchronized {
       sys.history.toArray()
     }
@@ -88,13 +148,6 @@ package object tests {
       case (time: Long, event: String) => time -> event
     }
   }
-
-  def merge[P <: SerializationPack](
-    qb: GenericQueryBuilder[P],
-    pref: ReadPreference,
-    maxDocs: Int) = qb.merge(pref, maxDocs)
-
-  def nodeSet(sys: MongoDBSystem): NodeSet = sys.getNodeSet
 
   def channelConnected(id: ChannelId) = ChannelConnected(id)
 
@@ -105,18 +158,21 @@ package object tests {
   def nextResponse[T](cursor: Cursor[T], maxDocs: Int) =
     cursor.asInstanceOf[CursorOps[T]].nextResponse(maxDocs)
 
-  @inline def channelBuffer(doc: BSONDocument) =
-    reactivemongo.core.netty.ChannelBufferWritableBuffer.single(doc)
+  @inline def channelBuffer(doc: BSONDocument) = {
+    val buf = reactivemongo.api.bson.buffer.WritableBuffer.empty
+
+    BSONSerializationPack.writeToBuffer(buf, doc)
+  }
 
   @inline def bufferSeq(doc: BSONDocument) =
-    reactivemongo.core.netty.BufferSequence.single(doc)
+    reactivemongo.core.netty.BufferSequence.single(BSONSerializationPack)(doc)
 
   def fakeResponse(
     doc: BSONDocument,
     reqID: Int = 2,
     respTo: Int = 1,
     chanId: ChannelId = DefaultChannelId.newInstance()): Response = {
-    val reply = reactivemongo.core.protocol.Reply(
+    val reply = new Reply(
       flags = 1,
       cursorID = 1,
       startingFrom = 0,
@@ -124,7 +180,7 @@ package object tests {
 
     val message = bufferSeq(doc).merged
 
-    val header = reactivemongo.core.protocol.MessageHeader(
+    val header = new MessageHeader(
       messageLength = message.capacity,
       requestID = reqID,
       responseTo = respTo,
@@ -134,15 +190,15 @@ package object tests {
       header,
       reply,
       documents = message,
-      info = ResponseInfo(chanId))
+      info = new ResponseInfo(chanId))
   }
 
   def fakeResponseError(
-    doc: BSONDocument,
+    doc: pack.Document,
     reqID: Int = 2,
     respTo: Int = 1,
     chanId: ChannelId = DefaultChannelId.newInstance()): Response = {
-    val reply = reactivemongo.core.protocol.Reply(
+    val reply = new Reply(
       flags = 1,
       cursorID = 1,
       startingFrom = 0,
@@ -150,7 +206,7 @@ package object tests {
 
     val message = bufferSeq(doc).merged
 
-    val header = reactivemongo.core.protocol.MessageHeader(
+    val header = new MessageHeader(
       messageLength = message.capacity,
       requestID = reqID,
       responseTo = respTo,
@@ -159,20 +215,9 @@ package object tests {
     Response.CommandError(
       _header = header,
       _reply = reply,
-      _info = ResponseInfo(chanId),
-      cause = DatabaseException(doc))
+      _info = new ResponseInfo(chanId),
+      cause = DatabaseException(pack)(doc))
   }
-
-  def foldResponses[T](
-    makeRequest: ExecutionContext => Future[Response],
-    next: (ExecutionContext, Response) => Future[Option[Response]],
-    killCursors: (Long, String) => Unit,
-    z: => T,
-    maxDocs: Int,
-    suc: (T, Response) => Future[Cursor.State[T]],
-    err: Cursor.ErrorHandler[T])(implicit sys: akka.actor.ActorSystem, ec: ExecutionContext): Future[T] =
-    FoldResponses[T](
-      z, makeRequest, next, killCursors, suc, err, maxDocs)(sys, ec)
 
   val bsonReadPref: ReadPreference => BSONDocument = {
     val writeReadPref = QueryCodecs.writeReadPref(BSONSerializationPack)
@@ -202,25 +247,26 @@ package object tests {
   @inline def releaseChannelFactory(f: ChannelFactory, clb: Promise[Unit]) =
     f.release(clb)
 
-  @inline def isMasterRequest(reqId: Int = RequestIdGenerator.isMaster.next): Request = {
-    import reactivemongo.api.BSONSerializationPack
-    import reactivemongo.api.commands.bson.{
-      BSONIsMasterCommandImplicits,
-      BSONIsMasterCommand
-    }, BSONIsMasterCommand.IsMaster
-    import reactivemongo.api.commands.Command
+  object IsMasterCommand
+    extends reactivemongo.api.commands.IsMasterCommand[Pack]
 
-    val (isMaster, _) = Command.buildRequestMaker(BSONSerializationPack)(
-      IsMaster,
-      BSONIsMasterCommandImplicits.IsMasterWriter,
+  @inline def isMasterRequest(reqId: Int = RequestIdGenerator.isMaster.next): Request = {
+    import reactivemongo.api.commands.Command
+    import IsMasterCommand.{ IsMaster, writer => mw }
+
+    val isMaster = Command.buildRequestMaker(BSONSerializationPack)(
+      new IsMaster(None, None),
+      mw(BSONSerializationPack),
       reactivemongo.api.ReadPreference.primaryPreferred,
       "admin") // only "admin" DB for the admin command
 
     isMaster(reqId) // RequestIdGenerator.isMaster
   }
 
-  @inline def isMasterResponse(response: Response) =
-    RequestIdGenerator.isMaster accepts response
+  object IsMasterResponse {
+    def unapply(response: Response) =
+      Option(response).filter(RequestIdGenerator.isMaster.accepts)
+  }
 
   def decodeResponse[T]: Array[Byte] => (Tuple2[ByteBuf, Response] => T) => T = {
     val decoder = new ResponseDecoder()
@@ -298,24 +344,58 @@ package object tests {
     txtResolver: reactivemongo.util.TXTResolver)(
     implicit
     ec: ExecutionContext) =
-    MongoConnection.fromString(uri, srvResolver, txtResolver)
+    MongoConnection.parse[Option[String]](uri, srvResolver, txtResolver)
 
-  @inline def probe(con: MongoConnection, timeout: FiniteDuration) = con.probe(timeout)
+  def parseURIWithDB(
+    uri: String,
+    srvResolver: reactivemongo.util.SRVRecordResolver,
+    txtResolver: reactivemongo.util.TXTResolver)(
+    implicit
+    ec: ExecutionContext) =
+    MongoConnection.parse[String](uri, srvResolver, txtResolver)
 
-  def sessionId(db: DB): Option[UUID] = db.session.map(_.lsid)
+  def preload(resp: Response)(implicit ec: ExecutionContext): Future[(Response, BSONDocument)] = reactivemongo.core.protocol.Response.preload(resp)
 
-  def preload(resp: Response)(implicit ec: ExecutionContext): Future[(Response, BSONDocument)] = Response.preload(resp)
+  @inline def session(db: DB): Option[Session] = db.session
 
-  @inline def session(db: DefaultDB): Option[Session] = db.session
+  def messageHeader(
+    messageLength: Int,
+    requestID: Int,
+    responseTo: Int,
+    opCode: Int): MessageHeader =
+    new MessageHeader(messageLength, requestID, responseTo, opCode)
 
-  @inline def indexOptions[P <: SerializationPack](i: Index.Aux[P]): i.pack.Document = i.optionDocument
+  def reply(
+    flags: Int,
+    cursorID: Long,
+    startingFrom: Int,
+    numberReturned: Int) = new Reply(flags, cursorID, startingFrom, numberReturned)
+
+  def query(
+    flags: Int,
+    fullCollectionName: String,
+    numberToSkip: Int,
+    numberToReturn: Int) = Query(flags, fullCollectionName, numberToSkip, numberToReturn)
+
+  def response(
+    header: MessageHeader,
+    reply: Reply,
+    documents: ByteBuf,
+    info: ResponseInfo) =
+    reactivemongo.core.protocol.Response(header, reply, documents, info)
+
+  def responseInfo(cid: ChannelId) = new ResponseInfo(cid)
+
+  def readMessageHeader(buffer: ByteBuf) = MessageHeader.readFrom(buffer)
+
+  def readReply(buffer: ByteBuf) = Reply.readFrom(buffer)
 
   object commands {
     implicit val replSetMaintenanceWriter =
       reactivemongo.api.commands.ReplSetMaintenance.writer(pack)
 
-    implicit val unitBoxReader =
-      reactivemongo.api.commands.CommandCodecs.unitBoxReader(pack)
+    implicit val unitReader =
+      reactivemongo.api.commands.CommandCodecs.unitReader(pack)
 
     implicit val replSetGetStatusWriter =
       reactivemongo.api.commands.ReplSetGetStatus.writer(pack)
@@ -325,21 +405,5 @@ package object tests {
     implicit val replSetStatusReader: pack.Reader[ReplSetStatus] =
       reactivemongo.api.commands.ReplSetGetStatus.reader(pack)
 
-    implicit val serverStatusWriter =
-      reactivemongo.api.commands.ServerStatus.writer(pack)
-
-    implicit val serverStatusReader =
-      reactivemongo.api.commands.ServerStatus.reader(pack)
-
-    import reactivemongo.api.commands.IsMasterCommand
-    type IsMaster = IsMasterCommand[pack.type]#IsMaster
-
-    def isMasterWriter(cmd: IsMasterCommand[pack.type]) = new {
-      def get[T <: cmd.IsMaster]: pack.Writer[T] = cmd.writer[T](pack)
-    }
-
-    def isMasterReader(cmd: IsMasterCommand[pack.type]) = new {
-      def get(implicit sr: pack.NarrowValueReader[String]): pack.Reader[cmd.IsMasterResult] = cmd.reader(pack)
-    }
   }
 }
