@@ -29,7 +29,7 @@ This is the process for a contributor (that is, a non ReactiveMongo core develop
         * Casting
         * Introducing new, heavy external dependencies
 3. Submit a pull request. If an issue already exists for the pull request, then follow [these](http://opensoul.org/blog/archives/2012/11/09/convert-a-github-issue-into-a-pull-request/) instructions for converting an issue into a pull request.
-    * New contributors need to sign the [CLA](http://www.clahub.com/agreements/ReactiveMongo/ReactiveMongo)
+    * New contributors must agree the [CLA](http://www.clahub.com/agreements/ReactiveMongo/ReactiveMongo)
 
 If the pull request does not meet the above requirements then the code should **not** be merged into master, or even reviewed - regardless of how good or important it is. No exceptions.
 
@@ -40,6 +40,12 @@ To discuss features, proposal and pull-requests, use the dedicated group at http
 ## Documentation
 
 The documentation lives as markdown pages in the [reactivemongo-site](https://github.com/ReactiveMongo/reactivemongo-site) repository.
+
+## Migration rules
+
+The migration rules are automated using [Scalafix](https://scalacenter.github.io/scalafix/).
+
+Each deprecation must lead to the introduction of appropriate rules in [ReactiveMongo-Scalafix](https://github.com/ReactiveMongo/ReactiveMongo-Scalafix).
 
 ## Work In Progress
 
