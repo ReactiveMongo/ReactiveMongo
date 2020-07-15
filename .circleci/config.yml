@@ -36,7 +36,7 @@ commands:
         default: "openjdk8"
       scala_version:
         type: string
-        default: "2.13.2"
+        default: "2.13.3"
       shaded:
         type: boolean
         default: true
@@ -130,8 +130,11 @@ commands:
 
       - run:
           name: Start integration services
-          command: if [ "x<< parameters.category >>" = "xINTEGRATION_TESTS" ]; then (./.ci_scripts/fork-mongod.sh /tmp/integration-env.sh); fi
           background: true
+          command: |
+                    if [ "x<< parameters.category >>" = "xINTEGRATION_TESTS" ]; then
+                      ./.ci_scripts/fork-mongod.sh /tmp/integration-env.sh
+                    fi
 
   collect_test_reports:
     description: Collect test reports
@@ -221,7 +224,7 @@ jobs:
         default: "openjdk8"
       scala_version:
         type: string
-        default: "2.13.2"
+        default: "2.13.3"
       shaded:
         type: boolean
         default: true
@@ -382,13 +385,13 @@ workflows:
       - integration_test_suite:
           name: integration_openjdk8_scala213_akka25_rs
           openjdk_version: 8
-          scala_version: 2.13.2
+          scala_version: 2.13.3
           mongo_profile: rs
 
       - integration_test_suite:
           name: integration_openjdk9_scala213_akka25_x509
           mongo_profile: x509
-          scala_version: 2.13.2
+          scala_version: 2.13.3
 
       - integration_test_suite:
           name: integration_openjdk11_scala212_akka26

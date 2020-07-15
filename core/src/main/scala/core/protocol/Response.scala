@@ -29,7 +29,7 @@ private[reactivemongo] sealed abstract class Response(
       val bson = Response.parse(this)
 
       if (bson.hasNext) {
-        Some(DatabaseException(BSONSerializationPack)(bson.next))
+        Some(DatabaseException(BSONSerializationPack)(bson.next()))
       } else None
     } else None
   }

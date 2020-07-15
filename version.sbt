@@ -28,7 +28,7 @@ version in ThisBuild := {
             sys.error("Fails to determine previous stable version")
         }
       } else {
-        descr.ref.value.drop(1) // without 'v' prefix
+        descr.ref.value
       }
     }
 
