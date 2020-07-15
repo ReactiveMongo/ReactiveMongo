@@ -373,7 +373,7 @@ final class MongoConnection private[reactivemongo] (
           new Exception(s"[$lnm] Closing connection..."))
 
         mongosystem ! Close("MonitorActor#Close", close.timeout)
-        waitingForClose += sender
+        waitingForClose += sender()
 
         ()
       }
@@ -422,6 +422,7 @@ object MongoConnection {
     cause: Throwable) extends Exception(message, cause) with NoStackTrace {
 
     @com.github.ghik.silencer.silent
+    @SuppressWarnings(Array("NullParameter"))
     def this(message: String) = this(message, null)
   }
 

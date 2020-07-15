@@ -161,7 +161,7 @@ final class BsonSpec extends org.specs2.mutable.Specification {
     val doc = BSONDocument("foo" -> 1, "bar" -> "LOREM")
 
     "parse a simple document" in {
-      def buf = channelBuffer(doc).toReadableBuffer
+      def buf = channelBuffer(doc).toReadableBuffer()
 
       val ser = BSONSerializationPack
 
@@ -183,7 +183,7 @@ final class BsonSpec extends org.specs2.mutable.Specification {
     "parse a response" in {
       val resp = fakeResponse(
         doc,
-        reqID = isMasterReqId,
+        reqID = isMasterReqId(),
         respTo = 1,
         chanId = DefaultChannelId.newInstance())
 

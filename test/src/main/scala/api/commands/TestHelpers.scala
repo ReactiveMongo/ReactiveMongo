@@ -12,6 +12,7 @@ import reactivemongo.core.errors.DatabaseException
 /** TestHelpers about commands. */
 object TestHelpers {
   /** '''EXPERIMENTAL:''' Test factory for [[WriteResult]] */
+  @SuppressWarnings(Array("MethodNames"))
   def WriteResult(
     ok: Boolean = true,
     n: Int = 1,
@@ -22,6 +23,7 @@ object TestHelpers {
     new DefaultWriteResult(ok, n, writeErrors, writeConcernError, code, errmsg)
 
   /** '''EXPERIMENTAL:''' */
+  @SuppressWarnings(Array("MethodNames"))
   def WriteError(
     errmsg: Option[String] = None,
     code: Option[Int] = None,

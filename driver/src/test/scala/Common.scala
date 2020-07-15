@@ -126,7 +126,7 @@ object Common extends CommonAuth {
 
     val _db = for {
       d <- con.database(name, failoverStrategy)
-      _ <- d.drop
+      _ <- d.drop()
     } yield d
 
     try {

@@ -109,7 +109,7 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
 
   protected def maxWireVersion: MongoWireVersion
 
-  implicit final private[reactivemongo] lazy val updateWriter: pack.Writer[UpdateCmd] = updateWriter(self.session)
+  implicit final private[reactivemongo] lazy val updateWriter: pack.Writer[UpdateCmd] = updateWriter(self.session())
 
   final private[reactivemongo] def updateWriter(session: Option[Session]): pack.Writer[UpdateCmd] = {
     val builder = pack.newBuilder

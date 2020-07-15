@@ -193,7 +193,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
           isMasterResp(secAvail).foreach { resp =>
             ref ! fakeResponse(
               resp,
-              reqID = isMasterReqId,
+              reqID = isMasterReqId(),
               respTo = req.requestID,
               chanId = chan.id)
           }

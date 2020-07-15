@@ -66,7 +66,7 @@ trait CollectionMetaSpec { collSpec: CollectionSpec =>
       }
 
       "with statistics (MongoDB >= 3.0)" in {
-        c.stats must beLike[CollectionStats] {
+        c.stats() must beLike[CollectionStats] {
           case stats => stats.capped must beTrue and (
             stats.maxSize must beSome(cappedMaxSize))
         }.await(1, timeout)

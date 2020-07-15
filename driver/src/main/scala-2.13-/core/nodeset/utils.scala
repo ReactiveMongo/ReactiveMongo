@@ -3,7 +3,7 @@ package reactivemongo.core.nodeset
 import scala.collection.generic.CanBuildFrom
 
 package object utils {
-  @SuppressWarnings(Array("UnsafeTraversableMethods"))
+  @SuppressWarnings(Array("UnsafeTraversableMethods", "TraversableHead"))
   private[nodeset] def update[A, M[T] <: Iterable[T]](coll: M[A])(f: PartialFunction[A, A])(implicit cbf: CanBuildFrom[M[_], A, M[A]]): (M[A], Boolean) = {
     val builder = cbf.apply
     val (head, tail) = coll.span(!f.isDefinedAt(_))

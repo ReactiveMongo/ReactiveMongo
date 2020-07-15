@@ -231,7 +231,7 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
         val c = "get john doe users sorted by age"
         val builder2 = builder1.comment(c)
 
-        val expected = expected1 ++ ("comment" -> c, "limit" -> 12)
+        val expected = expected1.++("comment" -> c, "limit" -> 12)
 
         builder2.merge(ReadPreference.Primary, 12) must_=== expected
       }

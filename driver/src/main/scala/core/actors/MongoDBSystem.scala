@@ -584,9 +584,9 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     }
 
     case RegisterMonitor => {
-      debug(s"Register monitor $sender")
+      debug(s"Register monitor ${sender()}")
 
-      monitors += sender
+      monitors += sender()
 
       // In case the NodeSet status has already been updated ...
       // TODO: Test
@@ -594,7 +594,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       val ns = nodeSetLock.synchronized { this._nodeSet }
 
       if (ns.isReachable) {
-        sender ! new SetAvailable(ns.protocolMetadata, ns.name, ns.isMongos)
+        sender() ! new SetAvailable(ns.protocolMetadata, ns.name, ns.isMongos)
 
         debug("The node set is available")
       }
@@ -603,7 +603,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         if (ns.authenticates.nonEmpty && prim.authenticated.isEmpty) {
           debug(s"The node set is available (${prim.names}); Waiting authentication: ${prim.authenticated}")
         } else {
-          sender ! new PrimaryAvailable(
+          sender() ! new PrimaryAvailable(
             ns.protocolMetadata, ns.name, ns.isMongos)
 
           debug(s"The primary is available: $prim")
@@ -780,7 +780,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       ()
     }
 
-    case RegisterMonitor => { monitors += sender; () }
+    case RegisterMonitor => { monitors += sender(); () }
 
     case req: ExpectingResponse => {
       import req.promise
@@ -1198,7 +1198,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
           }
         }
 
-        trace(s"""Discovered ${discoveredNodes.size} nodes${discoveredNodes.map(_.toShortString) mkString (": [ ", ", ", " ]")}""")
+        trace(s"""Discovered ${discoveredNodes.size} nodes${discoveredNodes.map(_.toShortString).mkString(": [ ", ", ", " ]")}""")
 
         val upSet = prepared.copy(
           name = isMaster.replicaSet.map(_.setName),
@@ -1255,7 +1255,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       }
     }
 
-    val origSender = context.sender
+    val origSender = context.sender()
 
     scheduler.scheduleOnce(Duration.Zero) {
       @inline def event = s"ConnectAll$$IsMaster(${response.header.responseTo}, ${updated.toShortString})"
