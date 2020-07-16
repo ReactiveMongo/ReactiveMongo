@@ -36,7 +36,7 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackS
   private[reactivemongo] def session(): Option[Session]
 
   protected final implicit lazy val deleteWriter: pack.Writer[DeleteCmd] =
-    deleteWriter(self.session)
+    deleteWriter(self.session())
 
   protected final def deleteWriter(
     session: Option[Session]): pack.Writer[DeleteCmd] = {

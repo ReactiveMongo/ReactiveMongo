@@ -187,7 +187,7 @@ private[reactivemongo] object CommandCodecs {
             element("lsid", idElmt),
             element("txnNumber", builder.long(transaction.txnNumber)))
 
-          if (!session.transactionToFlag) {
+          if (!session.transactionToFlag()) {
             elms += element("startTransaction", builder.boolean(true))
           }
 

@@ -107,7 +107,7 @@ private[api] trait FindAndModifyCommand[P <: SerializationPack] {
     val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
 
     val sessionElmts: Seq[pack.ElementProducer] =
-      session.fold(Seq.empty[pack.ElementProducer])(
+      session().fold(Seq.empty[pack.ElementProducer])(
         CommandCodecs.writeSession(builder))
 
     pack.writer[FindAndModifyCmd] { cmd =>
@@ -129,7 +129,7 @@ private[api] trait FindAndModifyCommand[P <: SerializationPack] {
           command.bypassDocumentValidation)))
 
       if (maxWireVersion.compareTo(MongoWireVersion.V40) >= 0 &&
-        !session.exists(_.transaction.isSuccess)) {
+        !session().exists(_.transaction.isSuccess)) {
 
         elements += element(
           "writeConcern", writeWriteConcern(command.writeConcern))

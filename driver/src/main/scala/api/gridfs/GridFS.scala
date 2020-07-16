@@ -318,7 +318,7 @@ sealed trait GridFS[P <: SerializationPack] extends PackSupport[P]
 
       }
 
-    go(Chunk(Array.empty, 0, digestInit, 0)).flatMap(_.finish)
+    go(Chunk(Array.empty, 0, digestInit, 0)).flatMap(_.finish())
   }
 
   protected lazy val maxWireVersion =

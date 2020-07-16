@@ -19,14 +19,25 @@ MONGOSHELL_OPTS=""
 
 # prepare SSL options
 if [ "$MONGO_PROFILE" = "invalid-ssl" ]; then
-    MONGOSHELL_OPTS="$MONGOSHELL_OPTS --ssl --sslAllowInvalidCertificates"
+    if [ "v$MONGO_VER" = "v4" ]; then
+        MONGOSHELL_OPTS="$MONGOSHELL_OPTS --tls --tlsAllowInvalidCertificates"
+    else
+        MONGOSHELL_OPTS="$MONGOSHELL_OPTS --ssl --sslAllowInvalidCertificates"
+    fi
 fi
 
 if [ "$MONGO_PROFILE" = "mutual-ssl" -o "$MONGO_PROFILE" = "x509" ]; then
-    MONGOSHELL_OPTS="$MONGOSHELL_OPTS --ssl --sslAllowInvalidCertificates"
-    MONGOSHELL_OPTS="$MONGOSHELL_OPTS --sslCAFile $SCRIPT_DIR/server-cert.pem"
-    MONGOSHELL_OPTS="$MONGOSHELL_OPTS --sslPEMKeyFile $SCRIPT_DIR/client-cert.pem"
-    MONGOSHELL_OPTS="$MONGOSHELL_OPTS --sslPEMKeyPassword $SSL_PASS"
+    if [ "v$MONGO_VER" = "v4" ]; then
+        MONGOSHELL_OPTS="$MONGOSHELL_OPTS --tls --tlsAllowInvalidCertificates"
+        MONGOSHELL_OPTS="$MONGOSHELL_OPTS --tlsCAFile $SCRIPT_DIR/server-cert.pem"
+        MONGOSHELL_OPTS="$MONGOSHELL_OPTS --tlsCertificateKeyFile $SCRIPT_DIR/client-cert.pem"
+        MONGOSHELL_OPTS="$MONGOSHELL_OPTS --tlsCertificateKeyFilePassword $SSL_PASS"
+    else
+        MONGOSHELL_OPTS="$MONGOSHELL_OPTS --ssl --sslAllowInvalidCertificates"
+        MONGOSHELL_OPTS="$MONGOSHELL_OPTS --sslCAFile $SCRIPT_DIR/server-cert.pem"
+        MONGOSHELL_OPTS="$MONGOSHELL_OPTS --sslPEMKeyFile $SCRIPT_DIR/client-cert.pem"
+        MONGOSHELL_OPTS="$MONGOSHELL_OPTS --sslPEMKeyPassword $SSL_PASS"
+    fi
 fi
 
 if [ "$MONGO_PROFILE" = "x509" ]; then
@@ -38,11 +49,35 @@ fi
 
 # prepare common options
 MONGOSHELL_OPTS="$MONGOSHELL_OPTS --eval"
-MONGODB_NAME=`mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'db.getName()' 2>/dev/null | tail -n 1`
+
+MONGODB_NAME=""
+I=0
+
+while [ $I -lt 3 -a ! "x$MONGODB_NAME" = "xFOO" ]; do
+    if [ $I -gt 0 ]; then
+        sleep 10s
+    fi
+
+    I=`expr $I + 1`
+    echo "[INFO] Checking MongoDB connection #$I ..."
+
+    MONGODB_NAME=`mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'db.getName()' 2>/dev/null | tail -n 1`
+done
 
 if [ ! "x$MONGODB_NAME" = "xFOO" ]; then
+    set +e
     echo -e -n "\n[ERROR] Fails to connect using the MongoShell: $PRIMARY_HOST ($MONGO_PROFILE); Retrying with $MONGOSHELL_OPTS ...\n"
     mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'db.getName()'
+
+    echo "[INFO] Mongo daemon process:"
+    ps | grep mongo
+
+    #echo "[INFO] Mongo daemon conf:"
+    #cat "$MONGO_CONF"
+
+    grep -i kill /var/log/*
+
+    echo "[INFO] Mongo daemon log:"
     tail -n 100 /tmp/mongod.log
     exit 2
 fi

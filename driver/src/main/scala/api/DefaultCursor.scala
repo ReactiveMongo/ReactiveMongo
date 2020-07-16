@@ -409,7 +409,7 @@ private[reactivemongo] object DefaultCursor {
       def go(v: T, it: Iterator[A]): Future[State[T]] = {
         if (!it.hasNext) {
           Future.successful(Cont(v))
-        } else Try(it.next) match {
+        } else Try(it.next()) match {
           case Failure(
             x: ReplyDocumentIteratorExhaustedException) =>
             Future.successful(Fail(x))

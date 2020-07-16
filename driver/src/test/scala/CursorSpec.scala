@@ -24,7 +24,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
     group1 // include fixture insert
 
     "stop on error" >> {
-      lazy val cursorDrv = Common.newAsyncDriver
+      lazy val cursorDrv = Common.newAsyncDriver()
       lazy val cursorCon = Await.result(
         cursorDrv.connect(List(primaryHost), DefaultOptions),
         Common.timeout)
@@ -196,7 +196,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
     }
 
     "continue on error" >> {
-      lazy val cursorDrv = Common.newAsyncDriver
+      lazy val cursorDrv = Common.newAsyncDriver()
       lazy val cursorCon = Await.result(
         cursorDrv.connect(List(primaryHost), DefaultOptions), timeout)
 

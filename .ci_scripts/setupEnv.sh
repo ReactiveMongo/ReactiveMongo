@@ -65,12 +65,21 @@ if [ "$MONGO_PROFILE" = "invalid-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" -o "$MO
 
     ls -al "$SCRIPT_DIR/keystore.p12"
 
-    cat >> "$MONGO_CONF" << EOF
+    if [ "v$MONGO_VER" = "v4" ]; then
+        cat >> "$MONGO_CONF" << EOF
+  tls:
+    mode: requireTLS
+    certificateKeyFile: $SCRIPT_DIR/server-cert.pem
+    certificateKeyFilePassword: $SSL_PASS
+EOF
+    else
+        cat >> "$MONGO_CONF" << EOF
   ssl:
     mode: requireSSL
     PEMKeyFile: $SCRIPT_DIR/server-cert.pem
     PEMKeyPassword: $SSL_PASS
 EOF
+    fi
 
     if [ "$MONGO_PROFILE" != "invalid-ssl" ]; then
         cat >> "$MONGO_CONF" << EOF

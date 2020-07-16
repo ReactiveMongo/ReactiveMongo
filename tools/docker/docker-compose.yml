@@ -1,4 +1,4 @@
-version: '2.2'
+version: '3.8'
 services:
   db:
     container_name: reactivemongo_db_1
@@ -47,12 +47,10 @@ services:
       - db
     stdin_open: true
     tty: true
-    cpus: 0.5
-    mem_limit: 4g
-    deploy: # Docker 3.x
+    deploy:
       resources:
         limits:
-          cpus: 0.5
+          cpus: '0.5'
           memory: 4G
     healthcheck:
       test: "dockerize -timeout 90s -wait tcp://db:27018"

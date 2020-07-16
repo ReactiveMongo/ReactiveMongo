@@ -385,7 +385,7 @@ final class AsyncDriver(
       import system.dispatcher
 
       connection.mapTo[MongoConnection].map { c =>
-        c.history = () => dbsystem.internalState
+        c.history = () => dbsystem.internalState()
         c
       }
     }
@@ -424,7 +424,7 @@ final class AsyncDriver(
 
         context.watch(connection.monitor)
 
-        sender ! connection
+        sender() ! connection
       }
 
       case Terminated(actor) => {
@@ -440,7 +440,7 @@ final class AsyncDriver(
 
         if (isEmpty) {
           context.stop(self)
-          sender ! Closed
+          sender() ! Closed
         } else {
           context.become(closing)
 
@@ -455,7 +455,7 @@ final class AsyncDriver(
     }
 
     def closing: Receive = {
-      val waitingForClose = mutable.Queue[ActorRef](sender)
+      val waitingForClose = mutable.Queue[ActorRef](sender())
 
       {
         case AddConnection(name, _, _, _) =>
@@ -473,12 +473,12 @@ final class AsyncDriver(
 
         case Close(src) if isEmpty => {
           logger.debug(s"[$supervisorName] Close the supervisor for $src")
-          sender ! Closed
+          sender() ! Closed
         }
 
         case Close(src) => {
           logger.warn(s"[$supervisorName] Close request received from $src, but already closing.")
-          waitingForClose += sender
+          waitingForClose += sender()
           ()
         }
       }

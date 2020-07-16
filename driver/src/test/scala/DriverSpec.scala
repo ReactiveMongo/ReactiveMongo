@@ -154,7 +154,6 @@ final class DriverSpec(implicit ee: ExecutionEnv)
   }
 
   section("scram_auth")
-  section("not_mongo26")
 
   def scramSpec(mechanism: AuthenticationMode) = {
     s"Authentication $mechanism" should {
@@ -329,7 +328,6 @@ final class DriverSpec(implicit ee: ExecutionEnv)
   scramSpec(ScramSha256Authentication)
   section("ge_mongo4")
 
-  section("not_mongo26")
   section("scram_auth")
 
   "X509 Authentication" should {

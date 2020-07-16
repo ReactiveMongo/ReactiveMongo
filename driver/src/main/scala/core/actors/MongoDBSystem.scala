@@ -282,7 +282,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       allChannelGroup(ns).close().addListener(relistener)
 
       // fail all requests waiting for a response
-      val istate = internalState
+      val istate = internalState()
 
       requestTracker.withAwaiting { (resps, chans) =>
         resps.foreach {
@@ -584,9 +584,9 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     }
 
     case RegisterMonitor => {
-      debug(s"Register monitor $sender")
+      debug(s"Register monitor ${sender()}")
 
-      monitors += sender
+      monitors += sender()
 
       // In case the NodeSet status has already been updated ...
       // TODO: Test
@@ -594,7 +594,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       val ns = nodeSetLock.synchronized { this._nodeSet }
 
       if (ns.isReachable) {
-        sender ! new SetAvailable(ns.protocolMetadata, ns.name, ns.isMongos)
+        sender() ! new SetAvailable(ns.protocolMetadata, ns.name, ns.isMongos)
 
         debug("The node set is available")
       }
@@ -603,7 +603,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         if (ns.authenticates.nonEmpty && prim.authenticated.isEmpty) {
           debug(s"The node set is available (${prim.names}); Waiting authentication: ${prim.authenticated}")
         } else {
-          sender ! new PrimaryAvailable(
+          sender() ! new PrimaryAvailable(
             ns.protocolMetadata, ns.name, ns.isMongos)
 
           debug(s"The primary is available: $prim")
@@ -651,7 +651,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         case _ =>
           req.promise.failure(new ChannelNotFoundException(
             s"No active channel can be found: ${readPref}",
-            false, internalState))
+            false, internalState()))
 
       }
 
@@ -780,7 +780,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       ()
     }
 
-    case RegisterMonitor => { monitors += sender; () }
+    case RegisterMonitor => { monitors += sender(); () }
 
     case req: ExpectingResponse => {
       import req.promise
@@ -789,7 +789,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
       updateHistory("Closing$$RejectExpectingResponse")
 
-      promise.failure(new ClosedException(supervisor, name, internalState))
+      promise.failure(new ClosedException(supervisor, name, internalState()))
       ()
     }
 
@@ -1198,7 +1198,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
           }
         }
 
-        trace(s"""Discovered ${discoveredNodes.size} nodes${discoveredNodes.map(_.toShortString) mkString (": [ ", ", ", " ]")}""")
+        trace(s"""Discovered ${discoveredNodes.size} nodes${discoveredNodes.map(_.toShortString).mkString(": [ ", ", ", " ]")}""")
 
         val upSet = prepared.copy(
           name = isMaster.replicaSet.map(_.setName),
@@ -1255,7 +1255,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       }
     }
 
-    val origSender = context.sender
+    val origSender = context.sender()
 
     scheduler.scheduleOnce(Duration.Zero) {
       @inline def event = s"ConnectAll$$IsMaster(${response.header.responseTo}, ${updated.toShortString})"
@@ -1426,7 +1426,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     request: Request): Try[(Node, Connection)] = request.channelIdHint match {
     case Some(chanId) => ns.pickByChannelId(chanId).
       fold[Try[(Node, Connection)]](Failure(new ChannelNotFoundException(
-        s"#${chanId}", false, internalState)))(Success(_))
+        s"#${chanId}", false, internalState())))(Success(_))
 
     case _ => requestTracker.withAwaiting { (_, chans) =>
       // Ordering Node by pending requests or lastIsMasterTime
@@ -1451,7 +1451,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
               val details = s"'${prim.name}' { ${nodeInfo(reqAuth, prim)} } ($supervisor/$name)"
 
               if (!reqAuth || prim.authenticated.nonEmpty) {
-                new ChannelNotFoundException(s"No active channel can be found to the primary node: $details", true, internalState)
+                new ChannelNotFoundException(s"No active channel can be found to the primary node: $details", true, internalState())
               } else {
                 new NotAuthenticatedException(
                   s"No authenticated channel for the primary node: $details")
@@ -1459,10 +1459,10 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
             }
 
             case _ => new PrimaryUnavailableException(
-              supervisor, name, internalState)
+              supervisor, name, internalState())
           }
         } else if (!ns.isReachable) {
-          new NodeSetNotReachableException(supervisor, name, internalState)
+          new NodeSetNotReachableException(supervisor, name, internalState())
         } else {
           // Node set is reachable, secondary is ok, but no channel found
           val (authed, msgs) = ns.nodes.foldLeft(
@@ -1475,7 +1475,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
           val details = s"""${msgs.mkString(", ")} ($supervisor/$name)"""
 
           if (!reqAuth || authed) {
-            new ChannelNotFoundException(s"No active channel with '${request.readPreference}' found for the nodes: $details", true, internalState)
+            new ChannelNotFoundException(s"No active channel with '${request.readPreference}' found for the nodes: $details", true, internalState())
           } else {
             new NotAuthenticatedException(s"No authenticated channel: $details")
           }
