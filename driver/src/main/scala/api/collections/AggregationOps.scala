@@ -24,7 +24,7 @@ import reactivemongo.api.commands.{
 }
 import reactivemongo.core.protocol.MongoWireVersion
 
-private[collections] trait AggregationOps[P <: SerializationPack] {
+trait AggregationOps[P <: SerializationPack] {
   collection: GenericCollection[P] =>
 
   /** The [[https://docs.mongodb.com/manual/core/aggregation-pipeline/ aggregation framework]] for this collection */
@@ -36,12 +36,12 @@ private[collections] trait AggregationOps[P <: SerializationPack] {
   }
 
   /** Aggregation framework */
-  type AggregationFramework = AggregationFramework.type
+  final type AggregationFramework = AggregationFramework.type
 
   /**
    * Aggregation pipeline operator/stage
    */
-  type PipelineOperator = AggregationFramework.PipelineOperator
+  final type PipelineOperator = AggregationFramework.PipelineOperator
 
   // ---
 
@@ -116,9 +116,9 @@ private[collections] trait AggregationOps[P <: SerializationPack] {
     with CommandWithPack[pack.type]
     with CommandWithResult[T]
 
-  private type AggregateCmd[T] = ResolvedCollectionCommand[Aggregate[T]]
+  private final type AggregateCmd[T] = ResolvedCollectionCommand[Aggregate[T]]
 
-  private def commandWriter[T]: pack.Writer[AggregateCmd[T]] = {
+  private final def commandWriter[T]: pack.Writer[AggregateCmd[T]] = {
     val builder = pack.newBuilder
     val session = collection.db.session.filter(
       _ => (version.compareTo(MongoWireVersion.V36) >= 0))

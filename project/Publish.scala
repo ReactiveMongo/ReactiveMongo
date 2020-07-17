@@ -12,7 +12,7 @@ object Publish {
   private val repoName = env("PUBLISH_REPO_NAME")
   private val repoUrl = env("PUBLISH_REPO_URL")
 
-  val previousVersion = "1.0.0-rc.1-SNAPSHOT" // TODO: 1.0.0
+  val previousVersion = "1.0.0-rc.1" // TODO: 1.0.0
 
   val missingMethodInOld: ProblemFilter = {
     case ReversedAbstractMethodProblem(_) |

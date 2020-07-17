@@ -7,7 +7,7 @@ import reactivemongo.api.{ PackSupport, SerializationPack }
  *
  * @see [[PipelineOperator]]
  */
-private[reactivemongo] trait AggregationFramework[P <: SerializationPack]
+trait AggregationFramework[P <: SerializationPack]
   extends GroupAggregation[P] with SliceAggregation[P] with SortAggregation[P]
   with AggregationPipeline[P] with ChangeStreamAggregation[P]
   with AtlasSearchAggregation[P] { self: PackSupport[P] =>
