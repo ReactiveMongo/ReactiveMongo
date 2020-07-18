@@ -176,6 +176,14 @@ commands:
                       echo "Skipped on branch ${CIRCLE_BRANCH}"
                       exit 0
                     fi
+
+                    LAST=`git log --pretty=format:'%h' -n 1 .`
+                    T=`git describe $LAST 2>&1 | grep -v 'cannot'`
+
+                    if [ "v$T" = "v" ]; then
+                      echo "Skipped on $T"
+                      exit 0
+                    fi
                     
                     export PUBLISH_REPO_NAME="Sonatype Nexus Repository Manager"
                     export PUBLISH_REPO_ID="oss.sonatype.org"
