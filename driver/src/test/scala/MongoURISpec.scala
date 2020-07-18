@@ -197,7 +197,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         ignoredOptions = Nil)).awaitFor(timeout)
     }
 
-    val withWriteConcernWMaj = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernW=majority"
+    val withWriteConcernWMaj = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?w=majority"
 
     s"parse $withWriteConcernWMaj with success" in {
       parseURI(withWriteConcernWMaj) must beTypedEqualTo(ParsedURI(
@@ -240,7 +240,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
         ignoredOptions = Nil)).awaitFor(timeout)
     }
 
-    val withWriteConcernJournaled = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernJ=true"
+    val withWriteConcernJournaled = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?journal=true"
 
     s"parse $withWriteConcernJournaled with success" in {
       parseURI(withWriteConcernJournaled) must beTypedEqualTo(
@@ -268,7 +268,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           ignoredOptions = Nil)).awaitFor(timeout)
     }
 
-    val withWriteConcernTmout = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?writeConcernTimeout=1543"
+    val withWriteConcernTmout = "mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?wtimeoutMS=1543"
 
     s"parse $withWriteConcernTmout with success" in {
       parseURI(withWriteConcernTmout) must beTypedEqualTo(
