@@ -811,6 +811,11 @@ object MongoConnection {
         (unsupported + (name -> input)) -> parsed
     }
 
+    def deprecated(expected: String, actual: String): Unit =
+      if (actual != expected) {
+        logger.info(s"Connection option '${actual}' is deprecated in favor of '${expected}'")
+      }
+
     val (remOpts, step1) = opts.iterator.foldLeft(
       Map.empty[String, String] -> initial) {
         case ((unsupported, result), kv) => kv match {
@@ -831,9 +836,7 @@ object MongoConnection {
             copy(authenticationMechanism = ScramSha1Authentication)
 
           case (n @ ("authenticationDatabase" | "authSource"), v) => {
-            if (n == "authSource") {
-              logger.info("Connection option 'authSource' is deprecated in favor of 'authenticationDatabase'")
-            }
+            deprecated(n, "authenticationDatabase")
 
             unsupported -> result.copy(authenticationDatabase = Some(v))
           }
@@ -977,25 +980,40 @@ object MongoConnection {
     // Overriding options
     remOpts2.iterator.foldLeft(List.empty[String] -> step2) {
       case ((unsupported, result), kv) => kv match {
-        case ("writeConcernW", "majority") => unsupported -> result.
-          copy(writeConcern = result.writeConcern.
+        case (o @ ("writeConcernW" | "w"), "majority") => {
+          deprecated(o, "w")
+
+          unsupported -> result.copy(writeConcern = result.writeConcern.
             copy(w = WriteConcern.Majority))
+        }
 
-        case ("writeConcernW", IntRe(str)) => unsupported -> result.
-          copy(writeConcern = result.writeConcern.
+        case (o @ ("writeConcernW" | "w"), IntRe(str)) => {
+          deprecated(o, "w")
+
+          unsupported -> result.copy(writeConcern = result.writeConcern.
             copy(w = WriteConcern.WaitForAcknowledgments(str.toInt)))
+        }
 
-        case ("writeConcernW", tag) => unsupported -> result.
-          copy(writeConcern = result.writeConcern.
+        case (o @ ("writeConcernW" | "w"), tag) => {
+          deprecated(o, "w")
+
+          unsupported -> result.copy(writeConcern = result.writeConcern.
             copy(w = WriteConcern.TagSet(tag)))
+        }
 
-        case ("writeConcernJ", journaled) => unsupported -> result.
-          copy(writeConcern = result.writeConcern.
+        case (o @ ("journal" | "writeConcernJ"), journaled) => {
+          deprecated(o, "journal")
+
+          unsupported -> result.copy(writeConcern = result.writeConcern.
             copy(j = journaled.toBoolean))
+        }
 
-        case ("writeConcernTimeout", IntRe(ms)) => unsupported -> result.
-          copy(writeConcern = result.writeConcern.
+        case (o @ ("wtimeoutMS" | "writeConcernTimeout"), IntRe(ms)) => {
+          deprecated(o, "journal")
+
+          unsupported -> result.copy(writeConcern = result.writeConcern.
             copy(wtimeout = Some(ms.toInt)))
+        }
 
         case (k, _) => (k :: unsupported) -> result
       }

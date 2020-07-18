@@ -2,6 +2,9 @@ package reactivemongo.api.commands
 
 import reactivemongo.api.SerializationPack
 
+/**
+ * @define fieldParam the name of field to group
+ */
 private[commands] trait GroupAggregation[P <: SerializationPack] {
   aggregation: AggregationFramework[P] =>
 

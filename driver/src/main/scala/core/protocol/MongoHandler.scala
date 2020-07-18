@@ -8,7 +8,10 @@ import reactivemongo.io.netty.channel.{
   ChannelHandlerContext,
   ChannelPromise
 }
-import reactivemongo.io.netty.handler.timeout.{ IdleStateEvent, IdleStateHandler }
+import reactivemongo.io.netty.handler.timeout.{
+  IdleStateEvent,
+  IdleStateHandler
+}
 
 import reactivemongo.core.actors.{ ChannelConnected, ChannelDisconnected }
 
@@ -51,9 +54,13 @@ private[reactivemongo] class MongoHandler(
 
     if (last != -1) {
       val chan = ctx.channel
+      val delay = now - last
+      def msg = s"Channel is closed under ${delay}ns: ${chan.remoteAddress}"
 
-      if (chan.remoteAddress != null) {
-        log(ctx, s"Channel is closed: $last")
+      if (delay < 500000000) {
+        warn(ctx, s"${msg}; Please check network connectivity and the status of the set.")
+      } else if (chan.remoteAddress != null) {
+        log(ctx, msg)
       }
 
       last = now
@@ -129,6 +136,10 @@ private[reactivemongo] class MongoHandler(
     super.handlerRemoved(ctx)
   }
    */
+
+  @inline def warn(ctx: ChannelHandlerContext, s: String) =
+    MongoHandler.logger.warn(
+      s"[$supervisor/$connection] $s (channel ${ctx.channel})")
 
   @inline def log(ctx: ChannelHandlerContext, s: String) =
     MongoHandler.logger.trace(
