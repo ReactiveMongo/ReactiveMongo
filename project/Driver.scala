@@ -32,7 +32,7 @@ final class Driver(core: Project) {
           val dir = (sourceManaged in Compile).value
           val outdir = dir / "reactivemongo" / "api"
           val f = outdir / "Version.scala"
-          val major = Release.major.value
+          val major = Common.majorVersion.value
 
           outdir.mkdirs()
 
