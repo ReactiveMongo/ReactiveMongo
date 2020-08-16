@@ -35,6 +35,20 @@ object Common extends AutoPlugin {
 
   val closeableObject = SettingKey[String]("class name of a closeable object")
 
+  def majorVersion = {
+    val Major = """([0-9]+)\.([0-9]+)\..*""".r
+
+    Def.setting[String] {
+      (version in ThisBuild).value match {
+        case Major(maj, min) =>
+          s"${maj}.${min}"
+
+        case ver =>
+          sys.error(s"Invalid version: $ver")
+      }
+    }
+  }
+
   val useShaded = settingKey[Boolean](
     "Use ReactiveMongo-Shaded (see system property 'reactivemongo.shaded')")
 
@@ -74,7 +88,7 @@ object Common extends AutoPlugin {
     scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation",
       /*"-diagrams", */"-implicits", "-skip-packages", "samples"),
     scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
-    scalacOptions in (Compile, doc) ++= Opts.doc.version(Release.major.value),
+    scalacOptions in (Compile, doc) ++= Opts.doc.version(majorVersion.value),
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
     mappings in (Compile, packageDoc) ~= filter,
@@ -97,8 +111,7 @@ object Common extends AutoPlugin {
 
       XmlUtil.transformPomDependencies(f)
     }
-  ) ++ Publish.settings ++ Format.settings ++ (
-    Release.settings ++ Publish.mimaSettings)
+  ) ++ Publish.settings ++ Format.settings ++ Publish.mimaSettings
 
   val cleanup = Def.task[ClassLoader => Unit] {
     val log = streams.value.log

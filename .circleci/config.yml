@@ -177,11 +177,10 @@ commands:
                       exit 0
                     fi
 
-                    LAST=`git log --pretty=format:'%h' -n 1 .`
-                    T=`git describe $LAST 2>&1 | grep -v 'cannot'`
+                    V=`sbt 'show version' 2>&1 | tail -n 1 | cut -d ']' -f 2 | perl -pe 's/^[ \t]+//;s/[ \t]+$//'`
 
-                    if [ "v$T" = "v" ]; then
-                      echo "Skipped on $T"
+                    if [ `echo "$V" | grep -- '-SNAPSHOT' | wc -l` -eq 0 ]; then
+                      echo "Cannot publish release $V"
                       exit 0
                     fi
                     
