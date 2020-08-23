@@ -5,7 +5,7 @@ import reactivemongo.api.{ ChangeStreams, SerializationPack }
 /**
  * [[https://github.com/mongodb/specifications/blob/master/source/change-streams/change-streams.rst#server-specification Change stream]]
  */
-private[commands] trait ChangeStreamAggregation[P <: SerializationPack] {
+trait ChangeStreamAggregation[P <: SerializationPack] {
   aggregation: AggregationFramework[P] =>
 
   /**
@@ -60,6 +60,7 @@ private[commands] trait ChangeStreamAggregation[P <: SerializationPack] {
   }
 
   object ChangeStream {
+    /** Change stream offset */
     sealed trait Offset
 
     /**
@@ -133,8 +134,8 @@ private[commands] trait ChangeStreamAggregation[P <: SerializationPack] {
     }
 
     object StartAt {
-      /*
-     * @param operationTime The operation time before which all change events are known. Must be in the time range of the oplog.
+      /**
+       * @param operationTime The operation time before which all change events are known. Must be in the time range of the oplog.
        */
       def apply(operationTime: Long): StartAt = new StartAt(operationTime)
     }

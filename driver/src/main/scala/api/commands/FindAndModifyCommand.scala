@@ -10,8 +10,7 @@ import reactivemongo.api.{
 
 import reactivemongo.core.protocol.MongoWireVersion
 
-private[api] trait FindAndModifyCommand[P <: SerializationPack] {
-  _: PackSupport[P] =>
+trait FindAndModifyCommand[P <: SerializationPack] { _: PackSupport[P] =>
 
   private[reactivemongo] final class FindAndModify(
     val query: pack.Document,
@@ -61,14 +60,24 @@ private[api] trait FindAndModifyCommand[P <: SerializationPack] {
   /** Remove (part of a FindAndModify command). */
   object FindAndRemoveOp extends FindAndModifyOp
 
-  /**
-   * @param upserted the value of the upserted ID
-   */
+  /** Last error for a find-and-update command */
   final class FindAndUpdateLastError private[api] (
-    val updatedExisting: Boolean,
-    val upserted: Option[pack.Value],
-    val n: Int,
-    val err: Option[String]) {
+    _updatedExisting: Boolean,
+    _upserted: Option[pack.Value],
+    _n: Int,
+    _err: Option[String]) {
+
+    /** Indicates whether an existing document has been updated */
+    @inline def updatedExisting: Boolean = _updatedExisting
+
+    /** The value of the upserted ID */
+    @inline def upserted: Option[pack.Value] = _upserted
+
+    /** The number of updated document */
+    @inline def n: Int = _n
+
+    /** The error message (if any) */
+    @inline def err: Option[String] = _err
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type => other.tupled == tupled
@@ -81,21 +90,36 @@ private[api] trait FindAndModifyCommand[P <: SerializationPack] {
       Tuple4(updatedExisting, upserted, n, err)
   }
 
+  /** Result for a find-and-modify command */
   final class FindAndModifyResult private[api] (
-    val lastError: Option[FindAndUpdateLastError],
-    val value: Option[pack.Document]) {
+    _lastError: Option[FindAndUpdateLastError],
+    _value: Option[pack.Document]) {
 
+    /** The last error (if any) */
+    @inline def lastError: Option[FindAndUpdateLastError] = _lastError
+
+    /** The result value (if any) */
+    @inline def value: Option[pack.Document] = _value
+
+    /**
+     * If any result, tries to read it as specified type.
+     *
+     * @param reader the reader of `T`
+     * @tparam T the type to read the result as
+     */
     def result[T](implicit reader: pack.Reader[T]): Option[T] =
       value.map(pack.deserialize(_, reader))
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (lastError -> value) == (other.lastError -> other.value)
+        tupled == other.tupled
 
       case _ => false
     }
 
-    override def hashCode: Int = (lastError -> value).hashCode
+    override def hashCode: Int = tupled.hashCode
+
+    private lazy val tupled = (lastError -> value)
   }
 
   private[reactivemongo] def session(): Option[Session]

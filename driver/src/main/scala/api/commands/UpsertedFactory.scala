@@ -2,12 +2,19 @@ package reactivemongo.api.commands
 
 import reactivemongo.api.{ PackSupport, SerializationPack }
 
-private[reactivemongo] trait UpsertedFactory[P <: SerializationPack] {
+trait UpsertedFactory[P <: SerializationPack] {
   _: PackSupport[P] =>
 
+  /** An upserted element */
   final class Upserted private (
-    val index: Int,
-    val _id: pack.Value) {
+    _index: Int,
+    __id: pack.Value) {
+
+    /** The index of the upserted element */
+    @inline def index: Int = _index
+
+    /** The id of the upserted element */
+    @inline def _id: pack.Value = __id
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>

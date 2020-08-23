@@ -15,21 +15,33 @@ import scala.concurrent.duration.FiniteDuration
  *   retries = 20,
  *   delayFactor = { `try` => `try` * 1.5D })
  * }}}
- *
- * @param initialDelay the initial delay between the first failed attempt and the next one.
- * @param retries the number of retries to do before giving up.
- * @param delayFactor a function that takes the current iteration and returns a factor to be applied to the initialDelay (default: [[FailoverStrategy.defaultFactor]]; see [[FailoverStrategy.FactorFun]])
  */
 final class FailoverStrategy private[api] (
-  val initialDelay: FiniteDuration,
-  val retries: Int,
-  val delayFactor: Int => Double) {
+  _initialDelay: FiniteDuration,
+  _retries: Int,
+  _delayFactor: Int => Double) {
+
+  /** The initial delay between the first failed attempt and the next one */
+  @inline def initialDelay: FiniteDuration = _initialDelay
+
+  /** The number of retries to do before giving up */
+  @inline def retries: Int = _retries
+
+  /**
+   * The function that takes the current iteration,
+   * and returns a factor to be applied to the initialDelay
+   * (default: [[FailoverStrategy.defaultFactor]];
+   * See [[FailoverStrategy.FactorFun]])
+   */
+  @inline def delayFactor: Int => Double = _delayFactor
+
+  // ---
 
   @SuppressWarnings(Array("VariableShadowing"))
   def copy(
-    initialDelay: FiniteDuration = this.initialDelay,
-    retries: Int = this.retries,
-    delayFactor: Int => Double = delayFactor): FailoverStrategy =
+    initialDelay: FiniteDuration = _initialDelay,
+    retries: Int = _retries,
+    delayFactor: Int => Double = _delayFactor): FailoverStrategy =
     new FailoverStrategy(initialDelay, retries, delayFactor)
 
   override lazy val toString = delayFactor match {
