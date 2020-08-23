@@ -2,104 +2,177 @@ package reactivemongo.api
 
 import java.net.URI
 
+// TODO: Make sure documentation of param properties is visible
 /**
  * Options for [[MongoConnection]] (see [[http://reactivemongo.org/releases/0.1x/documentation/tutorial/connect-database.html#connection-options more documentation]]).
- *
- * @param connectTimeoutMS The number of milliseconds to wait for a connection to be established before giving up.
- * @param authenticationDatabase the name of the database used for authentication
- * @param sslEnabled Enable SSL connection (required to be accepted on server-side).
- * @param sslAllowsInvalidCert If `sslEnabled` is true, this one indicates whether to accept invalid certificates (e.g. self-signed).
- * @param authenticationMechanism Either [[ScramSha1Authentication]] or [[X509Authentication]]
- * @param tcpNoDelay TCPNoDelay flag (ReactiveMongo-specific option). The default value is false (see [[http://docs.oracle.com/javase/8/docs/api/java/net/StandardSocketOptions.html#TCP_NODELAY TCP_NODELAY]]).
- * @param keepAlive TCP KeepAlive flag (ReactiveMongo-specific option). The default value is false (see [[http://docs.oracle.com/javase/8/docs/api/java/net/StandardSocketOptions.html#SO_KEEPALIVE SO_KEEPALIVE]]).
- * @param nbChannelsPerNode Number of channels (connections) per node (ReactiveMongo-specific option).
- * @param writeConcern the default [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]]
- * @param readPreference the default read preference
- * @param failoverStrategy the default failover strategy
- * @param heartbeatFrequencyMS the interval in milliseconds used by monitor to refresh the node set (default: 10000 aka 10s)
- * @param maxIdleTimeMS the maximum number of milliseconds that a [[https://docs.mongodb.com/manual/reference/connection-string/#urioption.maxIdleTimeMS channel can remain idle]] in the connection pool before being removed and closed (default: 0 to disable, as implemented using [[http://netty.io/4.1/api/io/netty/handler/timeout/IdleStateHandler.html Netty IdleStateHandler]]); If not 0, must be greater or equal to [[#heartbeatFrequencyMS]]
- * @param maxHistorySize the maximum size of the pool history (default: 25)
- * @param credentials the credentials per authentication database names
- * @param keyStore an optional key store
- * @param readConcern the default [[https://docs.mongodb.com/manual/reference/read-concern/ read concern]]
- * @param appName the application name (custom or default)
  */
 @SuppressWarnings(Array("VariableShadowing"))
 final class MongoConnectionOptions private[reactivemongo] (
   // canonical options - connection
-  val connectTimeoutMS: Int,
+  _connectTimeoutMS: Int,
 
   // canonical options - authentication options
-  val authenticationDatabase: Option[String],
-  val sslEnabled: Boolean,
-  val sslAllowsInvalidCert: Boolean,
-  val authenticationMechanism: AuthenticationMode,
+  _authenticationDatabase: Option[String],
+  _sslEnabled: Boolean,
+  _sslAllowsInvalidCert: Boolean,
+  _authenticationMechanism: AuthenticationMode,
 
   // reactivemongo specific options
-  val tcpNoDelay: Boolean,
-  val keepAlive: Boolean,
-  val nbChannelsPerNode: Int,
-  val maxInFlightRequestsPerChannel: Option[Int],
-  val minIdleChannelsPerNode: Int,
+  _tcpNoDelay: Boolean,
+  _keepAlive: Boolean,
+  _nbChannelsPerNode: Int,
+  _maxInFlightRequestsPerChannel: Option[Int],
+  _minIdleChannelsPerNode: Int,
 
   // read and write preferences
-  val writeConcern: WriteConcern,
-  val readPreference: ReadPreference,
+  _writeConcern: WriteConcern,
+  _readPreference: ReadPreference,
 
-  val failoverStrategy: FailoverStrategy,
+  _failoverStrategy: FailoverStrategy,
 
-  val heartbeatFrequencyMS: Int,
-  val maxIdleTimeMS: Int,
-  val maxHistorySize: Int,
-  val credentials: Map[String, MongoConnectionOptions.Credential],
-  val keyStore: Option[MongoConnectionOptions.KeyStore],
-  val readConcern: ReadConcern,
+  _heartbeatFrequencyMS: Int,
+  _maxIdleTimeMS: Int,
+  _maxHistorySize: Int,
+  _credentials: Map[String, MongoConnectionOptions.Credential],
+  _keyStore: Option[MongoConnectionOptions.KeyStore],
+  _readConcern: ReadConcern,
 
-  val appName: Option[String]) {
+  _appName: Option[String]) {
+
+  /**
+   * The number of milliseconds to wait for a connection
+   * to be established before giving up.
+   */
+  @inline def connectTimeoutMS: Int = _connectTimeoutMS
+
+  // --- Canonical options - authentication options
+
+  /** The name of the database used for authentication */
+  @inline def authenticationDatabase: Option[String] = _authenticationDatabase
+
+  /** Enable SSL connection (required to be accepted on server-side) */
+  @inline def sslEnabled: Boolean = _sslEnabled
+
+  /**
+   * If `sslEnabled` is true, this one indicates whether
+   * to accept invalid certificates (e.g. self-signed).
+   */
+  @inline def sslAllowsInvalidCert: Boolean = _sslAllowsInvalidCert
+
+  /** Either [[ScramSha1Authentication]] or [[X509Authentication]] */
+  @inline def authenticationMechanism: AuthenticationMode =
+    _authenticationMechanism
+
+  // --- Reactivemongo specific options
+
+  /**
+   * TCP NoDelay flag (ReactiveMongo-specific option).
+   * The default value is false (see [[http://docs.oracle.com/javase/8/docs/api/java/net/StandardSocketOptions.html#TCP_NODELAY TCP_NODELAY]]).
+   */
+  @inline def tcpNoDelay: Boolean = _tcpNoDelay
+
+  /**
+   * TCP KeepAlive flag (ReactiveMongo-specific option).
+   * The default value is false (see [[http://docs.oracle.com/javase/8/docs/api/java/net/StandardSocketOptions.html#SO_KEEPALIVE SO_KEEPALIVE]]).
+   */
+  @inline def keepAlive: Boolean = _keepAlive
+
+  /**
+   * The number of channels (connections)
+   * per node (ReactiveMongo-specific option)
+   */
+  @inline def nbChannelsPerNode: Int = _nbChannelsPerNode
+
+  /** The maximum number of requests processed per channel */
+  @inline def maxInFlightRequestsPerChannel: Option[Int] =
+    _maxInFlightRequestsPerChannel
+
+  /** The minimum number of idle channels per node */
+  @inline def minIdleChannelsPerNode: Int = _minIdleChannelsPerNode
+
+  // --- Read and write preferences
+
+  /** The default [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]] */
+  @inline def writeConcern: WriteConcern = _writeConcern
+
+  /** The default read preference */
+  @inline def readPreference: ReadPreference = _readPreference
+
+  /** The default failover strategy */
+  @inline def failoverStrategy: FailoverStrategy = _failoverStrategy
+
+  /**
+   * The interval in milliseconds used by monitor to refresh the node set
+   * (default: 10000 aka 10s)
+   */
+  @inline def heartbeatFrequencyMS: Int = _heartbeatFrequencyMS
+
+  /**
+   * The maximum number of milliseconds that a [[https://docs.mongodb.com/manual/reference/connection-string/#urioption.maxIdleTimeMS channel can remain idle]] in the connection pool before being removed and closed (default: 0 to disable, as implemented using [[http://netty.io/4.1/api/io/netty/handler/timeout/IdleStateHandler.html Netty IdleStateHandler]]); If not 0, must be greater or equal to [[heartbeatFrequencyMS]].
+   */
+  @inline def maxIdleTimeMS: Int = _maxIdleTimeMS
+
+  /** The maximum size of the pool history (default: 25) */
+  @inline def maxHistorySize: Int = _maxHistorySize
+
+  /** The credentials per authentication database names */
+  @inline def credentials: Map[String, MongoConnectionOptions.Credential] =
+    _credentials
+
+  /** An optional key store */
+  @inline def keyStore: Option[MongoConnectionOptions.KeyStore] = _keyStore
+
+  /** The default [[https://docs.mongodb.com/manual/reference/read-concern/ read concern]] */
+  @inline def readConcern: ReadConcern = _readConcern
+
+  /** An optional [[https://docs.mongodb.com/manual/reference/connection-string/#urioption.appName application name]] */
+  @inline def appName: Option[String] = _appName
+
+  // ---
 
   @SuppressWarnings(Array("MaxParameters"))
   def copy(
-    connectTimeoutMS: Int = this.connectTimeoutMS,
-    authenticationDatabase: Option[String] = this.authenticationDatabase,
-    sslEnabled: Boolean = this.sslEnabled,
-    sslAllowsInvalidCert: Boolean = this.sslAllowsInvalidCert,
-    authenticationMechanism: AuthenticationMode = this.authenticationMechanism,
-    tcpNoDelay: Boolean = this.tcpNoDelay,
-    keepAlive: Boolean = this.keepAlive,
-    nbChannelsPerNode: Int = this.nbChannelsPerNode,
-    maxInFlightRequestsPerChannel: Option[Int] = this.maxInFlightRequestsPerChannel,
-    minIdleChannelsPerNode: Int = this.minIdleChannelsPerNode,
-    writeConcern: WriteConcern = this.writeConcern,
-    readPreference: ReadPreference = this.readPreference,
-    failoverStrategy: FailoverStrategy = this.failoverStrategy,
-    heartbeatFrequencyMS: Int = this.heartbeatFrequencyMS,
-    maxIdleTimeMS: Int = this.maxIdleTimeMS,
-    maxHistorySize: Int = this.maxHistorySize,
-    credentials: Map[String, MongoConnectionOptions.Credential] = this.credentials,
-    keyStore: Option[MongoConnectionOptions.KeyStore] = this.keyStore,
-    readConcern: ReadConcern = this.readConcern,
-    appName: Option[String] = this.appName): MongoConnectionOptions =
+    connectTimeoutMS: Int = _connectTimeoutMS,
+    authenticationDatabase: Option[String] = _authenticationDatabase,
+    sslEnabled: Boolean = _sslEnabled,
+    sslAllowsInvalidCert: Boolean = _sslAllowsInvalidCert,
+    authenticationMechanism: AuthenticationMode = _authenticationMechanism,
+    tcpNoDelay: Boolean = _tcpNoDelay,
+    keepAlive: Boolean = _keepAlive,
+    nbChannelsPerNode: Int = _nbChannelsPerNode,
+    maxInFlightRequestsPerChannel: Option[Int] = _maxInFlightRequestsPerChannel,
+    minIdleChannelsPerNode: Int = _minIdleChannelsPerNode,
+    writeConcern: WriteConcern = _writeConcern,
+    readPreference: ReadPreference = _readPreference,
+    failoverStrategy: FailoverStrategy = _failoverStrategy,
+    heartbeatFrequencyMS: Int = _heartbeatFrequencyMS,
+    maxIdleTimeMS: Int = _maxIdleTimeMS,
+    maxHistorySize: Int = _maxHistorySize,
+    credentials: Map[String, MongoConnectionOptions.Credential] = _credentials,
+    keyStore: Option[MongoConnectionOptions.KeyStore] = _keyStore,
+    readConcern: ReadConcern = _readConcern,
+    appName: Option[String] = _appName): MongoConnectionOptions =
     new MongoConnectionOptions(
-      connectTimeoutMS = connectTimeoutMS,
-      authenticationDatabase = authenticationDatabase,
-      sslEnabled = sslEnabled,
-      sslAllowsInvalidCert = sslAllowsInvalidCert,
-      authenticationMechanism = authenticationMechanism,
-      tcpNoDelay = tcpNoDelay,
-      keepAlive = keepAlive,
-      nbChannelsPerNode = nbChannelsPerNode,
-      maxInFlightRequestsPerChannel = maxInFlightRequestsPerChannel,
-      minIdleChannelsPerNode = minIdleChannelsPerNode,
-      writeConcern = writeConcern,
-      readPreference = readPreference,
-      failoverStrategy = failoverStrategy,
-      heartbeatFrequencyMS = heartbeatFrequencyMS,
-      maxIdleTimeMS = maxIdleTimeMS,
-      maxHistorySize = maxHistorySize,
-      credentials = credentials,
-      keyStore = keyStore,
-      readConcern = readConcern,
-      appName = appName)
+      _connectTimeoutMS = connectTimeoutMS,
+      _authenticationDatabase = authenticationDatabase,
+      _sslEnabled = sslEnabled,
+      _sslAllowsInvalidCert = sslAllowsInvalidCert,
+      _authenticationMechanism = authenticationMechanism,
+      _tcpNoDelay = tcpNoDelay,
+      _keepAlive = keepAlive,
+      _nbChannelsPerNode = nbChannelsPerNode,
+      _maxInFlightRequestsPerChannel = maxInFlightRequestsPerChannel,
+      _minIdleChannelsPerNode = minIdleChannelsPerNode,
+      _writeConcern = writeConcern,
+      _readPreference = readPreference,
+      _failoverStrategy = failoverStrategy,
+      _heartbeatFrequencyMS = heartbeatFrequencyMS,
+      _maxIdleTimeMS = maxIdleTimeMS,
+      _maxHistorySize = maxHistorySize,
+      _credentials = credentials,
+      _keyStore = keyStore,
+      _readConcern = readConcern,
+      _appName = appName)
 
   override def toString = s"""MongoConnectionOptions { ${MongoConnectionOptions.toStrings(this).map { case (k, v) => k + ": " + v }.mkString(", ")} }"""
 
@@ -171,36 +244,42 @@ object MongoConnectionOptions {
     readConcern: ReadConcern = ReadConcern.default,
     appName: Option[String] = None): MongoConnectionOptions =
     new MongoConnectionOptions(
-      connectTimeoutMS = connectTimeoutMS,
-      authenticationDatabase = authenticationDatabase,
-      sslEnabled = sslEnabled,
-      sslAllowsInvalidCert = sslAllowsInvalidCert,
-      authenticationMechanism = authenticationMechanism,
-      tcpNoDelay = tcpNoDelay,
-      keepAlive = keepAlive,
-      nbChannelsPerNode = nbChannelsPerNode,
-      maxInFlightRequestsPerChannel = maxInFlightRequestsPerChannel,
-      minIdleChannelsPerNode = minIdleChannelsPerNode,
-      writeConcern = writeConcern,
-      readPreference = readPreference,
-      failoverStrategy = failoverStrategy,
-      heartbeatFrequencyMS = heartbeatFrequencyMS,
-      maxIdleTimeMS = maxIdleTimeMS,
-      maxHistorySize = maxHistorySize,
-      credentials = credentials,
-      keyStore = keyStore,
-      readConcern = readConcern,
-      appName = appName)
+      _connectTimeoutMS = connectTimeoutMS,
+      _authenticationDatabase = authenticationDatabase,
+      _sslEnabled = sslEnabled,
+      _sslAllowsInvalidCert = sslAllowsInvalidCert,
+      _authenticationMechanism = authenticationMechanism,
+      _tcpNoDelay = tcpNoDelay,
+      _keepAlive = keepAlive,
+      _nbChannelsPerNode = nbChannelsPerNode,
+      _maxInFlightRequestsPerChannel = maxInFlightRequestsPerChannel,
+      _minIdleChannelsPerNode = minIdleChannelsPerNode,
+      _writeConcern = writeConcern,
+      _readPreference = readPreference,
+      _failoverStrategy = failoverStrategy,
+      _heartbeatFrequencyMS = heartbeatFrequencyMS,
+      _maxIdleTimeMS = maxIdleTimeMS,
+      _maxHistorySize = maxHistorySize,
+      _credentials = credentials,
+      _keyStore = keyStore,
+      _readConcern = readConcern,
+      _appName = appName)
 
   // ---
 
   /**
-   * @param user the name (or subject) of the user
-   * @param password the associated password if some
+   * Connection credentials
+   * @see [[MongoConnectionOptions]]
    */
   final class Credential private[api] (
-    val user: String,
-    val password: Option[String]) {
+    _user: String,
+    _password: Option[String]) {
+
+    /** The name (or subject) of the user */
+    @inline def user: String = _user
+
+    /** The associated password if some */
+    @inline def password: Option[String] = _password
 
     private[api] lazy val tupled = user -> password
 
@@ -217,27 +296,47 @@ object MongoConnectionOptions {
     override def toString = s"Credential${tupled.toString}"
   }
 
+  /** [[Credential]] factory */
   object Credential {
+    /**
+     * Prepares credentials for [[MongoConnectionOptions]] usage
+     */
     def apply(user: String, password: Option[String]): Credential =
       new Credential(user, password)
 
   }
 
-  final class KeyStore(
-    val resource: URI,
-    val password: Option[Array[Char]],
-    val storeType: String,
-    val trust: Boolean) {
+  /**
+   * Connection key store
+   * @see [[MongoConnectionOptions]]
+   */
+  final class KeyStore private[api] (
+    _resource: URI,
+    _password: Option[Array[Char]],
+    _storeType: String,
+    _trust: Boolean) {
+
+    /** The resource URI for this key store */
+    @inline def resource: URI = _resource
+
+    /** An optional password to load this store */
+    @inline def password: Option[Array[Char]] = _password
+
+    /** The store type (e.g. PKCS12) */
+    @inline def storeType: String = _storeType
+
+    /** The flag to indicate whether to trust this store */
+    @inline def trust: Boolean = _trust
 
     override def toString = s"KeyStore#${storeType}{$resource}"
 
     import java.util.Arrays
 
     override def equals(that: Any): Boolean = that match {
-      case KeyStore(`resource`, Some(p), `storeType`, `trust`) =>
+      case KeyStore(`_resource`, Some(p), `_storeType`, `_trust`) =>
         password.exists(pwd => Arrays.equals(p, pwd))
 
-      case KeyStore(`resource`, None, `storeType`, `trust`) =>
+      case KeyStore(`_resource`, None, `_storeType`, `_trust`) =>
         password.isEmpty
 
       case _ => false
@@ -257,6 +356,7 @@ object MongoConnectionOptions {
     }
   }
 
+  /** [[KeyStore]] factory */
   object KeyStore {
     /**
      * @param resource the ressource to load as key store

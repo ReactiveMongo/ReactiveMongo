@@ -15,17 +15,30 @@ package reactivemongo.api
  * }}}
  */
 final class WriteConcern private[api] (
-  val w: WriteConcern.W,
-  val j: Boolean,
-  val fsync: Boolean,
-  val wtimeout: Option[Int]) {
+  _w: WriteConcern.W,
+  _j: Boolean,
+  _fsync: Boolean,
+  _wtimeout: Option[Int]) {
+
+  @inline def w: WriteConcern.W = _w
+
+  /** The journal flag */
+  @inline def j: Boolean = _j
+
+  @inline def fsync: Boolean = _fsync
+
+  /**
+   * The time limit, in milliseconds
+   * (only applicable for `w` values greater than 1)
+   */
+  @inline def wtimeout: Option[Int] = _wtimeout
 
   @SuppressWarnings(Array("VariableShadowing"))
   def copy(
-    w: WriteConcern.W = this.w,
-    j: Boolean = this.j,
-    fsync: Boolean = this.fsync,
-    wtimeout: Option[Int] = this.wtimeout): WriteConcern =
+    w: WriteConcern.W = _w,
+    j: Boolean = _j,
+    fsync: Boolean = _fsync,
+    wtimeout: Option[Int] = _wtimeout): WriteConcern =
     new WriteConcern(w, j, fsync, wtimeout)
 
   override def equals(that: Any): Boolean = that match {
@@ -42,10 +55,6 @@ final class WriteConcern private[api] (
 
 /** [[WriteConcern]] utilities. */
 object WriteConcern {
-  /**
-   * @param j the journal flag
-   * @param wtimeout specifies a time limit, in milliseconds (only applicable for `w` values greater than 1)
-   */
   def apply(
     w: WriteConcern.W,
     j: Boolean,

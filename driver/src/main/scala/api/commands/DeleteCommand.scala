@@ -18,17 +18,37 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackS
     val ordered: Boolean,
     val writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[DeleteResult]
 
-  /**
-   * @param q the query that matches documents to delete
-   * @param limit the number of matching documents to delete
-   * @param collation the collation to use for the operation
-   */
+  /** Delete command element */
   final class DeleteElement private[api] (
-    val q: pack.Document,
-    val limit: Int,
-    val collation: Option[Collation]) {
+    _q: pack.Document,
+    _limit: Int,
+    _collation: Option[Collation]) {
+
+    /** The query that matches documents to delete */
+    @inline def q: pack.Document = _q
+
+    /** The number of matching documents to delete */
+    @inline def limit: Int = _limit
+
+    /** The collation to use for the operation */
+    @inline def collation: Option[Collation] = _collation
+
+    override def toString = s"DeleteElement${tupled.toString}"
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        this.tupled == other.tupled
+
+      case _ =>
+        false
+    }
+
+    private lazy val tupled = (_q, _limit, _collation)
   }
 
+  /** Result for a delete command */
   final type DeleteResult = DefaultWriteResult
 
   protected final type DeleteCmd = ResolvedCollectionCommand[Delete]

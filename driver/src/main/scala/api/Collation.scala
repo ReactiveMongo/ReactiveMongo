@@ -18,15 +18,59 @@ package reactivemongo.api
  * }}}
  */
 final class Collation private[api] (
-  val locale: String,
-  val caseLevel: Option[Boolean],
-  val caseFirst: Option[Collation.CaseFirst],
-  val strength: Option[Collation.Strength],
-  val numericOrdering: Option[Boolean],
-  val alternate: Option[Collation.Alternate],
-  val maxVariable: Option[Collation.MaxVariable],
-  val backwards: Option[Boolean],
-  val normalization: Option[Boolean]) {
+  _locale: String,
+  _caseLevel: Option[Boolean],
+  _caseFirst: Option[Collation.CaseFirst],
+  _strength: Option[Collation.Strength],
+  _numericOrdering: Option[Boolean],
+  _alternate: Option[Collation.Alternate],
+  _maxVariable: Option[Collation.MaxVariable],
+  _backwards: Option[Boolean],
+  _normalization: Option[Boolean]) {
+
+  /** The [[https://docs.mongodb.com/manual/reference/collation-locales-defaults/#collation-languages-locales ICU locale]] */
+  @inline def locale: String = _locale
+
+  /** The flag that determines whether to include case comparison at strength level 1 or 2 (see [[http://userguide.icu-project.org/collation/concepts#TOC-CaseLevel ICU case level]]) */
+  @inline def caseLevel: Option[Boolean] = _caseLevel
+
+  /**
+   * The field that determines sort order of case differences
+   * during tertiary level comparisons
+   */
+  @inline def caseFirst: Option[Collation.CaseFirst] = _caseFirst
+
+  @inline def strength: Option[Collation.Strength] = _strength
+
+  /**
+   * The flag that determines whether to compare numeric strings
+   * as numbers or as strings
+   */
+  @inline def numericOrdering: Option[Boolean] = _numericOrdering
+
+  /**
+   * The field that determines whether collation
+   * should consider whitespace and punctuation as base characters
+   */
+  @inline def alternate: Option[Collation.Alternate] = _alternate
+
+  /**
+   * The field that determines up to which characters
+   * are considered ignorable
+   */
+  @inline def maxVariable: Option[Collation.MaxVariable] = _maxVariable
+
+  /**
+   * The flag that determines whether strings
+   * with diacritics sort from back of the string
+   */
+  @inline def backwards: Option[Boolean] = _backwards
+
+  /**
+   * The flag that determines whether to check
+   * if text require normalization and to perform normalization
+   */
+  @inline def normalization: Option[Boolean] = _normalization
 
   override def equals(that: Any): Boolean = that match {
     case other: Collation => other.tupled == tupled
@@ -49,16 +93,6 @@ final class Collation private[api] (
  * [[Collation]] utilities.
  */
 object Collation {
-  /**
-   * @param locale the [[https://docs.mongodb.com/manual/reference/collation-locales-defaults/#collation-languages-locales ICU locale]]
-   * @param caseLevel the flag that determines whether to include case comparison at strength level 1 or 2 (see [[http://userguide.icu-project.org/collation/concepts#TOC-CaseLevel ICU case level]])
-   * @param caseFirst the field that determines sort order of case differences during tertiary level comparisons
-   * @param numericOrdering the flag that determines whether to compare numeric strings as numbers or as strings
-   * @param alternate the field that determines whether collation should consider whitespace and punctuation as base characters
-   * @param maxVariable the field that determines up to which characters are considered ignorable
-   * @param backwards the flag that determines whether strings with diacritics sort from back of the string
-   * @param normalization the flag that determines whether to check if text require normalization and to perform normalization
-   */
   def apply(
     locale: String,
     caseLevel: Option[Boolean] = None,
@@ -157,17 +191,16 @@ object Collation {
       string(doc, "locale").map { locale =>
         new Collation(
           locale,
-          caseLevel = booleanLike(doc, "caseLevel"),
-          caseFirst = string(doc, "caseFirst").map(new Collation.CaseFirst(_)),
-          strength = decoder.int(
+          _caseLevel = booleanLike(doc, "caseLevel"),
+          _caseFirst = string(doc, "caseFirst").map(new Collation.CaseFirst(_)),
+          _strength = decoder.int(
             doc, "strength").map(new Collation.Strength(_)),
-          numericOrdering = booleanLike(doc, "numericOrdering"),
-          alternate = string(doc, "alternate").map(new Collation.Alternate(_)),
-          maxVariable = string(
+          _numericOrdering = booleanLike(doc, "numericOrdering"),
+          _alternate = string(doc, "alternate").map(new Collation.Alternate(_)),
+          _maxVariable = string(
             doc, "maxVariable").map(new Collation.MaxVariable(_)),
-          backwards = booleanLike(doc, "backwards"),
-          normalization = booleanLike(doc, "normalization"))
-
+          _backwards = booleanLike(doc, "backwards"),
+          _normalization = booleanLike(doc, "normalization"))
       }
     }
   }

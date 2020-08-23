@@ -59,6 +59,16 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
 
     /**
      * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateElement]]).
+     *
+     * {{{
+     * import scala.concurrent.ExecutionContext.Implicits.global
+     *
+     * import reactivemongo.api.bson.BSONDocument
+     * import reactivemongo.api.bson.collection.BSONCollection
+     *
+     * def updateOne(coll: BSONCollection, q: BSONDocument, u: BSONDocument) =
+     *   coll.update.one(q, u, upsert = true)
+     * }}}
      */
     final def one[Q, U](q: Q, u: U, upsert: Boolean = false, multi: Boolean = false)(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi, None, Seq.empty).flatMap { upd => execute(upd) }
 

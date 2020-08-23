@@ -45,6 +45,7 @@ trait AggregationOps[P <: SerializationPack] {
 
   // ---
 
+  /** Aggregator context */
   final class AggregatorContext[T] private[reactivemongo] (
     val pipeline: List[PipelineOperator],
     val explain: Boolean,

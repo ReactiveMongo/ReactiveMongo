@@ -19,7 +19,7 @@ private[api] trait CountOp[P <: SerializationPack] {
   implicit private lazy val countWriter: pack.Writer[CountCmd] = commandWriter
   implicit private lazy val countReader: pack.Reader[Long] = resultReader
 
-  protected def countDocuments(
+  protected[api] def countDocuments(
     query: Option[pack.Document],
     limit: Option[Int],
     skip: Int,
