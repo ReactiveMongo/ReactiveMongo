@@ -54,5 +54,5 @@ object Dependencies {
 
   val shapelessTest = "com.chuusai" %% "shapeless" % "2.3.3"
 
-  val commonsCodec = "commons-codec" % "commons-codec" % "1.14"
+  val commonsCodec = "commons-codec" % "commons-codec" % "1.15"
 }
