@@ -167,7 +167,7 @@ commands:
     parameters:
       shaded:
         type: boolean
-        default: false
+        default: true
     steps:
       - deploy:
           name: Publish artifacts to Sonatype Snapshots
@@ -336,6 +336,7 @@ jobs:
             - &snapshot_cache_key scala-{{ .Environment.CIRCLE_JOB }}-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}
 
       - publish_snapshots
+
       - publish_snapshots:
           shaded: false
 
