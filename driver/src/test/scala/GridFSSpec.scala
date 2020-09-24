@@ -177,7 +177,9 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
       def spec(id: gfs.pack.Value) =
         gfs.remove(id).map(_.n) must beTypedEqualTo(1).awaitFor(timeout)
 
-      spec(file1.id) and spec(file2.id)
+      spec(file1.id) and spec(file2.id) and {
+        countFile2Chunks() must beTypedEqualTo(0L).await(1, timeout)
+      }
     }
   }
 
