@@ -357,7 +357,7 @@ sealed trait GridFS[P <: SerializationPack] extends PackSupport[P]
   def remove[Id <: pack.Value](id: Id)(implicit ec: ExecutionContext): Future[WriteResult] = {
     val deleteChunkCmd = new Delete(
       Seq(new DeleteElement(
-        _q = document(Seq(elem("files_id", id))), 1, None)),
+        _q = document(Seq(elem("files_id", id))), 0, None)),
       ordered = false,
       writeConcern = defaultWriteConcern)
 
