@@ -3,6 +3,8 @@ import java.io.ByteArrayInputStream
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
+import reactivemongo.api.bson.BSONDocument
+
 import reactivemongo.api.{ Cursor, DB, WrappedCursor }
 
 import reactivemongo.api.tests.{ pack, newBuilder }
@@ -92,12 +94,20 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
 
     lazy val content2 = (100 to 200).view.map(_.toByte).toArray
 
+    def countFile2Chunks(): Future[Long] =
+      db.collection(s"${prefix}.chunks").
+        count(Some(BSONDocument("files_id" -> file2.id)))
+
     "store a file with computed MD5" in {
       def in = new ByteArrayInputStream(content2)
 
-      gfs.writeFromInputStream(file2, in).andThen {
+      gfs.writeFromInputStream(file2, in,
+        chunkSize = content2.size / 2 // enforce at least 2 chunks
+      ).andThen {
         case _ => in.close()
-      }.map(_.filename) must beSome(filename2).await(1, timeout)
+      }.map(_.filename) must beSome(filename2).await(1, timeout) and {
+        countFile2Chunks() must beTypedEqualTo(3L).await(1, timeout)
+      }
     }
 
     lazy val customField = s"foo-${System identityHashCode content2}"
