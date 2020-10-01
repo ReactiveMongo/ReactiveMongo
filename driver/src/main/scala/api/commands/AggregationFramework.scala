@@ -6,6 +6,28 @@ import reactivemongo.api.{ PackSupport, SerializationPack }
  * Implements the [[http://docs.mongodb.org/manual/applications/aggregation/ Aggregation Framework]].
  *
  * @see [[PipelineOperator]]
+ *
+ * @define addFieldsDescription [[https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/ \$addFields]] stage
+ *
+ * @define bucketDescription [[https://docs.mongodb.com/manual/reference/operator/aggregation/bucket/ \$bucket]] aggregation stage
+ *
+ * @define bucketAutoDescription [[https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/ \$bucket]] aggregation stage
+ *
+ * @define collStatsDescription [[https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/ \$collStats]] aggregation stage
+ *
+ * @define countDescription [[https://docs.mongodb.com/manual/reference/operator/aggregation/count/ \$count]] of the number of documents input
+ *
+ * @define currentOpDescription [[https://docs.mongodb.com/manual/reference/operator/aggregation/currentOp/ \$currentOp]]
+ *
+ * @define facetDescription [[https://docs.mongodb.com/manual/reference/operator/aggregation/facet/ \$facet]]
+ *
+ * @define groupDescription [[http://docs.mongodb.org/manual/reference/aggregation/group/#_S_group \$group]]s documents together to calculate aggregates on document collections
+ *
+ * @define lookupDescription Performs a [[https://docs.mongodb.com/v3.2/reference/operator/aggregation/lookup/#pipe._S_lookup left outer join]] to an unsharded collection in the same database to filter in documents from the "joined" collection for processing
+ *
+ * @define lookupPipelineDescription Performs an [[https://docs.mongodb.com/manual/reference/operator/aggregation/lookup/#join-conditions-and-uncorrelated-sub-queries uncorrelated lookup]]
+ *
+ * @define matchDescription [[http://docs.mongodb.org/manual/reference/aggregation/match/#_S_match Filters]] out documents from the stream that do not match the predicate
  */
 trait AggregationFramework[P <: SerializationPack]
   extends GroupAggregation[P] with SliceAggregation[P] with SortAggregation[P]
@@ -33,13 +55,7 @@ trait AggregationFramework[P <: SerializationPack]
     override def toString: String = s"Cursor(${batchSize})"
   }
 
-  /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/ \$addFields]] stage.
-   *
-   * @since MongoDB 3.4
-   * @param specifications The fields to include.
-   * The resulting objects will also contain these fields.
-   */
+  /** $addFieldsDescription. */
   final class AddFields private[api] (val specifications: pack.Document)
     extends PipelineOperator {
 
@@ -63,15 +79,22 @@ trait AggregationFramework[P <: SerializationPack]
     override def toString: String = s"AddFields(${pack pretty specifications})"
   }
 
+  /**
+   * $addFieldsDescription.
+   *
+   * @since MongoDB 3.4
+   */
   object AddFields {
+    /**
+     * @param specifications The fields to include.
+     * The resulting objects will also contain these fields.
+     */
     def apply(specifications: pack.Document): AddFields =
       new AddFields(specifications)
 
   }
 
-  /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/bucket/ \$bucket]] aggregation stage.
-   */
+  /** $bucketDescription.   */
   final class Bucket private (
     val groupBy: pack.Value,
     val boundaries: Seq[pack.Value],
@@ -113,6 +136,7 @@ trait AggregationFramework[P <: SerializationPack]
     override def toString = s"Bucket${tupled.toString}"
   }
 
+  /** $bucketDescription. */
   object Bucket {
     def apply(
       groupBy: pack.Value,
@@ -123,19 +147,7 @@ trait AggregationFramework[P <: SerializationPack]
 
   }
 
-  /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/bucketAuto/ \$bucket]] aggregation stage.
-   *
-   * @since MongoDB 3.4
-   *
-   * Categorizes incoming documents into a specific number of groups,
-   * called buckets, based on a specified expression.
-   *
-   * Bucket boundaries are automatically determined in an attempt
-   * to evenly distribute the documents into the specified number of buckets.
-   *
-   * Document fields identifier must be prefixed with `$`.
-   */
+  /** $bucketAutoDescription. */
   final class BucketAuto private (
     val groupBy: pack.Value,
     val buckets: Int,
@@ -176,6 +188,19 @@ trait AggregationFramework[P <: SerializationPack]
     override def toString = s"BucketAuto${tupled.toString}"
   }
 
+  /**
+   * $bucketAutoDescription.
+   *
+   * @since MongoDB 3.4
+   *
+   * Categorizes incoming documents into a specific number of groups,
+   * called buckets, based on a specified expression.
+   *
+   * Bucket boundaries are automatically determined in an attempt
+   * to evenly distribute the documents into the specified number of buckets.
+   *
+   * Document fields identifier must be prefixed with `$`.
+   */
   object BucketAuto {
     def apply(
       groupBy: pack.Value,
@@ -186,9 +211,7 @@ trait AggregationFramework[P <: SerializationPack]
 
   }
 
-  /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/collStats/ \$collStats]] aggregation stage.
-   */
+  /** $collStatsDescription. */
   final class CollStats private (
     val latencyStatsHistograms: Boolean,
     val storageStatsScale: Option[Double],
@@ -230,6 +253,7 @@ trait AggregationFramework[P <: SerializationPack]
     override def toString = s"CollStats${tupled.toString}"
   }
 
+  /** $collStatsDescription. */
   object CollStats {
     def apply(
       latencyStatsHistograms: Boolean,
@@ -239,12 +263,7 @@ trait AggregationFramework[P <: SerializationPack]
 
   }
 
-  /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/count/ \$count]] of the number of documents input.
-   *
-   * @since MongoDB 3.4
-   * @param outputName the name of the output field which has the count as its value
-   */
+  /** $countDescription. */
   final class Count private (val outputName: String)
     extends PipelineOperator {
 
@@ -268,20 +287,18 @@ trait AggregationFramework[P <: SerializationPack]
     override def toString: String = s"Count(${outputName})"
   }
 
+  /**
+   * $countDescription
+   * @since MongoDB 3.4
+   */
   object Count {
+    /**
+     * @param outputName the name of the output field which has the count as its value
+     */
     def apply(outputName: String): Count = new Count(outputName)
   }
 
-  /**
-   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/currentOp/ \$currentOp]].
-   *
-   * @since MongoDB 3.6
-   * @param allUsers (Defaults to `false`)
-   * @param idleConnections if set to true, all operations including idle connections will be returned (Defaults to `false`)
-   * @param idleCursors (Defaults to `false`; new in 4.2)
-   * @param idleSessions (Defaults to `true`; new in 4.0)
-   * @param localOps (Defaults to false; new in 4.0)
-   */
+  /** $currentOpDescription. */
   final class CurrentOp private (
     val allUsers: Boolean,
     val idleConnections: Boolean,
@@ -312,7 +329,18 @@ trait AggregationFramework[P <: SerializationPack]
     override def toString = s"CurrentOp${tupled.toString}"
   }
 
+  /**
+   * $currentOpDescription.
+   * @since MongoDB 3.6
+   */
   object CurrentOp {
+    /**
+     * @param allUsers (Defaults to `false`)
+     * @param idleConnections if set to true, all operations including idle connections will be returned (Defaults to `false`)
+     * @param idleCursors (Defaults to `false`; new in 4.2)
+     * @param idleSessions (Defaults to `true`; new in 4.0)
+     * @param localOps (Defaults to false; new in 4.0)
+     */
     def apply(
       allUsers: Boolean = false,
       idleConnections: Boolean = false,
@@ -323,16 +351,7 @@ trait AggregationFramework[P <: SerializationPack]
 
   }
 
-  /**
-   * Processes multiple aggregation pipelines within a single stage
-   * on the same set of input documents.
-   *
-   * Each sub-pipeline has its own field in the output document
-   * where its results are stored as an array of documents.
-   *
-   * @param specifications the subpipelines to run
-   * @see https://docs.mongodb.com/manual/reference/operator/aggregation/facet/
-   */
+  /** $facetDescription. */
   final class Facet private (
     val specifications: Iterable[(String, Pipeline)])
     extends PipelineOperator {
@@ -367,7 +386,17 @@ trait AggregationFramework[P <: SerializationPack]
     override def toString: String = s"Facet(${specifications})"
   }
 
+  /**
+   * Performs $facetDescription stage, to process multiple aggregation
+   * pipelines within a single stage on the same set of input documents.
+   *
+   * Each sub-pipeline has its own field in the output document
+   * where its results are stored as an array of documents.
+   */
   object Facet {
+    /**
+     * @param specifications the subpipelines to run
+     */
     def apply(specifications: Iterable[(String, Pipeline)]): Facet =
       new Facet(specifications)
   }
@@ -447,14 +476,7 @@ trait AggregationFramework[P <: SerializationPack]
 
   }
 
-  /**
-   * [[http://docs.mongodb.org/manual/reference/aggregation/group/#_S_group \$group]]s documents together to calculate aggregates on document collections.
-   * This command aggregates on arbitrary identifiers.
-   * Document fields identifier must be prefixed with `$`.
-   *
-   * @param identifiers any BSON value acceptable by mongodb as identifier
-   * @param ops the sequence of operators specifying aggregate calculation
-   */
+  /** $groupDescription. */
   final class Group private (val identifiers: pack.Value)(val ops: (String, GroupFunction)*) extends PipelineOperator {
 
     import builder.{ document, elementProducer => element }
@@ -478,7 +500,17 @@ trait AggregationFramework[P <: SerializationPack]
     override def toString = s"Group${tupled.toString}"
   }
 
+  /**
+   * $groupDescription.
+   *
+   * This command aggregates on arbitrary identifiers.
+   * Document fields identifier must be prefixed with `$`.
+   */
   object Group {
+    /**
+     * @param identifiers any BSON value acceptable by mongodb as identifier
+     * @param ops the sequence of operators specifying aggregate calculation
+     */
     def apply(identifiers: pack.Value)(ops: (String, GroupFunction)*): Group =
       new Group(identifiers)(ops: _*)
 
@@ -806,13 +838,8 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * Performs a [[https://docs.mongodb.com/v3.2/reference/operator/aggregation/lookup/#pipe._S_lookup left outer join]] to an unsharded collection in the same database to filter in documents from the "joined" collection for processing.
-   *
-   * @since MongoDB 3.2
-   * @param from the collection to perform the join with
-   * @param localField the field from the documents input
-   * @param foreignField the field from the documents in the `from` collection
-   * @param as the name of the new array field to add to the input documents
+   * $lookupDescription.
+   * @see [[LookupPipeline]]
    */
   final class Lookup private (
     val from: String,
@@ -844,7 +871,19 @@ trait AggregationFramework[P <: SerializationPack]
     override def toString = s"Lookup${tupled.toString}"
   }
 
+  /**
+   * $lookupDescription.
+   *
+   * @since MongoDB 3.2
+   * @see [[LookupPipeline]]
+   */
   object Lookup {
+    /**
+     * @param from the collection to perform the join with
+     * @param localField the field from the documents input
+     * @param foreignField the field from the documents in the `from` collection
+     * @param as the name of the new array field to add to the input documents
+     */
     def apply(
       from: String,
       localField: String,
@@ -854,10 +893,61 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   /**
-   * [[http://docs.mongodb.org/manual/reference/aggregation/match/#_S_match Filters]] out documents from the stream that do not match the predicate.
-   *
-   * @param predicate the query that documents must satisfy to be in the stream
+   * $lookupPipelineDescription.
+   * @see [[Lookup]]
    */
+  final class LookupPipeline private (
+    from: String,
+    let: pack.Document,
+    pipeline: Pipeline,
+    as: String) extends PipelineOperator {
+
+    import builder.{ array, document, elementProducer => element, string }
+    protected[reactivemongo] val makePipe: pack.Document = document(Seq(
+      element(f"$$lookup", document(Seq(
+        element("from", string(from)),
+        element("let", let),
+        element("pipeline", array(pipeline.map(_.makePipe))),
+        element("as", string(as)))))))
+
+    private[api] lazy val tupled =
+      Tuple4(from, let, pipeline, as)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        this.tupled == other.tupled
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"LookupPipeline${tupled.toString}"
+  }
+
+  /**
+   * $lookupPipelineDescription.
+   *
+   * @since MongoDB 3.6
+   * @see [[Lookup]]
+   */
+  object LookupPipeline {
+    /**
+     * @param from the collection to perform the join with
+     * @param let the variables to use in the pipeline field stages
+     * @param pipeline the pipeline to run on the joined collection
+     * @param as the name of the new array field to add to the input documents
+     */
+    def apply(
+      from: String,
+      let: pack.Document,
+      pipeline: Pipeline,
+      as: String): LookupPipeline =
+      new LookupPipeline(from, let, pipeline, as)
+  }
+
+  /** $matchDescription. */
   final class Match private (val predicate: pack.Document)
     extends PipelineOperator {
 
@@ -882,7 +972,11 @@ trait AggregationFramework[P <: SerializationPack]
     override def toString: String = s"Match(${pack pretty predicate})"
   }
 
+  /** $matchDescription. */
   object Match {
+    /**
+     * @param predicate the query that documents must satisfy to be in the stream
+     */
     def apply(predicate: pack.Document): Match = new Match(predicate)
   }
 
