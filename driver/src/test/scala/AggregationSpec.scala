@@ -1480,6 +1480,31 @@ db.accounts.aggregate([
 
     }
 
+    f"be $$lookup with pipeline" in {
+      import AggregationFramework.{ LookupPipeline, Match, Project }
+
+      val let = BSONDocument(
+        "order_item" -> f"$$item",
+        "order_qty" -> f"$$ordered")
+
+      val m = Match(BSONDocument(
+        f"$$expr" -> BSONDocument(f"$$and" -> Seq(
+          BSONDocument(f"$$eq" -> Seq(f"$$stock_item", f"$$order_item")),
+          BSONDocument(f"$$gte" -> Seq(f"$$instock", f"$$order_qty"))))))
+
+      val project = Project(BSONDocument("stock_item" -> 0, "_id" -> 0))
+
+      makePipe(LookupPipeline(
+        from = "warehouse",
+        let = let,
+        pipeline = List(m, project),
+        as = "stockdata")) must_=== BSONDocument(f"$$lookup" -> BSONDocument(
+        "from" -> "warehouse",
+        "let" -> let,
+        "pipeline" -> BSONArray(m, project),
+        "as" -> "stockdata"))
+    }
+
     f"be $$listLocalSessions" in {
       import AggregationFramework.ListLocalSessions
 
