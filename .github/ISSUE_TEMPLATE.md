@@ -41,6 +41,6 @@ Be descriptive: "it doesn't work" does not describe what the behaviour actually 
 
 ### Reproducible Test Case
 
-Please provide a PR with a failing test.  
+Please provide a PR with a failing test, or at least with a [minimal reproducible example](https://stackoverflow.com/help/minimal-reproducible-example).
 
-If the issue is more complex or requires configuration, please provide a link to a project on Github that reproduces the issue.
+If the issue is more complex or requires configuration, please provide a link to a project on GitHub that reproduces the issue.
