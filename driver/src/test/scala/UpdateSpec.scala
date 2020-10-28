@@ -10,6 +10,8 @@ import _root_.tests.Common
 
 import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 
+import scala.concurrent.{ Await, Future }
+
 trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
   import reactivemongo.api.TestCompat._
   import Common._
@@ -60,6 +62,47 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
         }
       }
       section("gt_mongo32")
+    }
+
+    "update many documents with the default connection" in {
+      case class TestDocument(id: String, children: List[BSONDocument])
+
+      val createChildDocuments =
+        (childrenNumber: Int) =>
+          List
+            .range(0, childrenNumber)
+            .map(
+              num =>
+                BSONDocument(
+                  "id" -> BSONString(s"child${num}"),
+                  "value" -> BSONString("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")))
+      
+      def upsertElements(collection: DefaultCollection, documents: List[TestDocument]) = {
+        val updateBuilder = collection.update(ordered = false)
+        val updateElements = Future.sequence(
+          for {
+            document <- documents
+          } yield updateBuilder.element(
+            q = BSONDocument("_id" -> document.id),
+            u = BSONDocument(
+              "_id" -> document.id,
+              "children" -> BSONArray(document.children)),
+            upsert = true))
+
+        updateElements.flatMap(updates => updateBuilder.many(updates))
+      }
+
+      val childrenPerElement = 200 * 1000
+      val documents = List(
+        TestDocument("id1", createChildDocuments(childrenPerElement)),
+        TestDocument("id2", createChildDocuments(childrenPerElement)))
+
+      val writeResult = Await.result(upsertElements(updCol2, documents), timeout)
+
+      val expectedDocumentsNumber = documents.size
+      writeResult.totalN must beTypedEqualTo(expectedDocumentsNumber) and {
+        writeResult.nModified must beTypedEqualTo(expectedDocumentsNumber)
+      }
     }
 
     "upsert a document" >> {
