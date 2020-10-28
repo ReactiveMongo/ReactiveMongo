@@ -179,7 +179,7 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
 
         BulkOps.bulkApply[UpdateElement, UpdateWriteResult](
           bulkProducer)({ bulk =>
-          execute(first, bulk.drop(1).toSeq)
+          execute(bulk.headOption.getOrElse(first), bulk.drop(1).toSeq)
         }, bulkRecover).map(MultiBulkWriteResult(_))
       }
 
