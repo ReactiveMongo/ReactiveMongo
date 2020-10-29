@@ -10,7 +10,7 @@ import _root_.tests.Common
 
 import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 
-import scala.concurrent.{ Await, Future }
+import scala.concurrent.Future
 
 trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
   import reactivemongo.api.TestCompat._
@@ -76,7 +76,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
                 BSONDocument(
                   "id" -> BSONString(s"child${num}"),
                   "value" -> BSONString("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")))
-      
+
       def upsertElements(collection: DefaultCollection, documents: List[TestDocument]) = {
         val updateBuilder = collection.update(ordered = false)
         val updateElements = Future.sequence(
@@ -94,14 +94,14 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
 
       val childrenPerElement = 200 * 1000
       val documents = List(
-        TestDocument("id1", createChildDocuments(childrenPerElement)),
-        TestDocument("id2", createChildDocuments(childrenPerElement)))
+        TestDocument(System.nanoTime().toString, createChildDocuments(childrenPerElement)),
+        TestDocument(System.nanoTime().toString, createChildDocuments(childrenPerElement)))
 
-      val writeResult = Await.result(upsertElements(updCol2, documents), timeout)
+      val writeResult = upsertElements(updCol2, documents)
 
       val expectedDocumentsNumber = documents.size
-      writeResult.totalN must beTypedEqualTo(expectedDocumentsNumber) and {
-        writeResult.nModified must beTypedEqualTo(expectedDocumentsNumber)
+      writeResult.map(_.totalN) must beTypedEqualTo(expectedDocumentsNumber).await(1, timeout) and {
+        writeResult.map(_.nModified) must beTypedEqualTo(expectedDocumentsNumber).await(1, timeout)
       }
     }
 
