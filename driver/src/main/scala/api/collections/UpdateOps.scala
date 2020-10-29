@@ -150,10 +150,7 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
         }
 
       BulkOps.bulkApply[UpdateElement, UpdateWriteResult](
-        bulkProducer)(
-        { bulk => execute(firstUpdate, bulk.toSeq) },
-        bulkRecover).
-        map(MultiBulkWriteResult(_))
+        bulkProducer)(execute(_), bulkRecover).map(MultiBulkWriteResult(_))
     }
 
     /**
@@ -182,25 +179,20 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
      * }
      * }}}
      */
-    final def many(updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = updates.headOption match {
-      case Some(first) => {
-        println(s"maxBulkSize = $maxBulkSize")
+    final def many(updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
+      if (updates.isEmpty) {
+        Future.failed[MultiBulkWriteResult](
+          new GenericDriverException("No update to be performed"))
 
+      } else {
         val bulkProducer = BulkOps.bulks(
           updates, maxBsonSize, maxBulkSize) { up =>
           elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(up.u)
         }
 
         BulkOps.bulkApply[UpdateElement, UpdateWriteResult](
-          bulkProducer)({ bulk =>
-          println(s"bulk = $bulk")
-          execute(first, bulk.drop(1).toSeq)
-        }, bulkRecover).map(MultiBulkWriteResult(_))
+          bulkProducer)(execute(_), bulkRecover).map(MultiBulkWriteResult(_))
       }
-
-      case _ =>
-        Future.failed[MultiBulkWriteResult](
-          new GenericDriverException("No update to be performed"))
     }
 
     // ---
@@ -250,6 +242,18 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
 
       pack.bsonSize(builder.document(elements.result()))
     }
+
+    @inline private final def execute(
+      bulk: Iterable[UpdateElement])(
+      implicit
+      ec: ExecutionContext): Future[UpdateWriteResult] =
+      bulk.headOption match {
+        case Some(first) =>
+          execute(first, bulk.drop(1).toSeq)
+
+        case _ =>
+          Future.failed(new GenericDriverException("Unexpected empty bulk"))
+      }
 
     private final def execute(
       firstUpdate: UpdateElement,
