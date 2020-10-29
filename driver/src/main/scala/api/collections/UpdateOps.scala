@@ -184,6 +184,8 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
      */
     final def many(updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = updates.headOption match {
       case Some(first) => {
+        println(s"maxBulkSize = $maxBulkSize")
+
         val bulkProducer = BulkOps.bulks(
           updates, maxBsonSize, maxBulkSize) { up =>
           elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(up.u)
@@ -191,6 +193,7 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
 
         BulkOps.bulkApply[UpdateElement, UpdateWriteResult](
           bulkProducer)({ bulk =>
+          println(s"bulk = $bulk")
           execute(first, bulk.drop(1).toSeq)
         }, bulkRecover).map(MultiBulkWriteResult(_))
       }
@@ -285,7 +288,7 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
     val bulkRecover = orderedRecover
 
     def maxBulkSize(max: Int): UpdateBuilder =
-      new OrderedUpdate(writeConcern, bypassDocumentValidation, maxBulkSize)
+      new OrderedUpdate(writeConcern, bypassDocumentValidation, max)
   }
 
   private val unorderedRecover: Option[Exception => Future[UpdateWriteResult]] =
@@ -322,6 +325,6 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
     val bulkRecover = unorderedRecover
 
     def maxBulkSize(max: Int): UpdateBuilder =
-      new UnorderedUpdate(writeConcern, bypassDocumentValidation, maxBulkSize)
+      new UnorderedUpdate(writeConcern, bypassDocumentValidation, max)
   }
 }
