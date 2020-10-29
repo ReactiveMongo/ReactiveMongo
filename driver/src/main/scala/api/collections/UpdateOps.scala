@@ -22,6 +22,7 @@ import reactivemongo.api.commands.{
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.update/#perform-an-unordered-update ordered]] behaviour
  * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
+ * @define maxBulkSizeParam the maximum number of document(s) per bulk
  */
 trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
   with UpdateWriteResultFactory[P] with MultiBulkWriteResultFactory[P]
@@ -35,13 +36,18 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
    * @param ordered $orderedParam
    * @param writeConcern $writeConcernParam
    * @param bypassDocumentValidation $bypassDocumentValidationParam
+   * @param maxBulkSize $maxBulkSize
    */
   private[reactivemongo] final def prepareUpdate(
     ordered: Boolean,
     writeConcern: WriteConcern,
-    bypassDocumentValidation: Boolean): UpdateBuilder = {
-    if (ordered) new OrderedUpdate(writeConcern, bypassDocumentValidation)
-    else new UnorderedUpdate(writeConcern, bypassDocumentValidation)
+    bypassDocumentValidation: Boolean,
+    maxBulkSize: Int): UpdateBuilder = {
+    if (ordered) {
+      new OrderedUpdate(writeConcern, bypassDocumentValidation, maxBulkSize)
+    } else {
+      new UnorderedUpdate(writeConcern, bypassDocumentValidation, maxBulkSize)
+    }
   }
 
   /** Builder for update operations. */
@@ -54,6 +60,12 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
 
     /** $bypassDocumentValidationParam */
     def bypassDocumentValidation: Boolean
+
+    /** $maxBulkSizeParam */
+    def maxBulkSize: Int
+
+    /** Returns an update builder with the given [[maxBulkSize]]. */
+    def maxBulkSize(max: Int): UpdateBuilder
 
     protected def bulkRecover: Option[Exception => Future[UpdateWriteResult]]
 
@@ -133,7 +145,7 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
      */
     final def many(firstUpdate: UpdateElement, updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
       val bulkProducer = BulkOps.bulks(
-        Seq(firstUpdate) ++ updates, maxBsonSize, metadata.maxBulkSize) { up =>
+        Seq(firstUpdate) ++ updates, maxBsonSize, maxBulkSize) { up =>
           elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(up.u)
         }
 
@@ -173,7 +185,7 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
     final def many(updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = updates.headOption match {
       case Some(first) => {
         val bulkProducer = BulkOps.bulks(
-          updates, maxBsonSize, metadata.maxBulkSize) { up =>
+          updates, maxBsonSize, maxBulkSize) { up =>
           elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(up.u)
         }
 
@@ -266,10 +278,14 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
 
   private final class OrderedUpdate(
     val writeConcern: WriteConcern,
-    val bypassDocumentValidation: Boolean) extends UpdateBuilder {
+    val bypassDocumentValidation: Boolean,
+    val maxBulkSize: Int) extends UpdateBuilder {
 
     val ordered = true
     val bulkRecover = orderedRecover
+
+    def maxBulkSize(max: Int): UpdateBuilder =
+      new OrderedUpdate(writeConcern, bypassDocumentValidation, maxBulkSize)
   }
 
   private val unorderedRecover: Option[Exception => Future[UpdateWriteResult]] =
@@ -299,9 +315,13 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
 
   private final class UnorderedUpdate(
     val writeConcern: WriteConcern,
-    val bypassDocumentValidation: Boolean) extends UpdateBuilder {
+    val bypassDocumentValidation: Boolean,
+    val maxBulkSize: Int) extends UpdateBuilder {
 
     val ordered = false
     val bulkRecover = unorderedRecover
+
+    def maxBulkSize(max: Int): UpdateBuilder =
+      new UnorderedUpdate(writeConcern, bypassDocumentValidation, maxBulkSize)
   }
 }
