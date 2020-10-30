@@ -116,6 +116,7 @@ commands:
           name: Prepare integration environment
           command: |
                     if [ `which make | wc -l` -eq 0 ]; then
+                      sudo apt-get install libc6
                       sudo apt update
                       sudo apt install build-essential
                     fi
