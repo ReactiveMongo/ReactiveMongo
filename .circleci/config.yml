@@ -6,7 +6,7 @@ commands:
     parameters:
       sbt_version:
         type: string
-        default: "1.4.0"
+        default: "1.4.1"
     steps:
       - restore_cache:
           name: Restore SBT cache
@@ -117,6 +117,7 @@ commands:
           command: |
                     if [ `which make | wc -l` -eq 0 ]; then
                       sudo apt update
+                      sudo apt autoremove
                       sudo apt install build-essential
                     fi
                     ./.ci_scripts/beforeInstall.sh << parameters.category >> << parameters.mongo_version >> << parameters.mongo_profile >> /tmp/integration-env.sh
