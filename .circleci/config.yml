@@ -264,7 +264,7 @@ jobs:
     parameters:
       openjdk_version:
         type: integer
-        default: 9-b179
+        default: 9
       scala_version:
         type: string
         default: "2.12.11"
