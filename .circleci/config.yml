@@ -115,11 +115,11 @@ commands:
       - run:
           name: Prepare integration environment
           command: |
-                    if [ `which make | wc -l` -eq 0 ]; then
-                      sudo apt update
-                      sudo apt-get install libc6
-                      sudo apt install build-essential
-                    fi
+                    #if [ `which make | wc -l` -eq 0 ]; then
+                    #  sudo apt update
+                    #  sudo apt-get install libc6
+                    #  sudo apt install build-essential
+                    #fi
                     ./.ci_scripts/beforeInstall.sh << parameters.category >> << parameters.mongo_version >> << parameters.mongo_profile >> /tmp/integration-env.sh
 
       - save_cache:
