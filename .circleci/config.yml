@@ -116,8 +116,8 @@ commands:
           name: Prepare integration environment
           command: |
                     if [ `which make | wc -l` -eq 0 ]; then
-                      sudo apt-get install libc6
                       sudo apt update
+                      sudo apt-get install libc6
                       sudo apt install build-essential
                     fi
                     ./.ci_scripts/beforeInstall.sh << parameters.category >> << parameters.mongo_version >> << parameters.mongo_profile >> /tmp/integration-env.sh
@@ -215,7 +215,7 @@ executors:
         type: integer
         default: 8
     docker:
-      - image: circleci/openjdk:<< parameters.version >>-jdk
+      - image: cchantep/circleci-openjdk:<< parameters.version >>-jdk
 
 jobs:
   unit_test_suite:
@@ -282,7 +282,7 @@ jobs:
         default: "default"
 
     docker:
-      - image: circleci/openjdk:<< parameters.openjdk_version >>-jdk
+      - image: cchantep/circleci-openjdk:<< parameters.openjdk_version >>-jdk
 
     working_directory: ~/repo
 
