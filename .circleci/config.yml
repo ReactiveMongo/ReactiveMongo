@@ -116,8 +116,7 @@ commands:
           name: Prepare integration environment
           command: |
                     if [ `which make | wc -l` -eq 0 ]; then
-                      #sudo apt update
-                      #sudo apt autoremove
+                      sudo apt update
                       sudo apt install build-essential
                     fi
                     ./.ci_scripts/beforeInstall.sh << parameters.category >> << parameters.mongo_version >> << parameters.mongo_profile >> /tmp/integration-env.sh
@@ -264,7 +263,7 @@ jobs:
     parameters:
       openjdk_version:
         type: integer
-        default: 9
+        default: 9-b179
       scala_version:
         type: string
         default: "2.12.11"
