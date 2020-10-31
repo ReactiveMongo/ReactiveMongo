@@ -1,3 +1,4 @@
+import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.ReadPreference
@@ -86,6 +87,50 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
 
       "with the slow connection" in {
         spec(slowUpdCol2, slowTimeout)
+      }
+    }
+
+    "update many documents" >> {
+      "with the default connection" in {
+        val coll = db(s"update3${System identityHashCode db}")
+        val update = coll.update.maxBulkSize(2)
+
+        // Fixtures
+        val doc1 = BSONDocument("_id" -> 1)
+        val doc2 = BSONDocument("_id" -> 2)
+        val doc3 = BSONDocument("_id" -> 3)
+
+        def resultSpec(res: Future[coll.MultiBulkWriteResult]) =
+          res must beLike[coll.MultiBulkWriteResult] {
+            case result => result.n must_=== 3 and {
+              result.nModified must_=== 0 // upserted
+            } and {
+              coll.find(BSONDocument.empty).cursor[BSONDocument]().
+                collect[Set]() must beTypedEqualTo(
+                  Set(doc1, doc2, doc3)).await(1, timeout)
+            }
+          }.await(1, timeout)
+
+        update.maxBulkSize must_=== 2 and {
+          Future.sequence(Seq(
+            update.element(doc1, doc1, upsert = true),
+            update.element(doc2, doc2, upsert = true),
+            update.element(doc3, doc3, upsert = true))).
+            aka("elements") must beLike[Seq[coll.UpdateElement]] {
+              case elements @ (up1 +: _) =>
+                elements.size must_=== 3 and {
+                  resultSpec(update.many(elements))
+                } and {
+                  // Clean collection
+                  coll.delete.one(BSONDocument.empty).
+                    map(_.n) must beTypedEqualTo(3).awaitFor(timeout)
+                } and {
+                  coll.count() must beTypedEqualTo(0L).await(1, timeout)
+                } and {
+                  resultSpec(update.many(up1, elements.drop(1)))
+                }
+            }.await(1, timeout)
+        }
       }
     }
 

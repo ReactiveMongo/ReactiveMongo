@@ -27,8 +27,8 @@ private[reactivemongo] object BulkOps {
    * according the specified `maxBsonSize` and `maxBulkSize`.
    *
    * @param documents the documents to be grouped in bulks
-   * @param maxBsonSize see [[reactivemongo.core.nodeset.ProtocolMetadata.maxBsonSize]]
-   * @param maxBulkSize see [[reactivemongo.core.nodeset.ProtocolMetadata.maxBulkSize]]
+   * @param maxBsonSize see [[reactivemongo.core.protocol.ProtocolMetadata.maxBsonSize]]
+   * @param maxBulkSize see [[reactivemongo.core.protocol.ProtocolMetadata.maxBulkSize]]
    * @param sz the function used to determine the BSON size of each document
    * @tparam I the input (document) type
    */

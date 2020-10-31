@@ -18,6 +18,8 @@ import reactivemongo.api.commands.{
   ResolvedCollectionCommand
 }
 
+// TODO: distinct in GenericCollection
+// TODO: single field BSONDocumentReader
 private[api] trait DistinctOp[P <: SerializationPack] extends DistinctOpCompat[P] {
   collection: GenericCollection[P] =>
 
