@@ -334,7 +334,9 @@ trait GenericCollection[P <: SerializationPack]
    * }
    * }}}
    */
-  def update: UpdateBuilder = prepareUpdate(false, writeConcern, false)
+  def update: UpdateBuilder =
+    prepareUpdate(false, writeConcern, false,
+      db.connectionState.metadata.maxBulkSize)
 
   /**
    * Returns an update builder.
@@ -359,7 +361,8 @@ trait GenericCollection[P <: SerializationPack]
    * @param ordered $orderedParam
    */
   def update(ordered: Boolean): UpdateBuilder =
-    prepareUpdate(ordered, writeConcern, false)
+    prepareUpdate(ordered, writeConcern, false,
+      db.connectionState.metadata.maxBulkSize)
 
   /**
    * Returns an ordered update builder.
@@ -383,7 +386,8 @@ trait GenericCollection[P <: SerializationPack]
    * @param writeConcern $writeConcernParam
    */
   def update(writeConcern: WriteConcern): UpdateBuilder =
-    prepareUpdate(true, writeConcern, false)
+    prepareUpdate(true, writeConcern, false,
+      db.connectionState.metadata.maxBulkSize)
 
   /**
    * Returns an update builder.
@@ -410,7 +414,8 @@ trait GenericCollection[P <: SerializationPack]
   def update(
     ordered: Boolean,
     writeConcern: WriteConcern): UpdateBuilder =
-    prepareUpdate(ordered, writeConcern, false)
+    prepareUpdate(ordered, writeConcern, false,
+      db.connectionState.metadata.maxBulkSize)
 
   /**
    * Returns an update builder.
@@ -439,7 +444,8 @@ trait GenericCollection[P <: SerializationPack]
   def update(
     ordered: Boolean,
     bypassDocumentValidation: Boolean): UpdateBuilder =
-    prepareUpdate(ordered, this.writeConcern, bypassDocumentValidation)
+    prepareUpdate(ordered, this.writeConcern, bypassDocumentValidation,
+      db.connectionState.metadata.maxBulkSize)
 
   /**
    * Returns an update builder.
@@ -471,7 +477,8 @@ trait GenericCollection[P <: SerializationPack]
     ordered: Boolean,
     writeConcern: WriteConcern,
     bypassDocumentValidation: Boolean): UpdateBuilder =
-    prepareUpdate(ordered, writeConcern, bypassDocumentValidation)
+    prepareUpdate(ordered, writeConcern, bypassDocumentValidation,
+      db.connectionState.metadata.maxBulkSize)
 
   /**
    * Returns an update modifier, to be used with `findAndModify`.

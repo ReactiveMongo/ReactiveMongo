@@ -75,7 +75,7 @@ object Version {
           }
         },
         libraryDependencies ++= akka.value ++ Seq(
-          "dnsjava" % "dnsjava" % "3.3.1",
+          "dnsjava" % "dnsjava" % "3.4.0-SNAPSOT",
           commonsCodec,
           shapelessTest % Test, specs.value) ++ logApi,
         mimaBinaryIssueFilters ++= {

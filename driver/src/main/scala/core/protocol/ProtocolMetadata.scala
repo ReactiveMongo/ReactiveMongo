@@ -11,7 +11,13 @@ case class ProtocolMetadata(
 }
 
 object ProtocolMetadata {
+  /**
+   * maxBulkSize = 1000
+   */
   val Default = ProtocolMetadata(
-    MongoWireVersion.V30, MongoWireVersion.V30,
-    48000000, 16 * 1024 * 1024, 1000)
+    minWireVersion = MongoWireVersion.V30,
+    maxWireVersion = MongoWireVersion.V30,
+    maxMessageSizeBytes = 48000000,
+    maxBsonSize = 16 * 1024 * 1024,
+    maxBulkSize = 1000)
 }
