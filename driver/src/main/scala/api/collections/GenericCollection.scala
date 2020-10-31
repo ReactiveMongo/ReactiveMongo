@@ -395,8 +395,8 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   def update[S, T](selector: S, update: T, writeConcern: WriteConcern = writeConcern, upsert: Boolean = false, multi: Boolean = false)(implicit swriter: pack.Writer[S], writer: pack.Writer[T], ec: ExecutionContext): Future[UpdateWriteResult] = prepareUpdate(
     ordered = true,
     writeConcern = writeConcern,
-    bypassDocumentValidation = false).
-    one(selector, update, upsert, multi)
+    bypassDocumentValidation = false,
+    maxBulkSize = db.connectionState.metadata.maxBulkSize).one(selector, update, upsert, multi)
 
   /**
    * Returns an unordered update builder.
@@ -416,7 +416,9 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * }
    * }}}
    */
-  def update: UpdateBuilder = prepareUpdate(false, writeConcern, false)
+  def update: UpdateBuilder =
+    prepareUpdate(false, writeConcern, false,
+      db.connectionState.metadata.maxBulkSize)
 
   /**
    * Returns an update builder.
@@ -440,7 +442,8 @@ trait GenericCollection[P <: SerializationPack with Singleton]
    * @param ordered $orderedParam
    */
   def update(ordered: Boolean): UpdateBuilder =
-    prepareUpdate(ordered, writeConcern, false)
+    prepareUpdate(ordered, writeConcern, false,
+      db.connectionState.metadata.maxBulkSize)
 
   /**
    * Returns an update builder.
@@ -467,7 +470,8 @@ trait GenericCollection[P <: SerializationPack with Singleton]
   def update(
     ordered: Boolean,
     writeConcern: WriteConcern): UpdateBuilder =
-    prepareUpdate(ordered, writeConcern, false)
+    prepareUpdate(ordered, writeConcern, false,
+      db.connectionState.metadata.maxBulkSize)
 
   /**
    * Returns an update builder.
@@ -499,7 +503,8 @@ trait GenericCollection[P <: SerializationPack with Singleton]
     ordered: Boolean,
     writeConcern: WriteConcern,
     bypassDocumentValidation: Boolean): UpdateBuilder =
-    prepareUpdate(ordered, writeConcern, bypassDocumentValidation)
+    prepareUpdate(ordered, writeConcern, bypassDocumentValidation,
+      db.connectionState.metadata.maxBulkSize)
 
   /**
    * Returns an update modifier, to be used with `findAndModify`.

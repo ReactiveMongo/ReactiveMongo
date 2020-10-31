@@ -22,6 +22,7 @@ import com.github.ghik.silencer.silent
  * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.update/#perform-an-unordered-update ordered]] behaviour
  * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
+ * @define maxBulkSizeParam the maximum number of document(s) per bulk
  */
 trait UpdateOps[P <: SerializationPack with Singleton] {
   collection: GenericCollection[P] =>
@@ -36,13 +37,18 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
    * @param ordered $orderedParam
    * @param writeConcern $writeConcernParam
    * @param bypassDocumentValidation $bypassDocumentValidationParam
+   * @param maxBulkSize $maxBulkSize
    */
   private[reactivemongo] final def prepareUpdate(
     ordered: Boolean,
     writeConcern: WriteConcern,
-    bypassDocumentValidation: Boolean): UpdateBuilder = {
-    if (ordered) new OrderedUpdate(writeConcern, bypassDocumentValidation)
-    else new UnorderedUpdate(writeConcern, bypassDocumentValidation)
+    bypassDocumentValidation: Boolean,
+    maxBulkSize: Int): UpdateBuilder = {
+    if (ordered) {
+      new OrderedUpdate(writeConcern, bypassDocumentValidation, maxBulkSize)
+    } else {
+      new UnorderedUpdate(writeConcern, bypassDocumentValidation, maxBulkSize)
+    }
   }
 
   /** Builder for update operations. */
@@ -57,6 +63,12 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
 
     /** $bypassDocumentValidationParam */
     def bypassDocumentValidation: Boolean
+
+    /** $maxBulkSizeParam */
+    def maxBulkSize: Int
+
+    /** Returns an update builder with the given `maxBulkSize`. */
+    def maxBulkSize(max: Int): UpdateBuilder
 
     protected def bulkRecover: Option[Exception => Future[UpdateWriteResult]]
 
@@ -127,15 +139,12 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
      */
     final def many(firstUpdate: UpdateElement, updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
       val bulkProducer = BulkOps.bulks(
-        Seq(firstUpdate) ++: updates, maxBsonSize, metadata.maxBulkSize) { up =>
+        Seq(firstUpdate) ++ updates, maxBsonSize, maxBulkSize) { up =>
           elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(up.u)
         }
 
       BulkOps.bulkApply[UpdateElement, UpdateWriteResult](
-        bulkProducer)(
-        { bulk => execute(firstUpdate, bulk.toSeq) },
-        bulkRecover).
-        map(MultiBulkWriteResult(_))
+        bulkProducer)(execute(_), bulkRecover).map(MultiBulkWriteResult(_))
     }
 
     /**
@@ -164,22 +173,20 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
      * }
      * }}}
      */
-    final def many(updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = updates.headOption match {
-      case Some(first) => {
+    final def many(updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
+      if (updates.isEmpty) {
+        Future.failed[MultiBulkWriteResult](
+          GenericDriverException("No update to be performed"))
+
+      } else {
         val bulkProducer = BulkOps.bulks(
-          updates, maxBsonSize, metadata.maxBulkSize) { up =>
+          updates, maxBsonSize, maxBulkSize) { up =>
           elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(up.u)
         }
 
         BulkOps.bulkApply[UpdateElement, UpdateWriteResult](
-          bulkProducer)({ bulk =>
-          execute(first, bulk.tail.toSeq)
-        }, bulkRecover).map(MultiBulkWriteResult(_))
+          bulkProducer)(execute(_), bulkRecover).map(MultiBulkWriteResult(_))
       }
-
-      case _ =>
-        Future.failed[MultiBulkWriteResult](
-          GenericDriverException("No update to be performed"))
     }
 
     // ---
@@ -246,6 +253,18 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
     implicit private lazy val writer: pack.Writer[UpdateCmd] =
       updateWriter(collection.db.session)
 
+    @inline private final def execute(
+      bulk: Iterable[UpdateElement])(
+      implicit
+      ec: ExecutionContext): Future[UpdateWriteResult] =
+      bulk.headOption match {
+        case Some(first) =>
+          execute(first, bulk.drop(1).toSeq)
+
+        case _ =>
+          Future.failed(GenericDriverException("Unexpected empty bulk"))
+      }
+
     private final def execute(
       firstUpdate: UpdateElement,
       updates: Seq[UpdateElement] = Seq.empty)(
@@ -281,10 +300,14 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
 
   private final class OrderedUpdate(
     val writeConcern: WriteConcern,
-    val bypassDocumentValidation: Boolean) extends UpdateBuilder {
+    val bypassDocumentValidation: Boolean,
+    val maxBulkSize: Int) extends UpdateBuilder {
 
     val ordered = true
     val bulkRecover = orderedRecover
+
+    def maxBulkSize(max: Int): UpdateBuilder =
+      new OrderedUpdate(writeConcern, bypassDocumentValidation, max)
   }
 
   private val unorderedRecover: Option[Exception => Future[UpdateWriteResult]] =
@@ -314,9 +337,13 @@ trait UpdateOps[P <: SerializationPack with Singleton] {
 
   private final class UnorderedUpdate(
     val writeConcern: WriteConcern,
-    val bypassDocumentValidation: Boolean) extends UpdateBuilder {
+    val bypassDocumentValidation: Boolean,
+    val maxBulkSize: Int) extends UpdateBuilder {
 
     val ordered = false
     val bulkRecover = unorderedRecover
+
+    def maxBulkSize(max: Int): UpdateBuilder =
+      new UnorderedUpdate(writeConcern, bypassDocumentValidation, max)
   }
 }
