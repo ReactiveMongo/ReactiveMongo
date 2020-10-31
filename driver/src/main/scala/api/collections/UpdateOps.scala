@@ -64,7 +64,7 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
     /** $maxBulkSizeParam */
     def maxBulkSize: Int
 
-    /** Returns an update builder with the given [[maxBulkSize]]. */
+    /** Returns an update builder with the given `maxBulkSize`. */
     def maxBulkSize(max: Int): UpdateBuilder
 
     protected def bulkRecover: Option[Exception => Future[UpdateWriteResult]]
