@@ -32,6 +32,7 @@ final class MongoConnectionOptions private[reactivemongo] (
 
   _heartbeatFrequencyMS: Int,
   _maxIdleTimeMS: Int,
+  _maxNonQueryableHeartbeats: Int,
   _maxHistorySize: Int,
   _credentials: Map[String, MongoConnectionOptions.Credential],
   _keyStore: Option[MongoConnectionOptions.KeyStore],
@@ -128,10 +129,37 @@ final class MongoConnectionOptions private[reactivemongo] (
   /** An optional [[https://docs.mongodb.com/manual/reference/connection-string/#urioption.appName application name]] */
   @inline def appName: Option[String] = _appName
 
+  /** '''EXPERIMENTAL:''' */
+  def maxNonQueryableHeartbeats = _maxNonQueryableHeartbeats
+
+  private[reactivemongo] def withMaxNonQueryableHeartbeats(max: Int) =
+    new MongoConnectionOptions(
+      _connectTimeoutMS = this.connectTimeoutMS,
+      _authenticationDatabase = this.authenticationDatabase,
+      _sslEnabled = this.sslEnabled,
+      _sslAllowsInvalidCert = this.sslAllowsInvalidCert,
+      _authenticationMechanism = this.authenticationMechanism,
+      _tcpNoDelay = this.tcpNoDelay,
+      _keepAlive = this.keepAlive,
+      _nbChannelsPerNode = this.nbChannelsPerNode,
+      _maxInFlightRequestsPerChannel = this.maxInFlightRequestsPerChannel,
+      _minIdleChannelsPerNode = this.minIdleChannelsPerNode,
+      _writeConcern = this.writeConcern,
+      _readPreference = this.readPreference,
+      _failoverStrategy = this.failoverStrategy,
+      _heartbeatFrequencyMS = this.heartbeatFrequencyMS,
+      _maxIdleTimeMS = this.maxIdleTimeMS,
+      _maxNonQueryableHeartbeats = max,
+      _maxHistorySize = this.maxHistorySize,
+      _credentials = this.credentials,
+      _keyStore = this.keyStore,
+      _readConcern = this.readConcern,
+      _appName = this.appName)
+
   // ---
 
   @SuppressWarnings(Array("MaxParameters"))
-  def copy(
+  def copy( // TODO: Add _maxNonQueryableHeartbeats
     connectTimeoutMS: Int = _connectTimeoutMS,
     authenticationDatabase: Option[String] = _authenticationDatabase,
     sslEnabled: Boolean = _sslEnabled,
@@ -168,6 +196,7 @@ final class MongoConnectionOptions private[reactivemongo] (
       _failoverStrategy = failoverStrategy,
       _heartbeatFrequencyMS = heartbeatFrequencyMS,
       _maxIdleTimeMS = maxIdleTimeMS,
+      _maxNonQueryableHeartbeats = this._maxNonQueryableHeartbeats, // TODO
       _maxHistorySize = maxHistorySize,
       _credentials = credentials,
       _keyStore = keyStore,
@@ -259,6 +288,7 @@ object MongoConnectionOptions {
       _failoverStrategy = failoverStrategy,
       _heartbeatFrequencyMS = heartbeatFrequencyMS,
       _maxIdleTimeMS = maxIdleTimeMS,
+      _maxNonQueryableHeartbeats = 30, // TODO
       _maxHistorySize = maxHistorySize,
       _credentials = credentials,
       _keyStore = keyStore,

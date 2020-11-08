@@ -1,7 +1,9 @@
 package reactivemongo
 
 import scala.collection.immutable.Set
-import scala.concurrent.{ Await, Future }
+
+import scala.concurrent.{ Await, Future, Promise }
+import scala.concurrent.duration._
 
 import akka.actor.ActorRef
 import akka.testkit.TestActorRef
@@ -36,7 +38,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
 
   // ---
 
-  def unresponsiveSecondarySpec =
+  def unresponsiveSecondarySpec = {
     "mark as Unknown the unresponsive secondary" in {
       val opts = MongoConnectionOptions.default.copy(nbChannelsPerNode = 1)
       val pingTimeout = opts.heartbeatFrequencyMS * 1000000L
@@ -140,8 +142,76 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
               }
           }
         }
+      }.await(1, timeout)
+    }
+
+    "evict non-queryable node after timeout" in {
+      val opts = MongoConnectionOptions.default.copy(
+        nbChannelsPerNode = 1,
+        heartbeatFrequencyMS = 10000).
+        withMaxNonQueryableHeartbeats(1)
+      val nonQueryableTimeout = 2L * (opts.heartbeatFrequencyMS * 1000000L)
+
+      withConAndSys(usd, opts) { (_ /*con*/ , ref) =>
+        def ns(): Set[String] =
+          nodeSet(ref.underlyingActor).nodes.map(_.name).toSet
+
+        withConMon1(ref.underlyingActor.name) { _ =>
+          updateNodeSet(ref.underlyingActor, "Test") {
+            // Connect the test nodes with "embedded" channels
+            _.updateAll { n =>
+              if (n.name startsWith "nodesetspec.node2:") {
+                // Simulate a isMaster timeout for node2
+                val lastTime = System.nanoTime() - nonQueryableTimeout
+
+                n.copy(
+                  pingInfo = n.pingInfo.copy(
+                    lastIsMasterId = 1,
+                    lastIsMasterTime = lastTime),
+                  statusChanged = lastTime)
+              } else n
+            }
+          }
+
+          ref ! RefreshAll
+
+          @volatile var t: Int = 0
+          val node = Promise[String]()
+
+          def check(): Unit = {
+            usSys.scheduler.scheduleOnce(3.seconds) {
+              t += 1
+
+              val res = ns()
+
+              res.headOption match {
+                case Some(n) if (res.size == 1) => {
+                  node.success(n)
+                  ()
+                }
+
+                case _ if (t < 5) =>
+                  check()
+
+                case _ => {
+                  node.failure(new Exception("Unexpected nodeSet"))
+                  ()
+                }
+              }
+            }
+
+            ()
+          }
+
+          check()
+
+          node.future.map(
+            _ must beTypedEqualTo("nodesetspec.node1:27017"))
+
+        }
       }.andThen { case _ => usd.close() }.await(1, timeout)
     }
+  }
 
   // ---
 

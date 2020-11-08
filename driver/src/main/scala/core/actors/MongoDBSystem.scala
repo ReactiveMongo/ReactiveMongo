@@ -190,7 +190,19 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
   private lazy val heartbeatFrequency =
     options.heartbeatFrequencyMS.milliseconds
 
-  private val pingTimeout = options.heartbeatFrequencyMS * 1000000L
+  private val pingTimeout: Long = options.heartbeatFrequencyMS * 1000000L
+
+  private val maxNonQueryableTime: Long = // in nanos
+    options.maxNonQueryableHeartbeats * pingTimeout
+
+  @inline private def formatNanos(ns: Long): String = {
+    if (ns < 1000L) s"${ns.toString}ns"
+    else if (ns < 100000000L) s"${(ns / 1000000L).toString}ms"
+    else s"${(ns / 1000000000L).toString}s"
+  }
+
+  private lazy val maxNonQueryableTimeRepr: String =
+    formatNanos(maxNonQueryableTime)
 
   private val nodeSetLock = new Object {}
 
@@ -218,7 +230,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
   /** On start or restart. */
   private def initNodeSet(): Try[NodeSet] = {
-    val seedNodeSet = new NodeSet(None, None, seeds.map(seed => new Node(seed, Set.empty, NodeStatus.Unknown, Vector.empty, Set.empty, tags = Map.empty[String, String], ProtocolMetadata.Default, PingInfo(), false)).toVector, initialAuthenticates.toSet)
+    val nanow = System.nanoTime()
+    val seedNodeSet = new NodeSet(None, None, seeds.map(seed => new Node(seed, Set.empty, NodeStatus.Unknown, Vector.empty, Set.empty, tags = Map.empty[String, String], ProtocolMetadata.Default, PingInfo(), false, nanow)).toVector, initialAuthenticates.toSet)
 
     debug(s"Initial node set: ${seedNodeSet.toShortString}")
 
@@ -720,7 +733,19 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
         s"RefreshAll($statusInfo)"
       }) { ns =>
-        ns.updateAll(_)
+        val nanow = System.nanoTime()
+
+        ns.copy(nodes = ns.nodes.filter {
+          case Node.Queryable(_) => true
+
+          case n =>
+            if ((nanow - n.statusChanged) < maxNonQueryableTime) true
+            else {
+              warn(s"Node ${n.toShortString} has been not queryable for at least ${maxNonQueryableTimeRepr}; Removing it from the set! Please check configuration and connectivity")
+
+              false
+            }
+        }).updateAll(_)
       }
 
       ()
@@ -1038,11 +1063,13 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         }
       }
 
-      if (node.signaling.isEmpty) {
+      if (node.signaling.isEmpty && node.status != NodeStatus.Unknown) {
         // If there no longer established connection
         trace(s"Unset the node status on disconnect (#${chanId})")
 
-        node.copy(status = NodeStatus.Unknown)
+        node.copy(
+          status = NodeStatus.Unknown,
+          statusChanged = System.nanoTime())
       } else {
         node
       }
@@ -1124,13 +1151,14 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         val nodeSetWasReachable = nodeSet.isReachable
         val wasPrimary: Option[Node] = nodeSet.primary
         @volatile var chanNode = Option.empty[Node]
+        val nanow = System.nanoTime()
 
         // Update the details of the node corresponding to the response chan
         val prepared =
           nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
             val pingTime: Long = {
               if (node.pingInfo.lastIsMasterId == respTo) {
-                System.nanoTime() - node.pingInfo.lastIsMasterTime
+                nanow - node.pingInfo.lastIsMasterTime
               } else { // not accurate - fallback
                 val expected = node.pingInfo.lastIsMasterId
 
@@ -1165,6 +1193,11 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
             val an = authenticating.copy(
               status = nodeStatus,
+              statusChanged = {
+                if (authenticating.status == nodeStatus) {
+                  authenticating.statusChanged
+                } else nanow
+              },
               pingInfo = pingInfo,
               tags = isMaster.replicaSet.map(_.tags).getOrElse(Map.empty),
               protocolMetadata = meta,
@@ -1184,7 +1217,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
               // Prepare node for newly discovered host in the RS
               val n = new Node(host, Set.empty, NodeStatus.Uninitialized,
                 Vector.empty, Set.empty, tags = Map.empty[String, String],
-                ProtocolMetadata.Default, PingInfo(), false)
+                ProtocolMetadata.Default, PingInfo(), false, nanow)
 
               n.createSignalingConnection(channelFactory, self) match {
                 case Success(upd) =>
@@ -1247,7 +1280,9 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
                 // invalidate node status on status conflict
                 warn(s"Invalid node status ${node.status} for ${node.name} (expected: ${n.status}); Fallback to Unknown status")
 
-                n.copy(status = NodeStatus.Unknown)
+                n.copy(
+                  status = NodeStatus.Unknown,
+                  statusChanged = nanow)
               } else n
             }
           }
@@ -1290,7 +1325,11 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
     updateNodeSet(st)(_.updateAll { node =>
       if (node.status != NodeStatus.Primary) node
-      else node.copy(status = NodeStatus.Unknown)
+      else {
+        node.copy(
+          status = NodeStatus.Unknown,
+          statusChanged = System.nanoTime())
+      }
     })
 
     broadcastMonitors(PrimaryUnavailable)
@@ -1628,9 +1667,15 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       } else if ((node.pingInfo.lastIsMasterTime + pingTimeout) < now) {
         // Unregister the pending requests for this node
         val wasPrimary = node.status == NodeStatus.Primary
+        val nanow = System.nanoTime()
 
         val updated = node.copy(
           status = NodeStatus.Unknown,
+          statusChanged = {
+            if (node.status != NodeStatus.Unknown) {
+              nanow
+            } else node.statusChanged
+          },
           //connections = Vector.empty,
           authenticated = Set.empty,
           pingInfo = renewedPingInfo)
@@ -1638,7 +1683,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         // The previous IsMaster request is expired
         val msg = s"${updated.toShortString} hasn't answered in time to last ping! Please check its connectivity"
 
-        warn(s"${msg} (<time:${System.nanoTime()}>).", internalState())
+        warn(s"${msg} (<time:${formatNanos(nanow)}>).", internalState())
 
         // Reset node state
         updateHistory {
