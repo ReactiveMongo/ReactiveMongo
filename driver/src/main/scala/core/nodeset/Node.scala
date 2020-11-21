@@ -138,12 +138,22 @@ private[reactivemongo] final class Node(
     else this
   }
 
-  lazy val toShortString = s"""Node[$name: $status (${authenticatedConnections.size}/${connected.size}/${connections.filterNot(_.signaling).size} available connections), latency=${pingInfo.ping}ns, authenticated={${authenticated.map(_.toShortString) mkString ", "}}]"""
+  lazy val toShortString = {
+    def latency = {
+      import pingInfo.{ ping => ns }
+
+      if (ns < 1000L) s"${ns.toString}ns"
+      else if (ns < 100000000L) s"${(ns / 1000000L).toString}ms"
+      else s"${(ns / 1000000000L).toString}s"
+    }
+
+    s"""Node[$name: $status (${authenticatedConnections.size}/${connected.size}/${connections.filterNot(_.signaling).size} available connections), latency=${latency}, authenticated={${authenticated.map(_.toShortString) mkString ", "}}]"""
+  }
 
   /** Returns the read-only information about this node. */
   def info = new NodeInfo(name, aliases, host, port, status,
     connections.count(!_.signaling),
-    connections.count(_.status == ConnectionStatus.Connected),
+    connected.size,
     authenticatedConnections.size, tags,
     protocolMetadata, pingInfo, isMongos)
 
@@ -193,7 +203,17 @@ final class NodeInfo private[reactivemongo] (
   /** All the node names (including its aliases) */
   def names: Set[String] = aliases + name
 
-  override lazy val toString = s"Node[$name: $status ($connected/$connections available connections), latency=${pingInfo.ping}, auth=$authenticated]"
+  override lazy val toString = {
+    def latency = {
+      import pingInfo.{ ping => ns }
+
+      if (ns < 1000L) s"${ns.toString}ns"
+      else if (ns < 100000000L) s"${(ns / 1000000L).toString}ms"
+      else s"${(ns / 1000000000L).toString}s"
+    }
+
+    s"Node[$name: $status ($connected/$connections available connections), latency=${latency}, auth=$authenticated]"
+  }
 
   override def equals(that: Any): Boolean = that match {
     case other: NodeInfo =>
