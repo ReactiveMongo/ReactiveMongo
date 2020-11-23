@@ -173,7 +173,7 @@ commands:
                       exit 0
                     fi
 
-                    V=`sbt 'show version' 2>&1 | tail -n 1 | cut -d ']' -f 2 | perl -pe 's/^[ \t]+//;s/[ \t]+$//'`
+                    V=`sbt 'show version' 2>&1 | tail -n 2 | cut -d ']' -f 2 | grep SNAPSHOT | sed -e 's/[ \t]*//g'`
 
                     if [ `echo "$V" | grep -- '-SNAPSHOT' | wc -l` -eq 0 ]; then
                       echo "Cannot publish release $V"
