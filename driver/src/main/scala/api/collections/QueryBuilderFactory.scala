@@ -111,6 +111,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
     val snapshot: Boolean = false,
     val comment: Option[String] = None,
     val maxTimeMs: Option[Long] = None,
+    val maxAwaitTimeMs: Option[Long] = None,
     val singleBatch: Boolean = false,
     val maxScan: Option[Double] = None,
     val returnKey: Boolean = false,
@@ -129,7 +130,9 @@ trait QueryBuilderFactory[P <: SerializationPack]
     /**
      * $filterFunction.
      */
-    private[api] def filter[T](selector: T)(implicit w: pack.Writer[T]): QueryBuilder =
+    private[api] def filter[T](selector: T)(
+      implicit
+      w: pack.Writer[T]): QueryBuilder =
       copy(filter = Option(selector).map(pack.serialize[T](_, w)))
 
     /**
@@ -247,12 +250,26 @@ trait QueryBuilderFactory[P <: SerializationPack]
      * import reactivemongo.api.bson.BSONDocument
      * import reactivemongo.api.bson.collection.BSONCollection
      *
-     * def foo(coll: BSONCollection) = coll.find(BSONDocument.empty).
-     *   maxTimeMs(1000L) // 1s
+     * def foo(coll: BSONCollection) =
+     *   coll.find(BSONDocument.empty).maxTimeMs(1000L) // 1s
      * }}}
      */
     def maxTimeMs(milliseconds: Long): QueryBuilder =
       copy(maxTimeMs = Some(milliseconds))
+
+    /**
+     * Adds [[https://github.com/mongodb/specifications/blob/master/source/find_getmore_killcursors_commands.rst#semantics-of-maxtimems-for-a-driver maxAwaitTimeMs]] to query.
+     *
+     * {{{
+     * import reactivemongo.api.bson.BSONDocument
+     * import reactivemongo.api.bson.collection.BSONCollection
+     *
+     * def foo(coll: BSONCollection) =
+     *   coll.find(BSONDocument.empty).maxAwaitTimeMs(1000L) // 1s
+     * }}}
+     */
+    def maxAwaitTimeMs(milliseconds: Long): QueryBuilder =
+      copy(maxAwaitTimeMs = Some(milliseconds))
 
     /**
      * Sets the [[ReadConcern]].
@@ -626,6 +643,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
       snapshot: Boolean = this.snapshot,
       comment: Option[String] = this.comment,
       maxTimeMs: Option[Long] = this.maxTimeMs,
+      maxAwaitTimeMs: Option[Long] = this.maxAwaitTimeMs,
       singleBatch: Boolean = this.singleBatch,
       maxScan: Option[Double] = this.maxScan,
       returnKey: Boolean = this.returnKey,
@@ -633,8 +651,8 @@ trait QueryBuilderFactory[P <: SerializationPack]
       collation: Option[Collation] = this.collation): QueryBuilder =
       new QueryBuilder(this.collection, failoverStrategy, skip, batchSize,
         cursorOptions, readConcern, readPreference, filter, projection, sort,
-        max, min, hint, explain, snapshot, comment, maxTimeMs, singleBatch,
-        maxScan, returnKey, showRecordId, collation)
+        max, min, hint, explain, snapshot, comment, maxTimeMs, maxAwaitTimeMs,
+        singleBatch, maxScan, returnKey, showRecordId, collation)
 
     // ---
 
@@ -876,7 +894,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
 
       DefaultCursor.query(pack, op, body, readPreference,
         collection.db, failoverStrategy,
-        collection.fullCollectionName, maxTimeMs)(reader)
+        collection.fullCollectionName, maxAwaitTimeMs)(reader)
     }
   }
 }

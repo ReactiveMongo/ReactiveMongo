@@ -14,6 +14,7 @@ trait UpsertedFactory[P <: SerializationPack] {
     @inline def index: Int = _index
 
     /** The id of the upserted element */
+    @SuppressWarnings(Array("MethodNames"))
     @inline def _id: pack.Value = __id
 
     override def equals(that: Any): Boolean = that match {

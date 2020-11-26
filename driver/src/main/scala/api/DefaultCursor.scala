@@ -41,12 +41,13 @@ private[reactivemongo] object DefaultCursor {
     db: DB,
     failover: FailoverStrategy,
     collectionName: String,
-    maxTimeMS: Option[Long])(implicit reader: pack.Reader[A]): Impl[A] =
+    _maxAwaitTimeMs: Option[Long])(implicit reader: pack.Reader[A]): Impl[A] =
     new Impl[A] {
       val preference = readPreference
       val database = db
       val failoverStrategy = failover
       val fullCollectionName = collectionName
+      val maxAwaitTimeMs = _maxAwaitTimeMs
 
       val numberToReturn = {
         val version = connection._metadata.
@@ -105,7 +106,7 @@ private[reactivemongo] object DefaultCursor {
               elem("collection", string(collName)),
               elem("batchSize", int(ntr)))
 
-            maxTimeMS.foreach { ms =>
+            maxAwaitTimeMs.foreach { ms =>
               cmdOpts += elem("maxTimeMS", long(ms))
             }
 
@@ -130,6 +131,7 @@ private[reactivemongo] object DefaultCursor {
     val preference = readPreference
     val database = db
     val failoverStrategy = failover
+    val maxAwaitTimeMs = Option.empty[Long]
 
     @inline def fullCollectionName = _ref.collectionName
 
@@ -221,6 +223,8 @@ private[reactivemongo] object DefaultCursor {
 
     def numberToReturn: Int
 
+    def maxAwaitTimeMs: Option[Long]
+
     def tailable: Boolean
 
     def makeIterator: Response => Iterator[A] // Unsafe
@@ -309,6 +313,7 @@ private[reactivemongo] object DefaultCursor {
         }.future.map(Some(_))
       } else {
         logger.warn("Call to next() but cursorID is 0, there is probably a bug")
+
         Future.successful(Option.empty[Response])
       }
     }
@@ -317,11 +322,16 @@ private[reactivemongo] object DefaultCursor {
       (response.reply.cursorID != 0) && (
         maxDocs < 0 || (nextBatchOffset(response) < maxDocs))
 
+    private lazy val renewTimeMs = maxAwaitTimeMs.getOrElse(500L)
+
     /** Returns next response using tailable mode */
-    private def tailResponse(current: Response, maxDocs: Int)(implicit ec: ExecutionContext): Future[Option[Response]] = {
+    private def tailResponse(
+      current: Response,
+      maxDocs: Int)(implicit ec: ExecutionContext): Future[Option[Response]] = {
       {
         @inline def closed = Future.successful {
           logger.warn("[tailResponse] Connection is closed")
+
           Option.empty[Response]
         }
 
@@ -334,7 +344,8 @@ private[reactivemongo] object DefaultCursor {
           }
         } else {
           logger.debug("[tailResponse] Current cursor exhausted, renewing...")
-          delayedFuture(500, connection.actorSystem).
+
+          delayedFuture(renewTimeMs, connection.actorSystem).
             flatMap { _ => makeRequest(maxDocs).map(Some(_)) }
         }
       }

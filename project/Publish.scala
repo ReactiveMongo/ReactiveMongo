@@ -28,7 +28,8 @@ object Publish {
   }
 
   val mimaSettings = Seq(
-    mimaPreviousArtifacts := Set.empty, // TODO
+    mimaPreviousArtifacts := Set(
+      organization.value %% name.value.toLowerCase % "1.0.0"),
     mimaBinaryIssueFilters ++= Seq(missingMethodInOld))
 
   val siteUrl = "http://reactivemongo.org"
