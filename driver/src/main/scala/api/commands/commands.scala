@@ -66,7 +66,7 @@ private[reactivemongo] object Command {
   private[commands] lazy val logger =
     reactivemongo.util.LazyLogger("reactivemongo.api.commands")
 
-  def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = fetchCursor[p.type, A](db, db.name + f".$$cmd", p, command, failover, CursorOptions.empty, maxTimeMS = None)
+  def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = fetchCursor[p.type, A](db, db.name + f".$$cmd", p, command, failover, CursorOptions.empty, maxAwaitTimeMS = None)
 
   /**
    * @param fullCollectionName the fully qualified collection name (even if `query.fullCollectionName` is `\$cmd`)
@@ -78,7 +78,7 @@ private[reactivemongo] object Command {
     command: A,
     failover: FailoverStrategy,
     options: CursorOptions,
-    maxTimeMS: Option[Long])(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = new CursorFetcher[p.type, DefaultCursor.Impl] {
+    maxAwaitTimeMS: Option[Long])(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = new CursorFetcher[p.type, DefaultCursor.Impl] {
     val pack: p.type = p
 
     protected def defaultReadPreference = db.connection.options.readPreference
@@ -151,7 +151,7 @@ private[reactivemongo] object Command {
       val op = Query(flags, db.name + f".$$cmd", 0, 1)
 
       DefaultCursor.query(pack, op, (_: Int) => bs,
-        readPreference, db, failover, fullCollectionName, maxTimeMS)
+        readPreference, db, failover, fullCollectionName, maxAwaitTimeMS)
 
     }
   }
@@ -170,11 +170,9 @@ private[reactivemongo] object Command {
      * Executes the `command` and returns its result
      * along with the MongoDB response.
      */
-    def cursor[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C, options: CursorOptions, rp: ReadPreference, maxTimeMS: Option[Long])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R]): DefaultCursor.Impl[R] = fetchCursor(
-      collection.db, collection.fullCollectionName, pack,
+    def cursor[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C, options: CursorOptions, rp: ReadPreference, maxAwaitTimeMS: Option[Long])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R]): DefaultCursor.Impl[R] = fetchCursor(collection.db, collection.fullCollectionName, pack,
       new ResolvedCollectionCommand(collection.name, command),
-      failover, options, maxTimeMS).
-      cursor[R](rp)
+      failover, options, maxAwaitTimeMS).cursor[R](rp)
 
     /**
      * Executes the `command` and returns its result

@@ -79,9 +79,17 @@ object Version {
           commonsCodec,
           shapelessTest % Test, specs.value) ++ logApi,
         mimaBinaryIssueFilters ++= {
-          //import com.typesafe.tools.mima.core._, ProblemFilters.{ exclude => x }
+          import com.typesafe.tools.mima.core._
 
-          Seq.empty
+          val mtp = ProblemFilters.exclude[MissingTypesProblem](_)
+
+          Seq(
+            mtp("reactivemongo.core.actors.MongoDBSystem$OperationHandler"),
+            mtp("reactivemongo.core.netty.ChannelFactory"),
+            mtp("reactivemongo.core.protocol.MongoHandler"),
+            mtp("reactivemongo.core.protocol.ResponseFrameDecoder"),
+            mtp("reactivemongo.core.protocol.RequestEncoder")
+          )
         },
         Common.closeableObject in Test := "tests.Common$",
         testOptions in Test += Tests.Cleanup(Common.cleanup.value),
