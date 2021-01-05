@@ -95,7 +95,6 @@ object Version {
           val log = streams.value.log
           val objectClass = f"tests.Common$$"
 
-
           Tests.Cleanup {cl: ClassLoader =>
             import scala.language.reflectiveCalls
 
