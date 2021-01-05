@@ -391,6 +391,24 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
       }.awaitFor(timeout)
     }
 
+    val maxNonQueryableHeartbeats =
+      "mongodb://host1?rm.maxNonQueryableHeartbeats=5"
+
+    s"parse $maxNonQueryableHeartbeats with success" in {
+      parseURI(maxNonQueryableHeartbeats) must beLike[ParsedURI] {
+        case uri => uri.options.maxNonQueryableHeartbeats must_=== 5
+      }.awaitFor(timeout)
+    }
+
+    "ignore option maxNonQueryableHeartbeats=0" in {
+      parseURI("mongodb://host1?rm.maxNonQueryableHeartbeats=0").
+        aka("parsed URI") must beLike[ParsedURI] {
+          case uri => uri.options.maxNonQueryableHeartbeats must_=== 30 and {
+            uri.ignoredOptions must (contain("rm.maxNonQueryableHeartbeats"))
+          }
+        }.awaitFor(timeout)
+    }
+
     val invalidMonRef1 = "mongodb://host1?heartbeatFrequencyMS=A"
 
     s"fail to parse $invalidMonRef1" in {

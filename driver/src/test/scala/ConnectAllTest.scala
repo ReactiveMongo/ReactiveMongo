@@ -86,7 +86,8 @@ trait ConnectAllTest { _: NodeSetSpec =>
             tags = Map.empty[String, String],
             ProtocolMetadata.Default,
             PingInfo(),
-            false)
+            false,
+            System.nanoTime())
         }
       }
 

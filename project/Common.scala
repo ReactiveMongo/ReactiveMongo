@@ -33,8 +33,6 @@ object Common extends AutoPlugin {
   val scala211 = "2.11.12"
   val scala213 = "2.13.3"
 
-  val closeableObject = SettingKey[String]("class name of a closeable object")
-
   def majorVersion = {
     val Major = """([0-9]+)\.([0-9]+)\..*""".r
 
@@ -51,9 +49,6 @@ object Common extends AutoPlugin {
 
   val useShaded = settingKey[Boolean](
     "Use ReactiveMongo-Shaded (see system property 'reactivemongo.shaded')")
-
-  val pomTransformer = settingKey[Option[XmlElem => Option[XmlElem]]](
-    "Optional XML node transformer")
 
   override def projectSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
     scalaVersion := "2.12.11",
@@ -92,41 +87,6 @@ object Common extends AutoPlugin {
     mappings in (Compile, packageBin) ~= filter,
     mappings in (Compile, packageSrc) ~= filter,
     mappings in (Compile, packageDoc) ~= filter,
-    testFrameworks ~= { _.filterNot(_ == TestFrameworks.ScalaTest) },
-    closeableObject in Test := "Common$",
-    pomTransformer := None,
-    pomPostProcess := {
-      val next: XmlElem => Option[XmlElem] = pomTransformer.value match {
-        case Some(t) => t
-        case None => Some(_: XmlElem)
-      }
-
-      val f: XmlElem => Option[XmlElem] = { dep =>
-        if ((dep \ "artifactId").text startsWith "silencer-lib") {
-          Option.empty[XmlElem]
-        } else {
-          next(dep)
-        }
-      }
-
-      XmlUtil.transformPomDependencies(f)
-    }
+    testFrameworks ~= { _.filterNot(_ == TestFrameworks.ScalaTest) }
   ) ++ Publish.settings ++ Format.settings ++ Publish.mimaSettings
-
-  val cleanup = Def.task[ClassLoader => Unit] {
-    val log = streams.value.log
-
-    {cl: ClassLoader =>
-      import scala.language.reflectiveCalls
-
-      val objectClass = (closeableObject in Test).value
-      val c = cl.loadClass(objectClass)
-      type M = { def close(): Unit }
-      val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
-
-      log.info(s"Closing $m ...")
-
-      m.close()
-    }
-  }
 }

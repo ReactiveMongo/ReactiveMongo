@@ -91,8 +91,22 @@ object Version {
             mtp("reactivemongo.core.protocol.RequestEncoder")
           )
         },
-        Common.closeableObject in Test := "tests.Common$",
-        testOptions in Test += Tests.Cleanup(Common.cleanup.value),
+        testOptions in Test += {
+          val log = streams.value.log
+          val objectClass = f"tests.Common$$"
+
+          Tests.Cleanup {cl: ClassLoader =>
+            import scala.language.reflectiveCalls
+
+            val c = cl.loadClass(objectClass)
+            type M = { def close(): Unit }
+            val m: M = c.getField("MODULE$").get(null).asInstanceOf[M]
+
+            log.info(s"Closing $m ...")
+
+            m.close()
+          }
+        },
         mappings in (Compile, packageBin) ~= driverFilter,
         //mappings in (Compile, packageDoc) ~= driverFilter,
         mappings in (Compile, packageSrc) ~= driverFilter,

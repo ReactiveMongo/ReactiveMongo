@@ -869,6 +869,9 @@ object MongoConnection {
           case ("rm.minIdleChannelsPerNode", IntRe(min)) =>
             unsupported -> result.copy(minIdleChannelsPerNode = min.toInt)
 
+          case ("rm.maxNonQueryableHeartbeats", IntRe(max)) if (max != "0") =>
+            unsupported -> result.withMaxNonQueryableHeartbeats(max.toInt)
+
           case ("writeConcern", "unacknowledged") => unsupported -> result.
             copy(writeConcern = WriteConcern.Unacknowledged)
 

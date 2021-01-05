@@ -14,6 +14,7 @@ import reactivemongo.core.netty.ChannelFactory
 
 /**
  * @param name the main name of the node
+ * @param statusChanged the time the status has last changed (in nanos)
  */
 private[reactivemongo] final class Node(
   val name: String,
@@ -24,7 +25,8 @@ private[reactivemongo] final class Node(
   val tags: Map[String, String],
   val protocolMetadata: ProtocolMetadata,
   val pingInfo: PingInfo,
-  val isMongos: Boolean) {
+  val isMongos: Boolean,
+  val statusChanged: Long) {
 
   /** All the node names (including its aliases) */
   lazy val names: Set[String] = aliases + name
@@ -110,7 +112,7 @@ private[reactivemongo] final class Node(
 
   def withAlias(as: String): Node =
     new Node(name, aliases + as, status, connections, authenticated, tags,
-      protocolMetadata, pingInfo, isMongos)
+      protocolMetadata, pingInfo, isMongos, statusChanged)
 
   @SuppressWarnings(Array("VariableShadowing"))
   def copy(
@@ -122,9 +124,10 @@ private[reactivemongo] final class Node(
     protocolMetadata: ProtocolMetadata = this.protocolMetadata,
     pingInfo: PingInfo = this.pingInfo,
     isMongos: Boolean = this.isMongos,
-    aliases: Set[String] = this.aliases): Node =
+    aliases: Set[String] = this.aliases,
+    statusChanged: Long = this.statusChanged): Node =
     new Node(name, aliases, status, connections, authenticated, tags,
-      protocolMetadata, pingInfo, isMongos)
+      protocolMetadata, pingInfo, isMongos, statusChanged)
 
   @inline private[core] def pickConnectionByChannelId(id: ChannelId): Option[Connection] = connections.find(_.channel.id == id)
 
@@ -147,7 +150,7 @@ private[reactivemongo] final class Node(
       else s"${(ns / 1000000000L).toString}s"
     }
 
-    s"""Node[$name: $status (${authenticatedConnections.size}/${connected.size}/${connections.filterNot(_.signaling).size} available connections), latency=${latency}, authenticated={${authenticated.map(_.toShortString) mkString ", "}}]"""
+    s"""Node[$name: $status<${statusChanged}ns> (${authenticatedConnections.size}/${connected.size}/${connections.filterNot(_.signaling).size} available connections), latency=${latency}, authenticated={${authenticated.map(_.toShortString) mkString ", "}}]"""
   }
 
   /** Returns the read-only information about this node. */
