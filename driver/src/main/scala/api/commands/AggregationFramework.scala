@@ -984,23 +984,36 @@ trait AggregationFramework[P <: SerializationPack]
    * [[https://docs.mongodb.com/manual/reference/operator/aggregation/merge/ \$merge]] aggregation stage.
    *
    * @since MongoDB 4.2
-   * @param intoDb the name of the `into` database
-   * @param intoCollection the name of the `into` collection
    */
   final class Merge private (
-    val intoDb: String,
-    val intoCollection: String,
+    val into: Merge.Into,
     val on: Seq[String],
     val whenMatched: Option[String],
     val let: Option[pack.Document],
     val whenNotMatched: Option[String]) extends PipelineOperator {
+
+    /** The name of the `into` database. */
+    @deprecated("Use `into.db`", "1.0.2")
+    @inline def intoDb: String = into.db.mkString
+
+    /** The name of the `into` collection. */
+    @deprecated("Use `into.collection`", "1.0.2")
+    @inline def intoCollection: String = into.collection
 
     import builder.{ elementProducer => element, string }
 
     def makePipe: pack.Document = {
       val opts = Seq.newBuilder[pack.ElementProducer]
 
-      opts += element("into", string(f"${intoDb}.${intoCollection}"))
+      into.db match {
+        case Some(db) =>
+          opts += element("into", builder.document(Seq(
+            element("db", string(db)),
+            element("coll", string(into.collection)))))
+
+        case _ =>
+          opts += element("into", string(into.collection))
+      }
 
       if (on.nonEmpty) {
         opts += element("on", builder.array(on.map(string)))
@@ -1022,7 +1035,7 @@ trait AggregationFramework[P <: SerializationPack]
     }
 
     private[api] lazy val tupled =
-      Tuple6(intoDb, intoCollection, on, whenMatched, let, whenNotMatched)
+      Tuple5(into, on, whenMatched, let, whenNotMatched)
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
@@ -1037,6 +1050,44 @@ trait AggregationFramework[P <: SerializationPack]
   }
 
   object Merge {
+    /**
+     * @param db the target database (default to the current one if `None`)
+     * @param collection the target collection
+     */
+    final class Into(
+      val db: Option[String],
+      val collection: String) {
+
+      private[api] lazy val tupled = db -> collection
+
+      override def equals(that: Any): Boolean = that match {
+        case other: this.type =>
+          this.tupled == other.tupled
+
+        case _ => false
+      }
+
+      override def hashCode: Int = tupled.hashCode
+
+      override def toString: String = db match {
+        case Some(name) => s"${name}.$collection"
+        case _          => collection
+      }
+    }
+
+    /**
+     * Defines a `\$merge` stage in the same database.
+     */
+    def apply(
+      intoCollection: String,
+      on: Seq[String],
+      whenMatched: Option[String],
+      let: Option[pack.Document],
+      whenNotMatched: Option[String]): Merge =
+      new Merge(
+        new Into(None, intoCollection),
+        on, whenMatched, let, whenNotMatched)
+
     def apply(
       intoDb: String,
       intoCollection: String,
@@ -1044,7 +1095,9 @@ trait AggregationFramework[P <: SerializationPack]
       whenMatched: Option[String],
       let: Option[pack.Document],
       whenNotMatched: Option[String]): Merge =
-      new Merge(intoDb, intoCollection, on, whenMatched, let, whenNotMatched)
+      new Merge(
+        new Into(Some(intoDb), intoCollection),
+        on, whenMatched, let, whenNotMatched)
   }
 
   /**

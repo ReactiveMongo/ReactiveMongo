@@ -1521,22 +1521,41 @@ db.accounts.aggregate([
         f"$$listSessions" -> BSONDocument("allUsers" -> true))
     }
 
-    f"be $$merge" in {
+    f"be $$merge" >> {
       import AggregationFramework.Merge
 
-      makePipe(Merge(
-        intoDb = "foo",
-        intoCollection = "bar",
-        on = Seq("lorem", "ipsum"),
-        whenMatched = Some("replace"),
-        let = Some(BSONDocument("var" -> "v")),
-        whenNotMatched = None)) must_=== BSONDocument(
-        f"$$merge" -> BSONDocument(
-          "into" -> "foo.bar",
-          "on" -> Seq("lorem", "ipsum"),
-          "whenMatched" -> "replace",
-          "let" -> BSONDocument("var" -> "v")))
+      "with explicit target DB" in {
+        makePipe(Merge(
+          intoDb = "foo",
+          intoCollection = "bar",
+          on = Seq("lorem", "ipsum"),
+          whenMatched = Some("replace"),
+          let = Some(BSONDocument("var" -> "v")),
+          whenNotMatched = None)) must_=== BSONDocument(
+          f"$$merge" -> BSONDocument(
+            "into" -> BSONDocument(
+              "db" -> "foo",
+              "coll" -> "bar"),
+            "on" -> Seq("lorem", "ipsum"),
+            "whenMatched" -> "replace",
+            "let" -> BSONDocument("var" -> "v")))
 
+      }
+
+      "without current DB as target" in {
+        makePipe(Merge(
+          intoCollection = "bar",
+          on = Seq("lorem", "ipsum"),
+          whenMatched = Some("replace"),
+          let = Some(BSONDocument("var" -> "v")),
+          whenNotMatched = None)) must_=== BSONDocument(
+          f"$$merge" -> BSONDocument(
+            "into" -> "bar",
+            "on" -> Seq("lorem", "ipsum"),
+            "whenMatched" -> "replace",
+            "let" -> BSONDocument("var" -> "v")))
+
+      }
     }
 
     f"be $$planCacheStats" in {
