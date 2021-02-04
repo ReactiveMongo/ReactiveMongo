@@ -66,7 +66,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.specifications == null && other.specifications == null) || (
           this.specifications != null && this.specifications.
-          equals(other.specifications))
+          ==(other.specifications))
 
       case _ =>
         false
@@ -274,7 +274,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.outputName == null && other.outputName == null) || (
           this.outputName != null && this.outputName.
-          equals(other.outputName))
+          ==(other.outputName))
 
       case _ =>
         false
@@ -373,7 +373,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.specifications == null && other.specifications == null) || (
           this.specifications != null && this.specifications.
-          equals(other.specifications))
+          ==(other.specifications))
 
       case _ =>
         false
@@ -706,7 +706,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
           this.expression != null && this.expression.
-          equals(other.expression))
+          ==(other.expression))
 
       case _ =>
         false
@@ -739,7 +739,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
           this.expression != null && this.expression.
-          equals(other.expression))
+          ==(other.expression))
 
       case _ =>
         false
@@ -959,7 +959,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.predicate == null && other.predicate == null) || (
           this.predicate != null && this.predicate.
-          equals(other.predicate))
+          ==(other.predicate))
 
       case _ =>
         false
@@ -1115,7 +1115,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.collection == null && other.collection == null) || (
           this.collection != null && this.collection.
-          equals(other.collection))
+          ==(other.collection))
 
       case _ =>
         false
@@ -1157,7 +1157,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.specifications == null && other.specifications == null) || (
           this.specifications != null && this.specifications.
-          equals(other.specifications))
+          ==(other.specifications))
 
       case _ =>
         false
@@ -1190,7 +1190,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
           this.expression != null && this.expression.
-          equals(other.expression))
+          ==(other.expression))
 
       case _ =>
         false
@@ -1225,7 +1225,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.newRoot == null && other.newRoot == null) || (
           this.newRoot != null && this.newRoot.
-          equals(other.newRoot))
+          ==(other.newRoot))
 
       case _ =>
         false
@@ -1260,7 +1260,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.newRoot == null && other.newRoot == null) || (
           this.newRoot != null && this.newRoot.
-          equals(other.newRoot))
+          ==(other.newRoot))
 
       case _ =>
         false
@@ -1295,7 +1295,7 @@ trait AggregationFramework[P <: SerializationPack]
         (this.replacementDocument == null &&
           other.replacementDocument == null) || (
             this.replacementDocument != null && this.replacementDocument.
-            equals(other.replacementDocument))
+            ==(other.replacementDocument))
 
       case _ =>
         false
@@ -1352,7 +1352,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
           this.expression != null && this.expression.
-          equals(other.expression))
+          ==(other.expression))
 
       case _ =>
         false
@@ -1405,7 +1405,7 @@ trait AggregationFramework[P <: SerializationPack]
 
     import builder.{ document, elementProducer => element }
     protected[reactivemongo] val makePipe: pack.Document = document(Seq(
-      element(f"$$sort", document(fields.map {
+      element(f"$$sort", document(fields.collect {
         case Ascending(field)  => element(field, builder.int(1))
 
         case Descending(field) => element(field, builder.int(-1))
@@ -1455,7 +1455,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
           this.expression != null && this.expression.
-          equals(other.expression))
+          ==(other.expression))
 
       case _ =>
         false
@@ -1490,7 +1490,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.field == null && other.field == null) || (
           this.field != null && this.field.
-          equals(other.field))
+          ==(other.field))
 
       case _ =>
         false
@@ -1557,7 +1557,7 @@ trait AggregationFramework[P <: SerializationPack]
       case other: this.type =>
         (this.field == null && other.field == null) || (
           this.field != null && this.field.
-          equals(other.field))
+          ==(other.field))
 
       case _ =>
         false

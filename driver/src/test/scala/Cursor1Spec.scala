@@ -249,7 +249,8 @@ trait Cursor1Spec { spec: CursorSpec =>
 
       "with session" in {
         spec(db.startSession().map(_.collection(coll.name)))
-      }
+      } tag "gt_mongo32"
+
     }
 
     { // Fold

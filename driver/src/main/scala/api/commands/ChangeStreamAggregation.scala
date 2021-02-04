@@ -75,7 +75,7 @@ trait ChangeStreamAggregation[P <: SerializationPack] {
       override def equals(that: Any): Boolean = that match {
         case other: this.type =>
           (this.value == null && other.value == null) || (
-            this.value != null && this.value.equals(other.value))
+            this.value != null && this.value == other.value)
 
         case _ =>
           false
@@ -101,7 +101,7 @@ trait ChangeStreamAggregation[P <: SerializationPack] {
       override def equals(that: Any): Boolean = that match {
         case other: this.type =>
           (this.value == null && other.value == null) || (
-            this.value != null && this.value.equals(other.value))
+            this.value != null && this.value == other.value)
 
         case _ =>
           false

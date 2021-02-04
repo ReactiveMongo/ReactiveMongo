@@ -47,8 +47,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
-          this.field != null && this.field.
-          equals(other.field))
+          this.field != null && this.field == other.field)
 
       case _ =>
         false
@@ -76,8 +75,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression.
-          equals(other.expression))
+          this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -107,8 +105,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
-          this.field != null && this.field.
-          equals(other.field))
+          this.field != null && this.field == other.field)
 
       case _ =>
         false
@@ -136,8 +133,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression.
-          equals(other.expression))
+          this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -167,8 +163,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
-          this.field != null && this.field.
-          equals(other.field))
+          this.field != null && this.field == other.field)
 
       case _ =>
         false
@@ -196,8 +191,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression.
-          equals(other.expression))
+          this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -227,8 +221,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.field == null && other.field == null) || (
-          this.field != null && this.field.
-          equals(other.field))
+          this.field != null && this.field == other.field)
 
       case _ =>
         false
@@ -259,8 +252,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression.
-          equals(other.expression))
+          this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -292,8 +284,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression.
-          equals(other.expression))
+          this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -325,7 +316,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
       case other: this.type =>
         (this.field == null && other.field == null) || (
           this.field != null && this.field.
-          equals(other.field))
+          ==(other.field))
 
       case _ =>
         false
@@ -354,8 +345,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression.
-          equals(other.expression))
+          this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -386,7 +376,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
       case other: this.type =>
         (this.field == null && other.field == null) || (
           this.field != null && this.field.
-          equals(other.field))
+          ==(other.field))
 
       case _ =>
         false
@@ -416,8 +406,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression.
-          equals(other.expression))
+          this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -448,7 +437,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
       case other: this.type =>
         (this.field == null && other.field == null) || (
           this.field != null && this.field.
-          equals(other.field))
+          ==(other.field))
 
       case _ =>
         false
@@ -479,8 +468,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression.
-          equals(other.expression))
+          this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -510,8 +498,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression.
-          equals(other.expression))
+          this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -545,7 +532,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
       case other: this.type =>
         (this.field == null && other.field == null) || (
           this.field != null && this.field.
-          equals(other.field))
+          ==(other.field))
 
       case _ =>
         false
@@ -577,8 +564,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression.
-          equals(other.expression))
+          this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -612,7 +598,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
       case other: this.type =>
         (this.field == null && other.field == null) || (
           this.field != null && this.field.
-          equals(other.field))
+          ==(other.field))
 
       case _ =>
         false
@@ -643,7 +629,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
       case other: this.type =>
         (this.field == null && other.field == null) || (
           this.field != null && this.field.
-          equals(other.field))
+          ==(other.field))
 
       case _ =>
         false
@@ -673,8 +659,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression.
-          equals(other.expression))
+          this.expression != null && this.expression == other.expression)
 
       case _ =>
         false

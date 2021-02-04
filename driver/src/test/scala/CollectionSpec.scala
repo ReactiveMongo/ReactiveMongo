@@ -97,14 +97,14 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
               collect[List](-1, Cursor.FailOnError[List[BSONDocument]]()).
               map(_.size) must beTypedEqualTo(2).await(1, slowTimeout)
           }
-      }
+      } tag "wip"
 
       "with bulkInsert" in {
         val persons = Seq(person3, person4, person5)
 
         collection.insert(ordered = true).many(persons).map(_.ok).
           aka("insertion") must beTrue.await(1, timeout)
-      }
+      } tag "wip"
     }
 
     "count the inserted documents" in {
@@ -204,8 +204,10 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
     {
       def cursorSpec(c: DefaultCollection, timeout: FiniteDuration) = {
-        implicit val reader = SometimesBuggyPersonReader()
-        @inline def cursor = findAll(c).cursor[Person]()
+        @inline def cursor = {
+          implicit val reader = SometimesBuggyPersonReader()
+          findAll(c).cursor[Person]()
+        }
 
         "using collect" in {
           val collect = cursor.
@@ -540,11 +542,13 @@ sealed trait CollectionFixtures { specs: CollectionSpec =>
     throw CustomException("hey hey hey")
   }
 
+  // Reader that throw Exception each 4 documents
   def SometimesBuggyPersonReader() = {
     var i = 0
 
     reader[Person] { doc =>
       i += 1
+      //println(s"reader = $i")
       if (i % 4 == 0) throw CustomException("hey hey hey")
       else pack.deserialize(doc, PersonReader)
     }

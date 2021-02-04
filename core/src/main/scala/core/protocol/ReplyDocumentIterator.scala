@@ -85,7 +85,7 @@ private[reactivemongo] sealed trait ReplyDocumentIteratorLowPriority {
 
           def docs = parseDocuments[P, A](pack)(buf)
 
-          val firstBatch = preloaded.iterator.map {
+          val firstBatch = preloaded.iterator.collect {
             case pack.IsDocument(bson) => pack.deserialize(bson, reader)
           }
 

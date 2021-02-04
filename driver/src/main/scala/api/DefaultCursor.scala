@@ -26,6 +26,8 @@ import reactivemongo.core.actors.{
   ExpectingResponse
 }
 
+import reactivemongo.api.commands.CommandCodecs
+
 private[reactivemongo] object DefaultCursor {
   import Cursor.{ State, Cont, Fail, logger }
   import CursorOps.UnrecoverableException
@@ -92,6 +94,14 @@ private[reactivemongo] object DefaultCursor {
       val builder = pack.newBuilder
 
       val getMoreOpCmd: Function2[Long, Int, (RequestOp, BufferSequence)] = {
+        def baseElmts: Seq[pack.ElementProducer] = db.session match {
+          case Some(session) =>
+            CommandCodecs.writeSession(builder)(session)
+
+          case _ =>
+            Seq.empty[pack.ElementProducer]
+        }
+
         if (lessThenV32) { (cursorId, ntr) =>
           GetMore(fullCollectionName, ntr, cursorId) -> BufferSequence.empty
         } else {
@@ -104,7 +114,7 @@ private[reactivemongo] object DefaultCursor {
             val cmdOpts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
               elem("getMore", long(cursorId)),
               elem("collection", string(collName)),
-              elem("batchSize", int(ntr)))
+              elem("batchSize", int(ntr))) ++= baseElmts
 
             maxAwaitTimeMs.foreach { ms =>
               cmdOpts += elem("maxTimeMS", long(ms))
@@ -177,6 +187,14 @@ private[reactivemongo] object DefaultCursor {
     lazy val builder = _pack.newBuilder
 
     val getMoreOpCmd: Function2[Long, Int, (RequestOp, BufferSequence)] = {
+      def baseElmts: Seq[_pack.ElementProducer] = db.session match {
+        case Some(session) =>
+          CommandCodecs.writeSession(builder)(session)
+
+        case _ =>
+          Seq.empty[_pack.ElementProducer]
+      }
+
       if (lessThenV32) { (cursorId, ntr) =>
         GetMore(fullCollectionName, ntr, cursorId) -> BufferSequence.empty
       } else {
@@ -190,7 +208,7 @@ private[reactivemongo] object DefaultCursor {
           val cmdOpts = Seq.newBuilder[_pack.ElementProducer] ++= Seq(
             elem("getMore", long(cursorId)),
             elem("collection", string(collName)),
-            elem("batchSize", int(ntr)))
+            elem("batchSize", int(ntr))) ++= baseElmts
 
           maxTimeMS.foreach { ms =>
             cmdOpts += elem("maxTimeMS", long(ms))
