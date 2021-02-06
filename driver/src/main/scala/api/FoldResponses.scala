@@ -45,7 +45,7 @@ private[api] final class FoldResponses[T](
     killCursors(cursorID, "FoldResponses")
   } catch {
     case NonFatal(cause) =>
-      logger.warn(s"fails to kill cursor: $cursorID", cause)
+      logger.warn(s"Fails to kill cursor: $cursorID", cause)
   }
 
   @inline private def ok(r: Response, v: T): Unit = {
@@ -125,14 +125,14 @@ private[api] final class FoldResponses[T](
     })(ec)
 
     case s =>
-      logger.warn(s"unexpected cursor state: $s")
+      logger.warn(s"Unexpected cursor state: $s")
   }
 
   @inline private def procResponses(last: Future[Response], cur: T, c: Int, lastID: Long): Unit = last.onComplete({
     case Success(r) => self ! HandleResponse(r, cur, c)
 
     case Failure(error) => {
-      logger.error("fails to send request", error)
+      logger.error("Fails to send request", error)
 
       err(cur, error) match {
         case Done(v) => {
