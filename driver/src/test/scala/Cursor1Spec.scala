@@ -234,13 +234,22 @@ trait Cursor1Spec { spec: CursorSpec =>
           "i" -> 1, "record" -> "record1")).await(0, timeout)
     }
 
-    "collect with limited maxDocs" in {
+    "collect with limited maxDocs" >> {
       val max = (nDocs / 8).toInt
 
-      coll.find(matchAll("collectLimit")).batchSize(997).cursor().
-        collect[List](max, Cursor.FailOnError[List[BSONDocument]]()).
-        aka("documents") must haveSize[List[BSONDocument]](max).
-        await(1, timeout)
+      def spec(cl: => Future[BSONCollection]) =
+        cl.flatMap { c =>
+          c.find(matchAll("collectLimit")).batchSize(997).cursor().
+            collect[List](max, Cursor.FailOnError[List[BSONDocument]]())
+        } must haveSize[List[BSONDocument]](max).await(1, timeout)
+
+      "without session" in {
+        spec(Future successful coll)
+      }
+
+      "with session" in {
+        spec(db.startSession().map(_.collection(coll.name)))
+      } tag "gt_mongo32"
 
     }
 

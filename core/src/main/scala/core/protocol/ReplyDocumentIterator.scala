@@ -8,6 +8,8 @@ import reactivemongo.api.SerializationPack
 
 import reactivemongo.api.bson.collection.BSONSerializationPack
 
+import reactivemongo.core.errors.GenericDriverException
+
 private[reactivemongo] object ReplyDocumentIterator
   extends ReplyDocumentIteratorLowPriority {
 
@@ -85,8 +87,22 @@ private[reactivemongo] sealed trait ReplyDocumentIteratorLowPriority {
 
           def docs = parseDocuments[P, A](pack)(buf)
 
-          val firstBatch = preloaded.iterator.map {
-            case pack.IsDocument(bson) => pack.deserialize(bson, reader)
+          val firstBatch: Iterator[A] = {
+            // Wrap iterator so that deserialization is only called on next,
+            // and possibly error only raised there (not on hasNext).
+            val underlying = preloaded.iterator
+
+            new Iterator[A] {
+              @inline def hasNext = underlying.hasNext
+
+              def next(): A = underlying.next() match {
+                case pack.IsDocument(bson) =>
+                  pack.deserialize(bson, reader)
+
+                case v =>
+                  throw new GenericDriverException(s"Invalid document: $v")
+              }
+            }
           }
 
           firstBatch ++ docs

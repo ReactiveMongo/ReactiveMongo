@@ -24,7 +24,7 @@ private[api] final class FoldResponses[T](
   private val promise = scala.concurrent.Promise[T]()
   lazy val result: Future[T] = promise.future
 
-  private val handle: Any => Unit = {
+  private val handle: Msg => Unit = {
     case ProcResponses(makeReq, cur, c, id) =>
       procResponses(makeReq(), cur, c, id)
 
@@ -36,13 +36,16 @@ private[api] final class FoldResponses[T](
 
     case OnError(last, cur, error, c) =>
       onError(last, cur, error, c)
+
+    case s =>
+      logger.warn(s"unexpected fold message: $s")
   }
 
   @inline private def kill(cursorID: Long): Unit = try {
     killCursors(cursorID, "FoldResponses")
   } catch {
     case NonFatal(cause) =>
-      logger.warn(s"fails to kill cursor: $cursorID", cause)
+      logger.warn(s"Fails to kill cursor: $cursorID", cause)
   }
 
   @inline private def ok(r: Response, v: T): Unit = {
@@ -88,6 +91,9 @@ private[api] final class FoldResponses[T](
 
         case next @ Cont(v) =>
           self ! ProcNext(last, v /*cur*/ , next, c)
+
+        case _ =>
+          ko(last, error)
       }
     }
 
@@ -117,13 +123,16 @@ private[api] final class FoldResponses[T](
       case Success(_) => ok(last, v)
       case Failure(e) => ko(last, e)
     })(ec)
+
+    case s =>
+      logger.warn(s"Unexpected cursor state: $s")
   }
 
   @inline private def procResponses(last: Future[Response], cur: T, c: Int, lastID: Long): Unit = last.onComplete({
     case Success(r) => self ! HandleResponse(r, cur, c)
 
     case Failure(error) => {
-      logger.error("fails to send request", error)
+      logger.error("Fails to send request", error)
 
       err(cur, error) match {
         case Done(v) => {
@@ -143,6 +152,12 @@ private[api] final class FoldResponses[T](
 
           promise.success(v)
         }
+
+        case _ => { // Should not happen
+          if (lastID > 0) kill(lastID)
+
+          promise.failure(error)
+        }
       }
     }
   })(ec)
@@ -150,13 +165,14 @@ private[api] final class FoldResponses[T](
   /**
    * Enqueues a `message` to be processed while fold the cursor results.
    */
-  private def ![M](message: M)(implicit delay: Delay.Aux[M]): Unit = {
+  private def ![M <: Msg](message: M)(implicit delay: Delay.Aux[M]): Unit = {
     actorSys.scheduler.scheduleOnce(delay.value)(handle(message))(ec)
 
     ()
   }
 
   // Messages
+  private[api] trait Msg
 
   /**
    * @param requester the function the perform the next request
@@ -168,14 +184,14 @@ private[api] final class FoldResponses[T](
     requester: () => Future[Response],
     cur: T,
     c: Int,
-    lastID: Long)
+    lastID: Long) extends Msg
 
   /**
    * @param last $lastParam
    * @param cur $curParam
    * @param c $cParam
    */
-  private case class HandleResponse(last: Response, cur: T, c: Int)
+  private case class HandleResponse(last: Response, cur: T, c: Int) extends Msg
 
   /**
    * @param last $lastParam
@@ -183,7 +199,9 @@ private[api] final class FoldResponses[T](
    * @param next the next state
    * @param c $cParam
    */
-  private case class ProcNext(last: Response, cur: T, next: State[T], c: Int)
+  private case class ProcNext(
+    last: Response,
+    cur: T, next: State[T], c: Int) extends Msg
 
   /**
    * @param last $lastParam
@@ -191,7 +209,8 @@ private[api] final class FoldResponses[T](
    * @param error the error details
    * @param c $cParam
    */
-  private case class OnError(last: Response, cur: T, error: Throwable, c: Int)
+  private case class OnError(
+    last: Response, cur: T, error: Throwable, c: Int) extends Msg
 
   // ---
 

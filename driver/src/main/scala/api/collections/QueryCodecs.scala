@@ -25,11 +25,11 @@ private[reactivemongo] object QueryCodecs {
       import builder.{ elementProducer => element, document, string }
 
       val mode = readPreference match {
-        case ReadPreference.Primary               => "primary"
         case ReadPreference.PrimaryPreferred(_)   => "primaryPreferred"
         case ReadPreference.Secondary(_)          => "secondary"
         case ReadPreference.SecondaryPreferred(_) => "secondaryPreferred"
         case ReadPreference.Nearest(_)            => "nearest"
+        case _                                    => "primary"
       }
       val elements = Seq.newBuilder[builder.pack.ElementProducer]
 

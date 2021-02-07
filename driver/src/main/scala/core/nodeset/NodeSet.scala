@@ -96,9 +96,6 @@ private[reactivemongo] class NodeSet(
     if (mongos.isDefined) {
       resolve(mongos)
     } else preference match {
-      case ReadPreference.Primary =>
-        resolve(primary)
-
       case ReadPreference.PrimaryPreferred(tags) =>
         resolve(primary).orElse(resolve(
           findNode(secondaries, filter(tags), secondaries.pick, unpriorised)))
@@ -114,6 +111,9 @@ private[reactivemongo] class NodeSet(
 
       case ReadPreference.Nearest(tags) =>
         resolve(findNode(nearestGroup, filter(tags), nearest, unpriorised))
+
+      case _ =>
+        resolve(primary)
     }
   }
 

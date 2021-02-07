@@ -31,7 +31,7 @@ object Common extends AutoPlugin {
   private val java8 = scala.util.Properties.isJavaAtLeast("1.8")
 
   val scala211 = "2.11.12"
-  val scala213 = "2.13.3"
+  val scala213 = "2.13.4"
 
   def majorVersion = {
     val Major = """([0-9]+)\.([0-9]+)\..*""".r
@@ -51,7 +51,7 @@ object Common extends AutoPlugin {
     "Use ReactiveMongo-Shaded (see system property 'reactivemongo.shaded')")
 
   override def projectSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
-    scalaVersion := "2.12.11",
+    scalaVersion := "2.12.12",
     crossScalaVersions := Seq(scala211, scalaVersion.value, scala213),
     crossVersion := CrossVersion.binary,
     useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),

@@ -204,8 +204,10 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
     {
       def cursorSpec(c: DefaultCollection, timeout: FiniteDuration) = {
-        implicit val reader = SometimesBuggyPersonReader()
-        @inline def cursor = findAll(c).cursor[Person]()
+        @inline def cursor = {
+          implicit val reader = SometimesBuggyPersonReader()
+          findAll(c).cursor[Person]()
+        }
 
         "using collect" in {
           val collect = cursor.
@@ -540,11 +542,13 @@ sealed trait CollectionFixtures { specs: CollectionSpec =>
     throw CustomException("hey hey hey")
   }
 
+  // Reader that throw Exception each 4 documents
   def SometimesBuggyPersonReader() = {
     var i = 0
 
     reader[Person] { doc =>
       i += 1
+      //println(s"reader = $i")
       if (i % 4 == 0) throw CustomException("hey hey hey")
       else pack.deserialize(doc, PersonReader)
     }
