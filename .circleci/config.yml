@@ -176,7 +176,9 @@ commands:
                     V=`sbt 'show version' 2>&1 | tail -n 2 | cut -d ']' -f 2 | grep SNAPSHOT | sed -e 's/[ \t]*//g'`
 
                     if [ `echo "$V" | grep -- '-SNAPSHOT' | wc -l` -eq 0 ]; then
-                      echo "Cannot publish release $V"
+                      S=`echo "$V" | perl -pe 's/([0-9]+)$/${\($1 + 1)}-SNAPSHOT/'`
+                      echo "Cannot bump $V to $S"
+                      echo "version in ThisBuild := \"$S\"" > version.sbt
                       exit 0
                     fi
                     
