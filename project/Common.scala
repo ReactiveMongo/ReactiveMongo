@@ -17,7 +17,8 @@ object Common extends AutoPlugin {
       Resolver.sonatypeRepo("snapshots"),
       Resolver.sonatypeRepo("staging")
     ),
-    mimaFailOnNoPrevious := false
+    mimaFailOnNoPrevious := false,
+    logBuffered in Test := false
   )
 
   val filter = { (ms: Seq[(File, String)]) =>

@@ -27,11 +27,11 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
       lazy val cursorDrv = Common.newAsyncDriver()
       lazy val cursorCon = Await.result(
         cursorDrv.connect(List(primaryHost), DefaultOptions),
-        Common.timeout)
+        timeout)
 
       lazy val slowCursorCon = Await.result(
         cursorDrv.connect(List(slowPrimary), SlowOptions),
-        Common.slowTimeout)
+        slowTimeout)
 
       lazy val (cursorDb, slowCursorDb) =
         Common.databases(Common.commonDb, cursorCon, slowCursorCon)
@@ -412,6 +412,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
   /* A selector matching all the documents, with an unique content for debug. */
   @inline def matchAll(name: String) =
     BSONDocument(name -> BSONDocument(f"$$exists" -> false))
+
 }
 
 sealed trait CursorSpecEnv { spec: CursorSpec =>

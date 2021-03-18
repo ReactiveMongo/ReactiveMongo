@@ -64,8 +64,11 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   }
   lazy val slowZipColl: BSONCollection = slowDb(zipColName)
 
-  implicit val locationHandler: BSONDocumentHandler[Location] = Macros.handler[Location]
-  implicit val zipCodeHandler: BSONDocumentHandler[ZipCode] = Macros.handler[ZipCode]
+  private implicit val locationHandler: BSONDocumentHandler[Location] =
+    Macros.handler[Location]
+
+  private implicit val zipCodeHandler: BSONDocumentHandler[ZipCode] =
+    Macros.handler[ZipCode]
 
   private val jpCodes = List(
     ZipCode("JP 13", "TOKYO", "JP", 13185502L,
@@ -110,7 +113,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
         case _         => Future.successful({})
       }
 
-      insert(zipCodes) must beTypedEqualTo({}).await(1, timeout) and {
+      insert(zipCodes) must beTypedEqualTo({}).awaitFor(timeout) and {
         coll.count() aka "c#1" must beTypedEqualTo(4L).await(1, slowTimeout)
       } and {
         slowZipColl.count() aka "c#2" must beTypedEqualTo(4L).
@@ -2067,7 +2070,7 @@ db.accounts.aggregate([
 
   // ---
 
-  def index(
+  private def index(
     key: Seq[(String, IndexType)],
     name: Option[String] = None,
     unique: Boolean = false,
@@ -2077,55 +2080,57 @@ db.accounts.aggregate([
     partialFilter: Option[pack.Document] = None,
     options: pack.Document = builder.document(Seq.empty)) = Index(pack)(key, name, unique, background, sparse, None, None, None, None, None, None, None, None, None, None, None, None, None, version, partialFilter, options)
 
-  case class User(
+  private case class User(
     _id: Int,
     name: String,
     favorites: Seq[String])
 
-  case class Location(lon: Double, lat: Double)
+  private case class Location(lon: Double, lat: Double)
 
-  case class ZipCode(
+  private case class ZipCode(
     _id: String, city: String, state: String,
     population: Long, location: Location)
 
-  case class Product(
+  private case class Product(
     _id: Int, sku: Option[String] = None,
     description: Option[String] = None,
     instock: Option[Int] = None)
 
-  case class InventoryReport(
+  private case class InventoryReport(
     _id: Int,
     item: Option[String] = None,
     price: Option[Int] = None,
     quantity: Option[Int] = None,
     docs: List[Product] = Nil)
 
-  case class QuizStdDev(_id: Int, stdDev: Double)
+  private case class QuizStdDev(_id: Int, stdDev: Double)
 
-  case class GeoPoint(coordinates: List[Double])
-  case class GeoDistance(calculated: Int, loc: GeoPoint)
-  case class GeoPlace(
+  private case class GeoPoint(coordinates: List[Double])
+  private case class GeoDistance(calculated: Int, loc: GeoPoint)
+  private case class GeoPlace(
     loc: GeoPoint,
     name: String,
     category: String,
     dist: GeoDistance)
 
-  case class Subsection(
+  private case class Subsection(
     subtitle: String,
     tags: List[String],
     content: String)
-  case class Redaction(
+  private case class Redaction(
     title: String,
     tags: List[String],
     year: Int,
     subsections: List[Subsection])
 
-  case class Score(name: String, score: Int)
-  implicit val scoreReader: BSONDocumentReader[Score] = Macros.reader[Score]
+  private case class Score(name: String, score: Int)
 
-  case class QuizScores(_id: Int, scores: Set[Score])
+  implicit private val scoreReader: BSONDocumentReader[Score] =
+    Macros.reader[Score]
 
-  implicit val quizScoresReader: BSONDocumentReader[QuizScores] =
+  private case class QuizScores(_id: Int, scores: Set[Score])
+
+  implicit private val quizScoresReader: BSONDocumentReader[QuizScores] =
     BSONDocumentReader[QuizScores] { doc =>
       (for {
         i <- doc.getAsTry[Int]("_id")

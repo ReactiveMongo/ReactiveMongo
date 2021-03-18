@@ -75,7 +75,15 @@ commands:
                     CMD="./.ci_scripts/validate.sh /tmp/integration-env.sh"
 
                     if [ "x$CI_CATEGORY" = "xINTEGRATION_TESTS" ]; then
-                      TEST_TIMEOUT=420s ./.ci_scripts/retry.sh 2 $CMD
+                      TEST_TIMEOUT=420s
+                      source /tmp/integration-env.sh
+                      export MONGO_MINOR
+
+                      if [ `echo "$MONGO_MINOR" | grep '^4.4' | wc -l` -eq 1 ]; then
+                        TEST_TIMEOUT="840s"
+                      fi
+                      export TEST_TIMEOUT
+                      ./.ci_scripts/retry.sh 2 $CMD
                     else
                       $CMD
                     fi
@@ -110,7 +118,7 @@ commands:
       - restore_cache:
           name: Restore MongoDB cache
           keys:
-            - &mongo_cache_key mongodb-<< parameters.mongo_version >>-<< parameters.mongo_profile >>
+            - &mongo_cache_key mongo-<< parameters.mongo_version >>-<< parameters.mongo_profile >>
 
       - run:
           name: Prepare integration environment

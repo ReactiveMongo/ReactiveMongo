@@ -11,8 +11,6 @@ import reactivemongo.api.bson.collection.BSONCollection
 
 import reactivemongo.core.protocol.MongoWireVersion
 
-import tests.Common.timeout
-
 import util.BsonMatchers._
 import util.WithTemporaryCollection._
 import util.{ MongoSkips, WithTemporaryDb }
@@ -22,6 +20,8 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
   with WithTemporaryDb with MongoSkips {
 
   "Change stream" title
+
+  import tests.Common.timeout
 
   "Change stream of a collection" should {
     "have an empty cursor when a new cursor is opened without resuming" in {

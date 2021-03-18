@@ -53,6 +53,10 @@ if [ "$MONGO_PROFILE" = "default" -a "$MONGO_VER" = "4" ]; then
     SBT_OPTS="$SBT_OPTS -Dtest.nettyNativeArch=linux"
 fi
 
+if [ `echo "$MONGO_MINOR" | grep '^4.4' | wc -l` -eq 1 ]; then
+    SBT_OPTS="$SBT_OPTS -Dspecs2.timeFactor=1.3"
+fi
+
 # Netty
 SBT_OPTS="$SBT_OPTS -Dreactivemongo.io.netty.leakDetection.level=paranoid"
 SBT_OPTS="$SBT_OPTS -Dreactivemongo.io.netty.leakDetection.acquireAndReleaseOnly=true"
