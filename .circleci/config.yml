@@ -80,7 +80,7 @@ commands:
                       export MONGO_MINOR
 
                       if [ `echo "$MONGO_MINOR" | grep '^4.4' | wc -l` -eq 1 ]; then
-                        TEST_TIMEOUT="720s"
+                        TEST_TIMEOUT="840s"
                       fi
                       export TEST_TIMEOUT
                       ./.ci_scripts/retry.sh 2 $CMD
