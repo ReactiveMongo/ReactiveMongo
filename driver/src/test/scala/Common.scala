@@ -48,7 +48,7 @@ object Common extends CommonAuth {
 
     if (sys.env.get("MONGO_MINOR") contains "4.4.4") {
       logger.warn("Increase timeout due to MongoDB 4.4 performance regression")
-      nominalValue * 9L
+      nominalValue * 10L
     } else {
       nominalValue
     }
