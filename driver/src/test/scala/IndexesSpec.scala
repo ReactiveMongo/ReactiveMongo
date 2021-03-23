@@ -64,7 +64,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
         c.indexesManager.ensure(index(
           List("loc" -> Geo2D),
           options = BSONDocument("min" -> -95, "max" -> 95, "bits" -> 28))).
-          aka("index") must beTrue.await(1, timeout * 2)
+          aka("index") must beTrue.await(1, timeout)
 
       "be created with the default connection" in {
         spec(geo, timeout)
@@ -84,7 +84,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
             e.code contains 13027
 
           case _ => false
-        } must beTrue.await(1, timeout)
+        } must beTrue.await(2, timeout)
     }
 
     {

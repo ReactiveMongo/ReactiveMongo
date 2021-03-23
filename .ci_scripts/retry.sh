@@ -29,7 +29,7 @@ while [ "$RETRY_COUNT" -lt "$RETRY_MAX" ]; do
   if [ "$RES" -eq 0 ]; then
     exit 0
   else
-    killall -9 java # Make sure
+    killall -9 java || true # Make sure
   fi
 done
 

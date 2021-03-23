@@ -30,11 +30,11 @@ final class CommandSpec(implicit ee: ExecutionEnv)
       def reindexSpec(db: DB, coll: String, t: FiniteDuration) = {
         val reIndexDoc = BSONDocument("reIndex" -> coll)
 
-        db(coll).create() must beTypedEqualTo({}).await(1, t) and {
+        db(coll).create() must beTypedEqualTo({}).awaitFor(t) and {
           db.runCommand(reIndexDoc, db.failoverStrategy).
             one[BSONDocument](ReadPreference.primary) must beLike[BSONDocument] {
               case doc => decoder.double(doc, "ok") must beSome(1)
-            }.await(1, t)
+            }.awaitFor(t)
         }
       }
 
@@ -42,7 +42,7 @@ final class CommandSpec(implicit ee: ExecutionEnv)
         reindexSpec(db, s"commandspec${System identityHashCode db}", timeout)
       }
 
-      "with the slow connection" in eventually(retries = 2, sleep = timeout) {
+      "with the slow connection" in eventually(2, timeout) {
         reindexSpec(
           slowDb, s"commandspec${System identityHashCode slowDb}",
           slowTimeout)

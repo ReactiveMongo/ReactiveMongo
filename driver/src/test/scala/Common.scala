@@ -32,6 +32,7 @@ object Common extends CommonAuth {
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
 
   private val timeoutFactor = 1.16D
+
   def estTimeout(fos: FailoverStrategy): FiniteDuration =
     (1 to fos.retries).foldLeft(fos.initialDelay) { (d, i) =>
       d + (fos.initialDelay * ((timeoutFactor * fos.delayFactor(i)).toLong))
@@ -40,8 +41,18 @@ object Common extends CommonAuth {
   val timeout: FiniteDuration = {
     val maxTimeout = estTimeout(failoverStrategy)
 
-    if (maxTimeout < 10.seconds) 10.seconds
-    else maxTimeout
+    val nominalValue = {
+      if (maxTimeout < 10.seconds) 10.seconds
+      else maxTimeout
+    }
+
+    if (sys.env.get("MONGO_MINOR") contains "4.4.4") {
+      logger.warn("Increase timeout due to MongoDB 4.4 performance regression")
+
+      nominalValue * 13L
+    } else {
+      nominalValue
+    }
   }
 
   val DefaultOptions = {

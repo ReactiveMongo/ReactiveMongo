@@ -15,8 +15,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
   "FindAndModify" title
 
   import reactivemongo.api.TestCompat._
-  import tests.Common
-  import Common._
+  import tests.Common, Common._
 
   "Raw findAndModify" should {
     case class Person(
@@ -90,10 +89,11 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
 
       "with the default connection" in {
         val after = jack1.copy(age = 37)
-        val colName = s"FindAndModifySpec${System identityHashCode this}-1"
-        val collection = db(colName)
 
         eventually(2, timeout) {
+          val colName = s"fam-${System identityHashCode this}-1-${System.currentTimeMillis()}"
+          val collection = db(colName)
+
           collection.count(Some(writeDocument(jack1))).
             aka("count before") must beTypedEqualTo(0L).await(1, timeout) and {
               upsertAndFetch(collection, jack1, after.age, timeout) {
@@ -106,10 +106,11 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
       "with the slow connection" in {
         val before = jack1
         val after = jack2
-        val colName = s"FindAndModifySpec${System identityHashCode this}-2"
-        val slowColl = slowDb(colName)
 
         eventually(2, timeout) {
+          val colName = s"fam-${System identityHashCode this}-2-${System.currentTimeMillis()}"
+          val slowColl = slowDb(colName)
+
           slowColl.update.one(before, before, upsert = true).
             map(_.n) must beTypedEqualTo(1).awaitFor(slowTimeout) and {
               db(colName).count(None) must beTypedEqualTo(1L).
@@ -126,14 +127,15 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
 
     "modify a document and fetch its previous value" in {
       val incrementAge = BSONDocument(f"$$inc" -> BSONDocument("age" -> 1))
-      val colName = s"FindAndModifySpec${System identityHashCode this}-3"
-      val collection = db(colName)
-
-      def findAndUpd = collection.findAndUpdate(jack2, incrementAge)
 
       eventually(2, timeout) {
+        val colName = s"fam${System identityHashCode this}-3-${System.currentTimeMillis()}"
+        val collection = db(colName)
+
+        def findAndUpd = collection.findAndUpdate(jack2, incrementAge)
+
         collection.update.one(jack2, jack2, upsert = true).
-          map(_.n) must beTypedEqualTo(1).await(0, timeout) and {
+          map(_.n) must beTypedEqualTo(1).await(1, timeout) and {
             collection.count(Some(BSONDocument(
               "firstName" -> jack2.firstName,
               "lastName" -> jack2.lastName))) must beTypedEqualTo(1L).
@@ -167,7 +169,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
           "firstName" -> james.firstName,
           "lastName" -> james.lastName)
 
-        val colName = s"FindAndModifySpec${System identityHashCode selector}-4"
+        val colName = s"fam${System identityHashCode selector}-4-${System.currentTimeMillis()}"
         val coll = db.collection(colName)
 
         (for {
@@ -239,7 +241,7 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
     } tag "gt_mongo32"
 
     f"fail with invalid $$inc clause" in eventually(2, timeout) {
-      val colName = s"FindAndModify${System identityHashCode this}-6-${System.currentTimeMillis()}"
+      val colName = s"fam${System identityHashCode this}-6-${System.currentTimeMillis()}"
       val collection = db(colName)
 
       val query = BSONDocument("FindAndModifySpecFail" -> BSONDocument(

@@ -35,7 +35,7 @@ trait Cursor1Spec { spec: CursorSpec =>
 
       insert(nDocs, Seq.empty).map { _ =>
         info(s"inserted $nDocs records")
-      } aka "fixtures" must beTypedEqualTo({}).await(1, timeout)
+      } must beTypedEqualTo({}).awaitFor(timeout)
     }
 
     "request for cursor query" in {
@@ -303,7 +303,8 @@ trait Cursor1Spec { spec: CursorSpec =>
               coll.find(matchAll("cursorspec4b")).
                 batchSize(2096).cursor().foldWhileM(0)(
                   (st, _) => Future.successful(Cursor.Cont(st + 1))).
-                  aka("result size") must beTypedEqualTo(16517).await(1, timeout)
+                  aka("result size") must beTypedEqualTo(16517).
+                  await(1, timeout)
             }
 
             "only 1024 documents" in {
