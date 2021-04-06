@@ -1,8 +1,8 @@
-scapegoatVersion in ThisBuild := "1.3.11"
+ThisBuild / scapegoatVersion := "1.3.11"
 
-scapegoatReports in ThisBuild := Seq("text") // xml in 2.13 require extra dep
+ThisBuild / scapegoatReports := Seq("text") // xml in 2.13 require extra dep
 
-scapegoatDisabledInspections in ThisBuild := Seq("FinalModifierOnCaseClass")
+ThisBuild / scapegoatDisabledInspections := Seq("FinalModifierOnCaseClass")
 
 pomPostProcess := {
   object Processor {

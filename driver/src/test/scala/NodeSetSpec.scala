@@ -17,7 +17,14 @@ import reactivemongo.api.{
 
 import reactivemongo.core.protocol.ProtocolMetadata
 
-import reactivemongo.core.nodeset.NodeSet
+import reactivemongo.core.nodeset.{
+  Connection,
+  ConnectionStatus,
+  Node,
+  NodeSet,
+  NodeStatus,
+  PingInfo
+}
 
 import reactivemongo.core.actors.{
   PrimaryAvailable,
@@ -202,6 +209,69 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
       }.awaitFor(timeout)
     }
 
+    "pick node according ReadPreference" >> {
+      val dummyConnection = new Connection(
+        channel = null,
+        status = ConnectionStatus.Connected,
+        authenticated = Set.empty,
+        authenticating = Option.empty,
+        signaling = false)
+
+      val primary = new Node(
+        name = "primary",
+        aliases = Set.empty[String],
+        status = NodeStatus.Primary,
+        connections = Vector(dummyConnection),
+        authenticated = Set.empty,
+        tags = Map.empty,
+        protocolMetadata = ProtocolMetadata.Default,
+        pingInfo = PingInfo(),
+        isMongos = false,
+        statusChanged = System.nanoTime())
+
+      val secondary1 = primary.copy(
+        name = "secondary1",
+        status = NodeStatus.Secondary)
+
+      val secondary2 = secondary1.copy(
+        name = "secondary2",
+        tags = Map("foo" -> "bar"))
+
+      val ns = new NodeSet(Some("rs0"), None,
+        nodes = Vector(primary, secondary1, secondary2),
+        authenticates = Set.empty)
+
+      implicit def ordering = scala.math.Ordering.by[Node, String](_.name)
+
+      "for primary" in {
+        ns.pick(
+          preference = ReadPreference.primary,
+          unpriorised = 0,
+          accept = _ => true) must beSome[(Node, Connection)].like {
+          case (n, _) => n must_=== primary
+        }
+      }
+
+      "for secondary" in {
+        ns.pick(
+          preference = ReadPreference.secondary,
+          unpriorised = 0,
+          accept = _ => true) must beSome[(Node, Connection)].like {
+          case (n, _) => n must_=== secondary1
+        }
+      }
+
+      "with tags" in {
+        ns.pick(
+          preference = ReadPreference.secondaryPreferred(
+            List(Map("foo" -> "bar"))),
+          unpriorised = 0,
+          accept = _ => true) must beSome[(Node, Connection)].like {
+            case (n, _) => n must_=== secondary2
+          }
+      }
+    }
+
     "be closed" in {
       md.close(timeout) must not(throwA[Exception])
     }
@@ -219,6 +289,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
       ConnectionListener().map(_.getClass.getName) must beNone
     }
   }
+
   section("unit")
 
   // ---

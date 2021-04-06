@@ -30,18 +30,24 @@ private[reactivemongo] class MongoHandler(
     super.channelActive(ctx)
   }
 
-  override def userEventTriggered(ctx: ChannelHandlerContext, evt: Any): Unit = {
+  override def userEventTriggered(
+    ctx: ChannelHandlerContext, evt: Any): Unit = {
     evt match {
-      case _: IdleStateEvent =>
+      case _: IdleStateEvent => {
         if (last != -1L) {
           val now = System.nanoTime()
 
-          log(ctx, s"Channel has been inactive for ${now - last} (last = $last)")
+          log(
+            ctx,
+            s"Channel has been inactive for ${now - last} (last = $last)")
         }
 
         ctx.channel.close() // configured timeout - See channelInactive
+      }
+
       case _ =>
     }
+
     super.userEventTriggered(ctx, evt)
   }
 

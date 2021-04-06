@@ -36,7 +36,7 @@ object ReadPreference {
           if (ts.get(k) contains v) {
             ms + (k -> v)
           } else ms
-      }.isEmpty)
+      }.nonEmpty)
 
       matching.isDefined
     }
