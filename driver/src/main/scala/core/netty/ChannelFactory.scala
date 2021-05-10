@@ -1,39 +1,22 @@
 package reactivemongo.core.netty
 
 import java.lang.{ Boolean => JBool }
-
+import java.util.concurrent.TimeUnit
 import scala.util.{ Failure, Success, Try }
-
 import scala.concurrent.Promise
 
 import reactivemongo.io.netty.util.concurrent.{ Future, GenericFutureListener }
-
 import reactivemongo.io.netty.bootstrap.Bootstrap
-
-import reactivemongo.io.netty.channel.{
-  Channel,
-  ChannelFuture,
-  ChannelFutureListener,
-  ChannelOption,
-  EventLoopGroup
-}, ChannelOption.{ CONNECT_TIMEOUT_MILLIS, SO_KEEPALIVE, TCP_NODELAY }
-
+import reactivemongo.io.netty.channel.{ Channel, ChannelFuture, ChannelFutureListener, ChannelOption, EventLoopGroup }
+import ChannelOption.{ CONNECT_TIMEOUT_MILLIS, SO_KEEPALIVE, TCP_NODELAY }
 import reactivemongo.io.netty.channel.ChannelInitializer
-
 import akka.actor.ActorRef
-
 import reactivemongo.util.LazyLogger
-
-import reactivemongo.core.protocol.{
-  MongoHandler,
-  RequestEncoder,
-  ResponseFrameDecoder,
-  ResponseDecoder
-}
+import reactivemongo.core.protocol.{ MongoHandler, RequestEncoder, ResponseDecoder, ResponseFrameDecoder }
 import reactivemongo.core.actors.ChannelDisconnected
 import reactivemongo.core.errors.GenericDriverException
-
 import reactivemongo.api.MongoConnectionOptions
+import reactivemongo.io.netty.handler.timeout.IdleStateHandler
 
 /**
  * @param supervisor the name of the driver supervisor
@@ -114,22 +97,20 @@ private[reactivemongo] final class ChannelFactory(
 
     val pipeline = channel.pipeline
 
+    val idleTimeMS = options.maxIdleTimeMS.toLong
+    pipeline.addLast("idleState", new IdleStateHandler(idleTimeMS, idleTimeMS, 0, TimeUnit.MILLISECONDS))
+
     if (options.sslEnabled) {
-      val sslEng = reactivemongo.core.SSL.
-        createEngine(sslContext, host, port)
-
-      val sslHandler =
-        new reactivemongo.io.netty.handler.ssl.SslHandler(sslEng, false /* TLS */ )
-
-      pipeline.addFirst("ssl", sslHandler)
+      val sslEng = reactivemongo.core.SSL.createEngine(sslContext, host, port)
+      val sslHandler = new reactivemongo.io.netty.handler.ssl.SslHandler(sslEng, false /* TLS */ )
+      pipeline.addLast("ssl", sslHandler)
     }
 
-    val mongoHandler = new MongoHandler(
-      supervisor, connection, receiver, options.maxIdleTimeMS.toLong)
-
     pipeline.addLast(
-      new ResponseFrameDecoder(), new ResponseDecoder(),
-      new RequestEncoder(), mongoHandler)
+      new ResponseFrameDecoder(),
+      new ResponseDecoder(),
+      new RequestEncoder(),
+      new MongoHandler(supervisor, connection, receiver))
 
     trace(s"Netty channel configuration:\n- connectTimeoutMS: ${options.connectTimeoutMS}\n- maxIdleTimeMS: ${options.maxIdleTimeMS}ms\n- tcpNoDelay: ${options.tcpNoDelay}\n- keepAlive: ${options.keepAlive}\n- sslEnabled: ${options.sslEnabled}\n- keyStore: ${options.keyStore.fold("None")(_.toString)}")
   }

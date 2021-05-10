@@ -1,51 +1,39 @@
 package reactivemongo.core.protocol
 
-import java.util.concurrent.TimeUnit
-
 import akka.actor.ActorRef
-
-import reactivemongo.io.netty.channel.{
-  ChannelHandlerContext,
-  ChannelPromise
-}
-import reactivemongo.io.netty.handler.timeout.{
-  IdleStateEvent,
-  IdleStateHandler
-}
-
 import reactivemongo.core.actors.{ ChannelConnected, ChannelDisconnected }
-
+import reactivemongo.io.netty.channel.{ ChannelDuplexHandler, ChannelHandlerContext, ChannelPromise }
+import reactivemongo.io.netty.handler.timeout.IdleStateEvent
 import reactivemongo.util.LazyLogger
 
 private[reactivemongo] class MongoHandler(
   supervisor: String,
   connection: String,
-  receiver: ActorRef,
-  idleTimeMS: Long) extends IdleStateHandler(
-  idleTimeMS, idleTimeMS, idleTimeMS, TimeUnit.MILLISECONDS) {
+  receiver: ActorRef) extends ChannelDuplexHandler {
 
   private var last: Long = -1L // in nano-precision
 
   override def channelActive(ctx: ChannelHandlerContext): Unit = {
     log(ctx, "Channel is active")
 
-    last = System.nanoTime()
-
     receiver ! ChannelConnected(ctx.channel.id)
 
     super.channelActive(ctx)
   }
 
-  override def channelIdle(ctx: ChannelHandlerContext, e: IdleStateEvent) = {
-    if (last != -1L) {
-      val now = System.nanoTime()
+  override def userEventTriggered(ctx: ChannelHandlerContext, evt: Any): Unit = {
+    evt match {
+      case _: IdleStateEvent =>
+        if (last != -1L) {
+          val now = System.nanoTime()
 
-      log(ctx, s"Channel has been inactive for ${now - last} (last = $last)")
+          log(ctx, s"Channel has been inactive for ${now - last} (last = $last)")
+        }
+
+        ctx.channel.close() // configured timeout - See channelInactive
+      case _ =>
     }
-
-    ctx.channel.close() // configured timeout - See channelInactive
-
-    super.channelIdle(ctx, e)
+    super.userEventTriggered(ctx, evt)
   }
 
   @SuppressWarnings(Array("NullParameter"))
@@ -55,6 +43,7 @@ private[reactivemongo] class MongoHandler(
     if (last != -1) {
       val chan = ctx.channel
       val delay = now - last
+
       def msg = s"Channel is closed under ${delay}ns: ${chan.remoteAddress}"
 
       if (delay < 500000000) {
