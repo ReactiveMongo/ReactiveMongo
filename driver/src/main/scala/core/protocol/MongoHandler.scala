@@ -1,17 +1,13 @@
 package reactivemongo.core.protocol
 
-import java.util.concurrent.TimeUnit
-
 import akka.actor.ActorRef
 
 import reactivemongo.io.netty.channel.{
   ChannelHandlerContext,
+  ChannelDuplexHandler,
   ChannelPromise
 }
-import reactivemongo.io.netty.handler.timeout.{
-  IdleStateEvent,
-  IdleStateHandler
-}
+import reactivemongo.io.netty.handler.timeout.IdleStateEvent
 
 import reactivemongo.core.actors.{ ChannelConnected, ChannelDisconnected }
 
@@ -20,9 +16,7 @@ import reactivemongo.util.LazyLogger
 private[reactivemongo] class MongoHandler(
   supervisor: String,
   connection: String,
-  receiver: ActorRef,
-  idleTimeMS: Long) extends IdleStateHandler(
-  idleTimeMS, idleTimeMS, idleTimeMS, TimeUnit.MILLISECONDS) {
+  receiver: ActorRef) extends ChannelDuplexHandler {
 
   private var last: Long = -1L // in nano-precision
 
