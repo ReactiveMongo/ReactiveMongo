@@ -1,20 +1,35 @@
 package reactivemongo.core.protocol
 
+import java.util.concurrent.TimeUnit
+
 import akka.actor.ActorRef
+
+import reactivemongo.io.netty.channel.{
+  ChannelHandlerContext,
+  ChannelPromise
+}
+import reactivemongo.io.netty.handler.timeout.{
+  IdleStateEvent,
+  IdleStateHandler
+}
+
 import reactivemongo.core.actors.{ ChannelConnected, ChannelDisconnected }
-import reactivemongo.io.netty.channel.{ ChannelDuplexHandler, ChannelHandlerContext, ChannelPromise }
-import reactivemongo.io.netty.handler.timeout.IdleStateEvent
+
 import reactivemongo.util.LazyLogger
 
 private[reactivemongo] class MongoHandler(
   supervisor: String,
   connection: String,
-  receiver: ActorRef) extends ChannelDuplexHandler {
+  receiver: ActorRef,
+  idleTimeMS: Long) extends IdleStateHandler(
+  idleTimeMS, idleTimeMS, idleTimeMS, TimeUnit.MILLISECONDS) {
 
   private var last: Long = -1L // in nano-precision
 
   override def channelActive(ctx: ChannelHandlerContext): Unit = {
     log(ctx, "Channel is active")
+
+    last = System.nanoTime()
 
     receiver ! ChannelConnected(ctx.channel.id)
 
@@ -43,7 +58,6 @@ private[reactivemongo] class MongoHandler(
     if (last != -1) {
       val chan = ctx.channel
       val delay = now - last
-
       def msg = s"Channel is closed under ${delay}ns: ${chan.remoteAddress}"
 
       if (delay < 500000000) {
