@@ -6,7 +6,7 @@ commands:
     parameters:
       sbt_version:
         type: string
-        default: "1.4.7"
+        default: "1.5.2"
     steps:
       - restore_cache:
           name: Restore SBT cache
@@ -48,7 +48,7 @@ commands:
       - restore_cache:
           name: Restore Scala cache
           keys:
-            - &scala_cache_key scala-{{ .Environment.CIRCLE_JOB }}-<< parameters.shaded >>-{{ checksum "version.sbt" }}-{{ checksum "build.sbt" }}-{{ checksum "project/Common.scala" }}-{{ checksum "project/Dependencies.scala" }}
+            - &scala_cache_key scala-{{ .Environment.CIRCLE_JOB }}-<< parameters.shaded >>-{{ checksum "version.sbt" }}_{{ checksum "build.sbt" }}-{{ checksum "project/Common.scala" }}-{{ checksum "project/Dependencies.scala" }}
 
       - restore_cache:
           name: Restore compilation cache
