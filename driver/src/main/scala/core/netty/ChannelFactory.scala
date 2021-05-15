@@ -21,7 +21,6 @@ import reactivemongo.io.netty.channel.{
 }, ChannelOption.{ CONNECT_TIMEOUT_MILLIS, SO_KEEPALIVE, TCP_NODELAY }
 
 import reactivemongo.io.netty.channel.ChannelInitializer
-
 import reactivemongo.io.netty.handler.timeout.IdleStateHandler
 
 import akka.actor.ActorRef
@@ -117,9 +116,10 @@ private[reactivemongo] final class ChannelFactory(
     debug(s"Initializing channel ${channel.id} to ${host}:${port} ($receiver)")
 
     val pipeline = channel.pipeline
-
     val idleTimeMS = options.maxIdleTimeMS.toLong
-    pipeline.addLast("idleState", new IdleStateHandler(idleTimeMS, idleTimeMS, 0, TimeUnit.MILLISECONDS))
+
+    pipeline.addLast("idleState", new IdleStateHandler(
+      idleTimeMS, idleTimeMS, 0, TimeUnit.MILLISECONDS))
 
     if (options.sslEnabled) {
       val sslEng = reactivemongo.core.SSL.createEngine(sslContext, host, port)

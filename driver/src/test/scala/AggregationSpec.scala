@@ -4,6 +4,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.bson.{
+  BSON,
   BSONArray,
   BSONDocument,
   BSONDocumentHandler,
@@ -2067,6 +2068,16 @@ db.accounts.aggregate([
   }
 
   section("unit")
+
+  "Update" should {
+    "support pipeline as operator" in {
+      import coll.AggregationFramework.ReplaceRootField
+
+      BSON.writeDocument(ReplaceRootField("foo")).
+        aka("pipeline as update") must beSuccessfulTry(BSONDocument(
+          f"$$replaceRoot" -> BSONDocument("newRoot" -> f"$$foo")))
+    }
+  }
 
   // ---
 

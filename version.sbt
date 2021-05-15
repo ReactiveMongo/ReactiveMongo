@@ -1,12 +1,12 @@
-dynverVTagPrefix in ThisBuild := false
+ThisBuild / dynverVTagPrefix := false
 
-version in ThisBuild := {
+ThisBuild / version := {
   val Stable = """([0-9]+)\.([0-9]+)\.([0-9]+)""".r
 
-  (dynverGitDescribeOutput in ThisBuild).value match {
+  (ThisBuild / dynverGitDescribeOutput).value match {
     case Some(descr) => {
-      if ((isSnapshot in ThisBuild).value) {
-        (previousStableVersion in ThisBuild).value match {
+      if ((ThisBuild / isSnapshot).value) {
+        (ThisBuild / previousStableVersion).value match {
           case Some(previousVer) => {
             val current = (for {
               Seq(maj, min, patch) <- Stable.unapplySeq(previousVer)

@@ -1,7 +1,7 @@
 lazy val `ReactiveMongo-Core` = project.in(file("core")).
   settings(
-    sourceDirectories in Compile ++= Seq(
-      (sourceDirectory in Compile).value / "scala-2.11+"),
+    Compile / sourceDirectories ++= Seq(
+      (Compile / sourceDirectory).value / "scala-2.11+"),
     libraryDependencies ++= {
       val deps = Dependencies.shaded.value
 
