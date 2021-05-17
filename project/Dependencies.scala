@@ -52,7 +52,7 @@ object Dependencies {
   ) ++ Seq("log4j-core", "log4j-slf4j-impl").map(
     "org.apache.logging.log4j" % _ % log4jVer % Test)
 
-  val shapelessTest = "com.chuusai" %% "shapeless" % "2.3.6"
+  val shapelessTest = "com.chuusai" %% "shapeless" % "2.3.7"
 
   val commonsCodec = "commons-codec" % "commons-codec" % "1.15"
 }
