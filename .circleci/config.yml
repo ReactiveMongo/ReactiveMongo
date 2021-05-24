@@ -271,7 +271,7 @@ jobs:
         default: 10
       scala_version:
         type: string
-        default: "2.12.11"
+        default: "2.12.13"
       akka_version:
         type: string
         default: "2.5.23"
@@ -386,7 +386,7 @@ workflows:
             name: openjdk
             version: 10
           jdk_version: openjdk10
-          scala_version: 2.12.11
+          scala_version: 2.12.13
 
       - integration_test_suite:
           name: integration_openjdk8_scala211_akka23
