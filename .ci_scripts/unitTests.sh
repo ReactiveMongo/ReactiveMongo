@@ -63,4 +63,8 @@ TEST_ARGS="$TEST_ARGS testQuick $SPECS_TESTS -- include unit"
 
 sed -e 's/"-deprecation", //' < project/Driver.scala > .tmp && mv .tmp project/Driver.scala
 
-sbt ++$SCALA_VERSION "$TEST_ARGS ;scapegoat ;doc"
+if [ ! `echo "n$SCALA_VERSION" | sed -e 's/2.12.*/o/'` = "no" ]; then
+  TEST_ARGS="$TEST_ARGS; scapegoat"
+fi
+
+sbt ++$SCALA_VERSION "$TEST_ARGS ;doc"
