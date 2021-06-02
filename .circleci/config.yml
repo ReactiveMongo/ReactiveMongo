@@ -386,7 +386,7 @@ workflows:
             name: openjdk
             version: 10
           jdk_version: openjdk10
-          scala_version: 2.12.13
+          scala_version: 2.12.14
 
       - integration_test_suite:
           name: integration_openjdk8_scala211_akka23
