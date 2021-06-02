@@ -52,7 +52,7 @@ object Common extends AutoPlugin {
     "Use ReactiveMongo-Shaded (see system property 'reactivemongo.shaded')")
 
   override def projectSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
-    scalaVersion := "2.12.13",
+    scalaVersion := "2.12.14",
     crossScalaVersions := Seq(scala211, scalaVersion.value, scala213),
     crossVersion := CrossVersion.binary,
     useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
