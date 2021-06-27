@@ -87,6 +87,25 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
           }
         }
       }
+
+      "with an aggregation pipeline" in {
+        val cmd = new Command(None)
+
+        updatePipeline(cmd) { update =>
+          val write = cmd.pack.serialize(_: cmd.UpdateCmd, cmd.updateWriter)
+
+          write(update) must_=== (BSONDocument(
+            "update" -> "foo",
+            "ordered" -> true,
+            "updates" -> Seq(
+              BSONDocument(
+                "q" -> BSONDocument("value" -> 2),
+                "u" -> Seq(
+                  BSONDocument(f"$$set" -> BSONDocument("value" -> 1))),
+                "upsert" -> false,
+                "multi" -> true))) ++ writeConcern)
+        }
+      }
     }
   }
   section("unit")
@@ -96,7 +115,7 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
   private def withUpdate[T](cmd: Command)(f: cmd.UpdateCmd => T): T = {
     val element1 = new cmd.UpdateElement(
       q = BSONDocument("_id" -> 1),
-      u = BSONDocument(f"$$set" -> BSONDocument("value" -> 1)),
+      u = Left(BSONDocument(f"$$set" -> BSONDocument("value" -> 1))),
       upsert = true,
       multi = false,
       collation = None,
@@ -104,7 +123,7 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
 
     val element2 = new cmd.UpdateElement(
       q = BSONDocument("value" -> 2),
-      u = BSONDocument(f"$$set" -> BSONDocument("label" -> "two")),
+      u = Left(BSONDocument(f"$$set" -> BSONDocument("label" -> "two"))),
       upsert = false,
       multi = true,
       collation = None,
@@ -118,6 +137,25 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
         bypassDocumentValidation = false,
         firstUpdate = element1,
         updates = Seq(element2))))
+  }
+
+  private def updatePipeline[T](cmd: Command)(f: cmd.UpdateCmd => T): T = {
+    val element = new cmd.UpdateElement(
+      q = BSONDocument("value" -> 2),
+      u = Right(Seq(BSONDocument(f"$$set" -> BSONDocument("value" -> 1)))),
+      upsert = false,
+      multi = true,
+      collation = None,
+      arrayFilters = Seq.empty)
+
+    f(new ResolvedCollectionCommand(
+      collection = "foo",
+      command = new cmd.Update(
+        ordered = true,
+        writeConcern = WriteConcern.Default,
+        bypassDocumentValidation = false,
+        firstUpdate = element,
+        updates = Seq.empty)))
   }
 
   import reactivemongo.api.tests.Pack

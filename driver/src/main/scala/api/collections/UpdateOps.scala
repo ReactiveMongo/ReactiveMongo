@@ -94,6 +94,15 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
      */
     final def one[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi, collation, arrayFilters).flatMap { upd => execute(upd) }
 
+    /**
+     * '''EXPERIMENTAL:'''
+     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateElement]]) with a [[https://docs.mongodb.com/manual/reference/command/update/#update-with-an-aggregation-pipeline aggregation pipeline]].
+     *
+     * @since MongoDB 4.2
+     */
+    @deprecated("Experimental", "1.0.5-SNAPSHOT")
+    final def one[Q](q: Q, u: AggregationFramework.Pipeline, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[UpdateWriteResult] = element[Q](q, u, upsert, multi, collation, arrayFilters).flatMap { upd => execute(upd) }
+
     /** Prepares an [[UpdateElement]] */
     final def element[Q, U](q: Q, u: U, upsert: Boolean = false, multi: Boolean = false)(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] = element(q, u, upsert, multi, None, Seq.empty)
 
@@ -103,7 +112,32 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
     /** Prepares an [[UpdateElement]] */
     final def element[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] = {
       (Try(pack.serialize(q, qw)).map { query =>
-        new UpdateElement(query, pack.serialize(u, uw), upsert, multi, collation, arrayFilters)
+        new UpdateElement(query, Left(pack.serialize(u, uw)), upsert, multi, collation, arrayFilters)
+      }) match {
+        case Success(element) => Future.successful(element)
+        case Failure(cause)   => Future.failed[UpdateElement](cause)
+      }
+    }
+
+    /**
+     * '''EXPERIMENTAL:'''
+     * Prepares an [[UpdateElement]] with an [[https://docs.mongodb.com/manual/reference/command/update/#update-with-an-aggregation-pipeline update pipeline]].
+     *
+     * @since MongoDB 4.2
+     */
+    @deprecated("Experimental", "1.0.5-SNAPSHOT")
+    final def element[Q](q: Q, u: AggregationFramework.Pipeline, upsert: Boolean, multi: Boolean, collation: Option[Collation])(implicit qw: pack.Writer[Q]): Future[UpdateElement] = element(q, u, upsert, multi, collation, Seq.empty)
+
+    /**
+     * '''EXPERIMENTAL:'''
+     * Prepares an [[UpdateElement]] with an [[https://docs.mongodb.com/manual/reference/command/update/#update-with-an-aggregation-pipeline update pipeline]].
+     *
+     * @since MongoDB 4.2
+     */
+    @deprecated("Experimental", "1.0.5-SNAPSHOT")
+    final def element[Q](q: Q, u: AggregationFramework.Pipeline, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit qw: pack.Writer[Q]): Future[UpdateElement] = {
+      (Try(pack.serialize(q, qw)).map { query =>
+        new UpdateElement(query, Right(u.map(_.makePipe)), upsert, multi, collation, arrayFilters)
       }) match {
         case Success(element) => Future.successful(element)
         case Failure(cause)   => Future.failed[UpdateElement](cause)
@@ -146,7 +180,13 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
     final def many(firstUpdate: UpdateElement, updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
       val bulkProducer = BulkOps.bulks(
         Seq(firstUpdate) ++ updates, maxBsonSize, maxBulkSize) { up =>
-          elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(up.u)
+          val v: pack.Value = up.u match {
+            case Left(doc) => doc
+            case Right(pipeline) =>
+              pack.newBuilder.array(pipeline)
+          }
+
+          elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(v)
         }
 
       BulkOps.bulkApply[UpdateElement, UpdateWriteResult](
@@ -187,7 +227,13 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
       } else {
         val bulkProducer = BulkOps.bulks(
           updates, maxBsonSize, maxBulkSize) { up =>
-          elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(up.u)
+          val v: pack.Value = up.u match {
+            case Left(doc) => doc
+            case Right(pipeline) =>
+              pack.newBuilder.array(pipeline)
+          }
+
+          elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(v)
         }
 
         BulkOps.bulkApply[UpdateElement, UpdateWriteResult](
@@ -204,7 +250,7 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
       val builder = pack.newBuilder
       val emptyElm = new UpdateElement(
         q = builder.document(Seq.empty),
-        u = builder.document(Seq.empty),
+        u = Left(builder.document(Seq.empty)),
         upsert = false,
         multi = false,
         collation = None,

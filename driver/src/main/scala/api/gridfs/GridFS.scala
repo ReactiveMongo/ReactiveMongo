@@ -334,7 +334,7 @@ sealed trait GridFS[P <: SerializationPack] extends PackSupport[P]
     val updateFileCmd = new Update(
       firstUpdate = new UpdateElement(
         q = document(Seq(elem("_id", id))),
-        u = metadata,
+        u = Left(metadata),
         upsert = false,
         multi = false,
         collation = None,
