@@ -46,11 +46,14 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
    */
   final class UpdateElement(
     val q: pack.Document,
-    val u: pack.Document,
+    private[api] val u: Either[pack.Document, Seq[pack.Document]],
     val upsert: Boolean,
     val multi: Boolean,
     val collation: Option[Collation],
     val arrayFilters: Seq[pack.Document]) {
+
+    @deprecated("Use the main constructor", "1.0.5")
+    def this(q: pack.Document, u: pack.Document, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document]) = this(q, Left(u), upsert, multi, collation, arrayFilters)
 
     private val data = (q, u, upsert, multi, collation, arrayFilters)
 
@@ -68,12 +71,22 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
     builder: SerializationPack.Builder[pack.type]): UpdateElement => pack.Document = {
     import builder.{ boolean, document, elementProducer }
 
-    def base(element: UpdateElement) =
-      Seq.newBuilder[pack.ElementProducer] ++= Seq(
-        elementProducer("q", element.q),
-        elementProducer("u", element.u),
+    def base(element: UpdateElement) = {
+      val els = Seq.newBuilder[pack.ElementProducer] += elementProducer(
+        "q", element.q)
+
+      element.u match {
+        case Left(op) =>
+          els += elementProducer("u", op)
+
+        case Right(pipeline) =>
+          els += elementProducer("u", builder.array(pipeline))
+      }
+
+      els ++= Seq(
         elementProducer("upsert", boolean(element.upsert)),
         elementProducer("multi", boolean(element.multi)))
+    }
 
     if (maxWireVersion < MongoWireVersion.V34) { elmt1 =>
       document(base(elmt1).result())

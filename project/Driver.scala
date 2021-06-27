@@ -18,18 +18,18 @@ final class Driver(core: Project) {
   lazy val module = Project("ReactiveMongo", file("driver")).
     settings(Seq(
         description := "ReactiveMongo is a Scala driver that provides fully non-blocking and asynchronous I/O operations ",
-        unmanagedSourceDirectories in Compile ++= {
+        Compile / unmanagedSourceDirectories ++= {
           val v = scalaBinaryVersion.value
 
           if (v == "2.11" || v == "2.12") {
-            Seq((sourceDirectory in Compile).value / "scala-2.11_12")
+            Seq((Compile / sourceDirectory).value / "scala-2.11_12")
           } else {
             Seq.empty[File]
           }
         },
-        sourceGenerators in Compile += Def.task {
+        Compile / sourceGenerators += Def.task {
           val ver = version.value
-          val dir = (sourceManaged in Compile).value
+          val dir = (Compile / sourceManaged).value
           val outdir = dir / "reactivemongo" / "api"
           val f = outdir / "Version.scala"
           val major = Common.majorVersion.value
@@ -53,7 +53,7 @@ object Version {
           })
         }.taskValue,
         driverCleanup := {
-          val classDir = (classDirectory in Compile).value
+          val classDir = (Compile / classDirectory).value
           val extDir = {
             val d = target.value / "external" / "reactivemongo"
             d.mkdirs(); d
@@ -66,7 +66,7 @@ object Version {
 
           IO.move(listenerClass, extDir / classFile)
         },
-        driverCleanup := driverCleanup.triggeredBy(compile in Compile).value,
+        driverCleanup := driverCleanup.triggeredBy(Compile / compile).value,
         libraryDependencies ++= {
           if (!Common.useShaded.value) {
             Seq(Dependencies.netty % Provided)
@@ -91,7 +91,7 @@ object Version {
             mtp("reactivemongo.core.protocol.RequestEncoder")
           )
         },
-        testOptions in Test += {
+        Test / testOptions += {
           val log = streams.value.log
           val objectClass = f"tests.Common$$"
 
@@ -107,9 +107,9 @@ object Version {
             m.close()
           }
         },
-        mappings in (Compile, packageBin) ~= driverFilter,
+        Compile / packageBin / mappings ~= driverFilter,
         //mappings in (Compile, packageDoc) ~= driverFilter,
-        mappings in (Compile, packageSrc) ~= driverFilter,
+        Compile / packageSrc / mappings ~= driverFilter,
         apiMappings ++= Documentation.mappings("com.typesafe.akka", "http://doc.akka.io/api/akka/%s/")("akka-actor").value ++ Documentation.mappings("com.typesafe.play", "http://playframework.com/documentation/%s/api/scala/index.html", _.replaceAll("[\\d]$", "x"))("play-iteratees").value,
     )).configure { p =>
       sys.props.get("test.nettyNativeArch") match {
