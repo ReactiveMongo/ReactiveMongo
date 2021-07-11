@@ -103,6 +103,9 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
     @deprecated("Experimental", "1.0.5-SNAPSHOT")
     final def one[Q](q: Q, u: AggregationFramework.Pipeline, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[UpdateWriteResult] = element[Q](q, u, upsert, multi, collation, arrayFilters).flatMap { upd => execute(upd) }
 
+    @deprecated("Experimental", "1.0.5")
+    final def one(update: UpdateElement)(implicit ec: ExecutionContext): Future[UpdateWriteResult] = execute(update)
+
     /** Prepares an [[UpdateElement]] */
     final def element[Q, U](q: Q, u: U, upsert: Boolean = false, multi: Boolean = false)(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] = element(q, u, upsert, multi, None, Seq.empty)
 
