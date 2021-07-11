@@ -46,7 +46,7 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
    */
   final class UpdateElement(
     val q: pack.Document,
-    private[api] val u: Either[pack.Document, Seq[pack.Document]],
+    private[reactivemongo] val u: Either[pack.Document, Seq[pack.Document]],
     val upsert: Boolean,
     val multi: Boolean,
     val collation: Option[Collation],
