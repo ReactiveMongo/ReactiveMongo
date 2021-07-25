@@ -6,7 +6,7 @@ commands:
     parameters:
       sbt_version:
         type: string
-        default: "1.5.2"
+        default: "1.5.5"
     steps:
       - restore_cache:
           name: Restore SBT cache
@@ -36,7 +36,7 @@ commands:
         default: "openjdk8"
       scala_version:
         type: string
-        default: "2.13.4"
+        default: "2.13.6"
       shaded:
         type: boolean
         default: true
@@ -236,7 +236,7 @@ jobs:
         default: "openjdk8"
       scala_version:
         type: string
-        default: "2.13.4"
+        default: "2.13.6"
       shaded:
         type: boolean
         default: true
@@ -271,7 +271,7 @@ jobs:
         default: 10
       scala_version:
         type: string
-        default: "2.12.13"
+        default: "2.12.14"
       akka_version:
         type: string
         default: "2.5.23"
