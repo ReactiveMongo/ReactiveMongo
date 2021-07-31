@@ -40,7 +40,7 @@ private[reactivemongo] trait UtilCompat {
 
   private[reactivemongo] type ArrayOps[T] = scala.collection.mutable.ArrayOps[T]
 
-  @inline private[reactivemongo] def sameThreadExecutionContext: ExecutionContext = SameThreadExecutionContext
+  private[reactivemongo] lazy val sameThreadExecutionContext: ExecutionContext = SameThreadExecutionContext
 
   private object SameThreadExecutionContext extends ExecutionContext {
     def execute(command: Runnable): Unit = command.run()
