@@ -15,6 +15,8 @@
  */
 package reactivemongo.core.actors
 
+import java.nio.channels.ClosedChannelException
+
 import java.net.InetSocketAddress
 
 import scala.concurrent.{ Await, Future, Promise }
@@ -470,7 +472,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
     val res = updateNodeSet(event) { ns =>
       val updSet = ns.updateConnectionByChannelId(channelId) { con =>
-        if (con.channel.isOpen) { // can still be reused
+        if (con.channel.isOpen) { // #cch4: can still be reused
           updated = 1
           con.copy(status = ConnectionStatus.Disconnected)
         } else {
@@ -489,6 +491,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
         updateNodeSet(reEvent) {
           _.updateNodeByChannelId(channelId) { n =>
+            // #cch5: replace channel
+
             n.updateByChannelId(channelId)({ con =>
               n.createConnection(channelFactory, self, con.signaling) match {
                 case Success(c) => c
@@ -1562,19 +1566,32 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
                 val asyncSt = Promise[ConnectionStatus]()
                 val nodeAddr = new InetSocketAddress(n.host, n.port)
 
-                c.channel.connect(nodeAddr).addListener(new OperationHandler(
-                  { cause =>
-                    error(s"Fails to connect channel #${c.channel.id}", cause)
+                try {
+                  c.channel.connect(nodeAddr).addListener(new OperationHandler(
+                    { cause =>
+                      error(s"Fails to connect channel #${c.channel.id}", cause)
 
-                    asyncSt.success(ConnectionStatus.Disconnected)
+                      asyncSt.success(ConnectionStatus.Disconnected)
 
-                    ()
-                  },
-                  { _ =>
-                    asyncSt.success(ConnectionStatus.Connecting)
+                      if (cause.isInstanceOf[ClosedChannelException]) {
+                        // #cch3: Channel is no longer open/cannot be active
+                        warn(s"Will never be able to connect closed channel #${c.channel.id}")
 
-                    ()
-                  }))
+                        self ! ChannelDisconnected(c.channel.id)
+                      }
+
+                      ()
+                    },
+                    { _ =>
+                      asyncSt.success(ConnectionStatus.Connecting)
+
+                      ()
+                    }))
+                } catch {
+                  case NonFatal(cause) =>
+                    cause.printStackTrace()
+                    throw cause
+                }
 
                 Await.result(asyncSt.future, connectTimeout)
               } catch {
