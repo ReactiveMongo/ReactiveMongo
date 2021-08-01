@@ -15,9 +15,9 @@ echo "[INFO] Running integration tests ..."
 # MongoDB
 echo "- MongoDB major: $MONGO_VER"
 
-if [ "$MONGO_VER" = "3" ]; then
+if [ "v$MONGO_VER" = "v3" ]; then
     TEST_OPTS="exclude gt_mongo32,ge_mongo4,unit"
-elif [ "$MONGO_VER" = "4" ]; then
+elif [ "v$MONGO_VER" = "v4" -o "v$MONGO_VER" = "v5" ]; then
     TEST_OPTS="exclude unit"
 else
     TEST_OPTS="exclude gt_mongo32,ge_mongo4,unit"

@@ -132,7 +132,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
                 } and {
                   resultSpec(update.many(up1, elements.drop(1)))
                 }
-            }.await(1, timeout)
+            }.await(1, timeout / 4L * 5L)
         }
       }
     }

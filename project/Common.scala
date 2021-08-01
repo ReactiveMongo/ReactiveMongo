@@ -18,7 +18,7 @@ object Common extends AutoPlugin {
       Resolver.sonatypeRepo("staging")
     ),
     mimaFailOnNoPrevious := false,
-    logBuffered in Test := false
+    Test / logBuffered := false
   )
 
   val filter = { (ms: Seq[(File, String)]) =>
@@ -38,7 +38,7 @@ object Common extends AutoPlugin {
     val Major = """([0-9]+)\.([0-9]+)\..*""".r
 
     Def.setting[String] {
-      (version in ThisBuild).value match {
+      (ThisBuild / version).value match {
         case Major(maj, min) =>
           s"${maj}.${min}"
 
@@ -61,7 +61,7 @@ object Common extends AutoPlugin {
       else target.value / "noshaded"
     },
     version := { 
-      val ver = (version in ThisBuild).value
+      val ver = (ThisBuild / version).value
       val suffix = {
         if (useShaded.value) "" // default ~> no suffix
         else "-noshaded"
@@ -71,23 +71,23 @@ object Common extends AutoPlugin {
         case (a, b) => s"${a}${suffix}${b}"
       }
     },
-    unmanagedSourceDirectories in Compile ++= {
+    Compile / unmanagedSourceDirectories ++= {
       val jdir = if (java8) "java8" else "java7"
 
-      Seq((sourceDirectory in Compile).value / jdir)
+      Seq((Compile / sourceDirectory).value / jdir)
     },
-    unmanagedSourceDirectories in Test ++= {
+    Test / unmanagedSourceDirectories ++= {
       val jdir = if (java8) "java8" else "java7"
 
-      Seq((sourceDirectory in Compile).value / jdir)
+      Seq((Compile / sourceDirectory).value / jdir)
     },
-    scalacOptions in (Compile, doc) ++= Seq("-unchecked", "-deprecation",
+    Compile / doc / scalacOptions ++= Seq("-unchecked", "-deprecation",
       /*"-diagrams", */"-implicits", "-skip-packages", "samples"),
-    scalacOptions in (Compile, doc) ++= Opts.doc.title("ReactiveMongo API"),
-    scalacOptions in (Compile, doc) ++= Opts.doc.version(majorVersion.value),
-    mappings in (Compile, packageBin) ~= filter,
-    mappings in (Compile, packageSrc) ~= filter,
-    mappings in (Compile, packageDoc) ~= filter,
+    Compile / doc / scalacOptions ++= Opts.doc.title("ReactiveMongo API"),
+    Compile / doc / scalacOptions ++= Opts.doc.version(majorVersion.value),
+    Compile / packageBin / mappings ~= filter,
+    Compile / packageSrc / mappings ~= filter,
+    Compile / packageDoc / mappings ~= filter,
     testFrameworks ~= { _.filterNot(_ == TestFrameworks.ScalaTest) }
   ) ++ Publish.settings ++ Format.settings ++ Publish.mimaSettings
 }

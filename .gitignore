@@ -12,3 +12,4 @@ target/
 .ci_scripts/signing-ca.csr
 .ci_scripts/signing-ca.key
 .ci_scripts/signing-ca
+.bsp

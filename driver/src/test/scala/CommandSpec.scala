@@ -25,28 +25,34 @@ final class CommandSpec(implicit ee: ExecutionEnv)
   import tests.Common
   import Common._
 
-  "Raw command" should {
-    "re-index test collection with command as document" >> {
-      def reindexSpec(db: DB, coll: String, t: FiniteDuration) = {
-        val reIndexDoc = BSONDocument("reIndex" -> coll)
+  if (!replSetOn) {
+    // Since MongoDB 5.0:
+    //   reIndex is only allowed on a standalone mongod instance
 
-        db(coll).create() must beTypedEqualTo({}).awaitFor(t) and {
-          db.runCommand(reIndexDoc, db.failoverStrategy).
-            one[BSONDocument](ReadPreference.primary) must beLike[BSONDocument] {
-              case doc => decoder.double(doc, "ok") must beSome(1)
-            }.awaitFor(t)
+    "Raw command" should {
+      "re-index test collection with command as document" >> {
+        def reindexSpec(db: DB, c: String, t: FiniteDuration) = {
+          val coll = s"${c}_${System.nanoTime()}"
+          val reIndexDoc = BSONDocument("reIndex" -> coll)
+
+          db(coll).create() must beTypedEqualTo({}).awaitFor(t) and {
+            db.runCommand(reIndexDoc, db.failoverStrategy).
+              one[BSONDocument](ReadPreference.primary) must beLike[BSONDocument] {
+                case doc => decoder.double(doc, "ok") must beSome(1)
+              }.awaitFor(t)
+          }
         }
-      }
 
-      "with the default connection" in eventually(2, timeout) {
-        reindexSpec(db, s"commandspec${System identityHashCode db}", timeout)
-      }
+        "with the default connection" in eventually(2, timeout) {
+          reindexSpec(db, s"commandspec${System identityHashCode db}", timeout)
+        }
 
-      "with the slow connection" in eventually(2, timeout) {
-        reindexSpec(
-          slowDb, s"commandspec${System identityHashCode slowDb}",
-          slowTimeout)
+        "with the slow connection" in eventually(2, timeout) {
+          reindexSpec(
+            slowDb, s"commandspec${System identityHashCode slowDb}",
+            slowTimeout)
 
+        }
       }
     }
   }

@@ -29,7 +29,7 @@ export PATH="$HOME/mongodb-linux-x86_64-amazon-$MONGO_MINOR/bin:$PATH"
 MONGO_DATA=`mktemp -d`
 MONGO_CONF_SUFFIX="26"
 
-if [ "$MONGO_VER" = "3" -o "$MONGO_VER" = "4" ]; then
+if [ "v$MONGO_VER" = "v3" -o "v$MONGO_VER" = "v4" -o "v$MONGO_VER" = "v5" ]; then
     MONGO_CONF_SUFFIX="3"
 fi
 
@@ -65,7 +65,7 @@ if [ "$MONGO_PROFILE" = "invalid-ssl" -o "$MONGO_PROFILE" = "mutual-ssl" -o "$MO
 
     ls -al "$SCRIPT_DIR/keystore.p12"
 
-    if [ "v$MONGO_VER" = "v4" ]; then
+    if [ "v$MONGO_VER" = "v4" -o "v$MONGO_VER" = "v5" ]; then
         cat >> "$MONGO_CONF" << EOF
   tls:
     mode: requireTLS

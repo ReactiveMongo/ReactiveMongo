@@ -23,7 +23,9 @@ echo "[INFO] MongoDB major version: $MONGO_VER"
 
 MONGO_MINOR="3.2.10"
 
-if [ "$MONGO_VER" = "4" ]; then
+if [ "v$MONGO_VER" = "v5" ]; then
+    MONGO_MINOR="5.0.1"
+elif [ "v$MONGO_VER" = "v4" ]; then
     MONGO_MINOR="4.4.4"
 fi
     

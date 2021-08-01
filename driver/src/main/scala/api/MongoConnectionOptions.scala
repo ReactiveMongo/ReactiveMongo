@@ -2,6 +2,8 @@ package reactivemongo.api
 
 import java.net.URI
 
+import reactivemongo.core.Compressor
+
 // TODO: Make sure documentation of param properties is visible
 /**
  * Options for [[MongoConnection]] (see [[http://reactivemongo.org/releases/0.1x/documentation/tutorial/connect-database.html#connection-options more documentation]]).
@@ -38,7 +40,8 @@ final class MongoConnectionOptions private[reactivemongo] (
   _keyStore: Option[MongoConnectionOptions.KeyStore],
   _readConcern: ReadConcern,
 
-  _appName: Option[String]) {
+  _appName: Option[String],
+  _compressors: Seq[Compressor]) {
 
   /**
    * The number of milliseconds to wait for a connection
@@ -63,6 +66,12 @@ final class MongoConnectionOptions private[reactivemongo] (
   /** Either [[ScramSha1Authentication]] or [[X509Authentication]] */
   @inline def authenticationMechanism: AuthenticationMode =
     _authenticationMechanism
+
+  /** An optional [[https://docs.mongodb.com/manual/reference/connection-string/#urioption.appName application name]] */
+  @inline def appName: Option[String] = _appName
+
+  /** The list of allowed [[https://docs.mongodb.com/manual/reference/connection-string/#mongodb-urioption-urioption.compressors compressors]] (e.g. `snappy`) */
+  @inline def compressors: Seq[Compressor] = _compressors
 
   // --- Reactivemongo specific options
 
@@ -126,9 +135,6 @@ final class MongoConnectionOptions private[reactivemongo] (
   /** The default [[https://docs.mongodb.com/manual/reference/read-concern/ read concern]] */
   @inline def readConcern: ReadConcern = _readConcern
 
-  /** An optional [[https://docs.mongodb.com/manual/reference/connection-string/#urioption.appName application name]] */
-  @inline def appName: Option[String] = _appName
-
   /** '''EXPERIMENTAL:''' */
   def maxNonQueryableHeartbeats = _maxNonQueryableHeartbeats
 
@@ -154,7 +160,8 @@ final class MongoConnectionOptions private[reactivemongo] (
       _credentials = this.credentials,
       _keyStore = this.keyStore,
       _readConcern = this.readConcern,
-      _appName = this.appName)
+      _appName = this.appName,
+      _compressors = this.compressors)
 
   // ---
 
@@ -201,7 +208,8 @@ final class MongoConnectionOptions private[reactivemongo] (
       _credentials = credentials,
       _keyStore = keyStore,
       _readConcern = readConcern,
-      _appName = appName)
+      _appName = appName,
+      _compressors = this._compressors)
 
   override def toString = s"""MongoConnectionOptions { ${MongoConnectionOptions.toStrings(this).map { case (k, v) => k + ": " + v }.mkString(", ")} }"""
 
@@ -293,7 +301,8 @@ object MongoConnectionOptions {
       _credentials = credentials,
       _keyStore = keyStore,
       _readConcern = readConcern,
-      _appName = appName)
+      _appName = appName,
+      _compressors = Seq.empty /* TODO */ )
 
   // ---
 

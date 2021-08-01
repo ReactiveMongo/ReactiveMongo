@@ -255,7 +255,7 @@ package object tests { self =>
     import IsMasterCommand.{ IsMaster, writer => mw }
 
     val isMaster = Command.buildRequestMaker(BSONSerializationPack)(
-      new IsMaster(None, None),
+      new IsMaster(None, Seq.empty, None),
       mw(BSONSerializationPack),
       reactivemongo.api.ReadPreference.primaryPreferred,
       "admin") // only "admin" DB for the admin command
