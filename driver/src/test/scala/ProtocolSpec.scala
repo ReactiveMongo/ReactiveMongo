@@ -74,7 +74,7 @@ final class ProtocolSpec(implicit ee: ExecutionEnv)
 
         val req = isMasterRequest(reqId = 0)
         val buffer = Unpooled.buffer(req.size, req.size)
-        val bytes = Array[Byte](58, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -44, 7, 0, 0, 4, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0, 19, 0, 0, 0, 16, 105, 115, 109, 97, 115, 116, 101, 114, 0, 1, 0, 0, 0, 0)
+        val bytes = Array[Byte](76, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -44, 7, 0, 0, 4, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0, 37, 0, 0, 0, 16, 105, 115, 109, 97, 115, 116, 101, 114, 0, 1, 0, 0, 0, 4, 99, 111, 109, 112, 114, 101, 115, 115, 105, 111, 110, 0, 5, 0, 0, 0, 0, 0)
 
         req.writeTo(buffer) must_=== ({}) and {
           getBytes(buffer, req.size) must_=== bytes

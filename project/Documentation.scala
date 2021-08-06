@@ -8,7 +8,7 @@ final class Documentation(excludes: Seq[ProjectReference]) {
   import UnidocPlugin.autoImport.ScalaUnidoc
 
   val settings = UnidocPlugin.projectSettings ++ Seq(
-    unidocProjectFilter in (ScalaUnidoc, unidoc) := {
+    ScalaUnidoc / unidoc / unidocProjectFilter := {
       inAnyProject -- inProjects(excludes: _*)
     },
     apiMappings ++= Documentation.mappings(
@@ -27,7 +27,7 @@ object Documentation {
     names: String*) = Def.task[Map[File, URL]] {
 
     (for {
-      entry: Attributed[File] <- (fullClasspath in Compile).value
+      entry: Attributed[File] <- (Compile / fullClasspath).value
       module: ModuleID <- entry.get(moduleID.key)
       if module.organization == org
       if names.exists(module.name.startsWith)

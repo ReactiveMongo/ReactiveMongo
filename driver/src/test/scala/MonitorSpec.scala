@@ -363,7 +363,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
               }
           }
         })
-      }.awaitFor(timeout * expectFactor)
+      }.await(1, timeout * expectFactor)
     }
 
     "manage reconnection according heartbeat frequency" >> {

@@ -4,15 +4,18 @@ import java.util.Date
 
 import reactivemongo.api.SerializationPack
 
-import reactivemongo.core.ClientMetadata
+import reactivemongo.core.{ ClientMetadata, Compressor }
 import reactivemongo.core.nodeset.NodeStatus
 
+// See https://github.com/mongodb/specifications/blob/master/source/mongodb-handshake/handshake.rst
+// TODO: hello?
 private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
   /**
    * @param client the client metadata (only for first isMaster request)
    */
   private[reactivemongo] final class IsMaster(
     val client: Option[ClientMetadata],
+    val compression: Seq[Compressor],
     val comment: Option[String]) extends Command
     with CommandWithResult[IsMasterResult] with CommandWithPack[P]
 
@@ -131,12 +134,15 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
 
       elms += element("ismaster", builder.int(1))
 
-      im.comment.foreach { comment =>
-        elms += element(f"$$comment", builder.string(comment))
-      }
-
       im.client.flatMap(serializeClientMeta).foreach { meta =>
         elms += element("client", meta)
+      }
+
+      elms += element("compression", builder.array(
+        im.compression.map(c => builder.string(c.name))))
+
+      im.comment.foreach { comment =>
+        elms += element(f"$$comment", builder.string(comment))
       }
 
       builder.document(elms.result())

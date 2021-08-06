@@ -1646,7 +1646,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         if (node.pingInfo.firstSent) None else Some(clientMetadata)
 
       lazy val isMaster = Command.buildRequestMaker(BSONSerializationPack)(
-        new IsMaster(client, Some(id.toString)),
+        new IsMaster(client, options.compressors, Some(id.toString)),
         writer(BSONSerializationPack),
         ReadPreference.primaryPreferred,
         "admin") // only "admin" DB for the admin command

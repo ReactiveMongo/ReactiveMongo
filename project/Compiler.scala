@@ -18,11 +18,11 @@ object Compiler {
     }
 
   val settings = Seq(
-    unmanagedSourceDirectories in Compile ++= {
-      unmanaged(scalaVersion.value, (sourceDirectory in Compile).value)
+    Compile / unmanagedSourceDirectories ++= {
+      unmanaged(scalaVersion.value, (Compile / sourceDirectory).value)
     },
-    unmanagedSourceDirectories in Test ++= {
-      unmanaged(scalaVersion.value, (sourceDirectory in Test).value)
+    Test / unmanagedSourceDirectories ++= {
+      unmanaged(scalaVersion.value, (Test / sourceDirectory).value)
     },
     scalacOptions ++= Seq(
       "-encoding", "UTF-8",
@@ -37,7 +37,7 @@ object Compiler {
       "-Ywarn-value-discard",
       "-g:vars"
     ),
-    scalacOptions in Compile ++= {
+    Compile / scalacOptions ++= {
       val ver = scalaBinaryVersion.value
 
       if (ver == "2.12") {
@@ -60,7 +60,7 @@ object Compiler {
           cross(CrossVersion.full)),
       ("com.github.ghik" %% "silencer-lib" % silencerVersion.
         value % Provided).cross(CrossVersion.full)),
-    scalacOptions in Compile ++= {
+    Compile / scalacOptions ++= {
       val v = scalaBinaryVersion.value
 
       val mongo30eol = "MongoDB\\ 3\\.0\\ EOL\\ reached\\ by\\ Feb\\ 2018"
@@ -80,13 +80,13 @@ object Compiler {
         )
       }
     },
-    scalacOptions in (Compile, console) ~= {
+    Compile / console / scalacOptions ~= {
       _.filterNot(excludeOpt)
     },
-    scalacOptions in (Test, console) ~= {
+    Test / console / scalacOptions ~= {
       _.filterNot(excludeOpt)
     },
-    scalacOptions in (Test, console) += "-Yrepl-class-based",
+    Test / console / scalacOptions += "-Yrepl-class-based",
   )
 
   private lazy val excludeOpt: String => Boolean = { opt =>
