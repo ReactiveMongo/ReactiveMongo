@@ -48,6 +48,7 @@ private[reactivemongo] class ResponseDecoder
       throw new IllegalStateException(
         s"Invalid message length: ${header.messageLength} < ${readableBytes}")
 
+      // TODO: if header.opCode == 2012 ~> decompression
     } else if (header.opCode != Reply.code) {
       frame.discardReadBytes()
 

@@ -12,27 +12,28 @@ import reactivemongo.api.ReadPreference
  *
  * @param requestID the ID of this request, so that the response may be identifiable. Should be strictly positive.
  * @param op request operation.
- * @param documents body of this request, a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents.
  * @param channelIdHint a hint for sending this request on a particular channel.
  */
-private[reactivemongo] case class Request(
-  requestID: Int,
+private[reactivemongo] final class Request private (
+  val requestID: Int,
   responseTo: Int,
-  op: RequestOp,
-  documents: BufferSequence,
-  readPreference: ReadPreference = ReadPreference.primary,
-  channelIdHint: Option[ChannelId] = None) extends ChannelBufferWritable {
+  val op: RequestOp,
+  val payload: ByteBuf,
+  val readPreference: ReadPreference = ReadPreference.primary,
+  val channelIdHint: Option[ChannelId] = None) extends ChannelBufferWritable {
+
+  private val payloadSize = payload.writerIndex
 
   val writeTo: ByteBuf => Unit = { buffer =>
     header writeTo buffer
     op writeTo buffer
 
-    buffer writeBytes documents.merged
+    buffer writeBytes payload
 
     ()
   }
 
-  def size = 16 + op.size + documents.merged.writerIndex
+  def size = 16 + op.size + payloadSize
 
   /** Header of this request */
   lazy val header = new MessageHeader(size, requestID, responseTo, op.code)
@@ -53,17 +54,33 @@ private[reactivemongo] object Request {
    *
    * @param requestID $requestID
    * @param op $op
+   * @param documents body of this request, a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents.
+   */
+  def apply(
+    requestID: Int,
+    responseTo: Int,
+    op: RequestOp,
+    documents: BufferSequence,
+    readPreference: ReadPreference = ReadPreference.primary,
+    channelIdHint: Option[ChannelId] = None): Request = new Request(
+    requestID, responseTo, op, documents.merged, readPreference, channelIdHint)
+
+  /**
+   * Create a request.
+   *
+   * @param requestID $requestID
+   * @param op $op
    * @param documents $documentsA
    */
   def apply(
     requestID: Int,
     responseTo: Int,
     op: RequestOp,
-    documents: Array[Byte]): Request = Request(
+    documents: Array[Byte]): Request = new Request(
     requestID,
     responseTo,
     op,
-    BufferSequence(Unpooled wrappedBuffer documents))
+    Unpooled.wrappedBuffer(documents))
 
   /**
    * Create a request.
@@ -84,4 +101,5 @@ private[reactivemongo] object Request {
   def apply(requestID: Int, op: RequestOp): Request =
     Request.apply(requestID, op, new Array[Byte](0))
 
+  //private def snappy = new reactivemongo.io.netty.handler.codec.compression.Snappy
 }

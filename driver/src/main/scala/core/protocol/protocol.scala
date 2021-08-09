@@ -37,7 +37,7 @@ private[reactivemongo] case class RequestMaker(
   readPreference: ReadPreference = ReadPreference.primary,
   channelIdHint: Option[ChannelId] = None) {
 
-  def apply(requestID: Int) = Request(
+  def apply(requestID: Int): Request = Request(
     requestID, 0, op, documents, readPreference, channelIdHint)
 }
 
@@ -49,6 +49,7 @@ private[reactivemongo] class RequestEncoder
     message: Request,
     buffer: ByteBuf): Unit = {
 
+    // TODO: compression
     message writeTo buffer
 
     ()
