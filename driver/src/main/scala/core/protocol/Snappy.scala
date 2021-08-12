@@ -1,23 +1,43 @@
 package reactivemongo.core.protocol
 
+import java.nio.ByteBuffer
+
 import scala.util.Try
+
+import org.xerial.snappy.{ Snappy => Z }
 
 import reactivemongo.io.netty.buffer.ByteBuf
 
 private[reactivemongo] final class Snappy {
-  private val underlying = new Snappy()
-
   def decode(in: ByteBuf, out: ByteBuf): Try[Int] = Try {
-    val before = out.writerIndex
+    val outNioBuffer: ByteBuffer =
+      out.internalNioBuffer(out.writerIndex, out.writableBytes)
 
-    underlying.decode(in, out)
+    val sz = Z.uncompress(in.nioBuffer, outNioBuffer)
 
-    out.writerIndex - before
+    out.writerIndex(sz)
+
+    sz
   }
 
   def encode(in: ByteBuf, out: ByteBuf): Try[Unit] = Try {
-    underlying.encode(in, out)
+    if (in.isDirect) {
+      val outNioBuffer: ByteBuffer =
+        out.internalNioBuffer(out.writerIndex, out.writableBytes)
+
+      Z.compress(in.nioBuffer, outNioBuffer)
+    } else {
+      val compressed = Z.compress(in.array)
+
+      out.writeBytes(compressed)
+
+      out.writerIndex(compressed.size)
+    }
 
     ()
   }
+}
+
+private[reactivemongo] object Snappy {
+  def apply(): Snappy = new Snappy()
 }

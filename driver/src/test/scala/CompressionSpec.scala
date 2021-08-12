@@ -45,6 +45,15 @@ final class CompressionSpec extends org.specs2.mutable.Specification {
       decode = bestCompressionZlib.decode(_: ByteBuf, _: ByteBuf))
   }
 
+  { // Snappy
+    val snappy = Snappy()
+
+    spec(
+      name = "Snappy",
+      encode = snappy.encode(_: ByteBuf, _: ByteBuf),
+      decode = snappy.decode(_: ByteBuf, _: ByteBuf))
+  }
+
   // ---
 
   private def spec(
