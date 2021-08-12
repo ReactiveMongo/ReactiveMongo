@@ -13,7 +13,7 @@ import com.github.luben.zstd.{ Zstd => Z }
  *
  * Inspired from https://github.com/netty/netty/blob/master/codec/src/main/java/io/netty/handler/codec/compression/ZstdEncoder.java
  */
-private[reactivemongo] class Zstd(
+private[reactivemongo] final class Zstd(
   blockSize: Int,
   compressionLevel: Int) {
 
