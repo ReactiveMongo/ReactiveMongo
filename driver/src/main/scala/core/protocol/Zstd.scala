@@ -1,5 +1,7 @@
 package reactivemongo.core.protocol
 
+import java.nio.ByteBuffer
+
 import scala.util.Try
 
 import reactivemongo.io.netty.buffer.{ ByteBuf, PooledByteBufAllocator }
@@ -15,15 +17,28 @@ private[reactivemongo] class Zstd(
   blockSize: Int,
   compressionLevel: Int) {
 
-  def encode(
-    in: ByteBuf,
-    out: ByteBuf,
-    buffer: ByteBuf = Zstd.buffer(blockSize)): Try[Unit] = {
+  def decode(in: ByteBuf, out: ByteBuf): Try[Int] = Try {
+    val inNioBuffer: ByteBuffer = in.nioBuffer()
+
+    val outNioBuffer: ByteBuffer =
+      out.internalNioBuffer(out.writerIndex, out.writableBytes)
+
+    val sz = Z.decompress(outNioBuffer, inNioBuffer)
+
+    out.writerIndex(sz)
+
+    sz
+  }
+
+  def encode(in: ByteBuf, out: ByteBuf): Try[Unit] =
+    compress(in, out, buffer = Zstd.buffer(blockSize))
+
+  def compress(in: ByteBuf, out: ByteBuf, buffer: ByteBuf): Try[Unit] = {
     @annotation.tailrec def go(): Unit = {
-      val length = in.readableBytes()
+      val length = in.readableBytes
 
       if (length > 0) {
-        val nextChunkSize = Math.min(length, buffer.writableBytes())
+        val nextChunkSize = Math.min(length, buffer.writableBytes)
 
         in.readBytes(buffer, nextChunkSize)
 
@@ -47,7 +62,7 @@ private[reactivemongo] class Zstd(
 
   // Unsafe
   private def flushBufferedData(buffer: ByteBuf, out: ByteBuf): Unit = {
-    val flushableBytes = buffer.readableBytes()
+    val flushableBytes = buffer.readableBytes
 
     if (flushableBytes > 0) {
       val bufSize = Z.compressBound(flushableBytes.toLong).toInt
@@ -56,7 +71,7 @@ private[reactivemongo] class Zstd(
 
       val idx = out.writerIndex()
 
-      val outNioBuffer = out.internalNioBuffer(idx, out.writableBytes())
+      val outNioBuffer = out.internalNioBuffer(idx, out.writableBytes)
 
       val compressedLength = Z.compress(
         outNioBuffer,
