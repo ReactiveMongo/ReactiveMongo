@@ -794,21 +794,60 @@ object MongoConnection {
     }
   }
 
-  private val IntRe = "^([0-9]+)$".r
+  private val UnsignedInt = "^([0-9]+)$".r
+
+  private val IntRe = "^([-]?[0-9]+)$".r
 
   private val FailoverRe = "^([^:]+):([0-9]+)x([0-9.]+)$".r
+
+  private object Compressors {
+    import Compressor._
+
+    def unapply(value: String): Option[(Seq[Compressor], Seq[String])] = {
+      val valid = Seq.newBuilder[Compressor]
+      val invalid = Seq.newBuilder[String]
+
+      value.split(",").toSeq.foreach {
+        case Zlib.name =>
+          valid += Zlib.DefaultCompressor
+
+        case Zstd.name =>
+          valid += Zstd
+
+        case Snappy.name =>
+          valid += Snappy
+
+        case name =>
+          invalid += name
+      }
+
+      Some(valid.result() -> invalid.result())
+    }
+  }
+
+  private case class ParseState(
+    options: MongoConnectionOptions,
+    rejected: Map[String, String] = Map.empty[String, String]) {
+
+    def updateOption(
+      f: MongoConnectionOptions => MongoConnectionOptions): ParseState =
+      copy(options = f(this.options))
+
+    def reject(setting: (String, String)): ParseState =
+      copy(rejected = this.rejected + setting)
+  }
 
   private def makeOptions(
     opts: Map[String, String],
     initial: MongoConnectionOptions): (List[String], MongoConnectionOptions) = {
 
-    @inline def make(name: String, input: String, unsupported: Map[String, String], parsed: MongoConnectionOptions)(f: => MongoConnectionOptions): (Map[String, String], MongoConnectionOptions) = try {
-      unsupported -> f
+    @inline def make(name: String, input: String, state: ParseState)(f: => ParseState): ParseState = try {
+      f
     } catch {
       case NonFatal(cause) =>
         logger.debug(s"Invalid option '$name': $input", cause)
 
-        (unsupported + (name -> input)) -> parsed
+        state.reject(name -> input)
     }
 
     def deprecated(expected: String, actual: String): Unit =
@@ -816,210 +855,239 @@ object MongoConnection {
         logger.info(s"Connection option '${actual}' is deprecated in favor of '${expected}'")
       }
 
-    val (remOpts, step1) = opts.iterator.foldLeft(
-      Map.empty[String, String] -> initial) {
-        case ((unsupported, result), kv) => kv match {
-          case ("replicaSet", _) => {
-            logger.info("Connection option 'replicaSet' is ignored: determined from servers response")
+    val parsed1 = opts.iterator.foldLeft(ParseState(initial)) {
+      case (state, ("replicaSet", _)) => {
+        logger.info("Connection option 'replicaSet' is ignored: determined from servers response")
 
-            unsupported -> result
-          }
-
-          case ("authenticationMechanism", "x509") => unsupported -> result.
-            copy(authenticationMechanism = X509Authentication)
-
-          case ("authenticationMechanism", "scram-sha256") =>
-            unsupported -> result.copy(
-              authenticationMechanism = ScramSha256Authentication)
-
-          case ("authenticationMechanism", _) => unsupported -> result.
-            copy(authenticationMechanism = ScramSha1Authentication)
-
-          case (n @ ("authenticationDatabase" | "authSource"), v) => {
-            deprecated(n, "authenticationDatabase")
-
-            unsupported -> result.copy(authenticationDatabase = Some(v))
-          }
-
-          case ("connectTimeoutMS", v) => unsupported -> result.
-            copy(connectTimeoutMS = v.toInt)
-
-          case ("maxIdleTimeMS", v) => unsupported -> result.
-            copy(maxIdleTimeMS = v.toInt)
-
-          case ("ssl", v) =>
-            unsupported -> result.copy(sslEnabled = v.toBoolean)
-
-          case ("sslAllowsInvalidCert", v) => unsupported -> result.
-            copy(sslAllowsInvalidCert = v.toBoolean)
-
-          case ("rm.tcpNoDelay", v) => unsupported -> result.
-            copy(tcpNoDelay = v.toBoolean)
-
-          case ("rm.keepAlive", v) => unsupported -> result.
-            copy(keepAlive = v.toBoolean)
-
-          case ("rm.nbChannelsPerNode", v) => unsupported -> result.
-            copy(nbChannelsPerNode = v.toInt)
-
-          case ("rm.maxInFlightRequestsPerChannel", IntRe(max)) =>
-            unsupported -> result.copy(
-              maxInFlightRequestsPerChannel = Some(max.toInt))
-
-          case ("rm.minIdleChannelsPerNode", IntRe(min)) =>
-            unsupported -> result.copy(minIdleChannelsPerNode = min.toInt)
-
-          case ("rm.maxNonQueryableHeartbeats", IntRe(max)) if (max != "0") =>
-            unsupported -> result.withMaxNonQueryableHeartbeats(max.toInt)
-
-          case ("writeConcern", "unacknowledged") => unsupported -> result.
-            copy(writeConcern = WriteConcern.Unacknowledged)
-
-          case ("writeConcern", "acknowledged") => unsupported -> result.
-            copy(writeConcern = WriteConcern.Acknowledged)
-
-          case ("writeConcern", "journaled") => unsupported -> result.
-            copy(writeConcern = WriteConcern.Journaled)
-
-          case ("writeConcern", "default") => unsupported -> result.
-            copy(writeConcern = WriteConcern.Default)
-
-          case ("readPreference", "primary") => unsupported -> result.
-            copy(readPreference = ReadPreference.primary)
-
-          case ("readPreference", "primaryPreferred") =>
-            unsupported -> result.copy(
-              readPreference = ReadPreference.primaryPreferred)
-
-          case ("readPreference", "secondary") => unsupported -> result.copy(
-            readPreference = ReadPreference.secondary)
-
-          case ("readPreference", "secondaryPreferred") =>
-            unsupported -> result.copy(
-              readPreference = ReadPreference.secondaryPreferred)
-
-          case ("readPreference", "nearest") => unsupported -> result.copy(
-            readPreference = ReadPreference.nearest)
-
-          case ("readConcernLevel", ReadConcern(c)) =>
-            unsupported -> result.copy(readConcern = c)
-
-          case ("rm.failover", "default") => unsupported -> result
-
-          case ("rm.failover", "remote") => unsupported -> result.copy(
-            failoverStrategy = FailoverStrategy.remote)
-
-          case ("rm.failover", "strict") => unsupported -> result.copy(
-            failoverStrategy = FailoverStrategy.strict)
-
-          case ("rm.failover", opt @ FailoverRe(d, r, f)) =>
-            make("rm.failover", opt, unsupported, result) {
-              val (time, unit) = Duration.unapply(Duration(d)) match {
-                case Some(dur) => dur
-                case _ =>
-                  throw new URIParsingException(
-                    s"Invalid duration 'rm.failover': $opt")
-              }
-
-              val delay = FiniteDuration(time, unit)
-              val retry = r.toInt
-              val factor = f.toDouble
-              val strategy = FailoverStrategy(delay, retry, _ * factor)
-
-              result.copy(failoverStrategy = strategy)
-            }
-
-          case ("retryWrites", "true") => {
-            logger.info("Connection option 'rm.failover' should be preferred to 'retryWrites'")
-
-            unsupported -> result
-          }
-
-          case ("retryWrites", _) => {
-            logger.info("Connection option 'rm.failover' should be preferred to 'retryWrites'")
-
-            unsupported -> result.copy(
-              failoverStrategy = FailoverStrategy.strict)
-          }
-
-          case ("heartbeatFrequencyMS", IntRe(ms)) =>
-            make("heartbeatFrequencyMS", ms, unsupported, result) {
-              val millis = ms.toInt
-
-              if (millis < 500) {
-                throw new URIParsingException(
-                  "'heartbeatFrequencyMS' must be >= 500 milliseconds")
-              }
-
-              result.copy(heartbeatFrequencyMS = millis)
-            }
-
-          case ("appName", nme) => Option(nme).map(_.trim).filter(v => {
-            v.nonEmpty && v.getBytes("UTF-8").size < 128
-          }) match {
-            case Some(appName) =>
-              unsupported -> result.copy(appName = Some(appName))
-
-            case _ =>
-              (unsupported + ("appName" -> nme)) -> result
-          }
-
-          case kv => (unsupported + kv) -> result
-        }
+        state
       }
 
-    val step2 = remOpts.get("keyStore").fold(step1) { uri =>
+      case (state, ("authenticationMechanism", "x509")) =>
+        state.updateOption(_.copy(authenticationMechanism = X509Authentication))
+
+      case (state, ("authenticationMechanism", "scram-sha256")) =>
+        state.updateOption(_.copy(
+          authenticationMechanism = ScramSha256Authentication))
+
+      case (state, ("authenticationMechanism", _)) =>
+        state.updateOption(_.copy(
+          authenticationMechanism = ScramSha1Authentication))
+
+      case (state, (n @ ("authenticationDatabase" | "authSource"), v)) => {
+        deprecated(n, "authenticationDatabase")
+
+        state.updateOption(_.copy(authenticationDatabase = Some(v)))
+      }
+
+      case (state, ("connectTimeoutMS", v)) =>
+        state.updateOption(_.copy(connectTimeoutMS = v.toInt))
+
+      case (state, ("maxIdleTimeMS", v)) =>
+        state.updateOption(_.copy(maxIdleTimeMS = v.toInt))
+
+      case (state, ("ssl", v)) =>
+        state.updateOption(_.copy(sslEnabled = v.toBoolean))
+
+      case (state, ("sslAllowsInvalidCert", v)) =>
+        state.updateOption(_.copy(sslAllowsInvalidCert = v.toBoolean))
+
+      case (state, ("compressors", Compressors(compressors, invalid))) =>
+        invalid.foldLeft(state) { (st, c) =>
+          st.reject("compressors" -> c)
+        }.updateOption(_.withCompressors(compressors))
+
+      case (state, ("rm.tcpNoDelay", v)) =>
+        state.updateOption(_.copy(tcpNoDelay = v.toBoolean))
+
+      case (state, ("rm.keepAlive", v)) =>
+        state.updateOption(_.copy(keepAlive = v.toBoolean))
+
+      case (state, ("rm.nbChannelsPerNode", v)) =>
+        state.updateOption(_.copy(nbChannelsPerNode = v.toInt))
+
+      case (state, ("rm.maxInFlightRequestsPerChannel", UnsignedInt(max))) =>
+        state.updateOption(_.copy(
+          maxInFlightRequestsPerChannel = Some(max.toInt)))
+
+      case (state, ("rm.minIdleChannelsPerNode", UnsignedInt(min))) =>
+        state.updateOption(_.copy(minIdleChannelsPerNode = min.toInt))
+
+      case (state, ("rm.maxNonQueryableHeartbeats", UnsignedInt(max))) if (
+        max != "0") =>
+        state.updateOption(_.withMaxNonQueryableHeartbeats(max.toInt))
+
+      case (state, ("writeConcern", "unacknowledged")) =>
+        state.updateOption(_.copy(writeConcern = WriteConcern.Unacknowledged))
+
+      case (state, ("writeConcern", "acknowledged")) =>
+        state.updateOption(_.copy(writeConcern = WriteConcern.Acknowledged))
+
+      case (state, ("writeConcern", "journaled")) =>
+        state.updateOption(_.copy(writeConcern = WriteConcern.Journaled))
+
+      case (state, ("writeConcern", "default")) =>
+        state.updateOption(_.copy(writeConcern = WriteConcern.Default))
+
+      case (state, ("readPreference", "primary")) =>
+        state.updateOption(_.copy(readPreference = ReadPreference.primary))
+
+      case (state, ("readPreference", "primaryPreferred")) =>
+        state.updateOption(_.copy(
+          readPreference = ReadPreference.primaryPreferred))
+
+      case (state, ("readPreference", "secondary")) =>
+        state.updateOption(_.copy(readPreference = ReadPreference.secondary))
+
+      case (state, ("readPreference", "secondaryPreferred")) =>
+        state.updateOption(_.copy(
+          readPreference = ReadPreference.secondaryPreferred))
+
+      case (state, ("readPreference", "nearest")) =>
+        state.updateOption(_.copy(readPreference = ReadPreference.nearest))
+
+      case (state, ("readConcernLevel", ReadConcern(c))) =>
+        state.updateOption(_.copy(readConcern = c))
+
+      case (state, ("rm.failover", "default")) => state
+
+      case (state, ("rm.failover", "remote")) =>
+        state.updateOption(_.copy(failoverStrategy = FailoverStrategy.remote))
+
+      case (state, ("rm.failover", "strict")) =>
+        state.updateOption(_.copy(failoverStrategy = FailoverStrategy.strict))
+
+      case (state, ("rm.failover", opt @ FailoverRe(d, r, f))) =>
+        make("rm.failover", opt, state) {
+          val (time, unit) = Duration.unapply(Duration(d)) match {
+            case Some(dur) => dur
+            case _ =>
+              throw new URIParsingException(
+                s"Invalid duration 'rm.failover': $opt")
+          }
+
+          val delay = FiniteDuration(time, unit)
+          val retry = r.toInt
+          val factor = f.toDouble
+          val strategy = FailoverStrategy(delay, retry, _ * factor)
+
+          state.updateOption(_.copy(failoverStrategy = strategy))
+        }
+
+      case (state, ("retryWrites", "true")) => {
+        logger.info("Connection option 'rm.failover' should be preferred to 'retryWrites'")
+
+        state
+      }
+
+      case (state, ("retryWrites", _)) => {
+        logger.info("Connection option 'rm.failover' should be preferred to 'retryWrites'")
+
+        state.updateOption(_.copy(
+          failoverStrategy = FailoverStrategy.strict))
+      }
+
+      case (state, ("heartbeatFrequencyMS", UnsignedInt(ms))) =>
+        make("heartbeatFrequencyMS", ms, state) {
+          val millis = ms.toInt
+
+          if (millis < 500) {
+            throw new URIParsingException(
+              "'heartbeatFrequencyMS' must be >= 500 milliseconds")
+          }
+
+          state.updateOption(_.copy(heartbeatFrequencyMS = millis))
+        }
+
+      case (state, ("appName", nme)) => Option(nme).map(_.trim).filter(v => {
+        v.nonEmpty && v.getBytes("UTF-8").size < 128
+      }) match {
+        case Some(appName) =>
+          state.updateOption(_.copy(appName = Some(appName)))
+
+        case _ =>
+          state.reject("appName" -> nme)
+      }
+
+      case (state, kv) => state.reject(kv)
+    }
+
+    val parsed2 = parsed1.rejected.get("zlibCompressionLevel").fold(parsed1) {
+      case IntRe(level) =>
+        var valid: Boolean = false
+
+        val compressors = parsed1.options.compressors.map {
+          case Compressor.Zlib(_) => {
+            valid = true
+            Compressor.Zlib(level.toInt)
+          }
+
+          case compressor =>
+            compressor
+        }
+
+        if (!valid) {
+          logger.info("Connection option 'zlibCompressionLevel' must only be specified after 'compressors' with 'zlib'")
+
+          parsed1.reject("zlibCompressionLevel" -> level)
+        } else {
+          parsed1.updateOption(_.withCompressors(compressors))
+        }
+    }
+
+    val parsed3 = parsed2.rejected.get("keyStore").fold(parsed2) { uri =>
+      import parsed2.rejected
+
       val keyStore = MongoConnectionOptions.KeyStore(
         resource = new java.net.URI(uri),
-        password = remOpts.get("keyStorePassword").map(_.toCharArray),
-        storeType = remOpts.getOrElse("keyStoreType", "PKCS12"),
+        password = rejected.get("keyStorePassword").map(_.toCharArray),
+        storeType = rejected.getOrElse("keyStoreType", "PKCS12"),
         trust = true)
 
-      step1.copy(keyStore = Some(keyStore))
+      parsed2.updateOption(_.copy(keyStore = Some(keyStore))).copy(
+        rejected = rejected - "keyStore" - "keyStorePassword" - "keyStoreType")
     }
-
-    val remOpts2 = remOpts - "keyStore" - "keyStorePassword" - "keyStoreType"
 
     // Overriding options
-    remOpts2.iterator.foldLeft(List.empty[String] -> step2) {
-      case ((unsupported, result), kv) => kv match {
-        case (o @ ("writeConcernW" | "w"), "majority") => {
-          deprecated(o, "w")
-
-          unsupported -> result.copy(writeConcern = result.writeConcern.
-            copy(w = WriteConcern.Majority))
-        }
-
-        case (o @ ("writeConcernW" | "w"), IntRe(str)) => {
-          deprecated(o, "w")
-
-          unsupported -> result.copy(writeConcern = result.writeConcern.
-            copy(w = WriteConcern.WaitForAcknowledgments(str.toInt)))
-        }
-
-        case (o @ ("writeConcernW" | "w"), tag) => {
-          deprecated(o, "w")
-
-          unsupported -> result.copy(writeConcern = result.writeConcern.
-            copy(w = WriteConcern.TagSet(tag)))
-        }
-
-        case (o @ ("journal" | "writeConcernJ"), journaled) => {
-          deprecated(o, "journal")
-
-          unsupported -> result.copy(writeConcern = result.writeConcern.
-            copy(j = journaled.toBoolean))
-        }
-
-        case (o @ ("wtimeoutMS" | "writeConcernTimeout"), IntRe(ms)) => {
-          deprecated(o, "journal")
-
-          unsupported -> result.copy(writeConcern = result.writeConcern.
-            copy(wtimeout = Some(ms.toInt)))
-        }
-
-        case (k, _) => (k :: unsupported) -> result
-      }
+    def updateWriteConcern(st: ParseState)(
+      f: WriteConcern => WriteConcern): ParseState = st.updateOption { opts =>
+      opts.copy(writeConcern = f(opts.writeConcern))
     }
+
+    val parsed4 = parsed3.rejected.iterator.foldLeft(parsed3) {
+      case (state, (o @ ("writeConcernW" | "w"), "majority")) => {
+        deprecated(o, "w")
+
+        updateWriteConcern(state)(_.copy(w = WriteConcern.Majority))
+      }
+
+      case (state, (o @ ("writeConcernW" | "w"), UnsignedInt(str))) => {
+        deprecated(o, "w")
+
+        updateWriteConcern(state)(_.copy(
+          w = WriteConcern.WaitForAcknowledgments(str.toInt)))
+      }
+
+      case (state, (o @ ("writeConcernW" | "w"), tag)) => {
+        deprecated(o, "w")
+
+        updateWriteConcern(state)(_.copy(w = WriteConcern.TagSet(tag)))
+      }
+
+      case (state, (o @ ("journal" | "writeConcernJ"), journaled)) => {
+        deprecated(o, "journal")
+
+        updateWriteConcern(state)(_.copy(j = journaled.toBoolean))
+      }
+
+      case (state, (o @ ("wtimeoutMS" | "writeConcernTimeout"), UnsignedInt(ms))) => {
+        deprecated(o, "journal")
+
+        updateWriteConcern(state)(_.copy(wtimeout = Some(ms.toInt)))
+      }
+
+      case (state, kv) => state.reject(kv)
+    }
+
+    (parsed4.rejected - "writeConcernW" - "w" - "journal" - "writeConcernJ" - "wtimeoutMS" - "writeConcernTimeout").keySet.toList.sorted -> parsed4.options
   }
 }

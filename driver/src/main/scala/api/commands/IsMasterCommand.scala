@@ -2,9 +2,9 @@ package reactivemongo.api.commands
 
 import java.util.Date
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ Compressor, SerializationPack }
 
-import reactivemongo.core.{ ClientMetadata, Compressor }
+import reactivemongo.core.ClientMetadata
 import reactivemongo.core.nodeset.NodeStatus
 
 // See https://github.com/mongodb/specifications/blob/master/source/mongodb-handshake/handshake.rst
