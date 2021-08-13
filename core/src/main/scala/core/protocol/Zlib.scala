@@ -62,5 +62,7 @@ private[reactivemongo] final class Zlib(compressionLevel: Int) {
 }
 
 private[reactivemongo] object Zlib {
-  def apply(compressionLevel: Int = -1): Zlib = new Zlib(compressionLevel)
+  def apply(compressionLevel: Int): Zlib = new Zlib(compressionLevel)
+
+  lazy val DefaultCompressor = Zlib(-1)
 }

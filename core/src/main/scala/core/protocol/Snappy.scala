@@ -40,4 +40,6 @@ private[reactivemongo] final class Snappy {
 
 private[reactivemongo] object Snappy {
   def apply(): Snappy = new Snappy()
+
+  lazy val DefaultCompressor = Snappy()
 }

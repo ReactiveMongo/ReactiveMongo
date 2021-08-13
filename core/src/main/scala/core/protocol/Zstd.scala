@@ -104,4 +104,6 @@ private[reactivemongo] object Zstd {
 
   @inline def buffer(blockSize: Int): ByteBuf =
     PooledByteBufAllocator.DEFAULT.directBuffer(blockSize)
+
+  lazy val DefaultCompressor = Zstd()
 }

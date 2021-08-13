@@ -26,6 +26,13 @@ private[reactivemongo] class MessageHeader(
   private[core] lazy val tupled =
     Tuple4(messageLength, requestID, responseTo, opCode)
 
+  private[core] def copy(
+    messageLength: Int = this.messageLength,
+    requestID: Int = this.requestID,
+    responseTo: Int = this.responseTo,
+    opCode: Int = this.opCode): MessageHeader = new MessageHeader(
+    messageLength, requestID, responseTo, opCode)
+
   override def equals(that: Any): Boolean = that match {
     case other: MessageHeader =>
       this.tupled == other.tupled

@@ -1,5 +1,6 @@
 import reactivemongo.io.netty.buffer.Unpooled
 
+import reactivemongo.api.Compressor
 import reactivemongo.api.bson.BSONDocument
 
 import org.specs2.specification.core.Fragments
@@ -12,6 +13,7 @@ final class ProtocolSpec(implicit ee: ExecutionEnv)
 
   import reactivemongo.api.tests.{
     Response,
+    compressRequest,
     query,
     getBytes,
     messageHeader,
@@ -78,6 +80,20 @@ final class ProtocolSpec(implicit ee: ExecutionEnv)
 
         req.writeTo(buffer) must_=== ({}) and {
           getBytes(buffer, req.size) must_=== bytes
+        } and {
+          // isMaster request must not be compressed, but anyway check
+          // request compression there
+          val expected = Array[Byte](96, -128, 37, 0, 0, 0, 16, 105, 115, 109, 97, 115, 116, 101, 114, 0, 1, 0, 0, 0, 4, 99, 111, 109, 112, 114, 101, 115, 115, 105, 111, 110, 0, 5, 0, -6, 1, 0)
+
+          compressRequest(req, Compressor.Snappy).map { req =>
+            import req.payload
+
+            val res = Array.fill[Byte](payload.writerIndex)(-1)
+
+            payload.readBytes(res, payload.readerIndex, res.size)
+
+            res
+          } must beSuccessfulTry(expected)
         }
       }
     }

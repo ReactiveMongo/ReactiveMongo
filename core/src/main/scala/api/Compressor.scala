@@ -35,7 +35,7 @@ object Compressor {
     val compressionLevel: Int) extends Compressor {
 
     val name = Zlib.name
-    val id: Byte = 2
+    val id = Zlib.id
 
     override def hashCode: Int = compressionLevel
 
@@ -52,6 +52,7 @@ object Compressor {
 
   object Zlib {
     val name = "zlib"
+    val id: Byte = 2
 
     lazy val DefaultCompressor: Zlib = new Zlib(-1)
 

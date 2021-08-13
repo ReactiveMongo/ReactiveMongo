@@ -77,8 +77,6 @@ object Version {
         libraryDependencies ++= akka.value ++ Seq(
           "dnsjava" % "dnsjava" % "3.4.1",
           commonsCodec,
-          "com.github.luben" % "zstd-jni" % "1.5.0-4",
-          "org.xerial.snappy" % "snappy-java" % "1.1.8.4",
           shapelessTest % Test, specs.value) ++ logApi,
         mimaBinaryIssueFilters ++= {
           import com.typesafe.tools.mima.core._

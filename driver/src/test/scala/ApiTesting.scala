@@ -406,4 +406,7 @@ package object tests { self =>
       reactivemongo.api.commands.ReplSetGetStatus.reader(pack)
 
   }
+
+  def compressRequest(req: Request, compressor: Compressor) =
+    Request.compress(req, compressor)
 }

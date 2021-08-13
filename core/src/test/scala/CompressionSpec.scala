@@ -21,7 +21,7 @@ final class CompressionSpec extends org.specs2.mutable.Specification {
   }
 
   { // Zlib
-    val defaultZlib = Zlib()
+    val defaultZlib = Zlib.DefaultCompressor
 
     spec(
       name = "Zlib (default)",
