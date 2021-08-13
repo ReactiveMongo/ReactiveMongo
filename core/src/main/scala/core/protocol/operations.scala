@@ -30,7 +30,9 @@ private[reactivemongo] sealed trait Op {
  *
  * Actually, all operations excepted Reply are requests.
  */
-private[reactivemongo] sealed trait RequestOp extends Op with ChannelBufferWritable {
+private[reactivemongo] sealed trait RequestOp
+  extends Op with ChannelBufferWritable {
+
   /** States if this request expects a response. */
   val expectsResponse: Boolean = false
 
@@ -231,10 +233,34 @@ private[reactivemongo] case class KillCursors(cursorIDs: Set[Long]) extends Requ
   val writeTo: ByteBuf => Unit = { buffer: ByteBuf =>
     buffer writeIntLE 0
     buffer writeIntLE cursorIDs.size
+
     for (cursorID <- cursorIDs) {
       buffer writeLongLE cursorID
     }
   }
 
   val size = 4 /* int32 ZERO */ + 4 + cursorIDs.size * 8
+}
+
+private[reactivemongo] case class CompressedOp(
+  override val expectsResponse: Boolean,
+  override val requiresPrimary: Boolean,
+  originalOpCode: Int,
+  uncompressedSize: Int,
+  compressorId: Byte) extends RequestOp {
+  val code = CompressedOp.code
+
+  val size = 4 + 4 + 1
+
+  val writeTo: ByteBuf => Unit = { buffer: ByteBuf =>
+    buffer writeIntLE originalOpCode
+    buffer writeIntLE uncompressedSize
+    buffer writeByte compressorId.toInt
+
+    ()
+  }
+}
+
+private[reactivemongo] object CompressedOp {
+  val code = 2012 // OP_COMPRESSED
 }

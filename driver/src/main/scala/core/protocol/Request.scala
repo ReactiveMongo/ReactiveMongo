@@ -1,11 +1,13 @@
 package reactivemongo.core.protocol
 
+import scala.util.{ Success, Try }
+
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 import reactivemongo.io.netty.channel.ChannelId
 
 import reactivemongo.core.netty.BufferSequence
 
-import reactivemongo.api.ReadPreference
+import reactivemongo.api.{ Compressor, ReadPreference }
 
 /**
  * Request message.
@@ -16,7 +18,7 @@ import reactivemongo.api.ReadPreference
  */
 private[reactivemongo] final class Request private (
   val requestID: Int,
-  responseTo: Int,
+  val responseTo: Int,
   val op: RequestOp,
   val payload: ByteBuf,
   val readPreference: ReadPreference = ReadPreference.primary,
@@ -101,5 +103,63 @@ private[reactivemongo] object Request {
   def apply(requestID: Int, op: RequestOp): Request =
     Request.apply(requestID, op, new Array[Byte](0))
 
-  //private def snappy = new reactivemongo.io.netty.handler.codec.compression.Snappy
+  /**
+   * @param req the request to be compressed
+   * @param compressor the compressor to be applied (if required)
+   */
+  def compress(req: Request, compressor: Compressor): Try[Request] = {
+    import req.op.{ code => originalOpCode }
+
+    if (originalOpCode == CompressedOp.code) {
+      // Already compressed
+      Success(req)
+    } else {
+      val uncompressedSize = req.payload.readableBytes
+
+      val compressed: Try[ByteBuf] = compressor match {
+        case Compressor.Snappy => {
+          val bufSize = org.xerial.snappy.Snappy.
+            maxCompressedLength(uncompressedSize)
+
+          val out = Unpooled.directBuffer(bufSize)
+
+          Snappy().encode(req.payload, out).map(_ => out)
+        }
+
+        case Compressor.Zstd => {
+          val bufSize = com.github.luben.zstd.Zstd.
+            compressBound(uncompressedSize.toLong).toInt
+
+          val out = Unpooled.directBuffer(bufSize)
+
+          Zstd().encode(req.payload, out).map(_ => out)
+        }
+
+        case Compressor.Zlib(level) => {
+          val out = Unpooled.directBuffer(
+            (uncompressedSize.toDouble * 1.2D).toInt)
+
+          Zlib(level).encode(req.payload, out).map(_ => out)
+        }
+
+        case _ =>
+          Try(req.payload.asReadOnly())
+      }
+
+      compressed.map { payload =>
+        new Request(
+          requestID = req.requestID,
+          responseTo = req.responseTo,
+          op = new CompressedOp(
+            expectsResponse = req.op.expectsResponse,
+            requiresPrimary = req.op.requiresPrimary,
+            originalOpCode = req.op.code,
+            uncompressedSize = uncompressedSize,
+            compressorId = compressor.id),
+          payload = payload,
+          readPreference = req.readPreference,
+          channelIdHint = req.channelIdHint)
+      }
+    }
+  }
 }
