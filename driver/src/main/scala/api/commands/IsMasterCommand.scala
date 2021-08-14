@@ -17,7 +17,11 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
     val client: Option[ClientMetadata],
     val compression: Seq[Compressor],
     val comment: Option[String]) extends Command
-    with CommandWithResult[IsMasterResult] with CommandWithPack[P]
+    with CommandWithResult[IsMasterResult] with CommandWithPack[P] {
+    val commandKind = CommandKind.Hello
+
+    override def toString = s"IsMaster($client, $compression)"
+  }
 
   private[reactivemongo] final class LastWrite(
     val opTime: Long,

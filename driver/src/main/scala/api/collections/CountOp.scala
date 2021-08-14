@@ -9,6 +9,7 @@ import reactivemongo.api.{ ReadConcern, ReadPreference, SerializationPack }
 import reactivemongo.api.commands.{
   CollectionCommand,
   CommandCodecs,
+  CommandKind,
   CommandWithResult,
   ResolvedCollectionCommand
 }
@@ -37,7 +38,9 @@ private[api] trait CountOp[P <: SerializationPack] {
     val skip: Int,
     val hint: Option[Hint],
     val readConcern: ReadConcern)
-    extends CollectionCommand with CommandWithResult[Long]
+    extends CollectionCommand with CommandWithResult[Long] {
+    val commandKind = CommandKind.Count
+  }
 
   private type CountCmd = ResolvedCollectionCommand[CountCommand]
 

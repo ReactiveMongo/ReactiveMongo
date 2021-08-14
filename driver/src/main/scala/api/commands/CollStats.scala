@@ -5,6 +5,8 @@ import reactivemongo.api.{ CollectionStats, SerializationPack }
 private[reactivemongo] final class CollStats(val scale: Option[Int] = None)
   extends CollectionCommand with CommandWithResult[CollectionStats] {
 
+  val commandKind = CommandKind.CollStats
+
   override def equals(that: Any): Boolean = that match {
     case other: CollStats =>
       this.scale == other.scale

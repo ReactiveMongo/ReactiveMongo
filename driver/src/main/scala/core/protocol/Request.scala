@@ -37,7 +37,7 @@ private[reactivemongo] final class Request private (
     ()
   }
 
-  def size = 16 + op.size + payloadSize
+  def size = /* MsgHeader: */ 16 + op.size + payloadSize
 
   /** Header of this request */
   lazy val header = new MessageHeader(size, requestID, responseTo, op.code)
@@ -116,7 +116,16 @@ private[reactivemongo] object Request {
       // Already compressed
       Success(req)
     } else {
-      val uncompressedSize = req.payload.readableBytes
+      val uncompressedSize = req.size - 16 /* MsgHeader */
+
+      def uncompressedData: ByteBuf = {
+        val buf = Unpooled.directBuffer(uncompressedSize)
+
+        req.op writeTo buf
+
+        req.payload.resetReaderIndex()
+        buf writeBytes req.payload
+      }
 
       val compressed: Try[ByteBuf] = compressor match {
         case Compressor.Snappy => {
@@ -125,7 +134,7 @@ private[reactivemongo] object Request {
 
           val out = Unpooled.directBuffer(bufSize)
 
-          buffer.Snappy().encode(req.payload, out).map(_ => out)
+          buffer.Snappy().encode(uncompressedData, out).map(_ => out)
         }
 
         case Compressor.Zstd => {
@@ -134,18 +143,18 @@ private[reactivemongo] object Request {
 
           val out = Unpooled.directBuffer(bufSize)
 
-          buffer.Zstd().encode(req.payload, out).map(_ => out)
+          buffer.Zstd().encode(uncompressedData, out).map(_ => out)
         }
 
         case Compressor.Zlib(level) => {
           val out = Unpooled.directBuffer(
             (uncompressedSize.toDouble * 1.2D).toInt)
 
-          buffer.Zlib(level).encode(req.payload, out).map(_ => out)
+          buffer.Zlib(level).encode(uncompressedData, out).map(_ => out)
         }
 
         case _ =>
-          Try(req.payload.asReadOnly())
+          Try(uncompressedData)
       }
 
       compressed.map { payload =>

@@ -14,6 +14,7 @@ import reactivemongo.core.errors.CommandException
 
 import reactivemongo.api.commands.{
   Command,
+  CommandKind,
   FailedAuthentication,
   SuccessfulAuthentication,
   ScramFinalNegociation,
@@ -114,7 +115,9 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
   protected final def sendAuthenticate(connection: Connection, nextAuth: Authenticate): Connection = {
     val start = initiate(nextAuth.user)
     val maker = Command.buildRequestMaker(pack)(
-      start, initiateWriter, ReadPreference.primary, nextAuth.db)
+      CommandKind.Authenticate,
+      start, initiateWriter, ReadPreference.primary, nextAuth.db,
+      options.compressors)
 
     connection.send(maker(RequestIdGenerator.getNonce.next))
 
@@ -180,8 +183,8 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
                     { sig =>
                       ns.updateConnectionByChannelId(chanId) { con =>
                         val maker = Command.buildRequestMaker(pack)(
-                          negociation, negociationWriter,
-                          ReadPreference.primary, db)
+                          CommandKind.GetNonce, negociation, negociationWriter,
+                          ReadPreference.primary, db, options.compressors)
 
                         con.send(maker(RequestIdGenerator.authenticate.next)).
                           addListener(new OperationHandler(
@@ -256,8 +259,9 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
 
                   } else {
                     val maker = Command.buildRequestMaker(pack)(
+                      CommandKind.Authenticate,
                       ScramFinalNegociation(cid, payload), finalWriter,
-                      ReadPreference.primary, db)
+                      ReadPreference.primary, db, options.compressors)
 
                     con.send(maker(RequestIdGenerator.authenticate.next)).
                       addListener(new OperationHandler(

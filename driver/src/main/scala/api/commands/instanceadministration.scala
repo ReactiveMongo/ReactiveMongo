@@ -4,7 +4,11 @@ import reactivemongo.api.{ SerializationPack, WriteConcern }
 
 import reactivemongo.core.errors.GenericDriverException
 
-private[reactivemongo] object DropDatabase extends Command with CommandWithResult[Unit] {
+private[reactivemongo] object DropDatabase
+  extends Command with CommandWithResult[Unit] {
+
+  val commandKind = CommandKind.DropDatabase
+
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[DropDatabase.type] = {
     val builder = pack.newBuilder
     val cmd = builder.document(Seq(
@@ -13,11 +17,13 @@ private[reactivemongo] object DropDatabase extends Command with CommandWithResul
     pack.writer[DropDatabase.type](_ => cmd)
   }
 
-  override val toString = "DropDatabase"
+  @inline override def toString = commandKind.name
 }
 
-private[reactivemongo] object DropCollection extends CollectionCommand
-  with CommandWithResult[Unit] {
+private[reactivemongo] object DropCollection
+  extends CollectionCommand with CommandWithResult[Unit] {
+
+  val commandKind = CommandKind.DropCollection
 
   private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[DropCollection.type]] = {
     val builder = pack.newBuilder
@@ -27,12 +33,16 @@ private[reactivemongo] object DropCollection extends CollectionCommand
         builder.elementProducer("drop", builder.string(drop.collection))))
     }
   }
+
+  @inline override def toString = commandKind.name
 }
 
 private[reactivemongo] case class RenameCollection(
   fullyQualifiedCollectionName: String,
   fullyQualifiedTargetName: String,
-  dropTarget: Boolean = false) extends Command with CommandWithResult[Unit]
+  dropTarget: Boolean = false) extends Command with CommandWithResult[Unit] {
+  val commandKind = CommandKind.RenameCollection
+}
 
 private[api] object RenameCollection {
   def writer[P <: SerializationPack](pack: P): pack.Writer[RenameCollection] = {
@@ -55,7 +65,10 @@ private[api] object RenameCollection {
 
 private[api] case class Create(
   capped: Option[Capped] = None,
-  writeConcern: WriteConcern = WriteConcern.Default) extends CollectionCommand with CommandWithResult[Unit]
+  writeConcern: WriteConcern = WriteConcern.Default)
+  extends CollectionCommand with CommandWithResult[Unit] {
+  val commandKind = CommandKind.Create
+}
 
 private[api] object CreateCollection {
   def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[Create]] = {
@@ -85,6 +98,8 @@ private[api] object CreateCollection {
 private[reactivemongo] final class ConvertToCapped(
   val capped: Capped)
   extends CollectionCommand with CommandWithResult[Unit] {
+
+  val commandKind = CommandKind.ConvertToCapped
 
   override def equals(that: Any): Boolean = that match {
     case other: ConvertToCapped =>
@@ -122,6 +137,8 @@ private[api] case class CollectionNames(names: List[String])
 /** List the names of DB collections. */
 private[api] object ListCollectionNames
   extends Command with CommandWithResult[CollectionNames] {
+
+  val commandKind = CommandKind.ListCollections
 
   def writer[P <: SerializationPack](pack: P): pack.Writer[ListCollectionNames.type] = {
     val builder = pack.newBuilder
@@ -243,6 +260,8 @@ final class ReplSetStatus private[api] (
 private[reactivemongo] object ReplSetGetStatus
   extends Command with CommandWithResult[ReplSetStatus] {
 
+  val commandKind = CommandKind.ReplSetGetStatus
+
   def writer[P <: SerializationPack](pack: P): pack.Writer[ReplSetGetStatus.type] = {
     val builder = pack.newBuilder
     val cmd = builder.document(Seq(builder.elementProducer(
@@ -293,7 +312,9 @@ private[reactivemongo] object ReplSetGetStatus
 /**
  * The command [[https://docs.mongodb.org/manual/reference/command/resync/ resync]]
  */
-private[api] object Resync extends Command with CommandWithResult[Unit]
+private[api] object Resync extends Command with CommandWithResult[Unit] {
+  val commandKind = CommandKind.Resync
+}
 
 /**
  * The [[https://docs.mongodb.org/manual/reference/command/replSetMaintenance/ replSetMaintenance]] command.
@@ -303,6 +324,8 @@ private[api] object Resync extends Command with CommandWithResult[Unit]
  */
 private[reactivemongo] final class ReplSetMaintenance(
   val enable: Boolean = true) extends Command with CommandWithResult[Unit] {
+  val commandKind = CommandKind.ReplSetMaintenance
+
   override def equals(that: Any): Boolean = that match {
     case other: ReplSetMaintenance =>
       this.enable == other.enable
@@ -335,4 +358,6 @@ private[reactivemongo] object ReplSetMaintenance {
  * The [[https://docs.mongodb.com/manual/reference/command/ping/ ping]] command.
  */
 private[reactivemongo] object PingCommand
-  extends Command with CommandWithResult[Boolean]
+  extends Command with CommandWithResult[Boolean] {
+  val commandKind = CommandKind.Ping
+}

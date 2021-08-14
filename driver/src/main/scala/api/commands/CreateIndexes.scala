@@ -15,6 +15,8 @@ private[reactivemongo] final class CreateIndexes(
   val indexes: List[Index])
   extends CollectionCommand with CommandWithResult[WriteResult] {
 
+  val commandKind = CommandKind.CreateIndexes
+
   override def equals(that: Any): Boolean = that match {
     case other: CreateIndexes =>
       this.tupled == other.tupled
@@ -61,6 +63,8 @@ private[reactivemongo] object CreateIndexes {
   private[api] class Command[P <: SerializationPack](
     val db: String,
     val indexes: List[Index.Aux[P]]) extends CollectionCommand with CommandWithResult[WriteResult] {
+
+    val commandKind = CommandKind.CreateIndexes
 
     override def equals(that: Any): Boolean = that match {
       case other: Command[P] =>

@@ -64,5 +64,5 @@ private[reactivemongo] object MessageHeader
     new MessageHeader(messageLength, requestID, responseTo, opCode)
   }
 
-  private[core] val size = 4 * 4 // 4 * int32
+  private[core] val size = 16 // 4 * int32
 }

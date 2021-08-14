@@ -23,6 +23,8 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
     val writeConcern: WriteConcern,
     val bypassDocumentValidation: Boolean) extends CollectionCommand with CommandWithResult[UpdateWriteResult] {
 
+    val commandKind = CommandKind.Update
+
     private[commands] lazy val tupled = Tuple5(
       firstUpdate, updates, ordered, writeConcern, bypassDocumentValidation)
 

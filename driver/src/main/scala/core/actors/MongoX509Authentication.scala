@@ -5,6 +5,7 @@ import reactivemongo.api.ReadPreference
 import reactivemongo.api.commands.{
   AuthenticationResult,
   Command,
+  CommandKind,
   X509Authenticate
 }
 
@@ -24,8 +25,9 @@ private[reactivemongo] trait MongoX509Authentication { system: MongoDBSystem =>
     nextAuth: Authenticate): Connection = {
 
     val maker = Command.buildRequestMaker(pack)(
+      CommandKind.Authenticate,
       X509Authenticate(Option(nextAuth.user)),
-      writer, ReadPreference.primary, db = f"$$external")
+      writer, ReadPreference.primary, db = f"$$external", options.compressors)
 
     connection.send(maker(RequestIdGenerator.authenticate.next))
 

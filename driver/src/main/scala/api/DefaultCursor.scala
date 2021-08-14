@@ -26,7 +26,7 @@ import reactivemongo.core.actors.{
   ExpectingResponse
 }
 
-import reactivemongo.api.commands.CommandCodecs
+import reactivemongo.api.commands.{ CommandCodecs, CommandKind }
 
 private[reactivemongo] object DefaultCursor {
   import Cursor.{ State, Cont, Fail, logger }
@@ -79,7 +79,8 @@ private[reactivemongo] object DefaultCursor {
           val op = query.copy(numberToReturn = ntr)
           val req = new ExpectingResponse(
             requestMaker = RequestMaker(
-              op, requestBuffer(maxDocs), readPreference),
+              CommandKind.Query, op, requestBuffer(maxDocs),
+              readPreference, compressors = compressors),
             pinnedNode = transaction.flatMap(_.pinnedNode))
 
           requester(0, maxDocs, req)(ec)
@@ -171,7 +172,9 @@ private[reactivemongo] object DefaultCursor {
         // MongoDB2.6: Int.MaxValue
         val op = getMoreOpCmd(_ref.cursorId, maxDocs)
         val req = new ExpectingResponse(
-          requestMaker = RequestMaker(op._1, op._2, readPreference),
+          requestMaker = RequestMaker(
+            CommandKind.Query, op._1, op._2, readPreference,
+            compressors = compressors),
           pinnedNode = pinnedNode)
 
         requester(0, maxDocs, req)(ec)
@@ -234,6 +237,9 @@ private[reactivemongo] object DefaultCursor {
       database.session.flatMap(_.transaction.toOption)
 
     @inline def connection: MongoConnection = database.connection
+
+    @inline protected final def compressors: Seq[Compressor] =
+      connection.options.compressors
 
     def failoverStrategy: FailoverStrategy
 
@@ -321,9 +327,10 @@ private[reactivemongo] object DefaultCursor {
         logger.trace(s"Asking for the next batch of $ntr documents on cursor #${reply.cursorID}, after ${nextOffset}: $op")
 
         def req = new ExpectingResponse(
-          requestMaker = RequestMaker(op, cmd,
+          requestMaker = RequestMaker(CommandKind.Query, op, cmd,
             readPreference = preference,
-            channelIdHint = Some(response.info.channelId)),
+            channelIdHint = Some(response.info.channelId),
+            compressors = compressors),
           pinnedNode = transaction.flatMap(_.pinnedNode))
 
         Failover(connection, failoverStrategy) { () =>
@@ -381,8 +388,10 @@ private[reactivemongo] object DefaultCursor {
         val result = connection.sendExpectingResponse(
           new ExpectingResponse(
             requestMaker = RequestMaker(
+              CommandKind.KillCursors,
               KillCursors(Set(cursorID)),
-              readPreference = preference),
+              readPreference = preference,
+              compressors = compressors),
             pinnedNode = transaction.flatMap(_.pinnedNode)))
 
         result.onComplete {

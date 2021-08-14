@@ -23,7 +23,9 @@ trait FindAndModifyCommand[P <: SerializationPack] { _: PackSupport[P] =>
     val collation: Option[Collation],
     val arrayFilters: Seq[pack.Document]) extends CollectionCommand
     with CommandWithPack[P]
-    with CommandWithResult[FindAndModifyResult]
+    with CommandWithResult[FindAndModifyResult] {
+    val commandKind = CommandKind.FindAndModify
+  }
 
   protected[reactivemongo] final type FindAndModifyCmd = ResolvedCollectionCommand[FindAndModify]
 

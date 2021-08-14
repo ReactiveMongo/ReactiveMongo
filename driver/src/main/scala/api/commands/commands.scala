@@ -6,6 +6,7 @@ import reactivemongo.api.{
   Cursor,
   CursorOptions,
   Collection,
+  Compressor,
   DB,
   SerializationPack,
   Session,
@@ -17,7 +18,10 @@ import reactivemongo.core.protocol.{ Reply, Response }
 import reactivemongo.core.actors.ExpectingResponse
 import reactivemongo.core.errors.GenericDriverException
 
-trait Command
+trait Command {
+  private[reactivemongo] def commandKind: CommandKind
+}
+
 trait CollectionCommand extends Command
 
 trait CommandWithResult[R] { _: Command => }
@@ -66,7 +70,7 @@ private[reactivemongo] object Command {
   private[commands] lazy val logger =
     reactivemongo.util.LazyLogger("reactivemongo.api.commands")
 
-  def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = fetchCursor[p.type, A](db, db.name + f".$$cmd", p, command, failover, CursorOptions.empty, maxAwaitTimeMS = None)
+  def defaultCursorFetcher[P <: SerializationPack, A](db: DB, p: P, kind: CommandKind, command: A, failover: FailoverStrategy)(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = fetchCursor[p.type, A](db, db.name + f".$$cmd", p, kind, command, failover, CursorOptions.empty, maxAwaitTimeMS = None)
 
   /**
    * @param fullCollectionName the fully qualified collection name (even if `query.fullCollectionName` is `\$cmd`)
@@ -75,6 +79,7 @@ private[reactivemongo] object Command {
     db: DB,
     fullCollectionName: String,
     p: P,
+    kind: CommandKind,
     command: A,
     failover: FailoverStrategy,
     options: CursorOptions,
@@ -83,6 +88,8 @@ private[reactivemongo] object Command {
 
     protected def defaultReadPreference = db.connection.options.readPreference
 
+    import db.connection.options.compressors
+
     /* TODO: Static binding to collect traces
     @inline private def stackTrace() =
       new Throwable().getStackTrace().drop(3).reverse
@@ -90,7 +97,7 @@ private[reactivemongo] object Command {
 
     def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = {
       val requestMaker = buildRequestMaker(pack)(
-        command, writer, readPreference, db.name)
+        kind, command, writer, readPreference, db.name, compressors)
 
       /* TODO: Static binding
       val contextSTE = stackTrace() */
@@ -157,20 +164,21 @@ private[reactivemongo] object Command {
   }
 
   final class CommandWithPackRunner[P <: SerializationPack](val pack: P, failover: FailoverStrategy = FailoverStrategy()) {
-    def apply[R, C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R], rp: ReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = defaultCursorFetcher(db, pack, command, failover).one[R](rp)
+    def apply[R, C <: Command with CommandWithResult[R]](db: DB, command: C with CommandWithResult[R], rp: ReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = defaultCursorFetcher(db, pack, command.commandKind, command, failover).one[R](rp)
 
-    def apply[C <: Command](db: DB, command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = defaultCursorFetcher(db, pack, command, failover)
+    def apply[C <: Command](db: DB, command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = defaultCursorFetcher(db, pack, command.commandKind, command, failover)
 
     // collection
-    def apply[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R], rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = defaultCursorFetcher(collection.db, pack, new ResolvedCollectionCommand(collection.name, command), failover).one[R](rp)
+    def apply[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R], rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = defaultCursorFetcher(collection.db, pack, command.commandKind, new ResolvedCollectionCommand(collection.name, command), failover).one[R](rp)
 
-    def apply[C <: CollectionCommand](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): CursorFetcher[pack.type, Cursor] = defaultCursorFetcher(collection.db, pack, new ResolvedCollectionCommand(collection.name, command), failover)
+    def apply[C <: CollectionCommand](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): CursorFetcher[pack.type, Cursor] = defaultCursorFetcher(collection.db, pack, command.commandKind, new ResolvedCollectionCommand(collection.name, command), failover)
 
     /**
      * Executes the `command` and returns its result
      * along with the MongoDB response.
      */
     def cursor[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C, options: CursorOptions, rp: ReadPreference, maxAwaitTimeMS: Option[Long])(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R]): DefaultCursor.Impl[R] = fetchCursor(collection.db, collection.fullCollectionName, pack,
+      command.commandKind,
       new ResolvedCollectionCommand(collection.name, command),
       failover, options, maxAwaitTimeMS).cursor[R](rp)
 
@@ -180,6 +188,7 @@ private[reactivemongo] object Command {
      */
     def withResponse[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C, rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[ResponseResult[R]] = {
       val cursor = defaultCursorFetcher(collection.db, pack,
+        command.commandKind,
         new ResolvedCollectionCommand(collection.name, command), failover).
         cursor[R](rp)
 
@@ -197,7 +206,9 @@ private[reactivemongo] object Command {
     def rawCommand[T](input: T)(implicit writer: pack.Writer[T]): RawCommand =
       RawCommand(pack.serialize(input, writer))
 
-    case class RawCommand(document: pack.Document) extends Command
+    case class RawCommand(document: pack.Document) extends Command {
+      val commandKind = CommandKind.Undefined
+    }
 
     object RawCommand {
       implicit val writer: pack.Writer[RawCommand] = pack.writer(_.document)
@@ -226,7 +237,18 @@ private[reactivemongo] object Command {
    */
   def run[P <: SerializationPack](pack: P, failover: FailoverStrategy): CommandWithPackRunner[pack.type] = new CommandWithPackRunner(pack, failover)
 
-  def buildRequestMaker[P <: SerializationPack, A](pack: P)(command: A, writer: pack.Writer[A], readPreference: ReadPreference, db: String): RequestMaker = {
+  /**
+   * @param command the command to be requested
+   * @param db the database name
+   * @param compressors the available compressors
+   */
+  def buildRequestMaker[P <: SerializationPack, A](pack: P)(
+    kind: CommandKind,
+    command: A,
+    writer: pack.Writer[A],
+    readPreference: ReadPreference,
+    db: String,
+    compressors: Seq[Compressor]): RequestMaker = {
     val buffer = WritableBuffer.empty
 
     pack.serializeAndWrite(buffer, command, writer)
@@ -235,7 +257,8 @@ private[reactivemongo] object Command {
     val flags = if (readPreference.slaveOk) QueryFlags.SlaveOk else 0
     val query = Query(flags, db + f".$$cmd", 0, 1)
 
-    RequestMaker(query, documents, readPreference)
+    RequestMaker(kind, query, documents, readPreference,
+      compressors = compressors)
   }
 }
 
@@ -246,6 +269,8 @@ private[reactivemongo] object Command {
 final class ResolvedCollectionCommand[C <: CollectionCommand](
   val collection: String,
   val command: C) extends Command {
+
+  @inline def commandKind = command.commandKind
 
   private lazy val tupled = collection -> command
 

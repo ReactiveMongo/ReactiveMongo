@@ -38,9 +38,9 @@ private[protocol] sealed trait BufferInteroperable[T] {
 
 /**
  * Helper methods to work with [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]].
-  * 
-  * @define writeTupleDescription Writes the given tuple into the given [[http://static.netty.io/4.0/api/io/netty/buffer/ByteBuf.html ByteBuf]]
-  * @define buffer_interop_tparam type that have an implicit typeclass [[reactivemongo.core.protocol.buffer.BufferInteroperable]]
+ *
+ * @define writeTupleDescription Writes the given tuple into the given [[http://static.netty.io/4.0/api/io/netty/buffer/ByteBuf.html ByteBuf]]
+ * @define buffer_interop_tparam type that have an implicit typeclass [[reactivemongo.core.protocol.buffer.BufferInteroperable]]
  */
 object `package` {
 
@@ -77,7 +77,7 @@ object `package` {
     i2(buffer, t._2)
   }
 
-  /** 
+  /**
    * $writeTupleDescription.
    *
    * @tparam A $buffer_interop_tparam

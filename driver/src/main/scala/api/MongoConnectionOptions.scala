@@ -161,7 +161,7 @@ final class MongoConnectionOptions private[reactivemongo] (
       _appName = this.appName,
       _compressors = this.compressors)
 
-  private[reactivemongo] def withCompressors(compressors: Seq[Compressor]) =
+  def withCompressors(compressors: Seq[Compressor]) =
     new MongoConnectionOptions(
       _connectTimeoutMS = this.connectTimeoutMS,
       _authenticationDatabase = this.authenticationDatabase,

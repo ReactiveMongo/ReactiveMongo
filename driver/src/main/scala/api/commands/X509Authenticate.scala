@@ -3,7 +3,9 @@ package reactivemongo.api.commands
 import reactivemongo.api.SerializationPack
 
 private[reactivemongo] case class X509Authenticate(user: Option[String])
-  extends Command with CommandWithResult[AuthenticationResult]
+  extends Command with CommandWithResult[AuthenticationResult] {
+  val commandKind = CommandKind.Authenticate
+}
 
 private[reactivemongo] object X509Authenticate {
   def writer[P <: SerializationPack](pack: P): pack.Writer[X509Authenticate] = {

@@ -8,6 +8,8 @@ import reactivemongo.api.{ Serialization, Session, WriteConcern => WC }
 private[reactivemongo] sealed abstract class EndTransaction(
   val session: Session,
   val writeConcern: WC) extends Command with CommandWithResult[Unit] {
+  val commandKind = CommandKind.EndTransaction
+
   protected def kind: String
 
   private lazy val tupled = Tuple3(session, writeConcern, kind)

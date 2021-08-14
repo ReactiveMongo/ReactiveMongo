@@ -18,6 +18,7 @@ import reactivemongo.api.commands.{
   AggregationFramework => AggFramework,
   CollectionCommand,
   CommandCodecs,
+  CommandKind,
   CommandWithPack,
   CommandWithResult,
   ResolvedCollectionCommand
@@ -115,7 +116,9 @@ trait AggregationOps[P <: SerializationPack] {
     val comment: Option[String],
     val collation: Option[Collation]) extends CollectionCommand
     with CommandWithPack[pack.type]
-    with CommandWithResult[T]
+    with CommandWithResult[T] {
+    val commandKind = CommandKind.Aggregate
+  }
 
   private final type AggregateCmd[T] = ResolvedCollectionCommand[Aggregate[T]]
 

@@ -25,6 +25,7 @@ private[reactivemongo] final class Zstd(
 
     val sz = Z.decompress(outNioBuffer, inNioBuffer)
 
+    in.readerIndex(in.writerIndex)
     out.writerIndex(sz)
 
     sz

@@ -10,6 +10,8 @@ import reactivemongo.api.SerializationPack
 private[reactivemongo] sealed abstract class EndSessions(
   val id: UUID,
   val ids: Seq[UUID]) extends Command with CommandWithResult[Unit] {
+  val commandKind = CommandKind.EndSession
+
   protected def kind: String
 
   private lazy val tupled = Tuple3(kind, id, ids)

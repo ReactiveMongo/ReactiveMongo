@@ -13,6 +13,7 @@ import reactivemongo.api.{ Collation, ReadConcern, SerializationPack }
 import reactivemongo.api.commands.{
   CollectionCommand,
   CommandCodecs,
+  CommandKind,
   CommandWithResult,
   CommandWithPack,
   ResolvedCollectionCommand
@@ -56,7 +57,9 @@ private[api] trait DistinctOp[P <: SerializationPack] extends DistinctOpCompat[P
     query: Option[pack.Document],
     readConcern: ReadConcern,
     collation: Option[Collation]) extends CollectionCommand
-    with CommandWithPack[pack.type] with CommandWithResult[DistinctResult]
+    with CommandWithPack[pack.type] with CommandWithResult[DistinctResult] {
+    val commandKind = CommandKind.Distinct
+  }
 
   /**
    * @param values the raw values (should not contain duplicate)

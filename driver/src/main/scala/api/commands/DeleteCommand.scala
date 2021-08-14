@@ -16,7 +16,9 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackS
   private[api] final class Delete(
     val deletes: Seq[DeleteElement],
     val ordered: Boolean,
-    val writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[DeleteResult]
+    val writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[DeleteResult] {
+    val commandKind = CommandKind.Delete
+  }
 
   /** Delete command element */
   final class DeleteElement private[api] (

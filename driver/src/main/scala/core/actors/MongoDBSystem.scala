@@ -83,7 +83,11 @@ import reactivemongo.api.{
   WriteConcern
 }
 
-import reactivemongo.api.commands.{ LastErrorFactory, UpsertedFactory }
+import reactivemongo.api.commands.{
+  CommandKind,
+  LastErrorFactory,
+  UpsertedFactory
+}
 
 import external.reactivemongo.ConnectionListener
 
@@ -680,7 +684,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
       debug(s"Received a request expecting a response ($reqId): $req")
 
-      val request = req.requestMaker(reqId) // TODO: compress?
+      val request = req.requestMaker(reqId)
 
       foldNodeConnection(_nodeSet, req.pinnedNode, request)(
         { r => req.promise.failure(r); () }, { (_, con) =>
@@ -983,7 +987,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
             n
           }
 
-          case (n, _) => n
+          case (n, _) =>
+            n
         }
       }
     }
@@ -1501,8 +1506,9 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
               }
             }
 
-            case _ => new PrimaryUnavailableException(
-              supervisor, name, internalState())
+            case _ =>
+              new PrimaryUnavailableException(
+                supervisor, name, internalState())
           }
         } else if (!ns.isReachable) {
           new NodeSetNotReachableException(supervisor, name, internalState())
@@ -1646,10 +1652,12 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         if (node.pingInfo.firstSent) None else Some(clientMetadata)
 
       lazy val isMaster = Command.buildRequestMaker(BSONSerializationPack)(
+        CommandKind.Hello,
         new IsMaster(client, options.compressors, Some(id.toString)),
         writer(BSONSerializationPack),
         ReadPreference.primaryPreferred,
-        "admin") // only "admin" DB for the admin command
+        "admin",
+        options.compressors) // only "admin" DB for the admin command
 
       val now = System.nanoTime()
 

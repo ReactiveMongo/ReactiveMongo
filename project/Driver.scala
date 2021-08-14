@@ -82,13 +82,18 @@ object Version {
           import com.typesafe.tools.mima.core._
 
           val mtp = ProblemFilters.exclude[MissingTypesProblem](_)
+          val fcp = ProblemFilters.exclude[FinalClassProblem](_)
 
           Seq(
             mtp("reactivemongo.core.actors.MongoDBSystem$OperationHandler"),
             mtp("reactivemongo.core.netty.ChannelFactory"),
             mtp("reactivemongo.core.protocol.MongoHandler"),
             mtp("reactivemongo.core.protocol.ResponseFrameDecoder"),
-            mtp("reactivemongo.core.protocol.RequestEncoder")
+            mtp("reactivemongo.core.protocol.RequestEncoder"),
+            fcp("reactivemongo.core.protocol.Request"),
+            mtp("reactivemongo.core.protocol.Request$"),
+            fcp("reactivemongo.core.protocol.RequestMaker"),
+            mtp("reactivemongo.core.protocol.RequestMaker$")
           )
         },
         Test / testOptions += {

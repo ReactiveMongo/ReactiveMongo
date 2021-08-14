@@ -68,13 +68,17 @@ final class CompressionSpec extends org.specs2.mutable.Specification {
 
       s"size $sz" in {
         encode(orig, compressed) must beSuccessfulTry({}) and {
+          orig.readableBytes must_=== 0
+        } and {
           val decompressed = PooledByteBufAllocator.DEFAULT.directBuffer(sz)
 
-          decode(compressed, decompressed) must beSuccessfulTry(sz)
-
-          (0 until decompressed.readableBytes).forall { i =>
-            input(i) == decompressed.readByte
-          } must beTrue
+          decode(compressed, decompressed) must beSuccessfulTry(sz) and {
+            compressed.readableBytes must_=== 0
+          } and {
+            (0 until decompressed.readableBytes).forall { i =>
+              input(i) == decompressed.readByte
+            } must beTrue
+          }
         }
       }
     }

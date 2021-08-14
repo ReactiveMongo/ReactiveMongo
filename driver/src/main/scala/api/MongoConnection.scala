@@ -298,7 +298,7 @@ final class MongoConnection private[reactivemongo] (
 
     val receive: Receive = {
       case available: PrimaryAvailable => {
-        debug(s"A primary is available: ${available.metadata}")
+        debug(s"A primary is available: ${available.metadata}") // TODO
 
         _metadata = Some(available.metadata)
 

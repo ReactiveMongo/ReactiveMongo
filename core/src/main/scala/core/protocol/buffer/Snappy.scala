@@ -13,26 +13,38 @@ private[reactivemongo] final class Snappy {
     val outNioBuffer: ByteBuffer =
       out.internalNioBuffer(out.writerIndex, out.writableBytes)
 
-    val sz = Z.uncompress(in.nioBuffer, outNioBuffer)
+    val inNioBuffer = in.nioBuffer
+    val sz = Z.uncompress(inNioBuffer, outNioBuffer)
 
+    in.readerIndex(in.writerIndex)
     out.writerIndex(sz)
 
     sz
   }
 
   def encode(in: ByteBuf, out: ByteBuf): Try[Unit] = Try {
-    if (in.isDirect) {
+    val sz: Int = if (in.isDirect) {
+      val inNioBuffer: ByteBuffer = in.nioBuffer
       val outNioBuffer: ByteBuffer =
         out.internalNioBuffer(out.writerIndex, out.writableBytes)
 
-      Z.compress(in.nioBuffer, outNioBuffer)
+      val z = Z.compress(inNioBuffer, outNioBuffer)
+
+      in.readerIndex(inNioBuffer.position())
+
+      z
     } else {
-      val compressed = Z.compress(in.array)
+      val bytes = in.array
+      val compressed = Z.compress(bytes)
 
       out.writeBytes(compressed)
 
-      out.writerIndex(compressed.size)
+      in.readerIndex(bytes.size)
+
+      compressed.size
     }
+
+    out.writerIndex(sz)
 
     ()
   }

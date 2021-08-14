@@ -7,6 +7,7 @@ import reactivemongo.api.{ Collation, SerializationPack }
 import reactivemongo.api.commands.{
   CollectionCommand,
   Command,
+  CommandKind,
   CommandWithResult,
   ResolvedCollectionCommand
 }
@@ -70,7 +71,9 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
     val viewName: String,
     val operator: PipelineOperator,
     val pipeline: Seq[PipelineOperator],
-    val collation: Option[Collation]) extends CollectionCommand with CommandWithResult[Unit]
+    val collation: Option[Collation]) extends CollectionCommand with CommandWithResult[Unit] {
+    val commandKind = CommandKind.CreateView
+  }
 
   private type CreateViewCommand = ResolvedCollectionCommand[CreateView]
 

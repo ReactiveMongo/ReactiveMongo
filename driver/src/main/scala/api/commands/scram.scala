@@ -46,6 +46,7 @@ private[reactivemongo] case class ScramSha256Challenge(
  * Command to start with Mongo SCRAM authentication.
  */
 private[reactivemongo] sealed trait ScramInitiate[M <: AuthenticationMode.Scram] extends Command with CommandWithResult[ScramChallenge[M]] {
+  val commandKind = CommandKind.SaslStart
 
   /** The user name */
   def user: String
@@ -170,6 +171,7 @@ private[reactivemongo] case class ScramNegociation(
  * Command to continue with Mongo SCRAM authentication.
  */
 private[reactivemongo] sealed trait ScramStartNegociation[M <: AuthenticationMode.Scram] extends Command with CommandWithResult[Either[SuccessfulAuthentication, Array[Byte]]] {
+  val commandKind = CommandKind.SaslContinue
 
   protected def mechanism: M
 
@@ -418,7 +420,9 @@ private[reactivemongo] object ScramStartNegociation {
  */
 private[reactivemongo] case class ScramFinalNegociation(
   conversationId: Int,
-  payload: Array[Byte]) extends Command with CommandWithResult[SuccessfulAuthentication]
+  payload: Array[Byte]) extends Command with CommandWithResult[SuccessfulAuthentication] {
+  val commandKind = CommandKind.Authenticate
+}
 
 private[reactivemongo] object ScramFinalNegociation {
   def writer[P <: SerializationPack](pack: P): pack.Writer[ScramFinalNegociation] = {
