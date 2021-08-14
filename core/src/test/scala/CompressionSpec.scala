@@ -1,4 +1,4 @@
-package reactivemongo.core.protocol
+package reactivemongo.core.protocol.buffer
 
 import scala.util.{ Random, Try }
 

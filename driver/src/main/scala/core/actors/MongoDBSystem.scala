@@ -680,7 +680,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
       debug(s"Received a request expecting a response ($reqId): $req")
 
-      val request = req.requestMaker(reqId)
+      val request = req.requestMaker(reqId) // TODO: compress?
 
       foldNodeConnection(_nodeSet, req.pinnedNode, request)(
         { r => req.promise.failure(r); () }, { (_, con) =>

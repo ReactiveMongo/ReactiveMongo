@@ -2,7 +2,11 @@ package reactivemongo.core.protocol
 
 import reactivemongo.io.netty.buffer.ByteBuf
 
-import reactivemongo.core.protocol.BufferAccessors.writeTupleToBuffer4
+import reactivemongo.core.protocol.buffer.{
+  ChannelBufferReadable,
+  ChannelBufferWritable,
+  writeTupleToBuffer4
+}
 
 /**
  * Header of a Mongo Wire Protocol message.

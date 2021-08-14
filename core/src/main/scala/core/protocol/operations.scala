@@ -17,7 +17,13 @@ package reactivemongo.core.protocol
 
 import reactivemongo.io.netty.buffer.ByteBuf
 
-import BufferAccessors._
+import reactivemongo.core.protocol.buffer.{
+  ChannelBufferReadable,
+  ChannelBufferWritable,
+  writeTupleToBuffer2,
+  writeTupleToBuffer3,
+  writeTupleToBuffer4
+}
 
 /** A Mongo Wire Protocol operation */
 private[reactivemongo] sealed trait Op {

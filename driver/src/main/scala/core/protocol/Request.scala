@@ -7,6 +7,8 @@ import reactivemongo.io.netty.channel.ChannelId
 
 import reactivemongo.core.netty.BufferSequence
 
+import reactivemongo.core.protocol.buffer.ChannelBufferWritable
+
 import reactivemongo.api.{ Compressor, ReadPreference }
 
 /**
@@ -123,7 +125,7 @@ private[reactivemongo] object Request {
 
           val out = Unpooled.directBuffer(bufSize)
 
-          Snappy().encode(req.payload, out).map(_ => out)
+          buffer.Snappy().encode(req.payload, out).map(_ => out)
         }
 
         case Compressor.Zstd => {
@@ -132,14 +134,14 @@ private[reactivemongo] object Request {
 
           val out = Unpooled.directBuffer(bufSize)
 
-          Zstd().encode(req.payload, out).map(_ => out)
+          buffer.Zstd().encode(req.payload, out).map(_ => out)
         }
 
         case Compressor.Zlib(level) => {
           val out = Unpooled.directBuffer(
             (uncompressedSize.toDouble * 1.2D).toInt)
 
-          Zlib(level).encode(req.payload, out).map(_ => out)
+          buffer.Zlib(level).encode(req.payload, out).map(_ => out)
         }
 
         case _ =>

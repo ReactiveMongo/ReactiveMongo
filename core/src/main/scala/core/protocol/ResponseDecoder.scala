@@ -88,13 +88,13 @@ private[reactivemongo] class ResponseDecoder
 
     val uncompress: Function2[ByteBuf, ByteBuf, Try[Int]] = compressorId match {
       case Compressor.Zlib.id =>
-        Zlib.DefaultCompressor.decode(_: ByteBuf, _: ByteBuf)
+        buffer.Zlib.DefaultCompressor.decode(_: ByteBuf, _: ByteBuf)
 
       case Compressor.Zstd.id =>
-        Zstd.DefaultCompressor.decode(_: ByteBuf, _: ByteBuf)
+        buffer.Zstd.DefaultCompressor.decode(_: ByteBuf, _: ByteBuf)
 
       case Compressor.Snappy.id =>
-        Snappy.DefaultCompressor.decode(_: ByteBuf, _: ByteBuf)
+        buffer.Snappy.DefaultCompressor.decode(_: ByteBuf, _: ByteBuf)
 
       case id =>
         throw new IllegalStateException(
