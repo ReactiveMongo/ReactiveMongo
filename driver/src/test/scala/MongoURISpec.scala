@@ -580,12 +580,12 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     }
 
     "parse valid compressor" >> {
-      Fragments.foreach(Seq[(String, Seq[Compressor])](
-        "snappy" -> Seq(Compressor.Snappy),
-        "zstd" -> Seq(Compressor.Zstd),
-        "zlib" -> Seq(Compressor.Zlib.DefaultCompressor),
-        "snappy,zstd" -> Seq(Compressor.Snappy, Compressor.Zstd),
-        "noop,zlib" -> Seq(Compressor.Zlib.DefaultCompressor))) {
+      Fragments.foreach(Seq[(String, ListSet[Compressor])](
+        "snappy" -> ListSet(Compressor.Snappy),
+        "zstd" -> ListSet(Compressor.Zstd),
+        "zlib" -> ListSet(Compressor.Zlib.DefaultCompressor),
+        "snappy,zstd" -> ListSet(Compressor.Snappy, Compressor.Zstd),
+        "noop,zlib" -> ListSet(Compressor.Zlib.DefaultCompressor))) {
         case (name, compressors) =>
           name in {
             parseURI(s"mongodb://host?compressors=${name}").
@@ -598,7 +598,7 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     "reject zlibCompressionLevel without zlib compressor" in {
       parseURI("mongodb://host?compressors=snappy&zlibCompressionLevel=1").
         map(_.options.compressors) must beTypedEqualTo(
-          Seq[Compressor](Compressor.Snappy)).awaitFor(timeout)
+          ListSet[Compressor](Compressor.Snappy)).awaitFor(timeout)
     }
 
     "support zlibCompressionLevel" >> {
@@ -609,16 +609,16 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
               s"mongodb://host?compressors=zlib&zlibCompressionLevel=${level}"
 
             parseURI(uri).map(_.options.compressors) must beTypedEqualTo(
-              Seq[Compressor](Compressor.Zlib(level))).awaitFor(timeout)
+              ListSet[Compressor](Compressor.Zlib(level))).awaitFor(timeout)
           }
       }
     }
 
     "reject invalid compressor" >> {
-      Fragments.foreach(Seq[(String, Seq[Compressor])](
-        "foo" -> Seq.empty[Compressor],
-        "snappy,bar" -> Seq(Compressor.Snappy),
-        "lorem,zstd" -> Seq(Compressor.Zstd))) {
+      Fragments.foreach(Seq[(String, ListSet[Compressor])](
+        "foo" -> ListSet.empty[Compressor],
+        "snappy,bar" -> ListSet(Compressor.Snappy),
+        "lorem,zstd" -> ListSet(Compressor.Zstd))) {
         case (setting, compressors) =>
           setting in {
             parseURI(s"mongodb://host?compressors=${setting}").

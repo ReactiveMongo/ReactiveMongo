@@ -51,7 +51,8 @@ import reactivemongo.util, util.{ LazyLogger, SRVRecordResolver, TXTResolver }
 private[api] case class ConnectionState(
   metadata: ProtocolMetadata,
   setName: Option[String],
-  isMongos: Boolean)
+  isMongos: Boolean,
+  compressors: ListSet[Compressor])
 
 /**
  * A pool of MongoDB connections, obtained from a [[reactivemongo.api.AsyncDriver]].
@@ -303,7 +304,8 @@ final class MongoConnection private[reactivemongo] (
         _metadata = Some(available.metadata)
 
         val state = ConnectionState(
-          available.metadata, available.setName, available.isMongos)
+          available.metadata, available.setName, available.isMongos,
+          available.compression)
 
         if (!primaryAvailable.trySuccess(state)) {
           primaryAvailable = Promise.successful(state)
@@ -328,7 +330,8 @@ final class MongoConnection private[reactivemongo] (
         _metadata = Some(available.metadata)
 
         val state = ConnectionState(
-          available.metadata, available.setName, available.isMongos)
+          available.metadata, available.setName, available.isMongos,
+          available.compression)
 
         if (!setAvailable.trySuccess(state)) {
           setAvailable = Promise.successful(state)
@@ -803,8 +806,8 @@ object MongoConnection {
   private object Compressors {
     import Compressor._
 
-    def unapply(value: String): Option[(Seq[Compressor], Seq[String])] = {
-      val valid = Seq.newBuilder[Compressor]
+    def unapply(value: String): Option[(ListSet[Compressor], Seq[String])] = {
+      val valid = ListSet.newBuilder[Compressor]
       val invalid = Seq.newBuilder[String]
 
       value.split(",").toSeq.foreach {

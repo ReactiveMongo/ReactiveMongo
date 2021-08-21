@@ -2,6 +2,8 @@ package reactivemongo.api.commands
 
 import java.util.Date
 
+import scala.collection.immutable.ListSet
+
 import reactivemongo.api.{ Compressor, SerializationPack }
 
 import reactivemongo.core.ClientMetadata
@@ -15,7 +17,7 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
    */
   private[reactivemongo] final class IsMaster(
     val client: Option[ClientMetadata],
-    val compression: Seq[Compressor],
+    val compression: ListSet[Compressor],
     val comment: Option[String]) extends Command
     with CommandWithResult[IsMasterResult] with CommandWithPack[P] {
     val commandKind = CommandKind.Hello
@@ -85,7 +87,7 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
     val minWireVersion: Int, // int? mongod >= 2.6
     val maxWireVersion: Int, // int? mongod >= 2.6
     val readOnly: Option[Boolean],
-    val compression: Seq[String],
+    val compression: ListSet[Compressor],
     val saslSupportedMech: Seq[String], // GSSAPI, SCRAM-SHA-256, SCRAM-SHA-1
     val replicaSet: Option[ReplicaSet], // flattened in the result
     val msg: Option[String] // Contains the value isdbgrid when isMaster returns from a mongos instance.
@@ -143,7 +145,7 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
       }
 
       elms += element("compression", builder.array(
-        im.compression.map(c => builder.string(c.name))))
+        im.compression.toSeq.map(c => builder.string(c.name))))
 
       im.comment.foreach { comment =>
         elms += element(f"$$comment", builder.string(comment))
@@ -205,7 +207,18 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
         maxWireVersion = int(doc, "maxWireVersion").getOrElse(0),
         readOnly = booleanLike(doc, "readOnly"),
         compression = values[String](doc, "compression").
-          getOrElse(List.empty[String]),
+          fold(ListSet.empty[Compressor]) { cs =>
+            ListSet.empty[Compressor] ++ cs.collect {
+              case Compressor.Snappy.name =>
+                Compressor.Snappy
+
+              case Compressor.Zlib.name =>
+                Compressor.Zlib.DefaultCompressor
+
+              case Compressor.Zstd.name =>
+                Compressor.Zstd
+            }
+          },
         saslSupportedMech = values[String](doc, "saslSupportedMech").
           getOrElse(List.empty[String]),
         replicaSet = rs, // flattened in the result

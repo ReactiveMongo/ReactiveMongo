@@ -1,5 +1,7 @@
 package tests
 
+import scala.collection.immutable.ListSet
+
 import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 
@@ -79,7 +81,7 @@ object Common extends CommonAuth {
           storeType = "PKCS12",
           password = sys.props.get("test.keyStorePassword").map(_.toCharArray),
           trust = true)
-      }).withCompressors(compressor.toSeq)
+      }).withCompressors(ListSet.empty[Compressor] ++ compressor.toSeq)
 
     val b = {
       if (sys.props.get("test.enableSSL") contains "true") {

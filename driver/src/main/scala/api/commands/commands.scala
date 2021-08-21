@@ -2,6 +2,8 @@ package reactivemongo.api.commands
 
 import scala.concurrent.{ ExecutionContext, Future }
 
+import scala.collection.immutable.ListSet
+
 import reactivemongo.api.{
   Cursor,
   CursorOptions,
@@ -86,9 +88,9 @@ private[reactivemongo] object Command {
     maxAwaitTimeMS: Option[Long])(implicit writer: p.Writer[A]): CursorFetcher[p.type, DefaultCursor.Impl] = new CursorFetcher[p.type, DefaultCursor.Impl] {
     val pack: p.type = p
 
-    protected def defaultReadPreference = db.connection.options.readPreference
+    @inline protected def defaultReadPreference = db.defaultReadPreference
 
-    import db.connection.options.compressors
+    import db.availableCompressors
 
     /* TODO: Static binding to collect traces
     @inline private def stackTrace() =
@@ -97,7 +99,7 @@ private[reactivemongo] object Command {
 
     def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = {
       val requestMaker = buildRequestMaker(pack)(
-        kind, command, writer, readPreference, db.name, compressors)
+        kind, command, writer, readPreference, db.name, availableCompressors)
 
       /* TODO: Static binding
       val contextSTE = stackTrace() */
@@ -248,7 +250,7 @@ private[reactivemongo] object Command {
     writer: pack.Writer[A],
     readPreference: ReadPreference,
     db: String,
-    compressors: Seq[Compressor]): RequestMaker = {
+    compressors: ListSet[Compressor]): RequestMaker = {
     val buffer = WritableBuffer.empty
 
     pack.serializeAndWrite(buffer, command, writer)

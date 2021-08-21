@@ -2,6 +2,8 @@ package reactivemongo.core.actors
 
 import scala.util.control.NonFatal
 
+import scala.collection.immutable.ListSet
+
 import reactivemongo.api.{
   AuthenticationMode,
   ReadPreference,
@@ -117,7 +119,7 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
     val maker = Command.buildRequestMaker(pack)(
       CommandKind.Authenticate,
       start, initiateWriter, ReadPreference.primary, nextAuth.db,
-      options.compressors)
+      compressors = ListSet.empty /* authenticate cannot be compressed */ )
 
     connection.send(maker(RequestIdGenerator.getNonce.next))
 
@@ -184,7 +186,8 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
                       ns.updateConnectionByChannelId(chanId) { con =>
                         val maker = Command.buildRequestMaker(pack)(
                           CommandKind.GetNonce, negociation, negociationWriter,
-                          ReadPreference.primary, db, options.compressors)
+                          ReadPreference.primary, db,
+                          compressors = ListSet.empty /* cannot compress */ )
 
                         con.send(maker(RequestIdGenerator.authenticate.next)).
                           addListener(new OperationHandler(
@@ -261,7 +264,8 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
                     val maker = Command.buildRequestMaker(pack)(
                       CommandKind.Authenticate,
                       ScramFinalNegociation(cid, payload), finalWriter,
-                      ReadPreference.primary, db, options.compressors)
+                      ReadPreference.primary, db,
+                      compressors = ListSet.empty /* cannot compress */ )
 
                     con.send(maker(RequestIdGenerator.authenticate.next)).
                       addListener(new OperationHandler(

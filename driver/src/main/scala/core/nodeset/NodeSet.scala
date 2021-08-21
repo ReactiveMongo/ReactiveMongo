@@ -1,6 +1,6 @@
 package reactivemongo.core.nodeset
 
-import scala.collection.immutable.Set
+import scala.collection.immutable.{ ListSet, Set }
 
 import scala.math.Ordering
 
@@ -14,7 +14,7 @@ import reactivemongo.core.protocol.ProtocolMetadata
 
 import reactivemongo.core.netty.ChannelFactory
 
-import reactivemongo.api.ReadPreference
+import reactivemongo.api.{ Compressor, ReadPreference }
 
 /**
  * @param name the replicaSet name
@@ -24,7 +24,8 @@ private[reactivemongo] class NodeSet(
   val name: Option[String],
   val version: Option[Long],
   val nodes: Vector[Node],
-  @transient val authenticates: Set[Authenticate]) {
+  @transient val authenticates: Set[Authenticate],
+  @transient val compression: ListSet[Compressor]) {
 
   /** The node which is the current primary one. */
   val primary: Option[Node] = nodes.find(_.status == NodeStatus.Primary)
@@ -187,8 +188,8 @@ private[reactivemongo] class NodeSet(
       mongos.map(_.info), ns.filter(_.status == NodeStatus.Secondary),
       nearest.map(_.info),
       awaitingRequests = None,
-      maxAwaitingRequestsPerChannel = None)
-
+      maxAwaitingRequestsPerChannel = None,
+      compression = compression)
   }
 
   @SuppressWarnings(Array("VariableShadowing"))
@@ -196,10 +197,12 @@ private[reactivemongo] class NodeSet(
     name: Option[String] = this.name,
     version: Option[Long] = this.version,
     nodes: Vector[Node] = this.nodes,
-    authenticates: Set[Authenticate] = this.authenticates): NodeSet =
-    new NodeSet(name, version, nodes, authenticates)
+    authenticates: Set[Authenticate] = this.authenticates,
+    compression: ListSet[Compressor] = this.compression): NodeSet =
+    new NodeSet(name, version, nodes, authenticates, compression)
 
-  private[core] lazy val tupled = Tuple4(name, version, nodes, authenticates)
+  private[core] lazy val tupled = Tuple5(
+    name, version, nodes, authenticates, compression)
 
   override def equals(that: Any): Boolean = that match {
     case other: NodeSet =>

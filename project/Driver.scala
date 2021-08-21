@@ -85,6 +85,7 @@ object Version {
           val fcp = ProblemFilters.exclude[FinalClassProblem](_)
 
           Seq(
+            mtp("reactivemongo.api.ConnectionState$"),
             mtp("reactivemongo.core.actors.MongoDBSystem$OperationHandler"),
             mtp("reactivemongo.core.netty.ChannelFactory"),
             mtp("reactivemongo.core.protocol.MongoHandler"),

@@ -2,6 +2,8 @@ package reactivemongo.core.protocol
 
 import scala.util.{ Failure, Success, Try }
 
+import scala.collection.immutable.ListSet
+
 import reactivemongo.io.netty.channel.ChannelId
 
 import reactivemongo.core.netty.BufferSequence
@@ -23,7 +25,7 @@ private[reactivemongo] final class RequestMaker(
   val documents: BufferSequence,
   val readPreference: ReadPreference,
   val channelIdHint: Option[ChannelId],
-  compressors: Seq[Compressor]) {
+  compressors: ListSet[Compressor]) {
 
   @inline def apply(requestID: Int): Request = make(requestID)
 
@@ -46,7 +48,7 @@ private[reactivemongo] final class RequestMaker(
   @annotation.tailrec private def compress(
     request: Request,
     next: Compressor,
-    alternatives: Seq[Compressor]): Try[Request] =
+    alternatives: ListSet[Compressor]): Try[Request] =
     Request.compress(request, next) match {
       case compressed @ Success(_) =>
         compressed
@@ -68,8 +70,9 @@ private[reactivemongo] object RequestMaker {
     documents: BufferSequence = BufferSequence.empty,
     readPreference: ReadPreference = ReadPreference.primary,
     channelIdHint: Option[ChannelId] = None,
-    compressors: Seq[Compressor] = Seq.empty): RequestMaker = new RequestMaker(
-    kind, op, documents, readPreference, channelIdHint, compressors)
+    compressors: ListSet[Compressor] = ListSet.empty): RequestMaker =
+    new RequestMaker(
+      kind, op, documents, readPreference, channelIdHint, compressors)
 
   def unapply(maker: RequestMaker): Option[(RequestOp, BufferSequence, ReadPreference, Option[ChannelId])] = Some((maker.op, maker.documents, maker.readPreference, maker.channelIdHint))
 

@@ -26,6 +26,7 @@ import scala.util.control.NonFatal
 
 import scala.collection.{ Map => IMap }
 import scala.collection.mutable.{ Map => MMap }
+import scala.collection.immutable.ListSet
 
 import akka.actor.{ Actor, ActorRef, Cancellable }
 
@@ -237,7 +238,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
   /** On start or restart. */
   private def initNodeSet(): Try[NodeSet] = {
     val nanow = System.nanoTime()
-    val seedNodeSet = new NodeSet(None, None, seeds.map(seed => new Node(seed, Set.empty, NodeStatus.Unknown, Vector.empty, Set.empty, tags = Map.empty[String, String], ProtocolMetadata.Default, PingInfo(), false, nanow)).toVector, initialAuthenticates.toSet)
+    val seedNodeSet = new NodeSet(None, None, seeds.map(seed => new Node(seed, Set.empty, NodeStatus.Unknown, Vector.empty, Set.empty, tags = Map.empty[String, String], ProtocolMetadata.Default, PingInfo(), false, nanow)).toVector, initialAuthenticates.toSet, ListSet.empty)
 
     debug(s"Initial node set: ${seedNodeSet.toShortString}")
 
@@ -499,7 +500,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
             n.updateByChannelId(channelId)({ con =>
               n.createConnection(channelFactory, self, con.signaling) match {
-                case Success(c) => c
+                case Success(c) =>
+                  c
 
                 case Failure(cause) => {
                   val msg = s"Cannot create connection for $n"
@@ -615,7 +617,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       val ns = nodeSetLock.synchronized { this._nodeSet }
 
       if (ns.isReachable) {
-        sender() ! new SetAvailable(ns.protocolMetadata, ns.name, ns.isMongos)
+        sender() ! new SetAvailable(
+          ns.protocolMetadata, ns.name, ns.isMongos, ns.compression)
 
         debug("The node set is available")
       }
@@ -625,7 +628,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
           debug(s"The node set is available (${prim.names}); Waiting authentication: ${prim.authenticated}")
         } else {
           sender() ! new PrimaryAvailable(
-            ns.protocolMetadata, ns.name, ns.isMongos)
+            ns.protocolMetadata, ns.name, ns.isMongos, ns.compression)
 
           debug(s"The primary is available: $prim")
         }
@@ -1245,7 +1248,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         val upSet = prepared.copy(
           name = isMaster.replicaSet.map(_.setName),
           version = isMaster.replicaSet.map { _.setVersion.toLong },
-          nodes = prepared.nodes ++ discoveredNodes)
+          nodes = prepared.nodes ++ discoveredNodes,
+          compression = isMaster.compression)
 
         chanNode.fold(upSet) { node =>
           if (upSet.authenticates.nonEmpty && node.authenticated.isEmpty) {
@@ -1256,7 +1260,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
               debug("The node set is now available")
 
               broadcastMonitors(new SetAvailable(
-                upSet.protocolMetadata, upSet.name, upSet.isMongos))
+                upSet.protocolMetadata, upSet.name, upSet.isMongos,
+                upSet.compression))
 
               updateHistory(s"IsMaster$$SetAvailable(${nodeSet.toShortString})")
             }
@@ -1270,7 +1275,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
               debug(s"The primary is now available: ${newPrim.mkString}")
 
               broadcastMonitors(new PrimaryAvailable(
-                upSet.protocolMetadata, upSet.name, upSet.isMongos))
+                upSet.protocolMetadata, upSet.name, upSet.isMongos,
+                upSet.compression))
 
               updateHistory(
                 s"IsMaster$$PrimaryAvailable(${nodeSet.toShortString})")
@@ -1384,7 +1390,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
                 debug("The node set is now authenticated")
 
                 broadcastMonitors(new SetAvailable(
-                  nodeSet.protocolMetadata, nodeSet.name, nodeSet.isMongos))
+                  nodeSet.protocolMetadata, nodeSet.name, nodeSet.isMongos,
+                  nodeSet.compression))
 
                 updateHistory(
                   s"AuthResponse$$SetAvailable(${nodeSet.toShortString})")
@@ -1394,7 +1401,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
                 debug("The primary is now authenticated")
 
                 broadcastMonitors(new PrimaryAvailable(
-                  nodeSet.protocolMetadata, nodeSet.name, nodeSet.isMongos))
+                  nodeSet.protocolMetadata, nodeSet.name, nodeSet.isMongos,
+                  nodeSet.compression))
 
                 updateHistory(
                   s"AuthResponse$$PrimaryAvailable(${nodeSet.toShortString})")
@@ -1657,7 +1665,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         writer(BSONSerializationPack),
         ReadPreference.primaryPreferred,
         "admin",
-        options.compressors) // only "admin" DB for the admin command
+        compressors = ListSet.empty // isMaster cannot be itself compressed
+      ) // only "admin" DB for the admin command
 
       val now = System.nanoTime()
 

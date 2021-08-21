@@ -5,6 +5,8 @@ import java.nio.channels.ClosedChannelException
 
 import scala.concurrent.Future
 
+import scala.collection.immutable.ListSet
+
 import reactivemongo.io.netty.channel.{
   DefaultChannelPromise,
   ChannelFuture,
@@ -37,9 +39,7 @@ trait ConnectAllTest { _: NodeSetSpec =>
   def connectAllSpec = {
     withNodeSet("connect all the nodes without synchronization") { sys =>
       // !! override the nodeset synchronization that takes place normally
-      { ns =>
-        connectAll(sys, ns)
-      }
+      connectAll(sys, _)
     }
 
     withNodeSet("connect all the nodes with synchronization") { sys =>
@@ -109,7 +109,8 @@ trait ConnectAllTest { _: NodeSetSpec =>
               PingInfo(),
               false,
               System.nanoTime())
-            ns = new NodeSet(Some("foo"), None, Vector(node), Set.empty)
+            ns = new NodeSet(
+              Some("foo"), None, Vector(node), Set.empty, ListSet.empty)
             _ = reactivemongo.api.tests.updateNodeSet(sys, "_test")(_ => ns)
             _ = connectAll(sys, ns)
           } yield reactivemongo.api.tests.nodeSet(sys))
@@ -118,6 +119,8 @@ trait ConnectAllTest { _: NodeSetSpec =>
 
           @annotation.tailrec
           def check(i: Int): Boolean = {
+            import ConnectionStatus.{ Connected, Connecting }
+
             val cs = reactivemongo.api.tests.
               nodeSet(sys).nodes.flatMap(_.connections).map { con =>
                 con.status -> con.channel.id
@@ -125,13 +128,14 @@ trait ConnectAllTest { _: NodeSetSpec =>
 
             cs match {
               case Seq(
-                Tuple2(ConnectionStatus.Connected, ChanId1),
-                Tuple2(ConnectionStatus.Connecting, chanId)) if (chanId != ChanId2) =>
+                Tuple2(Connected, ChanId1),
+                Tuple2(Connecting | Connected, chanId)) if (
+                chanId != ChanId2) =>
                 // See #cch5: ChanId2 has been replaced
                 //println("_ok")
                 true
 
-              case _ if (i < 10) => {
+              case _ if (i < 5) => {
                 Thread.sleep(500L)
                 check(i + 1)
               }
@@ -146,7 +150,8 @@ trait ConnectAllTest { _: NodeSetSpec =>
           }
         } must beTypedEqualTo(Seq[(ConnectionStatus, ChannelId)](
           Tuple2(ConnectionStatus.Disconnected, ChanId1),
-          Tuple2(ConnectionStatus.Connecting, ChanId2)) -> true).awaitFor(slowTimeout)
+          Tuple2(ConnectionStatus.Connecting, ChanId2)) -> true).
+          awaitFor(slowTimeout)
       }
     }
   }
@@ -208,7 +213,7 @@ trait ConnectAllTest { _: NodeSetSpec =>
       })
 
       def ns = nsNodes.map { nodes =>
-        new NodeSet(Some("foo"), None, nodes, Set.empty)
+        new NodeSet(Some("foo"), None, nodes, Set.empty, ListSet.empty)
       }
 
       lazy val concurCon = ns.flatMap { nodes =>

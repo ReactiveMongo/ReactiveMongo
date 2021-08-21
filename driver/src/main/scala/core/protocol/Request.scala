@@ -125,6 +125,10 @@ private[reactivemongo] object Request {
 
         req.payload.resetReaderIndex()
         buf writeBytes req.payload
+
+        req.payload.release()
+
+        buf
       }
 
       val compressed: Try[ByteBuf] = compressor match {

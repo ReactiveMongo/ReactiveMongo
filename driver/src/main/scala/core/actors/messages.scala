@@ -1,9 +1,11 @@
 package reactivemongo.core.actors
 
+import scala.collection.immutable.ListSet
+
 import scala.concurrent.{ Future, Promise }
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.api.ReadPreference
+import reactivemongo.api.{ Compressor, ReadPreference }
 
 import reactivemongo.io.netty.channel.ChannelId
 
@@ -72,7 +74,8 @@ private[reactivemongo] case class ChannelDisconnected(channelId: ChannelId)
 private[reactivemongo] class PrimaryAvailable(
   val metadata: ProtocolMetadata,
   val setName: Option[String],
-  val isMongos: Boolean) {
+  val isMongos: Boolean,
+  val compression: ListSet[Compressor]) {
 
   override def equals(that: Any): Boolean = that match {
     case other: PrimaryAvailable =>
@@ -83,13 +86,13 @@ private[reactivemongo] class PrimaryAvailable(
 
   override lazy val hashCode: Int = tupled.hashCode
 
-  private lazy val tupled = Tuple3(metadata, setName, isMongos)
+  private lazy val tupled = Tuple4(metadata, setName, isMongos, compression)
 }
 
 private[reactivemongo] object PrimaryAvailable {
 
   def apply(metadata: ProtocolMetadata): PrimaryAvailable =
-    new PrimaryAvailable(metadata, None, false)
+    new PrimaryAvailable(metadata, None, false, ListSet.empty)
 
   def unapply(that: Any): Option[ProtocolMetadata] = that match {
     case a: PrimaryAvailable => Option(a.metadata)
@@ -103,7 +106,8 @@ private[reactivemongo] case object PrimaryUnavailable
 private[reactivemongo] class SetAvailable(
   val metadata: ProtocolMetadata,
   val setName: Option[String],
-  val isMongos: Boolean) {
+  val isMongos: Boolean,
+  val compression: ListSet[Compressor]) {
 
   override def equals(that: Any): Boolean = that match {
     case other: SetAvailable =>
@@ -114,13 +118,13 @@ private[reactivemongo] class SetAvailable(
 
   override lazy val hashCode: Int = tupled.hashCode
 
-  private lazy val tupled = Tuple3(metadata, setName, isMongos)
+  private lazy val tupled = Tuple4(metadata, setName, isMongos, compression)
 }
 
 private[reactivemongo] object SetAvailable {
 
   def apply(metadata: ProtocolMetadata): SetAvailable =
-    new SetAvailable(metadata, None, false)
+    new SetAvailable(metadata, None, false, ListSet.empty)
 
   def unapply(that: Any): Option[ProtocolMetadata] = that match {
     case a: SetAvailable => Option(a.metadata)

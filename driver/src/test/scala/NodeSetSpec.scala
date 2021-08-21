@@ -2,6 +2,8 @@ package reactivemongo
 
 import scala.concurrent.{ Await, Future }
 
+import scala.collection.immutable.ListSet
+
 import akka.actor.ActorRef
 import akka.testkit.TestActorRef
 
@@ -10,6 +12,7 @@ import org.specs2.concurrent.ExecutionEnv
 
 import reactivemongo.api.{
   AsyncDriver,
+  Compressor,
   MongoConnection,
   MongoConnectionOptions,
   ReadPreference
@@ -66,7 +69,8 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
 
       "if the primary is not available if default preference" in {
         withCon() { (name, con, mon) =>
-          mon ! new SetAvailable(ProtocolMetadata.Default, None, false)
+          mon ! new SetAvailable(
+            ProtocolMetadata.Default, None, false, ListSet.empty)
 
           waitIsAvailable(con, failoverStrategy).map(_ => true).recover {
             case reason: PrimaryUnavailableException if (
@@ -77,20 +81,25 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
     }
 
     "be available" >> {
-      "with the primary if default preference" in {
+      "with the primary if default preference (and compression)" in {
         withCon() { (_, con, mon) =>
+          val serverCompression = ListSet(Compressor.Snappy, Compressor.Zstd)
+
           def test = (for {
-            _ <- {
-              mon ! new SetAvailable(ProtocolMetadata.Default, None, false)
-              mon ! new PrimaryAvailable(ProtocolMetadata.Default, None, false)
+            c <- {
+              mon ! new SetAvailable(
+                ProtocolMetadata.Default, None, false, serverCompression)
+
+              mon ! new PrimaryAvailable(
+                ProtocolMetadata.Default, None, false, serverCompression)
 
               waitIsAvailable(con, failoverStrategy)
             }
 
             after <- isAvailable(con, timeout)
-          } yield after)
+          } yield after -> c.compressors)
 
-          test must beTrue.await(1, timeout)
+          test must beTypedEqualTo(true -> serverCompression).await(1, timeout)
         }
       }
 
@@ -105,7 +114,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
                 def test = (for {
                   _ <- {
                     mon ! new SetAvailable(
-                      ProtocolMetadata.Default, None, false)
+                      ProtocolMetadata.Default, None, false, ListSet.empty)
 
                     waitIsAvailable(con, failoverStrategy)
                   }
@@ -122,8 +131,11 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
     "be unavailable" >> {
       "with the primary unavailable if default preference" in {
         withCon() { (_, con, mon) =>
-          mon ! new SetAvailable(ProtocolMetadata.Default, None, false)
-          mon ! new PrimaryAvailable(ProtocolMetadata.Default, None, false)
+          mon ! new SetAvailable(
+            ProtocolMetadata.Default, None, false, ListSet.empty)
+
+          mon ! new PrimaryAvailable(
+            ProtocolMetadata.Default, None, false, ListSet.empty)
 
           def test = (for {
             _ <- waitIsAvailable(con, failoverStrategy)
@@ -135,7 +147,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
             }
           } yield before -> after)
 
-          test must beEqualTo(true -> false).await(1, timeout)
+          test must beTypedEqualTo(true -> false).await(1, timeout)
         }
       }
 
@@ -144,7 +156,8 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
           readPreference = ReadPreference.primaryPreferred)
 
         withCon(opts) { (_, con, mon) =>
-          mon ! new SetAvailable(ProtocolMetadata.Default, None, false)
+          mon ! new SetAvailable(
+            ProtocolMetadata.Default, None, false, ListSet.empty)
 
           def test = (for {
             _ <- waitIsAvailable(con, failoverStrategy)
@@ -156,7 +169,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
             }
           } yield before -> after)
 
-          test must beEqualTo(true -> false).await(1, timeout)
+          test must beTypedEqualTo(true -> false).await(1, timeout)
         }
       }
     }
@@ -239,7 +252,8 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
 
       val ns = new NodeSet(Some("rs0"), None,
         nodes = Vector(primary, secondary1, secondary2),
-        authenticates = Set.empty)
+        authenticates = Set.empty,
+        compression = ListSet.empty)
 
       implicit def ordering = scala.math.Ordering.by[Node, String](_.name)
 

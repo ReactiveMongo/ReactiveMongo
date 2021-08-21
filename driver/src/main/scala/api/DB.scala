@@ -17,6 +17,8 @@ package reactivemongo.api
 
 import scala.util.{ Failure, Success }
 
+import scala.collection.immutable.ListSet
+
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.core.protocol.MongoWireVersion
@@ -82,8 +84,6 @@ final class DB private[api] (
   import Serialization.{ internalSerializationPack, unitReader }
 
   val pack: Serialization.Pack = internalSerializationPack
-
-  private[api] val defaultReadPreference = connection.options.readPreference
 
   /**
    * $resolveDescription (alias for the [[collection]] method).
@@ -519,7 +519,19 @@ final class DB private[api] (
     runner(this, runner.rawCommand(command))
   }
 
-  @inline private[api] def defaultWriteConcern: WriteConcern = connection.options.writeConcern
+  // ---
+
+  import connection.options
+
+  @inline private[api] def defaultReadPreference: ReadPreference =
+    options.readPreference
+
+  @inline private[api] def defaultWriteConcern: WriteConcern =
+    options.writeConcern
+
+  /* Negociated compression */
+  private[api] lazy val availableCompressors: ListSet[Compressor] =
+    options.compressors intersect connectionState.compressors
 
   override def toString = s"DB($name)"
 }

@@ -2,6 +2,8 @@ package reactivemongo.api
 
 import java.net.URI
 
+import scala.collection.immutable.ListSet
+
 // TODO: Make sure documentation of param properties is visible
 /**
  * Options for [[MongoConnection]] (see [[http://reactivemongo.org/releases/0.1x/documentation/tutorial/connect-database.html#connection-options more documentation]]).
@@ -39,7 +41,7 @@ final class MongoConnectionOptions private[reactivemongo] (
   _readConcern: ReadConcern,
 
   _appName: Option[String],
-  _compressors: Seq[Compressor]) {
+  _compressors: ListSet[Compressor]) {
 
   /**
    * The number of milliseconds to wait for a connection
@@ -69,7 +71,7 @@ final class MongoConnectionOptions private[reactivemongo] (
   @inline def appName: Option[String] = _appName
 
   /** The list of allowed [[https://docs.mongodb.com/manual/reference/connection-string/#mongodb-urioption-urioption.compressors compressors]] (e.g. `snappy`) */
-  @inline def compressors: Seq[Compressor] = _compressors
+  @inline def compressors: ListSet[Compressor] = _compressors
 
   // --- Reactivemongo specific options
 
@@ -161,7 +163,8 @@ final class MongoConnectionOptions private[reactivemongo] (
       _appName = this.appName,
       _compressors = this.compressors)
 
-  def withCompressors(compressors: Seq[Compressor]) =
+  /** '''EXPERIMENTAL:''' */
+  def withCompressors(compressors: ListSet[Compressor]) =
     new MongoConnectionOptions(
       _connectTimeoutMS = this.connectTimeoutMS,
       _authenticationDatabase = this.authenticationDatabase,
@@ -325,7 +328,7 @@ object MongoConnectionOptions {
       _keyStore = keyStore,
       _readConcern = readConcern,
       _appName = appName,
-      _compressors = Seq.empty /* TODO */ )
+      _compressors = ListSet.empty /* TODO */ )
 
   // ---
 

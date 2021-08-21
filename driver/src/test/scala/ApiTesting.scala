@@ -259,11 +259,11 @@ package object tests { self =>
 
     val isMaster = Command.buildRequestMaker(BSONSerializationPack)(
       CommandKind.Hello,
-      new IsMaster(None, Seq.empty, None),
+      new IsMaster(None, ListSet.empty, None),
       mw(BSONSerializationPack),
       reactivemongo.api.ReadPreference.primaryPreferred,
       "admin",
-      Seq.empty[Compressor]) // only "admin" DB for the admin command
+      ListSet.empty[Compressor]) // only "admin" DB for the admin command
 
     isMaster(reqId) // RequestIdGenerator.isMaster
   }

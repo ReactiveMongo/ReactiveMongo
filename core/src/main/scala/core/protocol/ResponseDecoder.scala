@@ -111,7 +111,7 @@ private[reactivemongo] class ResponseDecoder
       case _ =>
     }
 
-    frame.discardReadBytes()
+    frame.release()
 
     decodeReply(channelId, newFrame, newHeader)
   }

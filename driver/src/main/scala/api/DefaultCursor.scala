@@ -4,6 +4,8 @@ import scala.util.{ Failure, Success, Try }
 
 import scala.concurrent.{ ExecutionContext, Future }
 
+import scala.collection.immutable.ListSet
+
 import reactivemongo.util.ExtendedFutures.delayedFuture
 
 import reactivemongo.core.netty.BufferSequence
@@ -238,8 +240,8 @@ private[reactivemongo] object DefaultCursor {
 
     @inline def connection: MongoConnection = database.connection
 
-    @inline protected final def compressors: Seq[Compressor] =
-      connection.options.compressors
+    @inline protected final def compressors: ListSet[Compressor] =
+      database.availableCompressors
 
     def failoverStrategy: FailoverStrategy
 
