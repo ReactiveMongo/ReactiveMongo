@@ -86,8 +86,9 @@ final class ProtocolSpec(implicit ee: ExecutionEnv)
         req.writeTo(buffer) must_=== ({}) and {
           getBytes(buffer, req.size) must_=== bytes
         } and {
-          // isMaster request must not be compressed, but anyway check
-          // request compression there
+          // isMaster request must not be compressed, ...
+          // ... but anyway check request compression there
+
           val expected = Array[Byte](60, 56, 4, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 1, 1, 64, 1, 0, 0, 0, 37, 0, 0, 0, 16, 105, 115, 109, 97, 115, 116, 101, 114, 5, 18, 72, 4, 99, 111, 109, 112, 114, 101, 115, 115, 105, 111, 110, 0, 5, 0, 0, 0, 0, 0)
 
           val expectedReqSz = expected.size + 9 + 16

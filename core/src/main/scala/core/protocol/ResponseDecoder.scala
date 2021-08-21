@@ -75,16 +75,13 @@ private[reactivemongo] class ResponseDecoder
     }
   }
 
-  def decompress(
+  private[reactivemongo] def decompress(
     channelId: Option[ChannelId],
     frame: ByteBuf,
     header: MessageHeader): Response = {
     val originalOpCode = frame.readIntLE
     val uncompressedSize = frame.readIntLE
     val compressorId = frame.readUnsignedByte
-
-    // TODO: Remove
-    println(s"originalOpCode = $originalOpCode, uncompressedSize = $uncompressedSize, compressorId = $compressorId")
 
     val uncompress: Function2[ByteBuf, ByteBuf, Try[Int]] = compressorId match {
       case Compressor.Zlib.id =>
@@ -105,9 +102,14 @@ private[reactivemongo] class ResponseDecoder
       messageLength = uncompressedSize,
       opCode = originalOpCode)
 
-    val newFrame = Unpooled.buffer(uncompressedSize)
+    val newFrame = Unpooled.directBuffer(uncompressedSize)
 
-    uncompress(frame, newFrame)
+    uncompress(frame, newFrame) match {
+      case Failure(cause) =>
+        throw cause
+
+      case _ =>
+    }
 
     frame.discardReadBytes()
 
@@ -130,10 +132,8 @@ private[reactivemongo] class ResponseDecoder
       docs.writeBytes(frame)
 
       ResponseDecoder.first(docs) match {
-        case Failure(cause) => {
-          //cause.printStackTrace()
+        case Failure(cause) =>
           Response.CommandError(header, reply, info, DatabaseException(cause))
-        }
 
         case Success(doc) => {
           val ok = doc.booleanLike("ok") getOrElse false

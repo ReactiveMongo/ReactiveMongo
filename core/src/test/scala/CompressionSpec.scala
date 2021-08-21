@@ -11,6 +11,8 @@ import reactivemongo.io.netty.buffer.{
 final class CompressionSpec extends org.specs2.mutable.Specification {
   "Compression".title
 
+  section("unit")
+
   { // Zstandard
     val zstd = Zstd()
 
