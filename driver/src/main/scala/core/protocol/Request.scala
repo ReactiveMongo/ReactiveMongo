@@ -32,7 +32,7 @@ private[reactivemongo] final class Request private (
     header writeTo buffer
     op writeTo buffer
 
-    buffer writeBytes payload
+    buffer writeBytes payload.asReadOnly
 
     ()
   }

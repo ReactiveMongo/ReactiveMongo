@@ -39,7 +39,7 @@ final class MongoConnectionOptions private[reactivemongo] (
   _readConcern: ReadConcern,
 
   _appName: Option[String],
-  _compressors: Seq[Compressor] /* TODO: Parse */ ) {
+  _compressors: Seq[Compressor]) {
 
   /**
    * The number of milliseconds to wait for a connection

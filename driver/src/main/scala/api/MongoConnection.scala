@@ -298,7 +298,7 @@ final class MongoConnection private[reactivemongo] (
 
     val receive: Receive = {
       case available: PrimaryAvailable => {
-        debug(s"A primary is available: ${available.metadata}") // TODO
+        debug(s"A primary is available: ${available.metadata}")
 
         _metadata = Some(available.metadata)
 
@@ -1032,6 +1032,9 @@ object MongoConnection {
         } else {
           parsed1.updateOption(_.withCompressors(compressors))
         }
+
+      case _ =>
+        parsed1
     }
 
     val parsed3 = parsed2.rejected.get("keyStore").fold(parsed2) { uri =>

@@ -30,8 +30,6 @@ private[reactivemongo] final class RequestMaker(
   private val make: Int => Request = compressors.headOption match {
     case Some(first) if (CommandKind canCompress kind) =>
       { id: Int =>
-        //println(s"canCompress($kind): id = $id")
-
         compress(prepare(id), first, compressors.tail) match {
           case Success(compressed) => compressed
           case Failure(cause)      => throw cause
@@ -39,8 +37,6 @@ private[reactivemongo] final class RequestMaker(
       }
 
     case _ =>
-      // TODO: logging
-      //println(s"Won't compress ${kind} (compressors = $compressors)")
       prepare(_: Int)
   }
 
@@ -53,7 +49,6 @@ private[reactivemongo] final class RequestMaker(
     alternatives: Seq[Compressor]): Try[Request] =
     Request.compress(request, next) match {
       case compressed @ Success(_) =>
-        println(s"compressed = $compressed")
         compressed
 
       case failed @ Failure(_) => alternatives.headOption match {
