@@ -4,8 +4,6 @@ import scala.util.{ Failure, Success, Try }
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import scala.collection.immutable.ListSet
-
 import reactivemongo.util.ExtendedFutures.delayedFuture
 
 import reactivemongo.core.netty.BufferSequence
@@ -82,7 +80,7 @@ private[reactivemongo] object DefaultCursor {
           val req = new ExpectingResponse(
             requestMaker = RequestMaker(
               CommandKind.Query, op, requestBuffer(maxDocs),
-              readPreference, compressors = compressors),
+              readPreference, callerSTE = callerSTE),
             pinnedNode = transaction.flatMap(_.pinnedNode))
 
           requester(0, maxDocs, req)(ec)
@@ -175,8 +173,7 @@ private[reactivemongo] object DefaultCursor {
         val op = getMoreOpCmd(_ref.cursorId, maxDocs)
         val req = new ExpectingResponse(
           requestMaker = RequestMaker(
-            CommandKind.Query, op._1, op._2, readPreference,
-            compressors = compressors),
+            CommandKind.Query, op._1, op._2, readPreference),
           pinnedNode = pinnedNode)
 
         requester(0, maxDocs, req)(ec)
@@ -240,9 +237,6 @@ private[reactivemongo] object DefaultCursor {
 
     @inline def connection: MongoConnection = database.connection
 
-    @inline protected final def compressors: ListSet[Compressor] =
-      database.availableCompressors
-
     def failoverStrategy: FailoverStrategy
 
     def fullCollectionName: String
@@ -260,6 +254,9 @@ private[reactivemongo] object DefaultCursor {
 
     protected final lazy val version = connection._metadata.
       fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
+
+    protected final val callerSTE: Seq[StackTraceElement] =
+      reactivemongo.util.Trace.currentTraceElements.drop(2).take(15)
 
     @inline protected def lessThenV32: Boolean =
       version.compareTo(MongoWireVersion.V32) < 0
@@ -331,8 +328,7 @@ private[reactivemongo] object DefaultCursor {
         def req = new ExpectingResponse(
           requestMaker = RequestMaker(CommandKind.Query, op, cmd,
             readPreference = preference,
-            channelIdHint = Some(response.info.channelId),
-            compressors = compressors),
+            channelIdHint = Some(response.info.channelId)),
           pinnedNode = transaction.flatMap(_.pinnedNode))
 
         Failover(connection, failoverStrategy) { () =>
@@ -392,8 +388,7 @@ private[reactivemongo] object DefaultCursor {
             requestMaker = RequestMaker(
               CommandKind.KillCursors,
               KillCursors(Set(cursorID)),
-              readPreference = preference,
-              compressors = compressors),
+              readPreference = preference),
             pinnedNode = transaction.flatMap(_.pinnedNode)))
 
         result.onComplete {

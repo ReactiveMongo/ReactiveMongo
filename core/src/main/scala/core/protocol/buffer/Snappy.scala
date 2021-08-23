@@ -13,7 +13,7 @@ private[reactivemongo] final class Snappy {
     val outNioBuffer: ByteBuffer =
       out.internalNioBuffer(out.writerIndex, out.writableBytes)
 
-    val inNioBuffer = in.nioBuffer
+    val inNioBuffer = in.nioBuffer()
     val sz = Z.uncompress(inNioBuffer, outNioBuffer)
 
     in.readerIndex(in.writerIndex)

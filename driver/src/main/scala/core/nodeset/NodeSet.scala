@@ -19,6 +19,7 @@ import reactivemongo.api.{ Compressor, ReadPreference }
 /**
  * @param name the replicaSet name
  * @param version the replicaSet version
+ * @param compression the negociated compression
  */
 private[reactivemongo] class NodeSet(
   val name: Option[String],

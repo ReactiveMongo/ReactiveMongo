@@ -84,7 +84,11 @@ final class ProtocolSpec(implicit ee: ExecutionEnv)
         val bytes = Array[Byte](76, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -44, 7, 0, 0, 4, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36, 99, 109, 100, 0, 0, 0, 0, 0, 1, 0, 0, 0, 37, 0, 0, 0, 16, 105, 115, 109, 97, 115, 116, 101, 114, 0, 1, 0, 0, 0, 4, 99, 111, 109, 112, 114, 101, 115, 115, 105, 111, 110, 0, 5, 0, 0, 0, 0, 0)
 
         req.writeTo(buffer) must_=== ({}) and {
-          getBytes(buffer, req.size) must_=== bytes
+          val rbs = getBytes(buffer, req.size)
+
+          req.payload.resetReaderIndex() // so it can be reused
+
+          rbs must_=== bytes
         } and {
           // isMaster request must not be compressed, ...
           // ... but anyway check request compression there
@@ -95,100 +99,98 @@ final class ProtocolSpec(implicit ee: ExecutionEnv)
 
           val compressed = compressRequest(req, Compressor.Snappy).get
 
-          import reactivemongo.io.netty.buffer.Unpooled
-          import compressed.payload
+          withBuffer(compressed.payload) { payload =>
+            val res = Array.fill[Byte](payload.writerIndex)(-1)
 
-          val res = Array.fill[Byte](payload.writerIndex)(-1)
+            payload.readBytes(res, payload.readerIndex, res.size)
 
-          payload.readBytes(res, payload.readerIndex, res.size)
+            res must_=== expected and {
+              compressed.size must_=== expectedReqSz
+            } and withDirectBuffer(expectedReqSz) { buf =>
+              payload.resetReaderIndex()
 
-          res must_=== expected and {
-            compressed.size must_=== expectedReqSz
-          } and {
-            payload.resetReaderIndex()
+              compressed writeTo buf
 
-            val buf = Unpooled.directBuffer(expectedReqSz)
-            compressed writeTo buf
+              val uncompressedSize = bytes.size - 16 /* MsgHeader */
 
-            val uncompressedSize = bytes.size - 16 /* MsgHeader */
+              def msgHeaderOk =
+                buf.readableBytes must_=== expectedReqSz and {
+                  val msgHeader = readMessageHeader(buf)
 
-            def msgHeaderOk =
-              buf.readableBytes must_=== expectedReqSz and {
-                val msgHeader = readMessageHeader(buf)
-
-                msgHeader.messageLength must_=== expectedReqSz and {
-                  msgHeader.requestID must_=== compressed.requestID
-                } and {
-                  msgHeader.responseTo must_=== compressed.responseTo
-                } and {
-                  msgHeader.opCode must_=== 2012
-                } and {
-                  msgHeader.size must_=== 16
+                  msgHeader.messageLength must_=== expectedReqSz and {
+                    msgHeader.requestID must_=== compressed.requestID
+                  } and {
+                    msgHeader.responseTo must_=== compressed.responseTo
+                  } and {
+                    msgHeader.opCode must_=== 2012
+                  } and {
+                    msgHeader.size must_=== 16
+                  }
                 }
-              }
 
-            def compressedOpOk =
-              buf.readableBytes must_=== (expectedReqSz - 16) and {
-                buf.readIntLE aka "orignalOpCode" must_=== req.op.code
-              } and {
-                buf.readIntLE must_=== uncompressedSize
-              } and {
-                buf.readByte must_=== Compressor.Snappy.id
-              }
+              def compressedOpOk =
+                buf.readableBytes must_=== (expectedReqSz - 16) and {
+                  buf.readIntLE aka "orignalOpCode" must_=== req.op.code
+                } and {
+                  buf.readIntLE must_=== uncompressedSize
+                } and {
+                  buf.readByte must_=== Compressor.Snappy.id
+                }
 
-            def originalQueryOk(decompressed: ByteBuf) =
-              asQuery(req.op) must beSome.which { query =>
-                decompressed.readIntLE must_=== query.flags and {
-                  val x = Array.newBuilder[Byte]
+              def originalQueryOk(decompressed: ByteBuf) =
+                asQuery(req.op) must beSome.which { query =>
+                  decompressed.readIntLE must_=== query.flags and {
+                    val x = Array.newBuilder[Byte]
 
-                  @annotation.tailrec def read(): String = {
-                    val b = decompressed.readByte
+                    @annotation.tailrec def read(): String = {
+                      val b = decompressed.readByte
 
-                    if (b == 0) {
-                      new String(x.result(), "utf-8")
-                    } else {
-                      x += b
-                      read()
+                      if (b == 0) {
+                        new String(x.result(), "utf-8")
+                      } else {
+                        x += b
+                        read()
+                      }
+                    }
+
+                    read() must_=== query.fullCollectionName
+                  } and {
+                    decompressed.readIntLE must_=== query.numberToSkip
+                  } and {
+                    decompressed.readIntLE must_=== query.numberToReturn
+                  }
+                }
+
+              def compressedPayloadOk = {
+                val sizeAfterMsgHeaderAndOp: Int =
+                  expectedReqSz - 16 - compressed.op.size
+
+                withDirectBuffer(uncompressedSize) { decompressed =>
+                  buf.readableBytes must_=== sizeAfterMsgHeaderAndOp and {
+                    snappyDecompress(buf, decompressed).
+                      aka("uncompressed") must beSuccessfulTry(uncompressedSize)
+                  } and {
+                    buf.readableBytes must_=== 0
+                  } and {
+                    decompressed.readableBytes must_=== uncompressedSize
+                  } and {
+                    originalQueryOk(decompressed)
+                  } and {
+                    val origPayloadSz = req.payload.writerIndex
+
+                    origPayloadSz must_=== (uncompressedSize - req.op.size) and {
+                      decompressed.readableBytes must_=== origPayloadSz
+                    } and {
+                      readFromBuffer(decompressed) must beSuccessfulTry(
+                        BSONDocument(
+                          "ismaster" -> 1, "compression" -> Seq.empty[String]))
                     }
                   }
-
-                  read() must_=== query.fullCollectionName
-                } and {
-                  decompressed.readIntLE must_=== query.numberToSkip
-                } and {
-                  decompressed.readIntLE must_=== query.numberToReturn
                 }
               }
 
-            def compressedPayloadOk = {
-              val sizeAfterMsgHeaderAndOp: Int =
-                expectedReqSz - 16 - compressed.op.size
-
-              val decompressed = Unpooled.directBuffer(uncompressedSize)
-
-              buf.readableBytes must_=== sizeAfterMsgHeaderAndOp and {
-                snappyDecompress(buf, decompressed).
-                  aka("uncompressed") must beSuccessfulTry(uncompressedSize)
-              } and {
-                buf.readableBytes must_=== 0
-              } and {
-                decompressed.readableBytes must_=== uncompressedSize
-              } and {
-                originalQueryOk(decompressed)
-              } and {
-                val origPayloadSz = req.payload.writerIndex
-
-                origPayloadSz must_=== (uncompressedSize - req.op.size) and {
-                  decompressed.readableBytes must_=== origPayloadSz
-                } and {
-                  readFromBuffer(decompressed) must beSuccessfulTry(
-                    BSONDocument(
-                      "ismaster" -> 1, "compression" -> Seq.empty[String]))
-                }
-              }
+              msgHeaderOk and compressedOpOk and compressedPayloadOk
             }
-
-            msgHeaderOk and compressedOpOk and compressedPayloadOk
           }
         }
       }
@@ -251,4 +253,17 @@ final class ProtocolSpec(implicit ee: ExecutionEnv)
 
   lazy val msg1Bytes = Array[Byte](-51, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, -87, 0, 0, 0, 8, 105, 115, 109, 97, 115, 116, 101, 114, 0, 1, 16, 109, 97, 120, 66, 115, 111, 110, 79, 98, 106, 101, 99, 116, 83, 105, 122, 101, 0, 0, 0, 0, 1, 16, 109, 97, 120, 77, 101, 115, 115, 97, 103, 101, 83, 105, 122, 101, 66, 121, 116, 101, 115, 0, 0, 108, -36, 2, 16, 109, 97, 120, 87, 114, 105, 116, 101, 66, 97, 116, 99, 104, 83, 105, 122, 101, 0, -24, 3, 0, 0, 9, 108, 111, 99, 97, 108, 84, 105, 109, 101, 0, 121, -89, -110, -101, 95, 1, 0, 0, 16, 109, 97, 120, 87, 105, 114, 101, 86, 101, 114, 115, 105, 111, 110, 0, 5, 0, 0, 0, 16, 109, 105, 110, 87, 105, 114, 101, 86, 101, 114, 115, 105, 111, 110, 0, 0, 0, 0, 0, 8, 114, 101, 97, 100, 79, 110, 108, 121, 0, 0, 1, 111, 107, 0, 0, 0, 0, 0, 0, 0, -16, 63, 0)
 
+  private def withDirectBuffer[T](size: Int)(f: ByteBuf => T): T =
+    withBuffer(Unpooled.directBuffer(size))(f)
+
+  private def withBuffer[T](init: => ByteBuf)(f: ByteBuf => T): T = {
+    val buf = init
+
+    try {
+      f(buf)
+    } finally {
+      buf.release()
+      ()
+    }
+  }
 }

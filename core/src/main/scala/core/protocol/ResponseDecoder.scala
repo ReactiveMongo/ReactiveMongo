@@ -23,6 +23,7 @@ private[reactivemongo] class ResponseDecoder
     out: JList[Object]): Unit = {
 
     out.add(decodeResponse(
+      context = context,
       channelId = Option(context).map(_.channel.id),
       frame = frame))
 
@@ -30,6 +31,7 @@ private[reactivemongo] class ResponseDecoder
   }
 
   private[reactivemongo] def decodeResponse(
+    context: ChannelHandlerContext,
     channelId: Option[ChannelId],
     frame: ByteBuf): Response = {
 
@@ -69,7 +71,7 @@ private[reactivemongo] class ResponseDecoder
     }
 
     if (header.opCode == CompressedOp.code) {
-      decompress(channelId, frame, header)
+      decompress(channelId, frame, header, context.alloc.directBuffer(_: Int))
     } else {
       decodeReply(channelId, frame, header)
     }
@@ -78,7 +80,8 @@ private[reactivemongo] class ResponseDecoder
   private[reactivemongo] def decompress(
     channelId: Option[ChannelId],
     frame: ByteBuf,
-    header: MessageHeader): Response = {
+    header: MessageHeader,
+    allocDirect: Int => ByteBuf): Response = {
     val originalOpCode = frame.readIntLE
     val uncompressedSize = frame.readIntLE
     val compressorId = frame.readUnsignedByte
@@ -88,7 +91,7 @@ private[reactivemongo] class ResponseDecoder
         buffer.Zlib.DefaultCompressor.decode(_: ByteBuf, _: ByteBuf)
 
       case Compressor.Zstd.id =>
-        buffer.Zstd.DefaultCompressor.decode(_: ByteBuf, _: ByteBuf)
+        buffer.Zstd(allocDirect = allocDirect).decode(_: ByteBuf, _: ByteBuf)
 
       case Compressor.Snappy.id =>
         buffer.Snappy.DefaultCompressor.decode(_: ByteBuf, _: ByteBuf)
@@ -102,18 +105,23 @@ private[reactivemongo] class ResponseDecoder
       messageLength = uncompressedSize,
       opCode = originalOpCode)
 
-    val newFrame = Unpooled.directBuffer(uncompressedSize)
+    val buf = allocDirect(uncompressedSize)
 
-    uncompress(frame, newFrame) match {
-      case Failure(cause) =>
-        throw cause
+    try {
+      uncompress(frame, buf) match {
+        case Failure(cause) =>
+          throw cause
 
-      case _ =>
+        case _ =>
+      }
+
+      frame.discardReadBytes()
+
+      decodeReply(channelId, buf, newHeader)
+    } finally {
+      buf.release()
+      ()
     }
-
-    frame.release()
-
-    decodeReply(channelId, newFrame, newHeader)
   }
 
   private def decodeReply(

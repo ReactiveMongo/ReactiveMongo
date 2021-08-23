@@ -2,13 +2,10 @@ package reactivemongo.api.commands
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import scala.collection.immutable.ListSet
-
 import reactivemongo.api.{
   Cursor,
   CursorOptions,
   Collection,
-  Compressor,
   DB,
   SerializationPack,
   Session,
@@ -90,19 +87,11 @@ private[reactivemongo] object Command {
 
     @inline protected def defaultReadPreference = db.defaultReadPreference
 
-    import db.availableCompressors
-
-    /* TODO: Static binding to collect traces
-    @inline private def stackTrace() =
-      new Throwable().getStackTrace().drop(3).reverse
-     */
-
     def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = {
-      val requestMaker = buildRequestMaker(pack)(
-        kind, command, writer, readPreference, db.name, availableCompressors)
+      def requestMaker = buildRequestMaker(pack)(
+        kind, command, writer, readPreference, db.name)
 
-      /* TODO: Static binding
-      val contextSTE = stackTrace() */
+      val contextSTE = reactivemongo.util.Trace.currentTraceElements
 
       Failover(db.connection, failover) { () =>
         db.connection.sendExpectingResponse(new ExpectingResponse(
@@ -112,46 +101,41 @@ private[reactivemongo] object Command {
             t <- s.transaction.toOption
             n <- t.pinnedNode
           } yield n))
-      }.future /* TODO: Static binding; .recoverWith {
+      }.future.recoverWith {
         case cause => Future.failed[Response] {
-          cause.setStackTrace(contextSTE)
+          cause.setStackTrace(contextSTE.toArray)
           cause
         }
-      }*/ .flatMap {
-          case Response.CommandError(_, _, _, cause) =>
-            cause.originalDocument match {
-              case pack.IsDocument(doc) =>
-                // Error document as result
-                Future(pack.deserialize(doc, reader))
+      }.flatMap {
+        case Response.CommandError(_, _, _, cause) =>
+          cause.originalDocument match {
+            case pack.IsDocument(doc) =>
+              // Error document as result
+              Future(pack.deserialize(doc, reader))
 
-              case _ => Future.failed[T] {
-                /* TODO: Static binding
-                cause.setStackTrace(contextSTE) */
-                cause
-              }
+            case _ => Future.failed[T] {
+              cause.setStackTrace(contextSTE.toArray)
+              cause
+            }
+          }
+
+        case response @ Response.Successful(_, Reply(_, _, _, 0), _, _) =>
+          Future.failed[T](new GenericDriverException(
+            s"Cannot parse empty response: $response"))
+
+        case response => db.session match {
+          case Some(session) =>
+            Session.updateOnResponse(session, response).map {
+              case (_, resp) => pack.readAndDeserialize(resp, reader)
             }
 
-          case response @ Response.Successful(_, Reply(_, _, _, 0), _, _) =>
-            Future.failed[T](new GenericDriverException(
-              s"Cannot parse empty response: $response"))
-
-          case response => db.session match {
-            case Some(session) =>
-              Session.updateOnResponse(session, response).map {
-                case (_, resp) => pack.readAndDeserialize(resp, reader)
-              }
-
-            case _ =>
-              Future(pack.readAndDeserialize(response, reader))
-          }
+          case _ =>
+            Future(pack.readAndDeserialize(response, reader))
         }
+      }
     }
 
     def cursor[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T]): DefaultCursor.Impl[T] = {
-      val buffer = WritableBuffer.empty
-      pack.serializeAndWrite(buffer, command, writer)
-
-      val bs = BufferSequence(buffer.buffer)
       val flags = {
         if (readPreference.slaveOk) options.slaveOk.flags
         else options.flags
@@ -159,9 +143,12 @@ private[reactivemongo] object Command {
 
       val op = Query(flags, db.name + f".$$cmd", 0, 1)
 
-      DefaultCursor.query(pack, op, (_: Int) => bs,
-        readPreference, db, failover, fullCollectionName, maxAwaitTimeMS)
+      DefaultCursor.query(pack, op, (_: Int) => {
+        val buffer = WritableBuffer.empty
+        pack.serializeAndWrite(buffer, command, writer)
 
+        BufferSequence(buffer.buffer)
+      }, readPreference, db, failover, fullCollectionName, maxAwaitTimeMS)
     }
   }
 
@@ -249,8 +236,7 @@ private[reactivemongo] object Command {
     command: A,
     writer: pack.Writer[A],
     readPreference: ReadPreference,
-    db: String,
-    compressors: ListSet[Compressor]): RequestMaker = {
+    db: String): RequestMaker = {
     val buffer = WritableBuffer.empty
 
     pack.serializeAndWrite(buffer, command, writer)
@@ -259,8 +245,7 @@ private[reactivemongo] object Command {
     val flags = if (readPreference.slaveOk) QueryFlags.SlaveOk else 0
     val query = Query(flags, db + f".$$cmd", 0, 1)
 
-    RequestMaker(kind, query, documents, readPreference,
-      compressors = compressors)
+    RequestMaker(kind, query, documents, readPreference)
   }
 }
 

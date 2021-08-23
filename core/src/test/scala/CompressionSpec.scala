@@ -77,9 +77,13 @@ final class CompressionSpec extends org.specs2.mutable.Specification {
           decode(compressed, decompressed) must beSuccessfulTry(sz) and {
             compressed.readableBytes must_=== 0
           } and {
+            compressed.release() must not(throwA[Exception])
+          } and {
             (0 until decompressed.readableBytes).forall { i =>
               input(i) == decompressed.readByte
             } must beTrue
+          } and {
+            decompressed.release() must not(throwA[Exception])
           }
         }
       }

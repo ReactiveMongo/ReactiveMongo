@@ -213,7 +213,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
         //println(s"MonitorSpec_1: ${System.currentTimeMillis()}")
 
         Future.successful({
-          isAvailable(con, timeout) must beTrue.awaitFor(timeout)
+          isAvailable(con, timeout) must beTrue.await(1, timeout)
         } and {
           @volatile var connections1 = Vector.empty[Connection]
 

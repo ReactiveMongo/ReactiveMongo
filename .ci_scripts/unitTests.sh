@@ -31,14 +31,17 @@ fi
 source "$SCRIPT_DIR/jvmopts.sh"
 
 if [ "x$OS_NAME" = "xosx" ]; then
-    export SBT_OPTS="-Dtest.nettyNativeArch=osx"
+    SBT_OPTS="-Dtest.nettyNativeArch=osx"
 fi
+
+SBT_OPTS="$SBT_OPTS -Dreactivemongo.collectThreadTrace=true"
 
 cat > /dev/stdout <<EOF
 - JVM options: $JVM_OPTS
 - SBT options: $SBT_OPTS
 EOF
 
+export SBT_OPTS
 export JVM_OPTS
 
 if [ "x$SPECS_TESTS" = "x" ]; then

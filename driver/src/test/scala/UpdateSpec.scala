@@ -114,7 +114,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
             }
           }.await(1, timeout)
 
-        update.maxBulkSize must_=== 2 and {
+        update.maxBulkSize must_=== 2 and (eventually(2, timeout) {
           Future.sequence(Seq(
             update.element(doc1, doc1, upsert = true),
             update.element(doc2, doc2, upsert = true),
@@ -132,8 +132,8 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
                 } and {
                   resultSpec(update.many(up1, elements.drop(1)))
                 }
-            }.await(1, timeout / 4L * 5L)
-        }
+            }.awaitFor(timeout / 2L * 4L)
+        })
       }
     }
 

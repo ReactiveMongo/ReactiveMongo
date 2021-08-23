@@ -2,6 +2,8 @@ package reactivemongo.core.protocol
 
 import scala.util.{ Success, Try }
 
+import scala.util.control.NonFatal
+
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 import reactivemongo.io.netty.channel.ChannelId
 
@@ -10,6 +12,7 @@ import reactivemongo.core.netty.BufferSequence
 import reactivemongo.core.protocol.buffer.ChannelBufferWritable
 
 import reactivemongo.api.{ Compressor, ReadPreference }
+import reactivemongo.api.commands.CommandKind
 
 /**
  * Request message.
@@ -19,6 +22,7 @@ import reactivemongo.api.{ Compressor, ReadPreference }
  * @param channelIdHint a hint for sending this request on a particular channel.
  */
 private[reactivemongo] final class Request private (
+  val kind: CommandKind,
   val requestID: Int,
   val responseTo: Int,
   val op: RequestOp,
@@ -32,7 +36,7 @@ private[reactivemongo] final class Request private (
     header writeTo buffer
     op writeTo buffer
 
-    buffer writeBytes payload.asReadOnly
+    buffer writeBytes payload
 
     ()
   }
@@ -47,6 +51,7 @@ private[reactivemongo] final class Request private (
 }
 
 /**
+ * @define kind the command kind of this request
  * @define requestID id of this request, so that the response may be identifiable. Should be strictly positive.
  * @define op request operation.
  * @define documentsA body of this request, an Array containing 0, 1, or many documents.
@@ -56,31 +61,54 @@ private[reactivemongo] object Request {
   /**
    * Create a request.
    *
+   * @param kind $kind
    * @param requestID $requestID
    * @param op $op
    * @param documents body of this request, a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]] containing 0, 1, or many documents.
    */
   def apply(
+    kind: CommandKind,
     requestID: Int,
     responseTo: Int,
     op: RequestOp,
     documents: BufferSequence,
     readPreference: ReadPreference = ReadPreference.primary,
-    channelIdHint: Option[ChannelId] = None): Request = new Request(
-    requestID, responseTo, op, documents.merged, readPreference, channelIdHint)
+    channelIdHint: Option[ChannelId] = None,
+    callerSTE: Seq[StackTraceElement] = Seq.empty): Request = try {
+    new Request(
+      kind, requestID, responseTo, op, documents.merged,
+      readPreference, channelIdHint)
+  } catch {
+    case NonFatal(cause) =>
+      val trace = cause.getStackTrace
+      val callerTrace = Array.newBuilder[StackTraceElement] ++= trace
+
+      if (trace.nonEmpty) {
+        callerTrace += new StackTraceElement("---", "---", "---", -1)
+      }
+
+      callerTrace ++= callerSTE
+
+      cause.setStackTrace(callerTrace.result())
+
+      throw cause
+  }
 
   /**
    * Create a request.
    *
+   * @param kind $kind
    * @param requestID $requestID
    * @param op $op
    * @param documents $documentsA
    */
   def apply(
+    kind: CommandKind,
     requestID: Int,
     responseTo: Int,
     op: RequestOp,
     documents: Array[Byte]): Request = new Request(
+    kind,
     requestID,
     responseTo,
     op,
@@ -89,27 +117,36 @@ private[reactivemongo] object Request {
   /**
    * Create a request.
    *
+   * @param kind $kind
    * @param requestID $requestID
    * @param op $op
    * @param documents $documentsA
    */
-  def apply(requestID: Int, op: RequestOp, documents: Array[Byte]): Request =
-    Request.apply(requestID, 0, op, documents)
+  def apply(
+    kind: CommandKind,
+    requestID: Int,
+    op: RequestOp,
+    documents: Array[Byte]): Request =
+    Request.apply(kind, requestID, 0, op, documents)
 
   /**
    * Create a request.
    *
+   * @param kind $kind
    * @param requestID $requestID
    * @param op $op
    */
-  def apply(requestID: Int, op: RequestOp): Request =
-    Request.apply(requestID, op, new Array[Byte](0))
+  def apply(kind: CommandKind, requestID: Int, op: RequestOp): Request =
+    Request.apply(kind, requestID, op, new Array[Byte](0))
 
   /**
    * @param req the request to be compressed
    * @param compressor the compressor to be applied (if required)
    */
-  def compress(req: Request, compressor: Compressor): Try[Request] = {
+  def compress(
+    req: Request,
+    compressor: Compressor,
+    allocDirect: Int => ByteBuf): Try[Request] = {
     import req.op.{ code => originalOpCode }
 
     if (originalOpCode == CompressedOp.code) {
@@ -118,51 +155,68 @@ private[reactivemongo] object Request {
     } else {
       val uncompressedSize = req.size - 16 /* MsgHeader */
 
-      def uncompressedData: ByteBuf = {
-        val buf = Unpooled.directBuffer(uncompressedSize)
+      def withData[T](f: ByteBuf => T): T = {
+        var buf: ByteBuf = null
 
-        req.op writeTo buf
+        try {
+          buf = allocDirect(uncompressedSize)
 
-        req.payload.resetReaderIndex()
-        buf writeBytes req.payload
+          req.op writeTo buf
 
-        req.payload.release()
+          buf writeBytes req.payload
 
-        buf
+          f(buf)
+        } catch {
+          case NonFatal(cause) =>
+            throw cause
+        } finally {
+          if (buf != null) {
+            buf.release()
+            ()
+          }
+        }
       }
 
       val compressed: Try[ByteBuf] = compressor match {
-        case Compressor.Snappy => {
+        case Compressor.Snappy => Try {
           val bufSize = org.xerial.snappy.Snappy.
             maxCompressedLength(uncompressedSize)
 
-          val out = Unpooled.directBuffer(bufSize)
-
-          buffer.Snappy().encode(uncompressedData, out).map(_ => out)
+          allocDirect(bufSize)
+        }.flatMap { out =>
+          withData {
+            buffer.Snappy().encode(_, out).map(_ => out)
+          }
         }
 
-        case Compressor.Zstd => {
+        case Compressor.Zstd => Try {
           val bufSize = com.github.luben.zstd.Zstd.
             compressBound(uncompressedSize.toLong).toInt
 
-          val out = Unpooled.directBuffer(bufSize)
-
-          buffer.Zstd().encode(uncompressedData, out).map(_ => out)
+          allocDirect(bufSize)
+        }.flatMap { out =>
+          withData {
+            buffer.Zstd().encode(_, out).map(_ => out)
+          }
         }
 
-        case Compressor.Zlib(level) => {
-          val out = Unpooled.directBuffer(
-            (uncompressedSize.toDouble * 1.2D).toInt)
+        case Compressor.Zlib(level) => Try {
+          val bufSize = (uncompressedSize.toDouble * 1.2D).toInt
 
-          buffer.Zlib(level).encode(uncompressedData, out).map(_ => out)
+          allocDirect(bufSize)
+        }.flatMap { out =>
+          withData {
+            buffer.Zlib(level).encode(_, out).map(_ => out)
+          }
         }
 
         case _ =>
-          Try(uncompressedData)
+          Success(req.payload)
       }
 
       compressed.map { payload =>
         new Request(
+          kind = req.kind,
           requestID = req.requestID,
           responseTo = req.responseTo,
           op = new CompressedOp(

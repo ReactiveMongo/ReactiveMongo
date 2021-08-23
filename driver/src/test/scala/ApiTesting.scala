@@ -262,8 +262,7 @@ package object tests { self =>
       new IsMaster(None, ListSet.empty, None),
       mw(BSONSerializationPack),
       reactivemongo.api.ReadPreference.primaryPreferred,
-      "admin",
-      ListSet.empty[Compressor]) // only "admin" DB for the admin command
+      "admin") // only "admin" DB for the admin command
 
     isMaster(reqId) // RequestIdGenerator.isMaster
   }
@@ -420,7 +419,7 @@ package object tests { self =>
   }
 
   def compressRequest(req: Request, compressor: Compressor) =
-    Request.compress(req, compressor)
+    Request.compress(req, compressor, Unpooled.directBuffer(_: Int))
 
   def snappyDecompress(in: ByteBuf, out: ByteBuf) =
     new reactivemongo.core.protocol.buffer.Snappy().decode(in, out)

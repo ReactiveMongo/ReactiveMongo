@@ -15,7 +15,8 @@ import com.github.luben.zstd.{ Zstd => Z }
  */
 private[reactivemongo] final class Zstd(
   blockSize: Int,
-  compressionLevel: Int) {
+  compressionLevel: Int,
+  allocDirect: Int => ByteBuf) {
 
   def decode(in: ByteBuf, out: ByteBuf): Try[Int] = Try {
     val inNioBuffer: ByteBuffer = in.nioBuffer()
@@ -32,7 +33,7 @@ private[reactivemongo] final class Zstd(
   }
 
   def encode(in: ByteBuf, out: ByteBuf): Try[Unit] =
-    compress(in, out, buffer = Zstd.buffer(blockSize))
+    compress(in, out, buffer = allocDirect(blockSize))
 
   def compress(in: ByteBuf, out: ByteBuf, buffer: ByteBuf): Try[Unit] = {
     @annotation.tailrec def go(): Unit = {
@@ -58,6 +59,10 @@ private[reactivemongo] final class Zstd(
       if (buffer != null && buffer.isReadable()) {
         flushBufferedData(buffer, out)
       }
+
+      buffer.release()
+
+      ()
     }
   }
 
@@ -100,8 +105,11 @@ private[reactivemongo] object Zstd {
 
   def apply(
     blockSize: Int = DefaultBlockSize,
-    compressionLevel: Int = DefaultCompressionLevel): Zstd =
-    new Zstd(blockSize, compressionLevel)
+    compressionLevel: Int = DefaultCompressionLevel,
+    allocDirect: Int => ByteBuf = buffer(_)): Zstd = new Zstd(
+    blockSize = blockSize,
+    compressionLevel = compressionLevel,
+    allocDirect = allocDirect)
 
   @inline def buffer(blockSize: Int): ByteBuf =
     PooledByteBufAllocator.DEFAULT.directBuffer(blockSize)

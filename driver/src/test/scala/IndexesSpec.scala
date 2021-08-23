@@ -213,7 +213,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
 
     "have fixtures" in {
       Future.sequence(fixturesInsert).
-        map(_ => {}) must beEqualTo({}).await(0, timeout)
+        map(_ => {}) must beTypedEqualTo({}).await(1, timeout)
 
     }
 

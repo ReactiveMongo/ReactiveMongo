@@ -1,14 +1,10 @@
 package reactivemongo.core.protocol
 
-import scala.util.{ Failure, Success, Try }
-
-import scala.collection.immutable.ListSet
-
 import reactivemongo.io.netty.channel.ChannelId
 
 import reactivemongo.core.netty.BufferSequence
 
-import reactivemongo.api.{ Compressor, ReadPreference }
+import reactivemongo.api.ReadPreference
 import reactivemongo.api.commands.CommandKind
 
 /**
@@ -17,7 +13,7 @@ import reactivemongo.api.commands.CommandKind
  * @param kind the kind of command to be requested
  * @param op the write operation
  * @param documents body of this request
- * @param channelIdHint a hint for sending this request on a particular channel.
+ * @param channelIdHint a hint for sending this request on a particular channel
  */
 private[reactivemongo] final class RequestMaker(
   kind: CommandKind,
@@ -25,42 +21,26 @@ private[reactivemongo] final class RequestMaker(
   val documents: BufferSequence,
   val readPreference: ReadPreference,
   val channelIdHint: Option[ChannelId],
-  compressors: ListSet[Compressor]) {
+  parentSTE: Seq[StackTraceElement]) {
 
-  @inline def apply(requestID: Int): Request = make(requestID)
+  private val callerSTE: Seq[StackTraceElement] = {
+    val current = Seq.newBuilder[StackTraceElement]
 
-  private val make: Int => Request = compressors.headOption match {
-    case Some(first) if (CommandKind canCompress kind) =>
-      { id: Int =>
-        compress(prepare(id), first, compressors.tail) match {
-          case Success(compressed) => compressed
-          case Failure(cause)      => throw cause
-        }
-      }
+    current ++= reactivemongo.util.Trace.
+      currentTraceElements.drop(3).dropRight(6)
 
-    case _ =>
-      prepare(_: Int)
+    if (parentSTE.nonEmpty) {
+      current += new StackTraceElement("---", "---", "---", -1)
+      current ++= parentSTE
+    }
+
+    current.result()
   }
 
-  private def prepare(requestID: Int): Request = Request(
-    requestID, 0, op, documents, readPreference, channelIdHint)
+  @inline def apply(requestID: Int): Request =
+    Request(kind, requestID, 0, op, documents, readPreference,
+      channelIdHint, callerSTE)
 
-  @annotation.tailrec private def compress(
-    request: Request,
-    next: Compressor,
-    alternatives: ListSet[Compressor]): Try[Request] =
-    Request.compress(request, next) match {
-      case compressed @ Success(_) =>
-        compressed
-
-      case failed @ Failure(_) => alternatives.headOption match {
-        case Some(c) =>
-          compress(request, c, alternatives.tail)
-
-        case _ =>
-          failed
-      }
-    }
 }
 
 private[reactivemongo] object RequestMaker {
@@ -70,9 +50,8 @@ private[reactivemongo] object RequestMaker {
     documents: BufferSequence = BufferSequence.empty,
     readPreference: ReadPreference = ReadPreference.primary,
     channelIdHint: Option[ChannelId] = None,
-    compressors: ListSet[Compressor] = ListSet.empty): RequestMaker =
-    new RequestMaker(
-      kind, op, documents, readPreference, channelIdHint, compressors)
+    callerSTE: Seq[StackTraceElement] = Seq.empty): RequestMaker = new RequestMaker(
+    kind, op, documents, readPreference, channelIdHint, callerSTE)
 
   def unapply(maker: RequestMaker): Option[(RequestOp, BufferSequence, ReadPreference, Option[ChannelId])] = Some((maker.op, maker.documents, maker.readPreference, maker.channelIdHint))
 

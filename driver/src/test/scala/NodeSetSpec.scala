@@ -12,7 +12,6 @@ import org.specs2.concurrent.ExecutionEnv
 
 import reactivemongo.api.{
   AsyncDriver,
-  Compressor,
   MongoConnection,
   MongoConnectionOptions,
   ReadPreference
@@ -69,8 +68,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
 
       "if the primary is not available if default preference" in {
         withCon() { (name, con, mon) =>
-          mon ! new SetAvailable(
-            ProtocolMetadata.Default, None, false, ListSet.empty)
+          mon ! new SetAvailable(ProtocolMetadata.Default, None, false)
 
           waitIsAvailable(con, failoverStrategy).map(_ => true).recover {
             case reason: PrimaryUnavailableException if (
@@ -81,25 +79,21 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
     }
 
     "be available" >> {
-      "with the primary if default preference (and compression)" in {
+      "with the primary if default preference" in {
         withCon() { (_, con, mon) =>
-          val serverCompression = ListSet(Compressor.Snappy, Compressor.Zstd)
-
           def test = (for {
-            c <- {
-              mon ! new SetAvailable(
-                ProtocolMetadata.Default, None, false, serverCompression)
+            _ <- {
+              mon ! new SetAvailable(ProtocolMetadata.Default, None, false)
 
-              mon ! new PrimaryAvailable(
-                ProtocolMetadata.Default, None, false, serverCompression)
+              mon ! new PrimaryAvailable(ProtocolMetadata.Default, None, false)
 
               waitIsAvailable(con, failoverStrategy)
             }
 
             after <- isAvailable(con, timeout)
-          } yield after -> c.compressors)
+          } yield after)
 
-          test must beTypedEqualTo(true -> serverCompression).await(1, timeout)
+          test must beTrue.await(1, timeout)
         }
       }
 
@@ -114,7 +108,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
                 def test = (for {
                   _ <- {
                     mon ! new SetAvailable(
-                      ProtocolMetadata.Default, None, false, ListSet.empty)
+                      ProtocolMetadata.Default, None, false)
 
                     waitIsAvailable(con, failoverStrategy)
                   }
@@ -131,11 +125,9 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
     "be unavailable" >> {
       "with the primary unavailable if default preference" in {
         withCon() { (_, con, mon) =>
-          mon ! new SetAvailable(
-            ProtocolMetadata.Default, None, false, ListSet.empty)
+          mon ! new SetAvailable(ProtocolMetadata.Default, None, false)
 
-          mon ! new PrimaryAvailable(
-            ProtocolMetadata.Default, None, false, ListSet.empty)
+          mon ! new PrimaryAvailable(ProtocolMetadata.Default, None, false)
 
           def test = (for {
             _ <- waitIsAvailable(con, failoverStrategy)
@@ -156,8 +148,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
           readPreference = ReadPreference.primaryPreferred)
 
         withCon(opts) { (_, con, mon) =>
-          mon ! new SetAvailable(
-            ProtocolMetadata.Default, None, false, ListSet.empty)
+          mon ! new SetAvailable(ProtocolMetadata.Default, None, false)
 
           def test = (for {
             _ <- waitIsAvailable(con, failoverStrategy)

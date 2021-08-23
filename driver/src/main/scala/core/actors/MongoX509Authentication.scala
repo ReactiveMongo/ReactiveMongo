@@ -29,10 +29,11 @@ private[reactivemongo] trait MongoX509Authentication { system: MongoDBSystem =>
     val maker = Command.buildRequestMaker(pack)(
       CommandKind.Authenticate,
       X509Authenticate(Option(nextAuth.user)),
-      writer, ReadPreference.primary, db = f"$$external",
-      compressors = ListSet.empty /* cannot compress */ )
+      writer, ReadPreference.primary, db = f"$$external")
 
-    connection.send(maker(RequestIdGenerator.authenticate.next))
+    connection.send(
+      maker(RequestIdGenerator.authenticate.next),
+      compression = ListSet.empty)
 
     connection.copy(authenticating = Some(
       X509Authenticating(nextAuth.db, nextAuth.user)))

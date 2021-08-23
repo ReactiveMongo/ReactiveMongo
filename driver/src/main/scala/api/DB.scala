@@ -17,8 +17,6 @@ package reactivemongo.api
 
 import scala.util.{ Failure, Success }
 
-import scala.collection.immutable.ListSet
-
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.core.protocol.MongoWireVersion
@@ -528,10 +526,6 @@ final class DB private[api] (
 
   @inline private[api] def defaultWriteConcern: WriteConcern =
     options.writeConcern
-
-  /* Negociated compression */
-  private[api] lazy val availableCompressors: ListSet[Compressor] =
-    options.compressors intersect connectionState.compressors
 
   override def toString = s"DB($name)"
 }

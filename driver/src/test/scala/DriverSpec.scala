@@ -210,26 +210,26 @@ final class DriverSpec(implicit ee: ExecutionEnv)
       }
 
       "be successful on existing connection with right credentials" >> {
-        "with the default connection" in {
+        "with the default connection" in eventually(2, timeout) {
+          val tmout = timeout * 2L
+
           connection.flatMap(
             _.authenticate(
               dbName, userName, s"password-$id", failoverStrategy)).
             aka("auth request") must beAnInstanceOf[SuccessfulAuthentication].
-            await(1, timeout) and {
+            await(1, tmout) and {
               db_.flatMap {
                 _("testcol").insert.one(BSONDocument("foo" -> "bar"))
-              }.map(_ => {}) must beTypedEqualTo({}).await(1, timeout * 2L)
+              }.map(_ => {}) must beTypedEqualTo({}).await(1, tmout)
             }
         }
 
-        "with the slow connection" in {
-          eventually(2, timeout) {
-            slowConnection.flatMap(
-              _.authenticate(
-                dbName,
-                userName, s"password-$id", slowFailover)) must beAnInstanceOf[SuccessfulAuthentication].
-              awaitFor(slowTimeout + timeout)
-          }
+        "with the slow connection" in eventually(2, timeout) {
+          slowConnection.flatMap(
+            _.authenticate(
+              dbName,
+              userName, s"password-$id", slowFailover)) must beAnInstanceOf[SuccessfulAuthentication].
+            awaitFor(slowTimeout + timeout)
         }
       }
 
@@ -238,7 +238,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
           dbName -> MongoConnectionOptions.Credential(
             userName, Some(s"password-$id")))
 
-        "with the default connection" in {
+        "with the default connection" in eventually(2, timeout) {
           val con = Await.result(
             drv.connect(
               List(primaryHost),
@@ -251,7 +251,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
                 BSONDocument("foo" -> "bar")).map(_ => {}).
                 aka("insertion") must beTypedEqualTo({}).awaitFor(timeout)
 
-            }.await(1, timeout) and {
+            }.awaitFor(timeout) and {
               con.close()(timeout).
                 aka("close") must not(throwA[Exception]).awaitFor(timeout)
             }

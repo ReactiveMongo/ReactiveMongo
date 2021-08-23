@@ -28,29 +28,15 @@ final class Driver(core: Project) {
           }
         },
         Compile / sourceGenerators += Def.task {
-          val ver = version.value
           val dir = (Compile / sourceManaged).value
-          val outdir = dir / "reactivemongo" / "api"
-          val f = outdir / "Version.scala"
-          val major = Common.majorVersion.value
 
-          outdir.mkdirs()
-
-          Seq(IO.writer[File](f, "", IO.defaultCharset, false) { w =>
-            w.append(s"""package reactivemongo.api
-object Version {
-  /** The ReactiveMongo API version */
-  override val toString = "$ver"
-
-  /** The major version (e.g. 0.12 for the release 0.12.0) */
-  val majorVersion = "${major}"
-
-  /** The Scala major version (e.g. 2.12) */
-  val scalaBinaryVersion = "${scalaBinaryVersion.value}"
-}""")
-
-            f
-          })
+          Seq(
+            generateVersion(
+              scalaBinVer = scalaBinaryVersion.value,
+              ver = version.value,
+              major = Common.majorVersion.value,
+              dir = dir),
+            generateTrace(dir))
         }.taskValue,
         driverCleanup := {
           val classDir = (Compile / classDirectory).value
@@ -132,6 +118,59 @@ object Version {
     }.dependsOn(core)
 
   // ---
+
+  private def generateVersion(
+    scalaBinVer: String,
+    ver: String,
+    major: String,
+    dir: File
+  ): File = {
+    val outdir = dir / "reactivemongo" / "api"
+    val f = outdir / "Version.scala"
+
+    outdir.mkdirs()
+
+    IO.writer[File](f, "", IO.defaultCharset, false) { w =>
+      w.append(s"""package reactivemongo.api
+object Version {
+  /** The ReactiveMongo API version */
+  override val toString = "$ver"
+
+  /** The major version (e.g. 0.12 for the release 0.12.0) */
+  val majorVersion = "${major}"
+
+  /** The Scala major version (e.g. 2.12) */
+  val scalaBinaryVersion = "${scalaBinVer}"
+}""")
+
+      f
+    }
+  }
+
+  private def generateTrace(dir: File): File = {
+    val outdir = dir / "reactivemongo" / "util"
+    val f = outdir / "Trace.scala"
+
+    val collect: String =
+      sys.props.get("reactivemongo.collectThreadTrace") match {
+        case Some("true") =>
+          "def currentTraceElements = Thread.currentThread.getStackTrace.toSeq"
+
+        case _ =>
+          "val currentTraceElements = Seq.empty[StackTraceElement]"
+      }
+
+    outdir.mkdirs()
+
+    IO.writer[File](f, "", IO.defaultCharset, false) { w =>
+      w.append(s"""package reactivemongo.util
+private[reactivemongo] object Trace {
+  $collect
+}""")
+
+      f
+    }
+  }
 
   private def shadedNative(arch: String) = Def.setting[ModuleID] {
     if (Common.useShaded.value) {

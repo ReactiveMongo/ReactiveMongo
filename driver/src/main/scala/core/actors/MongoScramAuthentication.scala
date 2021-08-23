@@ -118,10 +118,10 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
     val start = initiate(nextAuth.user)
     val maker = Command.buildRequestMaker(pack)(
       CommandKind.Authenticate,
-      start, initiateWriter, ReadPreference.primary, nextAuth.db,
-      compressors = ListSet.empty /* authenticate cannot be compressed */ )
+      start, initiateWriter, ReadPreference.primary, nextAuth.db)
 
-    connection.send(maker(RequestIdGenerator.getNonce.next))
+    connection.send(
+      maker(RequestIdGenerator.getNonce.next), compression = ListSet.empty)
 
     nextAuth.password match {
       case Some(password) => connection.copy(authenticating = Some(
@@ -186,10 +186,11 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
                       ns.updateConnectionByChannelId(chanId) { con =>
                         val maker = Command.buildRequestMaker(pack)(
                           CommandKind.GetNonce, negociation, negociationWriter,
-                          ReadPreference.primary, db,
-                          compressors = ListSet.empty /* cannot compress */ )
+                          ReadPreference.primary, db)
 
-                        con.send(maker(RequestIdGenerator.authenticate.next)).
+                        con.send(
+                          maker(RequestIdGenerator.authenticate.next),
+                          compression = ListSet.empty).
                           addListener(new OperationHandler(
                             { cause =>
                               error(s"Fails to send request after ${mechanism} nonce #${chanId}", cause)
@@ -264,10 +265,11 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
                     val maker = Command.buildRequestMaker(pack)(
                       CommandKind.Authenticate,
                       ScramFinalNegociation(cid, payload), finalWriter,
-                      ReadPreference.primary, db,
-                      compressors = ListSet.empty /* cannot compress */ )
+                      ReadPreference.primary, db)
 
-                    con.send(maker(RequestIdGenerator.authenticate.next)).
+                    con.send(
+                      maker(RequestIdGenerator.authenticate.next),
+                      compression = ListSet.empty).
                       addListener(new OperationHandler(
                         { e =>
                           error(s"Fails to negociate $mechanism #${chanId}", e)

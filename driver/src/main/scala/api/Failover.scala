@@ -49,7 +49,7 @@ private[reactivemongo] final class Failover[A](
 
           after(delay, connection.actorSystem.scheduler)(send(`try`))
         } else {
-          // generally that means that the primary is not available
+          // Generally that means that the primary is not available
           // or the nodeset is unreachable
           logger.error(s"[$lnm] Got an error, no more attempts to do. Completing with a failure... ", e)
 

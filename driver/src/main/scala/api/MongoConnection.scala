@@ -51,8 +51,7 @@ import reactivemongo.util, util.{ LazyLogger, SRVRecordResolver, TXTResolver }
 private[api] case class ConnectionState(
   metadata: ProtocolMetadata,
   setName: Option[String],
-  isMongos: Boolean,
-  compressors: ListSet[Compressor])
+  isMongos: Boolean)
 
 /**
  * A pool of MongoDB connections, obtained from a [[reactivemongo.api.AsyncDriver]].
@@ -304,8 +303,7 @@ final class MongoConnection private[reactivemongo] (
         _metadata = Some(available.metadata)
 
         val state = ConnectionState(
-          available.metadata, available.setName, available.isMongos,
-          available.compression)
+          available.metadata, available.setName, available.isMongos)
 
         if (!primaryAvailable.trySuccess(state)) {
           primaryAvailable = Promise.successful(state)
@@ -330,8 +328,7 @@ final class MongoConnection private[reactivemongo] (
         _metadata = Some(available.metadata)
 
         val state = ConnectionState(
-          available.metadata, available.setName, available.isMongos,
-          available.compression)
+          available.metadata, available.setName, available.isMongos)
 
         if (!setAvailable.trySuccess(state)) {
           setAvailable = Promise.successful(state)
