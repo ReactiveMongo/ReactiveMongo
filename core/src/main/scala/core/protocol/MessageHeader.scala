@@ -2,7 +2,11 @@ package reactivemongo.core.protocol
 
 import reactivemongo.io.netty.buffer.ByteBuf
 
-import reactivemongo.core.protocol.BufferAccessors.writeTupleToBuffer4
+import reactivemongo.core.protocol.buffer.{
+  ChannelBufferReadable,
+  ChannelBufferWritable,
+  writeTupleToBuffer4
+}
 
 /**
  * Header of a Mongo Wire Protocol message.
@@ -25,6 +29,13 @@ private[reactivemongo] class MessageHeader(
 
   private[core] lazy val tupled =
     Tuple4(messageLength, requestID, responseTo, opCode)
+
+  private[core] def copy(
+    messageLength: Int = this.messageLength,
+    requestID: Int = this.requestID,
+    responseTo: Int = this.responseTo,
+    opCode: Int = this.opCode): MessageHeader = new MessageHeader(
+    messageLength, requestID, responseTo, opCode)
 
   override def equals(that: Any): Boolean = that match {
     case other: MessageHeader =>
@@ -53,5 +64,5 @@ private[reactivemongo] object MessageHeader
     new MessageHeader(messageLength, requestID, responseTo, opCode)
   }
 
-  private[core] val size = 4 * 4 // 4 * int32
+  private[core] val size = 16 // 4 * int32
 }

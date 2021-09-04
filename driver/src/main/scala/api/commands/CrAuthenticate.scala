@@ -10,6 +10,8 @@ import reactivemongo.api.SerializationPack
 private[reactivemongo] object GetCrNonce
   extends Command with CommandWithResult[CrNonce] {
 
+  val commandKind = CommandKind.GetNonce
+
   def writer[P <: SerializationPack](pack: P): pack.Writer[GetCrNonce.type] = {
     val builder = pack.newBuilder
     val cmd = builder.document(Seq(
@@ -41,6 +43,8 @@ private[reactivemongo] case class CrAuthenticate(
   password: String,
   nonce: String) extends Command with CommandWithResult[AuthenticationResult] {
   import reactivemongo.util._
+
+  val commandKind = CommandKind.Authenticate
 
   /** the computed digest of the password */
   lazy val pwdDigest = md5Hex(s"$user:mongo:$password", "UTF-8")

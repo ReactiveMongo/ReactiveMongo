@@ -1,11 +1,14 @@
 package tests
 
+import scala.collection.immutable.ListSet
+
 import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
 
 import reactivemongo.api.{
   AsyncDriver,
   DB,
+  Compressor,
   FailoverStrategy,
   MongoConnection,
   MongoConnectionOptions,
@@ -55,6 +58,18 @@ object Common extends CommonAuth {
     }
   }
 
+  val compressor: Option[Compressor] =
+    sys.env.get("COMPRESSOR").collect {
+      case "snappy" =>
+        Compressor.Snappy
+
+      case "zstd" =>
+        Compressor.Zstd
+
+      case "zlib" =>
+        Compressor.Zlib.DefaultCompressor
+    }
+
   val DefaultOptions = {
     val a = MongoConnectionOptions.default.copy(
       failoverStrategy = failoverStrategy,
@@ -66,7 +81,7 @@ object Common extends CommonAuth {
           storeType = "PKCS12",
           password = sys.props.get("test.keyStorePassword").map(_.toCharArray),
           trust = true)
-      })
+      }).withCompressors(ListSet.empty[Compressor] ++ compressor.toSeq)
 
     val b = {
       if (sys.props.get("test.enableSSL") contains "true") {

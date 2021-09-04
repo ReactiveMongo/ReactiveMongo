@@ -7,6 +7,7 @@ set -e
 # JVM/SBT setup
 SBT_OPTS="-Dtest.primaryHost=$PRIMARY_HOST -Dtest.slowPrimaryHost=$PRIMARY_SLOW_PROXY"
 SBT_OPTS="$SBT_OPTS -Dtest.slowProxyDelay=300 -Dtest.slowFailoverRetries=12"
+SBT_OPTS="$SBT_OPTS -Dreactivemongo.collectThreadTrace=true"
 
 TEST_OPTS=""
 

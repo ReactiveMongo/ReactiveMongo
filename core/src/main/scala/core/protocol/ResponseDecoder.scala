@@ -6,8 +6,9 @@ import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
 
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
-import reactivemongo.io.netty.channel.ChannelHandlerContext
+import reactivemongo.io.netty.channel.{ ChannelHandlerContext, ChannelId }
 
+import reactivemongo.api.Compressor
 import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.bson.collection.BSONSerializationPack
 
@@ -20,6 +21,19 @@ private[reactivemongo] class ResponseDecoder
     context: ChannelHandlerContext,
     frame: ByteBuf, // see ResponseFrameDecoder
     out: JList[Object]): Unit = {
+
+    out.add(decodeResponse(
+      context = context,
+      channelId = Option(context).map(_.channel.id),
+      frame = frame))
+
+    ()
+  }
+
+  private[reactivemongo] def decodeResponse(
+    context: ChannelHandlerContext,
+    channelId: Option[ChannelId],
+    frame: ByteBuf): Response = {
 
     val readableBytes = frame.readableBytes
 
@@ -48,7 +62,7 @@ private[reactivemongo] class ResponseDecoder
       throw new IllegalStateException(
         s"Invalid message length: ${header.messageLength} < ${readableBytes}")
 
-    } else if (header.opCode != Reply.code) {
+    } else if (header.opCode != Reply.code && header.opCode != CompressedOp.code) {
       frame.discardReadBytes()
 
       throw new IllegalStateException(
@@ -56,10 +70,67 @@ private[reactivemongo] class ResponseDecoder
 
     }
 
-    // ---
+    if (header.opCode == CompressedOp.code) {
+      decompress(channelId, frame, header, context.alloc.directBuffer(_: Int))
+    } else {
+      decodeReply(channelId, frame, header)
+    }
+  }
+
+  private[reactivemongo] def decompress(
+    channelId: Option[ChannelId],
+    frame: ByteBuf,
+    header: MessageHeader,
+    allocDirect: Int => ByteBuf): Response = {
+    val originalOpCode = frame.readIntLE
+    val uncompressedSize = frame.readIntLE
+    val compressorId = frame.readUnsignedByte
+
+    val uncompress: Function2[ByteBuf, ByteBuf, Try[Int]] = compressorId match {
+      case Compressor.Zlib.id =>
+        buffer.Zlib.DefaultCompressor.decode(_: ByteBuf, _: ByteBuf)
+
+      case Compressor.Zstd.id =>
+        buffer.Zstd(allocDirect = allocDirect).decode(_: ByteBuf, _: ByteBuf)
+
+      case Compressor.Snappy.id =>
+        buffer.Snappy.DefaultCompressor.decode(_: ByteBuf, _: ByteBuf)
+
+      case id =>
+        throw new IllegalStateException(
+          s"Unexpected compressor ID: ${id}")
+    }
+
+    val newHeader = header.copy(
+      messageLength = uncompressedSize,
+      opCode = originalOpCode)
+
+    val buf = allocDirect(uncompressedSize)
+
+    try {
+      uncompress(frame, buf) match {
+        case Failure(cause) =>
+          throw cause
+
+        case _ =>
+      }
+
+      frame.discardReadBytes()
+
+      decodeReply(channelId, buf, newHeader)
+    } finally {
+      buf.release()
+      ()
+    }
+  }
+
+  private def decodeReply(
+    channelId: Option[ChannelId],
+    frame: ByteBuf,
+    header: MessageHeader): Response = {
 
     val reply = Reply(frame)
-    val chanId = Option(context).map(_.channel.id).orNull
+    val chanId = channelId.orNull
     def info = new ResponseInfo(chanId)
 
     def response = if (reply.cursorID == 0 && reply.numberReturned > 0) {
@@ -69,10 +140,8 @@ private[reactivemongo] class ResponseDecoder
       docs.writeBytes(frame)
 
       ResponseDecoder.first(docs) match {
-        case Failure(cause) => {
-          //cause.printStackTrace()
+        case Failure(cause) =>
           Response.CommandError(header, reply, info, DatabaseException(cause))
-        }
 
         case Success(doc) => {
           val ok = doc.booleanLike("ok") getOrElse false
@@ -133,9 +202,7 @@ private[reactivemongo] class ResponseDecoder
       Response(header, reply, Unpooled.EMPTY_BUFFER, info)
     }
 
-    out.add(response)
-
-    ()
+    response
   }
 }
 

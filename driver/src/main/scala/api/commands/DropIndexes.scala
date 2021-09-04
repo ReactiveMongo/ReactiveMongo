@@ -5,6 +5,8 @@ import reactivemongo.api.SerializationPack
 private[reactivemongo] final class DropIndexes(
   val index: String) extends CollectionCommand with CommandWithResult[DropIndexesResult] {
 
+  val commandKind = CommandKind.DropIndexes
+
   override def equals(that: Any): Boolean = that match {
     case other: DropIndexes =>
       index == other.index

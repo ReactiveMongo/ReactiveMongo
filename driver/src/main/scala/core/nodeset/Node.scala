@@ -92,7 +92,8 @@ private[reactivemongo] final class Node(
     if (count > 0) {
       createConnection(channelFactory, receiver, false) match {
         case Success(con) =>
-          createChannels(channelFactory, receiver, count - 1, con +: created)
+          createChannels(
+            channelFactory, receiver, count - 1, con +: created)
 
         case Failure(cause) => Failure(cause)
       }

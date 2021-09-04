@@ -23,6 +23,8 @@ private[reactivemongo] trait InsertCommand[P <: SerializationPack] { self: PackS
     val writeConcern: WriteConcern,
     val bypassDocumentValidation: Boolean) extends CollectionCommand with CommandWithResult[InsertResult] {
 
+    val commandKind = CommandKind.Insert
+
     private[commands] lazy val tupled =
       Tuple5(head, tail, ordered, writeConcern, bypassDocumentValidation)
 

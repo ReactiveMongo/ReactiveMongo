@@ -80,7 +80,10 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
       val req = isMasterRequest()
       val reqBytes: Array[Byte] = {
         val buf = Unpooled.buffer(req.size, req.size)
+
         req.writeTo(buf)
+        req.payload.resetReaderIndex() // so req can be written again there
+
         getBytes(buf, req.size)
       }
       val sentRequest = Promise[Array[Byte]]()

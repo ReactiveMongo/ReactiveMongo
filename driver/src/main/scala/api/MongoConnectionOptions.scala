@@ -2,7 +2,7 @@ package reactivemongo.api
 
 import java.net.URI
 
-import reactivemongo.core.Compressor
+import scala.collection.immutable.ListSet
 
 // TODO: Make sure documentation of param properties is visible
 /**
@@ -41,7 +41,7 @@ final class MongoConnectionOptions private[reactivemongo] (
   _readConcern: ReadConcern,
 
   _appName: Option[String],
-  _compressors: Seq[Compressor]) {
+  _compressors: ListSet[Compressor]) {
 
   /**
    * The number of milliseconds to wait for a connection
@@ -71,7 +71,7 @@ final class MongoConnectionOptions private[reactivemongo] (
   @inline def appName: Option[String] = _appName
 
   /** The list of allowed [[https://docs.mongodb.com/manual/reference/connection-string/#mongodb-urioption-urioption.compressors compressors]] (e.g. `snappy`) */
-  @inline def compressors: Seq[Compressor] = _compressors
+  @inline def compressors: ListSet[Compressor] = _compressors
 
   // --- Reactivemongo specific options
 
@@ -163,10 +163,36 @@ final class MongoConnectionOptions private[reactivemongo] (
       _appName = this.appName,
       _compressors = this.compressors)
 
+  /** '''EXPERIMENTAL:''' */
+  def withCompressors(compressors: ListSet[Compressor]) =
+    new MongoConnectionOptions(
+      _connectTimeoutMS = this.connectTimeoutMS,
+      _authenticationDatabase = this.authenticationDatabase,
+      _sslEnabled = this.sslEnabled,
+      _sslAllowsInvalidCert = this.sslAllowsInvalidCert,
+      _authenticationMechanism = this.authenticationMechanism,
+      _tcpNoDelay = this.tcpNoDelay,
+      _keepAlive = this.keepAlive,
+      _nbChannelsPerNode = this.nbChannelsPerNode,
+      _maxInFlightRequestsPerChannel = this.maxInFlightRequestsPerChannel,
+      _minIdleChannelsPerNode = this.minIdleChannelsPerNode,
+      _writeConcern = this.writeConcern,
+      _readPreference = this.readPreference,
+      _failoverStrategy = this.failoverStrategy,
+      _heartbeatFrequencyMS = this.heartbeatFrequencyMS,
+      _maxIdleTimeMS = this.maxIdleTimeMS,
+      _maxNonQueryableHeartbeats = this._maxNonQueryableHeartbeats, // TODO
+      _maxHistorySize = this.maxHistorySize,
+      _credentials = this.credentials,
+      _keyStore = this.keyStore,
+      _readConcern = this.readConcern,
+      _appName = this.appName,
+      _compressors = compressors)
+
   // ---
 
   @SuppressWarnings(Array("MaxParameters"))
-  def copy( // TODO: Add _maxNonQueryableHeartbeats
+  def copy( // TODO: Add _maxNonQueryableHeartbeats, _compressors
     connectTimeoutMS: Int = _connectTimeoutMS,
     authenticationDatabase: Option[String] = _authenticationDatabase,
     sslEnabled: Boolean = _sslEnabled,
@@ -302,7 +328,7 @@ object MongoConnectionOptions {
       _keyStore = keyStore,
       _readConcern = readConcern,
       _appName = appName,
-      _compressors = Seq.empty /* TODO */ )
+      _compressors = ListSet.empty /* TODO */ )
 
   // ---
 
@@ -435,6 +461,7 @@ object MongoConnectionOptions {
       "sslAllowsInvalidCert" -> options.sslAllowsInvalidCert.toString,
       "writeConcern" -> options.writeConcern.toString,
       "readPreference" -> options.readPreference.toString,
-      "readConcern" -> options.readConcern.level)
+      "readConcern" -> options.readConcern.level,
+      "compressors" -> options.compressors.mkString("[", ", ", "]"))
 
 }

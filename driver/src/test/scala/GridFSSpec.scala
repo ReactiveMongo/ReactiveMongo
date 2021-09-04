@@ -153,7 +153,7 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
 
         cursor.foo must_=== "Bar" and {
           cursor.headOption must beSome[GFile].
-            which(matchFile(_, file1, content1)).await(1, timeout)
+            which(matchFile(_, file1, content1)).await(1, timeout / 3L * 2L)
         }
       } and {
         find(filename2) aka "file #2" must beSome[GFile].which { actual =>

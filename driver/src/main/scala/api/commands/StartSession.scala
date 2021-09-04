@@ -8,6 +8,8 @@ import reactivemongo.api.SerializationPack
 private[reactivemongo] object StartSession
   extends Command with CommandWithResult[StartSessionResult] {
 
+  val commandKind = CommandKind.StartSession
+
   def commandWriter[P <: SerializationPack](pack: P): pack.Writer[StartSession.type] = {
     val builder = pack.newBuilder
 

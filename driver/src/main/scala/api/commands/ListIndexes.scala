@@ -14,6 +14,8 @@ import reactivemongo.api.indexes.Index
 private[reactivemongo] class ListIndexes(val db: String)
   extends CollectionCommand with CommandWithResult[List[Index]] {
 
+  val commandKind = CommandKind.ListIndexes
+
   override def equals(that: Any): Boolean = that match {
     case other: ListIndexes =>
       this.db == other.db
@@ -61,6 +63,8 @@ private[reactivemongo] object ListIndexes {
 
   private[api] final class Command[P <: SerializationPack](val db: String)
     extends CollectionCommand with CommandWithResult[List[Index.Aux[P]]] {
+
+    val commandKind = CommandKind.ListIndexes
 
     override def equals(that: Any): Boolean = that match {
       case other: Command[P] =>

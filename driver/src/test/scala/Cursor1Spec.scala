@@ -176,7 +176,7 @@ trait Cursor1Spec { spec: CursorSpec =>
 
       val cn = s"${db.name}.${coll.name}"
 
-      cursor.headOption must beSome(0).await(1, timeout) and {
+      cursor.headOption must beSome(0).await(2, timeout) and {
         cursor.peek[List](100) must beLike[Cursor.Result[List[Int]]] {
           case Cursor.Result(0 :: 1 :: Nil, ref1) => // batchSize(2) ~> 0,1
             ref1.collectionName must_=== cn and {
@@ -206,7 +206,7 @@ trait Cursor1Spec { spec: CursorSpec =>
                 }.await(1, timeout)
               }
             }
-        }.await(1, timeout)
+        }.await(2, timeout)
       }
     }
 

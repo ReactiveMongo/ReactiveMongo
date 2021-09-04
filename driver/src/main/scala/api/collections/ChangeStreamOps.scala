@@ -61,8 +61,11 @@ trait ChangeStreamOps[P <: SerializationPack] { collection: GenericCollection[P]
     protected val context: AggregatorContext[T]
 
     /**
-     * Creates a cursor for the changeStream of this collection, as configured by the builder. The resulting cursor
-     * implicitly has a `tailable` and `awaitData` behavior and requires some special handling:
+     * Creates a cursor for the changeStream of this collection,
+     * as configured by the builder.
+     *
+     * The resulting cursor implicitly has a `tailable` and `awaitData`
+     * behavior, and requires some special handling:
      *
      * 1. The cursor will never be exhausted, unless the change stream is invalidated (see
      * [[https://docs.mongodb.com/manual/reference/change-events/#invalidate-event]]).

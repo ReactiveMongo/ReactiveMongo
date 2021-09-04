@@ -3,6 +3,7 @@ import scala.collection.immutable.ListSet
 import scala.concurrent.Future
 
 import reactivemongo.api.{
+  Compressor,
   MongoConnection,
   MongoConnectionOptions,
   ReadConcern,
@@ -15,6 +16,8 @@ import reactivemongo.api.{
 import reactivemongo.core.errors.ReactiveMongoException
 
 import org.specs2.concurrent.ExecutionEnv
+
+import org.specs2.specification.core.Fragments
 
 import reactivemongo.api.tests.{ ParsedURI, parseURIWithDB }
 
@@ -565,8 +568,6 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
     }
 
     "support readConcern" >> {
-      import org.specs2.specification.core.Fragments
-
       Fragments.foreach(Seq(
         ReadConcern.Local, ReadConcern.Majority,
         ReadConcern.Linearizable, ReadConcern.Available)) { c =>
@@ -575,6 +576,59 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
           parseURI(s"mongodb://host1?readConcernLevel=${c.level}").
             map(_.options.readConcern) must beTypedEqualTo(c).awaitFor(timeout)
         }
+      }
+    }
+
+    "parse valid compressor" >> {
+      Fragments.foreach(Seq[(String, ListSet[Compressor])](
+        "snappy" -> ListSet(Compressor.Snappy),
+        "zstd" -> ListSet(Compressor.Zstd),
+        "zlib" -> ListSet(Compressor.Zlib.DefaultCompressor),
+        "snappy,zstd" -> ListSet(Compressor.Snappy, Compressor.Zstd),
+        "noop,zlib" -> ListSet(Compressor.Zlib.DefaultCompressor))) {
+        case (name, compressors) =>
+          name in {
+            parseURI(s"mongodb://host?compressors=${name}").
+              map(_.options.compressors) must beTypedEqualTo(compressors).
+              awaitFor(timeout)
+          }
+      }
+    }
+
+    "reject zlibCompressionLevel without zlib compressor" in {
+      parseURI("mongodb://host?compressors=snappy&zlibCompressionLevel=1").
+        map(_.options.compressors) must beTypedEqualTo(
+          ListSet[Compressor](Compressor.Snappy)).awaitFor(timeout)
+    }
+
+    "support zlibCompressionLevel" >> {
+      Fragments.foreach(-1 to 9) {
+        case level =>
+          s"at ${level}" in {
+            val uri: String =
+              s"mongodb://host?compressors=zlib&zlibCompressionLevel=${level}"
+
+            parseURI(uri).map(_.options.compressors) must beTypedEqualTo(
+              ListSet[Compressor](Compressor.Zlib(level))).awaitFor(timeout)
+          }
+      }
+    }
+
+    "reject invalid compressor" >> {
+      Fragments.foreach(Seq[(String, ListSet[Compressor])](
+        "foo" -> ListSet.empty[Compressor],
+        "snappy,bar" -> ListSet(Compressor.Snappy),
+        "lorem,zstd" -> ListSet(Compressor.Zstd))) {
+        case (setting, compressors) =>
+          setting in {
+            parseURI(s"mongodb://host?compressors=${setting}").
+              aka("parsed") must beLike[ParsedURI] {
+                case uri =>
+                  uri.ignoredOptions must_=== List("compressors") and {
+                    uri.options.compressors must_=== compressors
+                  }
+              }.awaitFor(timeout)
+          }
       }
     }
   }

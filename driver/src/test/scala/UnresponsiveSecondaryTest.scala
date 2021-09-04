@@ -256,7 +256,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
   private def nettyHandler(ref: TestActorRef[StandardDBSystem])(isMasterResp: Boolean => Option[BSONDocument]): (Channel, Object) => Unit = {
     case (chan, req: Request) => {
       val bson = BSONSerializationPack.readFromBuffer(
-        ReadableBuffer(req.documents.merged))
+        ReadableBuffer(req.payload))
 
       bson.int("ismaster") match {
         case Some(1) => {

@@ -1,10 +1,13 @@
 package reactivemongo.core.actors
 
+import scala.collection.immutable.ListSet
+
 import reactivemongo.api.ReadPreference
 
 import reactivemongo.api.commands.{
   AuthenticationResult,
   Command,
+  CommandKind,
   X509Authenticate
 }
 
@@ -24,10 +27,13 @@ private[reactivemongo] trait MongoX509Authentication { system: MongoDBSystem =>
     nextAuth: Authenticate): Connection = {
 
     val maker = Command.buildRequestMaker(pack)(
+      CommandKind.Authenticate,
       X509Authenticate(Option(nextAuth.user)),
       writer, ReadPreference.primary, db = f"$$external")
 
-    connection.send(maker(RequestIdGenerator.authenticate.next))
+    connection.send(
+      maker(RequestIdGenerator.authenticate.next),
+      compression = ListSet.empty)
 
     connection.copy(authenticating = Some(
       X509Authenticating(nextAuth.db, nextAuth.user)))

@@ -2,6 +2,8 @@ package reactivemongo.core.actors
 
 import scala.util.control.NonFatal
 
+import scala.collection.immutable.ListSet
+
 import reactivemongo.api.{
   AuthenticationMode,
   ReadPreference,
@@ -14,6 +16,7 @@ import reactivemongo.core.errors.CommandException
 
 import reactivemongo.api.commands.{
   Command,
+  CommandKind,
   FailedAuthentication,
   SuccessfulAuthentication,
   ScramFinalNegociation,
@@ -114,9 +117,11 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
   protected final def sendAuthenticate(connection: Connection, nextAuth: Authenticate): Connection = {
     val start = initiate(nextAuth.user)
     val maker = Command.buildRequestMaker(pack)(
+      CommandKind.Authenticate,
       start, initiateWriter, ReadPreference.primary, nextAuth.db)
 
-    connection.send(maker(RequestIdGenerator.getNonce.next))
+    connection.send(
+      maker(RequestIdGenerator.getNonce.next), compression = ListSet.empty)
 
     nextAuth.password match {
       case Some(password) => connection.copy(authenticating = Some(
@@ -180,10 +185,12 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
                     { sig =>
                       ns.updateConnectionByChannelId(chanId) { con =>
                         val maker = Command.buildRequestMaker(pack)(
-                          negociation, negociationWriter,
+                          CommandKind.GetNonce, negociation, negociationWriter,
                           ReadPreference.primary, db)
 
-                        con.send(maker(RequestIdGenerator.authenticate.next)).
+                        con.send(
+                          maker(RequestIdGenerator.authenticate.next),
+                          compression = ListSet.empty).
                           addListener(new OperationHandler(
                             { cause =>
                               error(s"Fails to send request after ${mechanism} nonce #${chanId}", cause)
@@ -256,10 +263,13 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
 
                   } else {
                     val maker = Command.buildRequestMaker(pack)(
+                      CommandKind.Authenticate,
                       ScramFinalNegociation(cid, payload), finalWriter,
                       ReadPreference.primary, db)
 
-                    con.send(maker(RequestIdGenerator.authenticate.next)).
+                    con.send(
+                      maker(RequestIdGenerator.authenticate.next),
+                      compression = ListSet.empty).
                       addListener(new OperationHandler(
                         { e =>
                           error(s"Fails to negociate $mechanism #${chanId}", e)

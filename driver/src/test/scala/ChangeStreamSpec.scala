@@ -44,7 +44,7 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
           results must beLike[(Option[BSONDocument], Option[BSONDocument])] {
             case (resultBefore, resultAfter) =>
               (resultBefore must beNone) and (resultAfter must beNone)
-          }.await(1, timeout)
+          }.await(2, 3L * timeout)
         }
       }
     }
@@ -81,7 +81,7 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
               haveField[BSONDocument](
                 "fullDocument") that beTypedEqualTo(testDocument)
             }
-          }.await(1, timeout))
+          }.await(2, timeout))
         }
       }
     }
@@ -128,7 +128,7 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
               haveField[BSONDocument](
                 "fullDocument") that beTypedEqualTo(testDocument2)
             }
-          }.await(1, timeout))
+          }.await(2, timeout))
         }
       }
     }

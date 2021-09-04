@@ -2,6 +2,8 @@ package reactivemongo
 
 import scala.concurrent.{ Await, Future }
 
+import scala.collection.immutable.ListSet
+
 import akka.actor.ActorRef
 import akka.testkit.TestActorRef
 
@@ -82,6 +84,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
           def test = (for {
             _ <- {
               mon ! new SetAvailable(ProtocolMetadata.Default, None, false)
+
               mon ! new PrimaryAvailable(ProtocolMetadata.Default, None, false)
 
               waitIsAvailable(con, failoverStrategy)
@@ -123,6 +126,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
       "with the primary unavailable if default preference" in {
         withCon() { (_, con, mon) =>
           mon ! new SetAvailable(ProtocolMetadata.Default, None, false)
+
           mon ! new PrimaryAvailable(ProtocolMetadata.Default, None, false)
 
           def test = (for {
@@ -135,7 +139,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
             }
           } yield before -> after)
 
-          test must beEqualTo(true -> false).await(1, timeout)
+          test must beTypedEqualTo(true -> false).await(1, timeout)
         }
       }
 
@@ -156,7 +160,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
             }
           } yield before -> after)
 
-          test must beEqualTo(true -> false).await(1, timeout)
+          test must beTypedEqualTo(true -> false).await(1, timeout)
         }
       }
     }
@@ -239,7 +243,8 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
 
       val ns = new NodeSet(Some("rs0"), None,
         nodes = Vector(primary, secondary1, secondary2),
-        authenticates = Set.empty)
+        authenticates = Set.empty,
+        compression = ListSet.empty)
 
       implicit def ordering = scala.math.Ordering.by[Node, String](_.name)
 

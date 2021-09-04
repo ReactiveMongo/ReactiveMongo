@@ -20,6 +20,7 @@ import reactivemongo.core.protocol.{
   Query,
   MessageHeader,
   Request,
+  RequestOp,
   Reply,
   Response,
   ResponseInfo,
@@ -41,6 +42,8 @@ import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.bson.collection.BSONSerializationPack
 
 import reactivemongo.api.collections.QueryCodecs
+
+import reactivemongo.api.commands.CommandKind
 
 package object tests { self =>
   type Pack = Serialization.Pack
@@ -255,7 +258,8 @@ package object tests { self =>
     import IsMasterCommand.{ IsMaster, writer => mw }
 
     val isMaster = Command.buildRequestMaker(BSONSerializationPack)(
-      new IsMaster(None, Seq.empty, None),
+      CommandKind.Hello,
+      new IsMaster(None, ListSet.empty, None),
       mw(BSONSerializationPack),
       reactivemongo.api.ReadPreference.primaryPreferred,
       "admin") // only "admin" DB for the admin command
@@ -377,6 +381,11 @@ package object tests { self =>
     numberToSkip: Int,
     numberToReturn: Int) = Query(flags, fullCollectionName, numberToSkip, numberToReturn)
 
+  def asQuery(op: RequestOp): Option[Query] = op match {
+    case q: Query => Some(q)
+    case _        => None
+  }
+
   def response(
     header: MessageHeader,
     reply: Reply,
@@ -389,6 +398,8 @@ package object tests { self =>
   def readMessageHeader(buffer: ByteBuf) = MessageHeader.readFrom(buffer)
 
   def readReply(buffer: ByteBuf) = Reply.readFrom(buffer)
+
+  def readFromBuffer(buffer: ByteBuf) = ResponseDecoder.first(buffer)
 
   object commands {
     implicit val replSetMaintenanceWriter =
@@ -406,4 +417,10 @@ package object tests { self =>
       reactivemongo.api.commands.ReplSetGetStatus.reader(pack)
 
   }
+
+  def compressRequest(req: Request, compressor: Compressor) =
+    Request.compress(req, compressor, Unpooled.directBuffer(_: Int))
+
+  def snappyDecompress(in: ByteBuf, out: ByteBuf) =
+    new reactivemongo.core.protocol.buffer.Snappy().decode(in, out)
 }
