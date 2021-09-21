@@ -33,18 +33,24 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
     override def toString = s"AtlasSearch(${operator.toString})"
   }
 
-  /** '''EXPERIMENTAL:''' One or at least one string */
+  /** '''EXPERIMENTAL:''' One or at least one string with optional alternate analyzer specified in multi field*/
   final class SearchString private[api] (
     val head: String,
-    val next: Seq[String]) {
+    val next: Seq[String],
+    val multi: Option[String]) {
 
     lazy val values: Seq[String] = head +: next
 
     private[api] def value: pack.Value = {
-      import builder.{ array, string }
+      import builder.{ array, string, elementProducer => elm }
 
-      if (next.headOption.nonEmpty) {
+      if (next.headOption.nonEmpty && multi.isEmpty) {
         array(string(head) +: next.map(string))
+      } else if (multi.nonEmpty) {
+        array(
+          builder.document(Seq(
+            elm("value", string(head)),
+            elm("multi", string(multi.get)))) +: next.map(string))
       } else {
         string(head)
       }
@@ -64,7 +70,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
       s"""SearchString${values.mkString("[ ", ", ", " ]")}"""
   }
 
-  /** '''EXPERIMENTAL:''' Search string utilities */
+  /** '''EXPERIMENTAL:''' Search string utilities  [[https://docs.atlas.mongodb.com/reference/atlas-search/path-construction/#usage]]*/
   object SearchString {
     import scala.language.implicitConversions
 
@@ -80,7 +86,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * }}}
      */
     implicit def apply(single: String): SearchString =
-      new SearchString(single, Seq.empty)
+      new SearchString(single, Seq.empty, None)
 
     /**
      * Returns a search string from more than one strings.
@@ -94,7 +100,35 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * }}}
      */
     implicit def apply(strings: (String, Seq[String])): SearchString =
-      new SearchString(strings._1, strings._2)
+      new SearchString(strings._1, strings._2, None)
+
+    /**
+     * Returns a single search string with alternate analyzer specified.
+     *
+     * {{{
+     * import reactivemongo.api.bson.collection.BSONCollection
+     *
+     * def prepare(
+     *   coll: BSONCollection): coll.AggregationFramework.SearchString =
+     *   SearchString("foo", "mySecondaryAnalyzer")
+     * }}}
+     */
+    def apply(single: String, multi: String): SearchString =
+      new SearchString(single, Seq.empty, Some(multi))
+
+    /**
+     * Returns a search string from more than one strings with alternate analyzer specified for first term.
+     *
+     * {{{
+     * import reactivemongo.api.bson.collection.BSONCollection
+     *
+     * def prepare(
+     *   coll: BSONCollection): coll.AggregationFramework.SearchString =
+     *   SearchString("foo" -> "mySecondaryAnalyzer", Seq("bar", "lorem"))
+     * }}}
+     */
+    def apply(singleWithMulti: (String, String), next: Seq[String]): SearchString =
+      new SearchString(singleWithMulti._1, next, Some(singleWithMulti._2))
 
   }
 
@@ -151,7 +185,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
       val value: Double) extends Score {
 
       def document = builder.document(Seq(builder.elementProducer(
-        "boost", builder.double(value))))
+        "boost", builder.document(Seq(builder.elementProducer(
+          "value", builder.double(value)))))))
 
       @inline override def hashCode: Int = value.toInt
 
@@ -172,7 +207,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
       val value: Double) extends Score {
 
       def document = builder.document(Seq(builder.elementProducer(
-        "constant", builder.double(value))))
+        "constant", builder.document(Seq(builder.elementProducer(
+          "value", builder.double(value)))))))
 
       @inline override def hashCode: Int = value.toInt
 
@@ -1022,12 +1058,12 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
     /**
      * '''EXPERIMENTAL:''' See [[Near$]]
      *
-     * @param query $queryParam
+     * @param origin $originParam
      * @param path $pathParam
      * @param score $scoreParam
      */
     final class Near private[api] (
-      val query: SearchString,
+      val origin: Near.Origin,
       val path: SearchString,
       val pivot: Option[Double],
       val score: Option[Score]) extends Operator {
@@ -1038,7 +1074,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         import builder.{ elementProducer => elm }
 
         val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
-          elm("query", query.value),
+          elm("origin", origin.value),
           elm("path", path.value))
 
         pivot.foreach { pv =>
@@ -1052,7 +1088,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         builder.document(elms.result())
       }
 
-      private lazy val tupled = Tuple4(query, path, pivot, score)
+      private lazy val tupled = Tuple4(origin, path, pivot, score)
 
       @inline override def hashCode: Int = tupled.hashCode
 
@@ -1070,7 +1106,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
     /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/near/#near-ref Near]] operator for Atlas Search */
     object Near {
       /**
-       * @param query $queryParam
+       * @param origin $originParam
        * @param path $pathParam
        * @param pivot the value to use to calculate scores of Atlas Search result documents
        * @param score $scoreParam
@@ -1079,18 +1115,23 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * import reactivemongo.api.bson.collection.BSONCollection
        *
        * def prepare(coll: BSONCollection): coll.AggregationFramework.AtlasSearch.Near = coll.AggregationFramework.AtlasSearch.Near(
-       *   query = "foo",
+       *   origin = Near.origin(1),
        *   path = "field",
        *   pivot = Some(0.5D)
        * )
        * }}}
        */
       def apply(
-        query: SearchString,
+        origin: Near.Origin,
         path: SearchString,
         pivot: Option[Double] = None,
         score: Option[Score] = None): Near =
-        new Near(query, path, pivot, score)
+        new Near(origin, path, pivot, score)
+
+      final class Origin private[api] (val value: pack.Value)
+
+      def origin[T](value: T)(implicit w: Writer[T]): Origin =
+        new Origin(w.write(value))
     }
 
     /**
@@ -1242,37 +1283,37 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
         override def toString = tpe
       }
+    }
 
-      sealed trait Writer[T] {
-        /** Returns the serialized representation for the input value `v` */
-        def write(v: T): pack.Value
+    sealed trait Writer[T] {
+      /** Returns the serialized representation for the input value `v` */
+      def write(v: T): pack.Value
+    }
+
+    object Writer {
+      import java.time.Instant
+
+      def apply[T](f: T => pack.Value): Writer[T] = new FunctionalWriter(f)
+
+      implicit def intWriter: Writer[Int] = Writer[Int](builder.int)
+
+      implicit def floatWriter: Writer[Float] = Writer[Float] { f =>
+        builder.double(f.toDouble)
       }
 
-      object Writer {
-        import java.time.Instant
+      implicit def longWriter: Writer[Long] = Writer[Long](builder.long)
 
-        def apply[T](f: T => pack.Value): Writer[T] = new FunctionalWriter(f)
+      implicit def doubleWriter: Writer[Double] = Writer[Double](builder.double)
 
-        implicit def intWriter: Writer[Int] = Writer[Int](builder.int)
+      implicit def instantWriter: Writer[Instant] =
+        Writer[Instant] { i => builder.dateTime(i.toEpochMilli) }
 
-        implicit def floatWriter: Writer[Float] = Writer[Float] { f =>
-          builder.double(f.toDouble)
-        }
+      // ---
 
-        implicit def longWriter: Writer[Long] = Writer[Long](builder.long)
+      private final class FunctionalWriter[T](
+        f: T => pack.Value) extends Writer[T] {
 
-        implicit def doubleWriter: Writer[Double] = Writer[Double](builder.double)
-
-        implicit def instantWriter: Writer[Instant] =
-          Writer[Instant] { i => builder.dateTime(i.toEpochMilli) }
-
-        // ---
-
-        private final class FunctionalWriter[T](
-          f: T => pack.Value) extends Writer[T] {
-
-          def write(v: T): pack.Value = f(v)
-        }
+        def write(v: T): pack.Value = f(v)
       }
     }
 
