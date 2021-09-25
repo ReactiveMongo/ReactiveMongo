@@ -1648,7 +1648,7 @@ db.accounts.aggregate([
     import reactivemongo.api.tests.{ AggFramework, makeSearch, scoreDocument }
     import AggFramework._
     import AtlasSearch.{ Score => AtlasScore, _ }
-    import reactivemongo.api.tests.builder.{string, dateTime}
+    import reactivemongo.api.tests.builder.{ string, dateTime }
 
     "serialize score for term search" >> {
       val doc = scoreDocument(AggFramework) _
@@ -1862,20 +1862,20 @@ db.accounts.aggregate([
             result()) must_=== BSONDocument(
             "must" -> Seq(BSONDocument("term" -> doc(term1))),
             "mustNot" -> Seq(BSONDocument("phrase" -> doc(phrase1)))) and {
-            val expected = BSONDocument(
-              "must" -> Seq(BSONDocument("term" -> doc(term1))),
-              "mustNot" -> Seq(
-                BSONDocument("text" -> doc(text1)),
-                BSONDocument("phrase" -> doc(phrase1))))
+              val expected = BSONDocument(
+                "must" -> Seq(BSONDocument("term" -> doc(term1))),
+                "mustNot" -> Seq(
+                  BSONDocument("text" -> doc(text1)),
+                  BSONDocument("phrase" -> doc(phrase1))))
 
-            doc(builder1.append(
-              Compound.mustNot, text1, Seq(phrase1)).
-              result()) must_=== expected and {
               doc(builder1.append(
-                Compound.mustNot, text1 -> Seq(phrase1)).
-                result()) must_=== expected
+                Compound.mustNot, text1, Seq(phrase1)).
+                result()) must_=== expected and {
+                doc(builder1.append(
+                  Compound.mustNot, text1 -> Seq(phrase1)).
+                  result()) must_=== expected
+              }
             }
-          }
         }
 
         "with overriden clause" in {
@@ -1891,10 +1891,10 @@ db.accounts.aggregate([
         op.name must_=== "exists" and {
           doc(op) must_=== BSONDocument(
             "path" -> "title") and {
-            doc(Exists("title" -> Seq(
-              "description", "tags"))) must_=== BSONDocument(
-              "path" -> Seq("title", "description", "tags"))
-          }
+              doc(Exists("title" -> Seq(
+                "description", "tags"))) must_=== BSONDocument(
+                "path" -> Seq("title", "description", "tags"))
+            }
         }
       }
 
