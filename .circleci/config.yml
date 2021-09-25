@@ -227,7 +227,7 @@ commands:
 executors:
   osx:
     macos:
-      xcode: 9.4.1
+      xcode: 10.3.0
   openjdk:
     parameters:
       version:
