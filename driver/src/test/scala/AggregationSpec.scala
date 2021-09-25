@@ -1648,6 +1648,7 @@ db.accounts.aggregate([
     import reactivemongo.api.tests.{ AggFramework, makeSearch, scoreDocument }
     import AggFramework._
     import AtlasSearch.{ Score => AtlasScore, _ }
+    import reactivemongo.api.tests.builder.{string, dateTime}
 
     "serialize score for term search" >> {
       val doc = scoreDocument(AggFramework) _
@@ -1694,16 +1695,22 @@ db.accounts.aggregate([
           }
         }
 
-        "with score" in {
-          import api.tests.builder.string
+        "with multi analyzer in path" in {
           doc(Term(
             query = "foo" -> Seq("bar"),
-            path = SearchString("title" -> "alternateAnalyzer", Seq("anotherField")),
+            path = SearchString("title", "alternateAnalyzer", Seq("anotherField")))) must_=== BSONDocument(
+            "query" -> Seq("foo", "bar"),
+            "path" -> Seq(BSONDocument("value" -> "title", "multi" -> "alternateAnalyzer"), string("anotherField")))
+        }
+
+        "with score" in {
+          doc(Term(
+            query = "foo" -> Seq("bar"),
+            path = "title" -> Nil,
             score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
             "query" -> Seq("foo", "bar"),
-            "path" -> Seq(BSONDocument("value" -> "title", "multi" -> "alternateAnalyzer"), string("anotherField")),
+            "path" -> "title",
             "score" -> BSONDocument("boost" -> BSONDocument("value" -> 2.1D)))
-
         }
 
         Fragments.foreach[(Term.Modifier, String)](Seq(
@@ -1855,20 +1862,20 @@ db.accounts.aggregate([
             result()) must_=== BSONDocument(
             "must" -> Seq(BSONDocument("term" -> doc(term1))),
             "mustNot" -> Seq(BSONDocument("phrase" -> doc(phrase1)))) and {
-              val expected = BSONDocument(
-                "must" -> Seq(BSONDocument("term" -> doc(term1))),
-                "mustNot" -> Seq(
-                  BSONDocument("text" -> doc(text1)),
-                  BSONDocument("phrase" -> doc(phrase1))))
+            val expected = BSONDocument(
+              "must" -> Seq(BSONDocument("term" -> doc(term1))),
+              "mustNot" -> Seq(
+                BSONDocument("text" -> doc(text1)),
+                BSONDocument("phrase" -> doc(phrase1))))
 
+            doc(builder1.append(
+              Compound.mustNot, text1, Seq(phrase1)).
+              result()) must_=== expected and {
               doc(builder1.append(
-                Compound.mustNot, text1, Seq(phrase1)).
-                result()) must_=== expected and {
-                doc(builder1.append(
-                  Compound.mustNot, text1 -> Seq(phrase1)).
-                  result()) must_=== expected
-              }
+                Compound.mustNot, text1 -> Seq(phrase1)).
+                result()) must_=== expected
             }
+          }
         }
 
         "with overriden clause" in {
@@ -1884,17 +1891,19 @@ db.accounts.aggregate([
         op.name must_=== "exists" and {
           doc(op) must_=== BSONDocument(
             "path" -> "title") and {
-              doc(Exists("title" -> Seq(
-                "description", "tags"))) must_=== BSONDocument(
-                "path" -> Seq("title", "description", "tags"))
-            }
+            doc(Exists("title" -> Seq(
+              "description", "tags"))) must_=== BSONDocument(
+              "path" -> Seq("title", "description", "tags"))
+          }
         }
       }
 
       "near" >> {
+        import java.time.Instant
+
         "with minimal options" in {
           val op = Near(
-            origin = Near.origin(1),
+            origin = Near.numericOrigin(1),
             path = "title" -> Seq("description", "tags"))
 
           op.name must_=== "near" and {
@@ -1906,11 +1915,11 @@ db.accounts.aggregate([
 
         "with pivot and score" in {
           doc(Near(
-            origin = Near.origin(1),
+            origin = Near.dateOrigin(Instant.ofEpochMilli(0)),
             path = "title" -> Nil,
             pivot = Some(0.5D),
             score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
-            "origin" -> 1,
+            "origin" -> dateTime(0),
             "path" -> "title",
             "pivot" -> 0.5D,
             "score" -> BSONDocument("boost" -> BSONDocument("value" -> 2.1D)))
