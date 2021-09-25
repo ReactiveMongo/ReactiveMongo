@@ -50,14 +50,17 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
       (next.headOption, multi) match {
         case (Some(_), None) =>
           array(string(head) +: next.map(string))
+
         case (Some(_), Some(alterAnalyzer)) => array(
           builder.document(Seq(
             elm("value", string(head)),
             elm("multi", string(alterAnalyzer)))) +: next.map(string))
+
         case (None, Some(alterAnalyzer)) => array(Seq(
           builder.document(Seq(
             elm("value", string(head)),
             elm("multi", string(alterAnalyzer))))))
+
         case _ =>
           string(head)
       }
@@ -1084,7 +1087,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         import builder.{ elementProducer => elm }
 
         val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
-          elm("origin", origin.value),
+          elm("origin", origin.value()),
           elm("path", path.value))
 
         pivot.foreach { pv =>
@@ -1141,22 +1144,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         new Near(origin, path, pivot, score)
 
       private[api] trait Origin {
-        def value: pack.Value
-      }
-
-      private[api] final class InstantOrigin(origin: Instant) extends Origin {
-        override def value: pack.Value = builder.dateTime(origin.toEpochMilli)
-      }
-
-      private[api] final class NumericOrigin[T: Numeric](origin: T) extends Origin {
-
-        override def value: pack.Value = origin match {
-          case v: Short  => builder.int(v.toInt)
-          case v: Int    => builder.int(v)
-          case v: Long   => builder.long(v)
-          case v: Float  => builder.double(v.toDouble)
-          case v: Double => builder.double(v)
-        }
+        def value(): pack.Value
       }
 
       /**
@@ -1167,8 +1155,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        *   coll.AggregationFramework.AtlasSearch.Near.dateOrigin(Instant.now())
        * }}}
        */
-      def dateOrigin(value: Instant): Origin =
-        new InstantOrigin(value)
+      def dateOrigin(origin: Instant): Origin = () =>
+        builder.dateTime(origin.toEpochMilli)
 
       /**
        * {{{
@@ -1178,8 +1166,14 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        *   coll.AggregationFramework.AtlasSearch.Near.numericOrigin(1)
        * }}}
        */
-      def numericOrigin[T: Numeric](value: T): Origin =
-        new NumericOrigin[T](value)
+      def numericOrigin[T: Numeric](origin: T): Origin = () =>
+        origin match {
+          case v: Short  => builder.int(v.toInt)
+          case v: Int    => builder.int(v)
+          case v: Long   => builder.long(v)
+          case v: Float  => builder.double(v.toDouble)
+          case v: Double => builder.double(v)
+        }
     }
 
     /**
