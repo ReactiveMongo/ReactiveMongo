@@ -61,7 +61,7 @@ final class Driver(core: Project) {
           }
         },
         libraryDependencies ++= akka.value ++ Seq(
-          "dnsjava" % "dnsjava" % "3.4.1",
+          "dnsjava" % "dnsjava" % "3.4.2",
           commonsCodec,
           shapelessTest % Test, specs.value) ++ logApi,
         mimaBinaryIssueFilters ++= {
