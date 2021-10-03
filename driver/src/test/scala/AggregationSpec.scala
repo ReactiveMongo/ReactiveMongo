@@ -1645,18 +1645,17 @@ db.accounts.aggregate([
   }
 
   "Atlas Search" >> {
-    import reactivemongo.api.tests.{
-      AggFramework,
-      scoreDocument,
-      makeSearch
-    }, AggFramework._, AtlasSearch.{ Score => AtlasScore, _ }
+    import reactivemongo.api.tests.{ AggFramework, makeSearch, scoreDocument }
+    import AggFramework._
+    import AtlasSearch.{ Score => AtlasScore, _ }
+    import reactivemongo.api.tests.builder.{ string, dateTime }
 
     "serialize score for term search" >> {
       val doc = scoreDocument(AggFramework) _
 
       Fragments.foreach[(AtlasScore, BSONDocument)](Seq(
-        AtlasScore.constant(1.23D) -> BSONDocument("constant" -> 1.23D),
-        AtlasScore.boost(45.6D) -> BSONDocument("boost" -> 45.6D))) {
+        AtlasScore.constant(1.23D) -> BSONDocument("constant" -> BSONDocument("value" -> 1.23D)),
+        AtlasScore.boost(45.6D) -> BSONDocument("boost" -> BSONDocument("value" -> 45.6D)))) {
         case (score, expected) => score.toString in {
           doc(score) must_=== expected
         }
@@ -1696,6 +1695,14 @@ db.accounts.aggregate([
           }
         }
 
+        "with multi analyzer in path" in {
+          doc(Term(
+            query = "foo" -> Seq("bar"),
+            path = SearchString("title", "alternateAnalyzer", Seq("anotherField")))) must_=== BSONDocument(
+            "query" -> Seq("foo", "bar"),
+            "path" -> Seq(BSONDocument("value" -> "title", "multi" -> "alternateAnalyzer"), string("anotherField")))
+        }
+
         "with score" in {
           doc(Term(
             query = "foo" -> Seq("bar"),
@@ -1703,8 +1710,7 @@ db.accounts.aggregate([
             score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
             "query" -> Seq("foo", "bar"),
             "path" -> "title",
-            "score" -> BSONDocument("boost" -> 2.1D))
-
+            "score" -> BSONDocument("boost" -> BSONDocument("value" -> 2.1D)))
         }
 
         Fragments.foreach[(Term.Modifier, String)](Seq(
@@ -1720,7 +1726,7 @@ db.accounts.aggregate([
               "query" -> "foo",
               "path" -> "title",
               flag -> true,
-              "score" -> BSONDocument("constant" -> 3.45D))
+              "score" -> BSONDocument("constant" -> BSONDocument("value" -> 3.45D)))
           }
         }
 
@@ -1756,7 +1762,7 @@ db.accounts.aggregate([
             score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
             "query" -> Seq("foo", "bar"),
             "path" -> "title",
-            "score" -> BSONDocument("boost" -> 2.1D))
+            "score" -> BSONDocument("boost" -> BSONDocument("value" -> 2.1D)))
 
         }
 
@@ -1797,7 +1803,7 @@ db.accounts.aggregate([
             "query" -> Seq("foo", "bar"),
             "path" -> "title",
             "slop" -> 5,
-            "score" -> BSONDocument("boost" -> 2.1D))
+            "score" -> BSONDocument("boost" -> BSONDocument("value" -> 2.1D)))
 
         }
       }
@@ -1893,28 +1899,30 @@ db.accounts.aggregate([
       }
 
       "near" >> {
+        import java.time.Instant
+
         "with minimal options" in {
           val op = Near(
-            query = "foo" -> Seq.empty,
+            origin = Near.int(1),
             path = "title" -> Seq("description", "tags"))
 
           op.name must_=== "near" and {
             doc(op) must_=== BSONDocument(
-              "query" -> "foo",
+              "origin" -> 1,
               "path" -> Seq("title", "description", "tags"))
           }
         }
 
         "with pivot and score" in {
           doc(Near(
-            query = "foo" -> Seq("bar"),
+            origin = Near.date(Instant.ofEpochMilli(0)),
             path = "title" -> Nil,
             pivot = Some(0.5D),
             score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
-            "query" -> Seq("foo", "bar"),
+            "origin" -> dateTime(0),
             "path" -> "title",
             "pivot" -> 0.5D,
-            "score" -> BSONDocument("boost" -> 2.1D))
+            "score" -> BSONDocument("boost" -> BSONDocument("value" -> 2.1D)))
 
         }
       }
@@ -1943,7 +1951,7 @@ db.accounts.aggregate([
             "query" -> Seq("foo", "bar"),
             "path" -> "title",
             "allowAnalyzedField" -> true,
-            "score" -> BSONDocument("boost" -> 2.1D))
+            "score" -> BSONDocument("boost" -> BSONDocument("value" -> 2.1D)))
 
         }
       }
@@ -1971,7 +1979,7 @@ db.accounts.aggregate([
             "query" -> Seq("foo", "bar"),
             "path" -> "title",
             "allowAnalyzedField" -> true,
-            "score" -> BSONDocument("boost" -> 2.1D))
+            "score" -> BSONDocument("boost" -> BSONDocument("value" -> 2.1D)))
 
         }
       }
@@ -2000,7 +2008,7 @@ db.accounts.aggregate([
             "path" -> "foo",
             "gt" -> 2,
             "lte" -> 7.5D,
-            "score" -> BSONDocument("boost" -> 2.1D))
+            "score" -> BSONDocument("boost" -> BSONDocument("value" -> 2.1D)))
 
         }
       }
@@ -2025,7 +2033,7 @@ db.accounts.aggregate([
             score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(
             "defaultPath" -> "title",
             "query" -> "Rocky AND (IV OR 4 OR Four)",
-            "score" -> BSONDocument("boost" -> 2.1D))
+            "score" -> BSONDocument("boost" -> BSONDocument("value" -> 2.1D)))
 
         }
       }

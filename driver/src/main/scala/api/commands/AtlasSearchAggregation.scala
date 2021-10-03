@@ -33,20 +33,36 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
     override def toString = s"AtlasSearch(${operator.toString})"
   }
 
-  /** '''EXPERIMENTAL:''' One or at least one string */
+  /**
+   * '''EXPERIMENTAL:'''
+   * One or at least one string with optional alternate analyzer specified in multi field
+   */
   final class SearchString private[api] (
     val head: String,
-    val next: Seq[String]) {
+    val next: Seq[String],
+    val multi: Option[String]) {
 
     lazy val values: Seq[String] = head +: next
 
     private[api] def value: pack.Value = {
-      import builder.{ array, string }
+      import builder.{ array, string, elementProducer => elm }
 
-      if (next.headOption.nonEmpty) {
-        array(string(head) +: next.map(string))
-      } else {
-        string(head)
+      (next.headOption, multi) match {
+        case (Some(_), None) =>
+          array(string(head) +: next.map(string))
+
+        case (Some(_), Some(alterAnalyzer)) => array(
+          builder.document(Seq(
+            elm("value", string(head)),
+            elm("multi", string(alterAnalyzer)))) +: next.map(string))
+
+        case (None, Some(alterAnalyzer)) => array(Seq(
+          builder.document(Seq(
+            elm("value", string(head)),
+            elm("multi", string(alterAnalyzer))))))
+
+        case _ =>
+          string(head)
       }
     }
 
@@ -64,7 +80,10 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
       s"""SearchString${values.mkString("[ ", ", ", " ]")}"""
   }
 
-  /** '''EXPERIMENTAL:''' Search string utilities */
+  /**
+   * '''EXPERIMENTAL:''' Search string utilities
+   * @see [[https://docs.atlas.mongodb.com/reference/atlas-search/path-construction/#usage]]
+   */
   object SearchString {
     import scala.language.implicitConversions
 
@@ -80,7 +99,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * }}}
      */
     implicit def apply(single: String): SearchString =
-      new SearchString(single, Seq.empty)
+      new SearchString(single, Seq.empty, None)
 
     /**
      * Returns a search string from more than one strings.
@@ -94,7 +113,39 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * }}}
      */
     implicit def apply(strings: (String, Seq[String])): SearchString =
-      new SearchString(strings._1, strings._2)
+      new SearchString(strings._1, strings._2, None)
+
+    /**
+     * Returns a single search string with alternate analyzer specified.
+     *
+     * {{{
+     * import reactivemongo.api.bson.collection.BSONCollection
+     *
+     * def prepare(
+     *   coll: BSONCollection): coll.AggregationFramework.SearchString =
+     *   coll.AggregationFramework.SearchString("foo", "mySecondaryAnalyzer")
+     * }}}
+     */
+    def apply(single: String, multi: String): SearchString =
+      new SearchString(single, Seq.empty, Some(multi))
+
+    /**
+     * Returns a search string from more than one strings with alternate analyzer specified for first term.
+     *
+     * {{{
+     * import reactivemongo.api.bson.collection.BSONCollection
+     *
+     * def prepare(
+     *   coll: BSONCollection): coll.AggregationFramework.SearchString =
+     *   coll.AggregationFramework.SearchString(
+     *     "foo", "mySecondaryAnalyzer", Seq("bar", "lorem"))
+     * }}}
+     */
+    def apply(
+      single: String,
+      alternateAnalyzer: String,
+      next: Seq[String]): SearchString =
+      new SearchString(single, next, Some(alternateAnalyzer))
 
   }
 
@@ -151,7 +202,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
       val value: Double) extends Score {
 
       def document = builder.document(Seq(builder.elementProducer(
-        "boost", builder.double(value))))
+        "boost", builder.document(Seq(builder.elementProducer(
+          "value", builder.double(value)))))))
 
       @inline override def hashCode: Int = value.toInt
 
@@ -172,7 +224,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
       val value: Double) extends Score {
 
       def document = builder.document(Seq(builder.elementProducer(
-        "constant", builder.double(value))))
+        "constant", builder.document(Seq(builder.elementProducer(
+          "value", builder.double(value)))))))
 
       @inline override def hashCode: Int = value.toInt
 
@@ -225,6 +278,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * @param path $pathParam
      * @param score $scoreParam
      */
+    @deprecated("https://docs.atlas.mongodb.com/reference/atlas-search/term/", "")
     final class Term private[api] (
       val query: SearchString,
       val path: SearchString,
@@ -286,17 +340,6 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * @param path $pathParam
        * @param modifier the optional modifier for the term query execution (`wildcard` or `regex` or `prefix` or `fuzzy`)
        * @param score $scoreParam
-       *
-       * {{{
-       * import reactivemongo.api.bson.collection.BSONCollection
-       *
-       * def prepare(
-       *   coll: BSONCollection): coll.AggregationFramework.AtlasSearch.Term =
-       *   coll.AggregationFramework.AtlasSearch.Term(
-       *     query = "foo",
-       *     path = "field1" // or "field1" -> Seq("field2", ...)
-       *   )
-       * }}}
        */
       def apply(
         query: SearchString,
@@ -1022,12 +1065,14 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
     /**
      * '''EXPERIMENTAL:''' See [[Near$]]
      *
-     * @param query $queryParam
+     * @see [[https://docs.atlas.mongodb.com/reference/atlas-search/near/ near]] operator
+     *
+     * @param origin $originParam
      * @param path $pathParam
      * @param score $scoreParam
      */
     final class Near private[api] (
-      val query: SearchString,
+      val origin: Near.Origin,
       val path: SearchString,
       val pivot: Option[Double],
       val score: Option[Score]) extends Operator {
@@ -1038,7 +1083,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         import builder.{ elementProducer => elm }
 
         val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
-          elm("query", query.value),
+          elm("origin", origin.value),
           elm("path", path.value))
 
         pivot.foreach { pv =>
@@ -1052,7 +1097,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         builder.document(elms.result())
       }
 
-      private lazy val tupled = Tuple4(query, path, pivot, score)
+      private lazy val tupled = Tuple4(origin, path, pivot, score)
 
       @inline override def hashCode: Int = tupled.hashCode
 
@@ -1070,7 +1115,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
     /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/near/#near-ref Near]] operator for Atlas Search */
     object Near {
       /**
-       * @param query $queryParam
+       * @param origin $originParam
        * @param path $pathParam
        * @param pivot the value to use to calculate scores of Atlas Search result documents
        * @param score $scoreParam
@@ -1079,18 +1124,55 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * import reactivemongo.api.bson.collection.BSONCollection
        *
        * def prepare(coll: BSONCollection): coll.AggregationFramework.AtlasSearch.Near = coll.AggregationFramework.AtlasSearch.Near(
-       *   query = "foo",
+       *   origin = coll.AggregationFramework.AtlasSearch.Near.int(1),
        *   path = "field",
        *   pivot = Some(0.5D)
        * )
        * }}}
        */
       def apply(
-        query: SearchString,
+        origin: Near.Origin,
         path: SearchString,
         pivot: Option[Double] = None,
         score: Option[Score] = None): Near =
-        new Near(query, path, pivot, score)
+        new Near(origin, path, pivot, score)
+
+      final class Origin private[api] (
+        private[api] val value: pack.Value)
+
+      /**
+       * {{{
+       * import reactivemongo.api.bson.collection.BSONCollection
+       *
+       * def prepare(coll: BSONCollection) = coll.AggregationFramework.
+       *   AtlasSearch.Near.date(java.time.Instant.now())
+       * }}}
+       */
+      def date(origin: java.time.Instant): Origin =
+        new Origin(builder dateTime origin.toEpochMilli)
+
+      /**
+       * {{{
+       * import reactivemongo.api.bson.collection.BSONCollection
+       *
+       * def prepare(coll: BSONCollection) =
+       *   coll.AggregationFramework.AtlasSearch.Near.int(1)
+       * }}}
+       */
+      def int(value: Int): Origin =
+        new Origin(builder.int(value))
+
+      def short(value: Short): Origin =
+        new Origin(builder.int(value.toInt))
+
+      def long(value: Long): Origin =
+        new Origin(builder.long(value))
+
+      def float(value: Float): Origin =
+        new Origin(builder.double(value.toDouble))
+
+      def double(value: Double): Origin =
+        new Origin(builder.double(value))
     }
 
     /**
