@@ -1903,7 +1903,7 @@ db.accounts.aggregate([
 
         "with minimal options" in {
           val op = Near(
-            origin = Near.numericOrigin(1),
+            origin = Near.int(1),
             path = "title" -> Seq("description", "tags"))
 
           op.name must_=== "near" and {
@@ -1915,7 +1915,7 @@ db.accounts.aggregate([
 
         "with pivot and score" in {
           doc(Near(
-            origin = Near.dateOrigin(Instant.ofEpochMilli(0)),
+            origin = Near.date(Instant.ofEpochMilli(0)),
             path = "title" -> Nil,
             pivot = Some(0.5D),
             score = Some(AtlasScore.boost(2.1D)))) must_=== BSONDocument(

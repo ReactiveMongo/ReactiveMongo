@@ -123,7 +123,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      *
      * def prepare(
      *   coll: BSONCollection): coll.AggregationFramework.SearchString =
-     *   SearchString("foo", "mySecondaryAnalyzer")
+     *   coll.AggregationFramework.SearchString("foo", "mySecondaryAnalyzer")
      * }}}
      */
     def apply(single: String, multi: String): SearchString =
@@ -137,10 +137,14 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      *
      * def prepare(
      *   coll: BSONCollection): coll.AggregationFramework.SearchString =
-     *   SearchString("foo", "mySecondaryAnalyzer", Seq("bar", "lorem"))
+     *   coll.AggregationFramework.SearchString(
+     *     "foo", "mySecondaryAnalyzer", Seq("bar", "lorem"))
      * }}}
      */
-    def apply(single: String, alternateAnalyzer: String, next: Seq[String]): SearchString =
+    def apply(
+      single: String,
+      alternateAnalyzer: String,
+      next: Seq[String]): SearchString =
       new SearchString(single, next, Some(alternateAnalyzer))
 
   }
@@ -274,6 +278,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * @param path $pathParam
      * @param score $scoreParam
      */
+    @deprecated("https://docs.atlas.mongodb.com/reference/atlas-search/term/", "")
     final class Term private[api] (
       val query: SearchString,
       val path: SearchString,
@@ -335,17 +340,6 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * @param path $pathParam
        * @param modifier the optional modifier for the term query execution (`wildcard` or `regex` or `prefix` or `fuzzy`)
        * @param score $scoreParam
-       *
-       * {{{
-       * import reactivemongo.api.bson.collection.BSONCollection
-       *
-       * def prepare(
-       *   coll: BSONCollection): coll.AggregationFramework.AtlasSearch.Term =
-       *   coll.AggregationFramework.AtlasSearch.Term(
-       *     query = "foo",
-       *     path = "field1" // or "field1" -> Seq("field2", ...)
-       *   )
-       * }}}
        */
       def apply(
         query: SearchString,
@@ -1071,6 +1065,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
     /**
      * '''EXPERIMENTAL:''' See [[Near$]]
      *
+     * @see [[https://docs.atlas.mongodb.com/reference/atlas-search/near/ near]] operator
+     *
      * @param origin $originParam
      * @param path $pathParam
      * @param score $scoreParam
@@ -1087,7 +1083,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         import builder.{ elementProducer => elm }
 
         val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
-          elm("origin", origin.value()),
+          elm("origin", origin.value),
           elm("path", path.value))
 
         pivot.foreach { pv =>
@@ -1128,14 +1124,12 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * import reactivemongo.api.bson.collection.BSONCollection
        *
        * def prepare(coll: BSONCollection): coll.AggregationFramework.AtlasSearch.Near = coll.AggregationFramework.AtlasSearch.Near(
-       *   origin = Near.numericOrigin(1),
+       *   origin = coll.AggregationFramework.AtlasSearch.Near.int(1),
        *   path = "field",
        *   pivot = Some(0.5D)
        * )
        * }}}
        */
-      import java.time.Instant
-
       def apply(
         origin: Near.Origin,
         path: SearchString,
@@ -1143,37 +1137,42 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         score: Option[Score] = None): Near =
         new Near(origin, path, pivot, score)
 
-      private[api] trait Origin {
-        def value(): pack.Value
-      }
+      final class Origin private[api] (
+        private[api] val value: pack.Value)
+
+      /**
+       * {{{
+       * import reactivemongo.api.bson.collection.BSONCollection
+       *
+       * def prepare(coll: BSONCollection) = coll.AggregationFramework.
+       *   AtlasSearch.Near.date(java.time.Instant.now())
+       * }}}
+       */
+      def date(origin: java.time.Instant): Origin =
+        new Origin(builder dateTime origin.toEpochMilli)
 
       /**
        * {{{
        * import reactivemongo.api.bson.collection.BSONCollection
        *
        * def prepare(coll: BSONCollection) =
-       *   coll.AggregationFramework.AtlasSearch.Near.dateOrigin(Instant.now())
+       *   coll.AggregationFramework.AtlasSearch.Near.int(1)
        * }}}
        */
-      def dateOrigin(origin: Instant): Origin = () =>
-        builder.dateTime(origin.toEpochMilli)
+      def int(value: Int): Origin =
+        new Origin(builder.int(value))
 
-      /**
-       * {{{
-       * import reactivemongo.api.bson.collection.BSONCollection
-       *
-       * def prepare(coll: BSONCollection) =
-       *   coll.AggregationFramework.AtlasSearch.Near.numericOrigin(1)
-       * }}}
-       */
-      def numericOrigin[T: Numeric](origin: T): Origin = () =>
-        origin match {
-          case v: Short  => builder.int(v.toInt)
-          case v: Int    => builder.int(v)
-          case v: Long   => builder.long(v)
-          case v: Float  => builder.double(v.toDouble)
-          case v: Double => builder.double(v)
-        }
+      def short(value: Short): Origin =
+        new Origin(builder.int(value.toInt))
+
+      def long(value: Long): Origin =
+        new Origin(builder.long(value))
+
+      def float(value: Float): Origin =
+        new Origin(builder.double(value.toDouble))
+
+      def double(value: Double): Origin =
+        new Origin(builder.double(value))
     }
 
     /**
