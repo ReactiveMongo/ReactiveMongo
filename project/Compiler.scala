@@ -2,7 +2,7 @@ import sbt._
 import sbt.Keys._
 
 object Compiler {
-  private val silencerVersion = Def.setting[String]("1.7.6")
+  private val silencerVersion = Def.setting[String]("1.7.7")
 
   private def unmanaged(ver: String, base: File): Seq[File] =
     CrossVersion.partialVersion(ver) match {
