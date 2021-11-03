@@ -67,7 +67,7 @@ private[reactivemongo] object CreateIndexes {
     val commandKind = CommandKind.CreateIndexes
 
     override def equals(that: Any): Boolean = that match {
-      case other: Command[P] =>
+      case other: Command[_] =>
         this.tupled == other.tupled
 
       case _ =>

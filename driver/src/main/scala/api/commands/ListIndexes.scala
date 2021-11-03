@@ -67,7 +67,7 @@ private[reactivemongo] object ListIndexes {
     val commandKind = CommandKind.ListIndexes
 
     override def equals(that: Any): Boolean = that match {
-      case other: Command[P] =>
+      case other: Command[_] =>
         this.db == other.db
 
       case _ =>
