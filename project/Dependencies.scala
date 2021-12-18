@@ -47,7 +47,6 @@ object Dependencies {
 
   val logApi = Seq(
     slf4j % Provided,
-    "org.apache.logging.log4j" % "log4j-api" % log4jVer, // deprecated
     "com.lmax" % "disruptor" % "3.4.4" % Test
   ) ++ Seq("log4j-core", "log4j-slf4j-impl").map(
     "org.apache.logging.log4j" % _ % log4jVer % Test)
