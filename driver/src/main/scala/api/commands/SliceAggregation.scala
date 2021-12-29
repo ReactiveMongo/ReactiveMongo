@@ -1,9 +1,9 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ PackSupport, SerializationPack }
 
 private[commands] trait SliceAggregation[P <: SerializationPack] {
-  aggregation: AggregationFramework[P] =>
+  aggregation: PackSupport[P] with AggregationFramework[P] =>
 
   /**
    * Returns a [[https://docs.mongodb.com/manual/reference/operator/aggregation/slice/ slice]]/subset of an array.

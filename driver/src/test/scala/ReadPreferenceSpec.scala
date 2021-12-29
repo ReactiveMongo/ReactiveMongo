@@ -6,7 +6,7 @@ import org.specs2.specification.core.Fragments
 import reactivemongo.api.tests.{ bsonReadPref => bson }
 
 final class ReadPreferenceSpec extends org.specs2.mutable.Specification {
-  "Read preference" title
+  "Read preference".title
 
   section("unit")
   "BSON read preference" should {

@@ -22,7 +22,8 @@ private[actors] final class AwaitingResponse(
    * if the current retry count is less then the maximum.
    */
   def retriable(max: Int): Option[ChannelId => AwaitingResponse] =
-    if (!promise.isCompleted && retry >= max) None else Some({ id: ChannelId =>
+    if (!promise.isCompleted && retry >= max) None
+    else Some({ (id: ChannelId) =>
       copy(
         channelID = id,
         retry = this.retry + 1)

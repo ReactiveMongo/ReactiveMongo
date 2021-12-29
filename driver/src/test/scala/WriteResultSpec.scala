@@ -3,7 +3,7 @@ package reactivemongo
 import reactivemongo.api.commands.{ CommandException, DefaultWriteResult }
 
 final class WriteResultSpec extends org.specs2.mutable.Specification {
-  "Write result" title
+  "Write result".title
 
   section("unit")
   "WriteResult" should {

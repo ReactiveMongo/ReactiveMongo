@@ -361,7 +361,9 @@ trait Cursor1Spec { spec: CursorSpec =>
     }
 
     "produce a custom cursor for the results" in {
-      implicit def fooProducer[T] = new CursorProducer[T] {
+      type CP[T] = CursorProducer[T] { type ProducedCursor = FooCursor[T] }
+
+      implicit def fooProducer[T]: CP[T] = new CursorProducer[T] {
         type ProducedCursor = FooCursor[T]
 
         def produce(base: Cursor.WithOps[T]): ProducedCursor =

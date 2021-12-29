@@ -240,7 +240,7 @@ private[api] final class FoldResponses[T](
     }
   }
 
-  private sealed trait LowPriorityDelay { _: Delay.type =>
+  private sealed trait LowPriorityDelay { _self: Delay.type =>
     private val unsafe = new Delay {
       type Message = Nothing
       val value = Duration.Zero

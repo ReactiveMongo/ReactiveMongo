@@ -135,7 +135,7 @@ private[reactivemongo] class NodeSet(
     unpriorised: Int)(implicit ord: Ordering[Node]): Option[Node] =
     filter match {
       case Some(f) => {
-        val nodeFilter = { n: Node =>
+        val nodeFilter = { (n: Node) =>
           if (n.tags.isEmpty) false
           else f(n.tags)
         }

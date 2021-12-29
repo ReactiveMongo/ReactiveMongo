@@ -33,7 +33,7 @@ import org.specs2.concurrent.ExecutionEnv
 final class DriverSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
-  "Driver" title
+  "Driver".title
 
   sequential
 
@@ -345,7 +345,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
       val con = Await.result(
         drv.connect(List(primaryHost), options = conOpts), timeout)
 
-      conOpts.credentials must not(beEmpty) and {
+      conOpts.credentials must not(beEmpty[Map[String, MongoConnectionOptions.Credential]]) and {
         con.database(dbName, failoverStrategy).
           aka("authed DB") must beLike[DB] {
             case rdb => rdb.collection("testcol").insert.one(

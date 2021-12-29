@@ -196,7 +196,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
   }
 }
 
-sealed trait UpdateFixtures { _: UpdateSpec =>
+sealed trait UpdateFixtures { _self: UpdateSpec with CollectionSpec =>
   case class Person3(
     firstName: String,
     lastName: String,
@@ -205,7 +205,7 @@ sealed trait UpdateFixtures { _: UpdateSpec =>
 
   object Person3 {
     implicit lazy val personReader: pack.Reader[Person3] =
-      reader[Person3] { doc: pack.Document =>
+      reader[Person3] { (doc: pack.Document) =>
         Person3(
           decoder.string(doc, "firstName").getOrElse(""),
           decoder.string(doc, "lastName").getOrElse(""),
@@ -216,7 +216,7 @@ sealed trait UpdateFixtures { _: UpdateSpec =>
     implicit lazy val personWriter: pack.Writer[Person3] = {
       import builder.{ elementProducer => e, string }
 
-      writer[Person3] { person: Person3 =>
+      writer[Person3] { (person: Person3) =>
         builder.document(Seq(
           e("firstName", string(person.firstName)),
           e("lastName", string(person.lastName)),

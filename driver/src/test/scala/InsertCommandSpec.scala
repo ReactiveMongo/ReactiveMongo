@@ -13,7 +13,7 @@ import reactivemongo.api.{
 import reactivemongo.api.commands.{ InsertCommand, ResolvedCollectionCommand }
 
 final class InsertCommandSpec extends org.specs2.mutable.Specification {
-  "Insert command" title
+  "Insert command".title
 
   section("unit")
   "Insert command" should {
@@ -72,7 +72,7 @@ final class InsertCommandSpec extends org.specs2.mutable.Specification {
     BSONDocument("_id" -> 2, "value" -> "bar"),
     BSONDocument("_id" -> 3, "value" -> "lorem"))
 
-  def withInsert[T](support: Support)(f: Function2[ResolvedCollectionCommand[support.Insert], support.InsertCmd => support.pack.Document, T]): T = f(
+  private def withInsert[T](support: Support)(f: Function2[ResolvedCollectionCommand[support.Insert], support.InsertCmd => support.pack.Document, T]): T = f(
     new ResolvedCollectionCommand(
       collection = "foo",
       command = new support.Insert(

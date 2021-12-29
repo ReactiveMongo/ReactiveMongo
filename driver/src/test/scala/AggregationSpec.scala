@@ -39,7 +39,7 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with org.specs2.specification.AfterAll {
 
-  "Aggregation framework" title
+  "Aggregation framework".title
 
   sequential
   stopOnFail
@@ -299,7 +299,9 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
             val foo = "Bar"
           }
 
-          implicit def fooProducer[T] = new CursorProducer[T] {
+          type CP[T] = CursorProducer[T] { type ProducedCursor = FooCursor[T] }
+
+          implicit def fooProducer[T]: CP[T] = new CursorProducer[T] {
             type ProducedCursor = FooCursor[T]
             def produce(base: Cursor.WithOps[T]) = new DefaultFooCursor(base)
           }
@@ -436,8 +438,11 @@ final class AggregationSpec(implicit ee: ExecutionEnv)
     "perform a simple lookup so the joined documents are returned" in {
       // See https://docs.mongodb.com/master/reference/operator/aggregation/lookup/#examples
 
-      implicit val productHandler: BSONDocumentHandler[Product] = Macros.handler[Product]
-      implicit val invReportHandler: BSONDocumentHandler[InventoryReport] = Macros.handler[InventoryReport]
+      implicit val productHandler: BSONDocumentHandler[Product] =
+        Macros.handler[Product]
+
+      implicit val invReportHandler: BSONDocumentHandler[InventoryReport] =
+        Macros.handler[InventoryReport]
 
       def expected = List(
         InventoryReport(1, Some("abc"), Some(12), Some(2),
@@ -1209,15 +1214,17 @@ db.accounts.aggregate([
     }
 
     "and counted" in {
-      implicit def countReader = BSONDocumentReader[Int] {
-        _.getAsTry[Int]("foo").get
+      val reader = BSONDocumentReader.field[Int]("foo")
+
+      {
+        implicit def countReader: BSONDocumentReader[Int] = reader
+
+        contacts.aggregateWith[Int]() { framework =>
+          import framework.{ Count, Match }
+
+          List(Match(document("first_name" -> "Gary")), Count("foo"))
+        }.head must beTypedEqualTo(1).await(0, timeout)
       }
-
-      contacts.aggregateWith[Int]() { framework =>
-        import framework.{ Count, Match }
-
-        List(Match(document("first_name" -> "Gary")), Count("foo"))
-      }.head must beTypedEqualTo(1).await(0, timeout)
     }
   }
 
@@ -1651,7 +1658,7 @@ db.accounts.aggregate([
     import reactivemongo.api.tests.builder.{ string, dateTime }
 
     "serialize score for term search" >> {
-      val doc = scoreDocument(AggFramework) _
+      val doc = scoreDocument(AggFramework)(_: AtlasScore)
 
       Fragments.foreach[(AtlasScore, BSONDocument)](Seq(
         AtlasScore.constant(1.23D) -> BSONDocument("constant" -> BSONDocument("value" -> 1.23D)),
@@ -1677,7 +1684,7 @@ db.accounts.aggregate([
       path = "title" -> Seq("description", "tags"))
 
     "support operator" >> {
-      val doc = makeSearch(AggFramework) _
+      val doc = makeSearch(AggFramework)(_: Operator)
 
       "<custom>" in {
         val expected = BSONDocument("foo" -> "bar")
@@ -2040,7 +2047,7 @@ db.accounts.aggregate([
     }
 
     f"be serialized as $$search" >> {
-      val doc = makeSearch(AggFramework) _
+      val doc = makeSearch(AggFramework)(_: Operator)
       val makePipe = reactivemongo.api.tests.makePipe(AggFramework)(_)
 
       Fragments.foreach(Seq[(Operator, BSONDocument)](

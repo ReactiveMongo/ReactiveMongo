@@ -3,7 +3,7 @@ package reactivemongo
 import reactivemongo.core.nodeset.RoundRobiner
 
 final class RoundRobinerSpec extends org.specs2.mutable.Specification {
-  "Round robiner" title
+  "Round robiner".title
 
   section("unit")
 

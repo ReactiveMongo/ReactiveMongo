@@ -3,7 +3,7 @@ package reactivemongo.api.commands
 import reactivemongo.api.{ PackSupport, SerializationPack }
 
 trait UpsertedFactory[P <: SerializationPack] {
-  _: PackSupport[P] =>
+  _self: PackSupport[P] =>
 
   /** An upserted element */
   final class Upserted private (

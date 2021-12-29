@@ -5,7 +5,7 @@ import scala.collection.Factory
 import scala.concurrent.{ ExecutionContext, Future }
 
 private[api] trait CursorCompat[T] {
-  _: DefaultCursor.Impl[T] with CursorCompatAPI[T] =>
+  _self: DefaultCursor.Impl[T] with CursorCompatAPI[T] =>
 
   import Cursor.{ Cont, ErrorHandler }
 

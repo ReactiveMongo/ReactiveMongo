@@ -585,7 +585,7 @@ trait AggregationFramework[P <: SerializationPack]
    *
    * @since MongoDB 3.2
    */
-  final case object IndexStats extends PipelineOperator {
+  case object IndexStats extends PipelineOperator {
     protected[reactivemongo] val makePipe: pack.Document = pipe(f"$$indexStats", builder.document(Nil))
   }
 

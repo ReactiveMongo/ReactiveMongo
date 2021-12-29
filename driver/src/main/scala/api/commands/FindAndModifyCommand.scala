@@ -10,7 +10,8 @@ import reactivemongo.api.{
 
 import reactivemongo.core.protocol.MongoWireVersion
 
-trait FindAndModifyCommand[P <: SerializationPack] { _: PackSupport[P] =>
+trait FindAndModifyCommand[P <: SerializationPack] {
+  _self: PackSupport[P] =>
 
   private[reactivemongo] final class FindAndModify(
     val query: pack.Document,

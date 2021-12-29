@@ -499,7 +499,7 @@ object MongoConnection {
 
   // ---
 
-  private sealed trait URIBuilder[T] {
+  private[reactivemongo] sealed trait URIBuilder[T] {
     def apply(
       hosts: ListSet[(String, Int)],
       options: MongoConnectionOptions,
@@ -507,7 +507,7 @@ object MongoConnection {
       db: Option[String]): Future[URI[T]]
   }
 
-  private object URIBuilder {
+  private[reactivemongo] object URIBuilder {
     implicit def default: URIBuilder[Option[String]] =
       new FunctionalBuilder[Option[String]]({
         (hosts, options, ignoredOptions, db) =>
@@ -733,9 +733,6 @@ object MongoConnection {
                 }
               }
             }
-
-            case _ => Future.failed(new URIParsingException(
-              s"Could not parse host from URI: invalid definition '$h'"))
           }
 
           case _ =>
@@ -760,10 +757,6 @@ object MongoConnection {
         parseHosts(seedList, hosts, srvRecResolver).map {
           Some(dbName drop 1) -> _
         }
-
-      case _ =>
-        Future.failed(new URIParsingException(
-          s"Could not parse hosts and database from URI: '$input'"))
     }
 
   private def parseOptions(options: String): Future[Map[String, String]] = {

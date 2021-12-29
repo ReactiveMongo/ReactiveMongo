@@ -111,7 +111,7 @@ package object tests { self =>
 
   object AggFramework extends PackSupport[Pack]
     with AggregationFramework[Pack] {
-    val pack = self.pack
+    val pack = tests.pack
   }
 
   def makePipe[P <: SerializationPack](a: AggregationFramework[P])(o: a.PipelineOperator) = o.makePipe
@@ -137,7 +137,7 @@ package object tests { self =>
     import akka.pattern.ask
 
     def message = d.addConnectionMsg(name, nodes, options, mongosystem)
-    implicit def timeout = Timeout(10, SECONDS)
+    implicit def timeout: Timeout = Timeout(10, SECONDS)
 
     d.supervisorActor ? message
   }
@@ -286,7 +286,7 @@ package object tests { self =>
 
       decoder.decode(null, buf, out)
 
-      { f: (Tuple2[ByteBuf, Response] => T) =>
+      { (f: (Tuple2[ByteBuf, Response] => T)) =>
         try {
           f(buf -> out.get(0).asInstanceOf[Response])
         } finally {
@@ -402,19 +402,23 @@ package object tests { self =>
   def readFromBuffer(buffer: ByteBuf) = ResponseDecoder.first(buffer)
 
   object commands {
-    implicit val replSetMaintenanceWriter =
-      reactivemongo.api.commands.ReplSetMaintenance.writer(pack)
+    import reactivemongo.api.commands.{
+      ReplSetGetStatus,
+      ReplSetMaintenance,
+      ReplSetStatus
+    }
 
-    implicit val unitReader =
+    implicit val replSetMaintenanceWriter: pack.Writer[ReplSetMaintenance] =
+      ReplSetMaintenance.writer(pack)
+
+    implicit val unitReader: pack.Reader[Unit] =
       reactivemongo.api.commands.CommandCodecs.unitReader(pack)
 
-    implicit val replSetGetStatusWriter =
-      reactivemongo.api.commands.ReplSetGetStatus.writer(pack)
-
-    import reactivemongo.api.commands.ReplSetStatus
+    implicit val replSetGetStatusWriter: pack.Writer[ReplSetGetStatus.type] =
+      ReplSetGetStatus.writer(pack)
 
     implicit val replSetStatusReader: pack.Reader[ReplSetStatus] =
-      reactivemongo.api.commands.ReplSetGetStatus.reader(pack)
+      ReplSetGetStatus.reader(pack)
 
   }
 

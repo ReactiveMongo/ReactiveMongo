@@ -186,7 +186,7 @@ private[reactivemongo] object DefaultCursor {
       }
     }
 
-    lazy val builder = _pack.newBuilder
+    final lazy val builder = _pack.newBuilder
 
     val getMoreOpCmd: Function2[Long, Int, (RequestOp, BufferSequence)] = {
       def baseElmts: Seq[_pack.ElementProducer] = db.session match {
@@ -264,7 +264,7 @@ private[reactivemongo] object DefaultCursor {
     protected lazy val requester: (Int, Int, ExpectingResponse) => ExecutionContext => Future[Response] = {
       val base: ExecutionContext => ExpectingResponse => Future[Response] = { implicit ec: ExecutionContext =>
         database.session match {
-          case Some(session) => { req: ExpectingResponse =>
+          case Some(session) => { (req: ExpectingResponse) =>
             connection.sendExpectingResponse(req).flatMap {
               Session.updateOnResponse(session, _).map(_._2)
             }

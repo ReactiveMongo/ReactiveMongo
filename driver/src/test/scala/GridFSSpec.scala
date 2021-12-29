@@ -17,7 +17,7 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with org.specs2.specification.AfterAll {
 
-  "GridFS" title
+  "GridFS".title
 
   sequential
   stopOnFail
@@ -56,7 +56,7 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
     type GFile = gfs.ReadFile[pack.Value]
     val builder = newBuilder(pack)
     import builder.{ document, elementProducer => elem, string => str }
-    implicit def dw = pack.IdentityWriter
+    implicit def dw: pack.Writer[pack.Document] = pack.IdentityWriter
 
     val filename1 = s"file1-${System identityHashCode gfs}"
     lazy val file1 = gfs.fileToSave(
@@ -142,7 +142,11 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
       }
 
       {
-        implicit def fooProducer[T] = new reactivemongo.api.CursorProducer[T] {
+        import reactivemongo.api.CursorProducer
+
+        type CP[T] = CursorProducer[T] { type ProducedCursor = FooCursor[T] }
+
+        implicit def fooProducer[T]: CP[T] = new CursorProducer[T] {
           type ProducedCursor = FooCursor[T]
 
           def produce(base: Cursor.WithOps[T]): ProducedCursor =

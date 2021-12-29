@@ -60,7 +60,7 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
     val cmd = new CreateView(name, operator, pipeline, collation)
 
     // Command codecs
-    implicit def writer = createViewWriter
+    implicit def writer: pack.Writer[CreateViewCommand] = createViewWriter
 
     command(self, cmd, writePreference)
   }
@@ -81,7 +81,7 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
     val builder = pack.newBuilder
     import builder.{ elementProducer => element, string }
 
-    pack.writer { cmd: CreateViewCommand =>
+    pack.writer { (cmd: CreateViewCommand) =>
       val elements = Seq.newBuilder[pack.ElementProducer]
 
       elements ++= Seq(

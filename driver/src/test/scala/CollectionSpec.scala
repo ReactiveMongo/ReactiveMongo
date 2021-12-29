@@ -24,7 +24,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
   with org.specs2.specification.AfterAll
   with UpdateSpec with CollectionMetaSpec with CollectionFixtures {
 
-  "Collection" title
+  "Collection".title
 
   sequential
   stopOnFail
@@ -528,7 +528,7 @@ final class CollectionSpec(implicit protected val ee: ExecutionEnv)
 
 sealed trait CollectionFixtures { specs: CollectionSpec =>
   val colName = s"bsoncoll${System identityHashCode this}"
-  lazy val collection = db(colName)
+  protected final lazy val collection = db(colName)
   lazy val slowColl = slowDb(colName)
 
   case class Person(name: String, age: Int)

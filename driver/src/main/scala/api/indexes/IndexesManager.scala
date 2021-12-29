@@ -29,6 +29,8 @@ import reactivemongo.api.commands.{
   CommandCodecs,
   CommandException,
   DropIndexes,
+  DropIndexesResult,
+  ResolvedCollectionCommand,
   WriteResult
 }
 
@@ -59,7 +61,7 @@ sealed trait IndexesManager {
    *
    * def listIndexes(db: DB)(
    *   implicit ec: ExecutionContext): Future[List[String]] =
-   *   db.indexesManager.list().map(_.flatMap { ni: NSIndex =>
+   *   db.indexesManager.list().map(_.flatMap { (ni: NSIndex) =>
    *     ni.index.name.toList
    *   })
    * }}}
@@ -236,7 +238,7 @@ private[api] sealed abstract class AbstractIndexesManager(
 
     private lazy val listCommand = new ListIndexes.Command[Pack](db.name)
 
-    private implicit lazy val listWriter = ListIndexes.writer[Pack](pack)
+    private implicit lazy val listWriter: pack.Writer[ResolvedCollectionCommand[ListIndexes.Command[Pack]]] = ListIndexes.writer[Pack](pack)
 
     private implicit lazy val indexReader: pack.Reader[Index] =
       IndexesManager.indexReader[Pack](pack)
@@ -265,7 +267,7 @@ private[api] sealed abstract class AbstractIndexesManager(
       }
     }
 
-    private implicit val createWriter = CreateIndexes.writer[Pack](pack)
+    private implicit val createWriter: pack.Writer[ResolvedCollectionCommand[CreateIndexes.Command[Pack]]] = CreateIndexes.writer[Pack](pack)
 
     private implicit lazy val writeResultReader: pack.Reader[WriteResult] =
       CommandCodecs.writeResultReader[WriteResult, Pack](pack)
@@ -276,8 +278,10 @@ private[api] sealed abstract class AbstractIndexesManager(
         new CreateIndexes.Command[Pack](db.name, List(index)),
         ReadPreference.primary)
 
-    private implicit def dropWriter = DropIndexes.writer[Pack](pack)
-    private implicit def dropReader = DropIndexes.reader[Pack](pack)
+    private implicit def dropWriter: pack.Writer[ResolvedCollectionCommand[DropIndexes]] = DropIndexes.writer[Pack](pack)
+
+    private implicit def dropReader: pack.Reader[DropIndexesResult] =
+      DropIndexes.reader[Pack](pack)
 
     def drop(indexName: String): Future[Int] = {
       runner(
@@ -440,7 +444,7 @@ private class DefaultCollectionIndexesManager(
 
   private lazy val runner = Command.run[Pack](pack, db.failoverStrategy)
 
-  private implicit lazy val listWriter = ListIndexes.writer[Pack](pack)
+  private implicit lazy val listWriter: pack.Writer[ResolvedCollectionCommand[ListIndexes.Command[Pack]]] = ListIndexes.writer[Pack](pack)
 
   private implicit lazy val indexReader: pack.Reader[Index] =
     IndexesManager.indexReader[Pack](pack)
@@ -469,7 +473,7 @@ private class DefaultCollectionIndexesManager(
     }
   }
 
-  private implicit val createWriter = CreateIndexes.writer[Pack](pack)
+  private implicit val createWriter: pack.Writer[ResolvedCollectionCommand[CreateIndexes.Command[Pack]]] = CreateIndexes.writer[Pack](pack)
 
   def create(index: Index): Future[WriteResult] =
     runner(
@@ -477,10 +481,9 @@ private class DefaultCollectionIndexesManager(
       new CreateIndexes.Command[Pack](db.name, List(index)),
       ReadPreference.primary)
 
-  private implicit def dropWriter =
-    DropIndexes.writer(Serialization.internalSerializationPack)
+  private implicit def dropWriter: pack.Writer[ResolvedCollectionCommand[DropIndexes]] = DropIndexes.writer(Serialization.internalSerializationPack)
 
-  private implicit def dropReader =
+  private implicit def dropReader: pack.Reader[DropIndexesResult] =
     DropIndexes.reader(Serialization.internalSerializationPack)
 
   def drop(indexName: String): Future[Int] = {
@@ -730,7 +733,6 @@ object IndexesManager {
     }
   }
 
-  private[api] implicit lazy val nsIndexReader =
-    nsIndexReader[Serialization.Pack](Serialization.internalSerializationPack)
+  private[api] implicit lazy val nsIndexReader: Serialization.Pack#Reader[NSIndex.Aux[Serialization.Pack]] = nsIndexReader[Serialization.Pack](Serialization.internalSerializationPack)
 
 }

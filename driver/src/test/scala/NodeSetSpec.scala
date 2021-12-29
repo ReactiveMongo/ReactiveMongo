@@ -4,6 +4,8 @@ import scala.concurrent.{ Await, Future }
 
 import scala.collection.immutable.ListSet
 
+import scala.math.Ordering
+
 import akka.actor.ActorRef
 import akka.testkit.TestActorRef
 
@@ -41,7 +43,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with ConnectAllTest with UnresponsiveSecondaryTest {
 
-  "Node set" title
+  "Node set".title
 
   sequential // for ConnectAllSpec
   stopOnFail
@@ -191,7 +193,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
         import akka.pattern.ask
         import akka.util.Timeout
 
-        implicit def timeout = Timeout(3.seconds)
+        implicit def timeout: Timeout = Timeout(3.seconds)
 
         ask(sys, fakeResponse(
           doc = isPrim, reqID = isMasterReqId())).mapTo[NodeSet]
@@ -246,7 +248,7 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
         authenticates = Set.empty,
         compression = ListSet.empty)
 
-      implicit def ordering = scala.math.Ordering.by[Node, String](_.name)
+      implicit def ordering: Ordering[Node] = Ordering.by[Node, String](_.name)
 
       "for primary" in {
         ns.pick(
@@ -304,7 +306,8 @@ final class NodeSetSpec(implicit val ee: ExecutionEnv)
     val supervisorName = s"withConAndSys-sup-${System identityHashCode ee}"
     val poolName = s"withConAndSys-con-${System identityHashCode f}"
 
-    @inline implicit def sys = reactivemongo.api.tests.system(drv)
+    @inline implicit def sys: akka.actor.ActorSystem =
+      reactivemongo.api.tests.system(drv)
 
     val auths = Seq(Authenticate(
       Common.commonDb, "test", Some("password")))

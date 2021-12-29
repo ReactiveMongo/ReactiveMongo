@@ -34,4 +34,4 @@ ThisBuild / version := {
   }
 }
 
-ThisBuild / version := "1.1.0-RC2-SNAPSHOT"
+ThisBuild / version := "1.1.0-RC2-6760159-SNAPSHOT"

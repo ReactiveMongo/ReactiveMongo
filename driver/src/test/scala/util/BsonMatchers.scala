@@ -12,7 +12,7 @@ object BsonMatchers {
 
   class HaveField[T](key: String)(implicit reader: BSONReader[T]) {
     def that(matcher: Matcher[T]): Matcher[BSONDocument] = {
-      doc: BSONDocument => doc.getAsOpt[T](key) must beSome(matcher)
+      (_: BSONDocument).getAsOpt[T](key) must beSome(matcher)
     }
   }
 }

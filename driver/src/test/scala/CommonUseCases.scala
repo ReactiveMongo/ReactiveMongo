@@ -15,7 +15,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with org.specs2.specification.AfterAll {
 
-  "Common use cases" title
+  "Common use cases".title
 
   sequential
   stopOnFail

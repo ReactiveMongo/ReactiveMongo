@@ -31,7 +31,7 @@ import reactivemongo.api.MongoConnectionOptions
 
 import _root_.tests.NettyEmbedder
 
-trait ConnectAllTest { _: NodeSetSpec =>
+trait ConnectAllTest { _self: NodeSetSpec =>
   import reactivemongo.api.tests.connectAll
 
   private val testhost = java.net.InetAddress.getLocalHost.getHostName

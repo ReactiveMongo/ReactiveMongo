@@ -27,6 +27,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{
   Collection,
+  CollectionStats,
   Cursor,
   CursorProducer,
   DB,
@@ -40,12 +41,15 @@ import reactivemongo.api.{
 
 import reactivemongo.api.commands.{
   CollStats,
+  Create,
+  CreateCollection,
   Command,
   CommandException,
   CommandCodecs,
   CommandCodecsWithPack,
   DeleteCommand,
   InsertCommand,
+  ResolvedCollectionCommand,
   UpdateCommand,
   UpdateWriteResultFactory,
   UpsertedFactory,
@@ -68,7 +72,8 @@ import reactivemongo.api.gridfs.{ FileToSave => SF, ReadFile => RF }
  * @define readFileParam the file to be read
  * @define fileReader fileReader a file reader automatically resolved if `Id` is a valid value
  */
-sealed trait GridFS[P <: SerializationPack] extends PackSupport[P]
+sealed trait GridFS[P <: SerializationPack]
+  extends GridFSCompat with PackSupport[P]
   with InsertCommand[P] with DeleteCommand[P] with UpdateCommand[P]
   with UpdateWriteResultFactory[P] with UpsertedFactory[P]
   with CommandCodecsWithPack[P] with QueryBuilderFactory[P] { self =>
@@ -119,15 +124,16 @@ sealed trait GridFS[P <: SerializationPack] extends PackSupport[P]
 
   import builder.{ document, elementProducer => elem }
 
-  type ReadFile[+Id <: P#Value] = RF[Id, pack.Document]
+  type ReadFile[+Id <: pack.Value] = RF[Id, pack.Document]
 
-  type FileToSave[Id <: P#Value] = SF[Id, pack.Document]
+  type FileToSave[Id <: pack.Value] = SF[Id, pack.Document]
 
   @annotation.implicitNotFound("Cannot resolve a file reader: make sure Id type ${Id} is a serialized value (e.g. kind of BSON value) and that a ClassTag instance is implicitly available for")
-  private[api] sealed trait FileReader[Id <: P#Value] {
+  private[api] sealed trait FileReader[Id <: pack.Value] {
     def read(doc: pack.Document): ReadFile[Id]
 
-    implicit lazy val reader = pack.reader[ReadFile[Id]](read(_))
+    implicit lazy val reader: pack.Reader[ReadFile[Id]] =
+      pack.reader[ReadFile[Id]](read(_))
   }
 
   private[api] object FileReader {
@@ -195,8 +201,8 @@ sealed trait GridFS[P <: SerializationPack] extends PackSupport[P]
    * }}}
    */
   def find(selector: pack.Document)(implicit cp: CursorProducer[ReadFile[pack.Value]]): cp.ProducedCursor = {
-    implicit def w = pack.IdentityWriter
-    implicit def r = FileReader.default(pack.IsValue)
+    implicit def w: pack.Writer[pack.Document] = pack.IdentityWriter
+    implicit def r: FileReader[pack.Value] = FileReader.default(pack.IsValue)
 
     find[pack.Document, pack.Value](selector)
   }
@@ -212,7 +218,7 @@ sealed trait GridFS[P <: SerializationPack] extends PackSupport[P]
     readPreference: ReadPreference = defaultReadPreference)(implicit cp: CursorProducer[Array[Byte]]): cp.ProducedCursor = {
     val selectorOpts = chunkSelector(file)
     val sortOpts = document(Seq(elem("n", builder.int(1))))
-    implicit def reader = chunkReader
+    implicit def reader: pack.Reader[Array[Byte]] = chunkReader
 
     val query = chunkQueryBuilder.filter(selectorOpts).sort(sortOpts)
 
@@ -590,13 +596,12 @@ sealed trait GridFS[P <: SerializationPack] extends PackSupport[P]
 
   // Coll creation
 
-  private lazy val createCollCmd = reactivemongo.api.commands.Create()
+  private lazy val createCollCmd = Create()
 
-  private implicit lazy val unitReader =
+  private implicit lazy val unitReader: pack.Reader[Unit] =
     CommandCodecs.unitReader[pack.type](pack)
 
-  private implicit lazy val createWriter =
-    reactivemongo.api.commands.CreateCollection.writer[pack.type](pack)
+  private implicit lazy val createWriter: pack.Writer[ResolvedCollectionCommand[Create]] = CreateCollection.writer[pack.type](pack)
 
   private def create(coll: Collection)(implicit ec: ExecutionContext) =
     runner(coll, createCollCmd, defaultReadPreference).recover {
@@ -610,29 +615,15 @@ sealed trait GridFS[P <: SerializationPack] extends PackSupport[P]
 
   private lazy val collStatsCmd = new CollStats()
 
-  private implicit lazy val collStatsWriter = CollStats.writer[pack.type](pack)
+  private implicit lazy val collStatsWriter: pack.Writer[ResolvedCollectionCommand[CollStats]] = CollStats.writer[pack.type](pack)
 
-  private implicit lazy val collStatsReader = CollStats.reader[pack.type](pack)
+  private implicit lazy val collStatsReader: pack.Reader[CollectionStats] =
+    CollStats.reader[pack.type](pack)
 
   @inline private def stats(coll: Collection)(implicit ec: ExecutionContext) =
     runner(coll, collStatsCmd, defaultReadPreference)
 
   // ---
-
-  /* Concats two array - fast way */
-  private def concat[T](a1: Array[T], a2: Array[T])(implicit m: Manifest[T]): Array[T] = {
-    var i, j = 0
-    val result = new Array[T](a1.length + a2.length)
-    while (i < a1.length) {
-      result(i) = a1(i)
-      i = i + 1
-    }
-    while (j < a2.length) {
-      result(i + j) = a2(j)
-      j = j + 1
-    }
-    result
-  }
 
   override def toString: String = s"GridFS(db = ${db.name}, files = ${fileColl.name}, chunks = ${chunkColl.name})"
 }

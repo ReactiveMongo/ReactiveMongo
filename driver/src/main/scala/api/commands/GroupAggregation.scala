@@ -1,12 +1,12 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ PackSupport, SerializationPack }
 
 /**
  * @define fieldParam the name of field to group
  */
 private[commands] trait GroupAggregation[P <: SerializationPack] {
-  aggregation: AggregationFramework[P] =>
+  aggregation: PackSupport[P] with AggregationFramework[P] =>
 
   /**
    * Represents one of the group/accumulator operators,
@@ -511,7 +511,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     override def toString: String = s"StdDevPop(${expression})"
   }
 
-  object StdDevPop extends {
+  object StdDevPop {
     def apply(expression: pack.Value): StdDevPop = new StdDevPop(expression)
   }
 

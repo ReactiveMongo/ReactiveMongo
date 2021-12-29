@@ -205,7 +205,7 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
   }
 }
 
-sealed trait LowPriorityNettyEmbedder { _: NettyEmbedder.type =>
+sealed trait LowPriorityNettyEmbedder { _self: NettyEmbedder.type =>
   implicit def defaultOnComplete[T]: OnComplete[T] = new OnComplete[T] {
     def onComplete(underlying: T, f: () => Unit): Unit = f()
   }

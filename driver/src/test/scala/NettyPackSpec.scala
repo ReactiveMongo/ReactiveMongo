@@ -1,7 +1,7 @@
 package reactivemongo.core
 
 final class NettyPackSpec extends org.specs2.mutable.Specification {
-  "Netty pack" title
+  "Netty pack".title
 
   "Pack" should {
     import netty.Pack

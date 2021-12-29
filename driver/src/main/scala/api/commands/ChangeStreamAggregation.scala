@@ -1,12 +1,12 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ ChangeStreams, SerializationPack }
+import reactivemongo.api.{ ChangeStreams, PackSupport, SerializationPack }
 
 /**
  * [[https://github.com/mongodb/specifications/blob/master/source/change-streams/change-streams.rst#server-specification Change stream]]
  */
 trait ChangeStreamAggregation[P <: SerializationPack] {
-  aggregation: AggregationFramework[P] =>
+  aggregation: PackSupport[P] with AggregationFramework[P] =>
 
   /**
    * Low level pipeline operator which allows to open a tailable cursor

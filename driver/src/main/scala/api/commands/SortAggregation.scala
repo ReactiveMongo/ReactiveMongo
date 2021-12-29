@@ -1,9 +1,9 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ PackSupport, SerializationPack }
 
 private[commands] trait SortAggregation[P <: SerializationPack] {
-  aggregation: AggregationFramework[P] =>
+  aggregation: PackSupport[P] with AggregationFramework[P] =>
 
   /**
    * [[https://docs.mongodb.org/v3.0/reference/operator/aggregation/meta/#exp._S_meta Keyword of metadata]].

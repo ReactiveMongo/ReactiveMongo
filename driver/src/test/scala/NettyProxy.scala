@@ -309,10 +309,6 @@ object NettyProxy {
               log.error(s"fails to prepare address '$repr'", e)
               None
           }
-
-          case _ =>
-            log.error(s"invalid remote address: $repr")
-            None
         }
       }
   }

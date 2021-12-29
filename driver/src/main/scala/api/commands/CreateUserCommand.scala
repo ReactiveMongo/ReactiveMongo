@@ -92,7 +92,8 @@ object AuthenticationRestriction {
     new AuthenticationRestriction(clientSource, serverAddress)
 }
 
-private[reactivemongo] trait CreateUserCommand[P <: SerializationPack] { _: PackSupport[P] =>
+private[reactivemongo] trait CreateUserCommand[P <: SerializationPack] {
+  _self: PackSupport[P] =>
 
   /**
    * The [[https://docs.mongodb.com/manual/reference/command/createUser/ createUser]] command.

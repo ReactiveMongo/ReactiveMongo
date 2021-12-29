@@ -1,6 +1,6 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.SerializationPack
+import reactivemongo.api.{ PackSupport, SerializationPack }
 
 /**
  * @define queryParam the value or values to search for
@@ -8,7 +8,7 @@ import reactivemongo.api.SerializationPack
  * @define scoreParam the optional score modifier (default: `None`)
  */
 private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
-  aggregation: AggregationFramework[P] =>
+  aggregation: PackSupport[P] with AggregationFramework[P] =>
 
   /**
    * '''EXPERIMENTAL:''' See [[AtlasSearch$]]

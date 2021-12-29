@@ -97,7 +97,7 @@ object WriteResult {
 }
 
 private[reactivemongo] trait LastErrorFactory[P <: SerializationPack] {
-  _: UpsertedFactory[P] =>
+  _self: PackSupport[P] with UpsertedFactory[P] =>
 
   @SuppressWarnings(Array("IncorrectlyNamedExceptions"))
   private[reactivemongo] final class LastError(
@@ -237,7 +237,7 @@ private[reactivemongo] case class DefaultWriteResult(
 }
 
 private[reactivemongo] trait UpdateWriteResultFactory[P <: SerializationPack] {
-  _: PackSupport[P] with UpsertedFactory[P] =>
+  _self: PackSupport[P] with UpsertedFactory[P] =>
 
   /**
    * [[https://docs.mongodb.com/manual/reference/command/update/#output Result]] for the update operations.

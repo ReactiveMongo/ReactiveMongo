@@ -30,7 +30,7 @@ object ReadPreference {
   @SuppressWarnings(Array("MethodNames"))
   private[reactivemongo] def TagFilter(
     tags: Seq[Map[String, String]]): Option[Map[String, String] => Boolean] = {
-    if (tags.isEmpty) None else Some { ts: Map[String, String] =>
+    if (tags.isEmpty) None else Some { (ts: Map[String, String]) =>
       val matching = tags.find(_.foldLeft(Map.empty[String, String]) {
         case (ms, (k, v)) =>
           if (ts.get(k) contains v) {
