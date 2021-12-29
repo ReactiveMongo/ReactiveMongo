@@ -33,15 +33,12 @@ object Dependencies {
   }
 
   val specsVer = Def.setting[String] {
-    if (scalaBinaryVersion.value startsWith "3") {
-      "5.0.0-RC-22"
-    } else {
-      "4.5.1"/*"4.3.5"*/
-    }
+    "4.5.1"/*"4.3.5"*/
   }
 
   val specs = Def.setting[ModuleID] {
-    "org.specs2" %% "specs2-core" % specsVer.value % Test
+    ("org.specs2" %% "specs2-core" % specsVer.value).
+      cross(CrossVersion.for3Use2_13) % Test
   }
 
   val slf4jVer = "1.7.32"

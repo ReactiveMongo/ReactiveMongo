@@ -20,6 +20,9 @@ import reactivemongo.io.netty.buffer.ByteBuf
 import reactivemongo.core.protocol.buffer.{
   ChannelBufferReadable,
   ChannelBufferWritable,
+  IntChannelInteroperable,
+  LongChannelInteroperable,
+  StringChannelInteroperable,
   writeTupleToBuffer2,
   writeTupleToBuffer3,
   writeTupleToBuffer4
@@ -236,7 +239,7 @@ private[reactivemongo] case class Delete(
 private[reactivemongo] case class KillCursors(cursorIDs: Set[Long]) extends RequestOp {
   val code = 2007
 
-  val writeTo: ByteBuf => Unit = { buffer: ByteBuf =>
+  val writeTo: ByteBuf => Unit = { (buffer: ByteBuf) =>
     buffer writeIntLE 0
     buffer writeIntLE cursorIDs.size
 
@@ -258,7 +261,7 @@ private[reactivemongo] case class CompressedOp(
 
   val size = 4 + 4 + 1
 
-  val writeTo: ByteBuf => Unit = { buffer: ByteBuf =>
+  val writeTo: ByteBuf => Unit = { (buffer: ByteBuf) =>
     buffer writeIntLE originalOpCode
     buffer writeIntLE uncompressedSize
     buffer writeByte compressorId.toInt

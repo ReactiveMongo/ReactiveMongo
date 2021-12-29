@@ -10,7 +10,7 @@ import reactivemongo.api.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
 import reactivemongo.core.protocol.Response
 
-trait SerializationPack { self: Singleton =>
+trait SerializationPack extends SerializationPackCompat { self: Singleton =>
   type Value
   type ElementProducer
   type Document <: Value
@@ -21,9 +21,6 @@ trait SerializationPack { self: Singleton =>
 
   private[reactivemongo] val IsDocument: ClassTag[Document]
   private[reactivemongo] val IsValue: ClassTag[Value]
-
-  val IdentityWriter: Writer[Document]
-  val IdentityReader: Reader[Document]
 
   def serialize[A](a: A, writer: Writer[A]): Document
 

@@ -70,7 +70,7 @@ private[reactivemongo] object ReplyDocumentIterator
 }
 
 private[reactivemongo] sealed trait ReplyDocumentIteratorLowPriority {
-  _: ReplyDocumentIterator.type =>
+  _self: ReplyDocumentIterator.type =>
 
   def parse[P <: SerializationPack, A](pack: P)(response: Response)(implicit reader: pack.Reader[A]): Iterator[A] = response match {
     case Response.CommandError(_, _, _, cause) =>

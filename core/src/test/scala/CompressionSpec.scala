@@ -69,7 +69,7 @@ final class CompressionSpec extends org.specs2.mutable.Specification {
       val compressed = PooledByteBufAllocator.DEFAULT.directBuffer(sz)
 
       s"size $sz" in {
-        encode(orig, compressed) must beSuccessfulTry({}) and {
+        encode(orig, compressed) must beSuccessfulTry[Unit](()) and {
           orig.readableBytes must_=== 0
         } and {
           val decompressed = PooledByteBufAllocator.DEFAULT.directBuffer(sz)
@@ -105,7 +105,7 @@ final class CompressionSpec extends org.specs2.mutable.Specification {
 
       "work with recurrent data" >> {
         def data(sz: Int): Array[Byte] = {
-          val byte = Random.nextInt.toByte
+          val byte = Random.nextInt().toByte
           Array.fill[Byte](sz)(byte)
         }
 

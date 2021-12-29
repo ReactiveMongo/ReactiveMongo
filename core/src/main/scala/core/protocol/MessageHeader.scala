@@ -5,6 +5,7 @@ import reactivemongo.io.netty.buffer.ByteBuf
 import reactivemongo.core.protocol.buffer.{
   ChannelBufferReadable,
   ChannelBufferWritable,
+  IntChannelInteroperable,
   writeTupleToBuffer4
 }
 

@@ -30,7 +30,8 @@ object Compiler {
       "-unchecked",
       "-deprecation",
       "-feature",
-      "-Xfatal-warnings"
+      "-Xfatal-warnings",
+      "-language:higherKinds"
     ),
     scalacOptions ++= {
       if (scalaBinaryVersion.value startsWith "2.") {
