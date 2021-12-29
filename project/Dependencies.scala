@@ -21,7 +21,8 @@ object Dependencies {
     val ver = sys.env.get("AKKA_VERSION").getOrElse {
       val v = scalaBinaryVersion.value
 
-      if (v == "2.12" || v == "2.13") "2.5.32"
+      if (v startsWith "3") "2.6.18"
+      else if (v == "2.12" || v == "2.13") "2.5.32"
       else "2.3.13"
     }
 
@@ -32,7 +33,11 @@ object Dependencies {
   }
 
   val specsVer = Def.setting[String] {
-    "4.5.1"/*"4.3.5"*/
+    if (scalaBinaryVersion.value startsWith "3") {
+      "5.0.0-RC-22"
+    } else {
+      "4.5.1"/*"4.3.5"*/
+    }
   }
 
   val specs = Def.setting[ModuleID] {
@@ -40,7 +45,7 @@ object Dependencies {
   }
 
   val slf4jVer = "1.7.32"
-  val log4jVer = "2.17.0"
+  val log4jVer = "2.17.0" // TODO: Remove
 
   val slf4j = "org.slf4j" % "slf4j-api" % slf4jVer
   val slf4jSimple = "org.slf4j" % "slf4j-simple" % slf4jVer
