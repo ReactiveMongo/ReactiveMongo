@@ -159,8 +159,11 @@ final class DB private[api] (
       Future.successful(this) // NoOp
 
     case _ => {
-      implicit def w = StartSession.commandWriter(internalSerializationPack)
-      implicit def r = StartSessionResult.reader(internalSerializationPack)
+      implicit def w: pack.Writer[StartSession.type] =
+        StartSession.commandWriter(internalSerializationPack)
+
+      implicit def r: pack.Reader[StartSessionResult] =
+        StartSessionResult.reader(internalSerializationPack)
 
       Command.run(internalSerializationPack, failoverStrategy).
         apply(this, StartSession, defaultReadPreference).map { res =>
@@ -330,7 +333,8 @@ final class DB private[api] (
 
       case Success(tx) => tx.writeConcern match {
         case Some(wc) => {
-          implicit def w = EndTransaction.commandWriter
+          implicit def w: Serialization.Pack#Writer[EndTransaction] =
+            EndTransaction.commandWriter
 
           connection.database("admin").flatMap { adminDb =>
             Command.run(internalSerializationPack, failoverStrategy).apply(
@@ -417,7 +421,8 @@ final class DB private[api] (
 
   private def endSessionById(failIfNotStarted: Boolean)(command: java.util.UUID => EndSessions)(implicit ec: ExecutionContext): Future[DB] = session.map(_.lsid) match {
     case Some(lsid) => {
-      implicit def w = EndSessions.commandWriter(internalSerializationPack)
+      implicit def w: pack.Writer[EndSessions] =
+        EndSessions.commandWriter(internalSerializationPack)
 
       Command.run(internalSerializationPack, failoverStrategy).
         apply(this, command(lsid), defaultReadPreference).map(_ =>
@@ -511,7 +516,7 @@ final class DB private[api] (
     command: pack.Document,
     failoverStrategy: FailoverStrategy): CursorFetcher[pack.type, Cursor] = {
     val runner = Command.run[pack.type](pack, failoverStrategy)
-    implicit def w = pack.IdentityWriter
+    implicit def w: pack.Writer[pack.Document] = pack.IdentityWriter
     import runner.RawCommand.writer
 
     runner(this, runner.rawCommand(command))

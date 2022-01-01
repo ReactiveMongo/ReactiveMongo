@@ -534,12 +534,14 @@ trait QueryBuilderFactory[P <: SerializationPack]
      * {{{
      * import scala.concurrent.{ ExecutionContext, Future }
      *
-     * import reactivemongo.api.bson.{ BSONDocument, Macros }
+     * import reactivemongo.api.bson.{
+     *   BSONDocument, BSONDocumentHandler, Macros
+     * }
      * import reactivemongo.api.bson.collection.BSONCollection
      *
      * case class User(name: String, pass: String)
      *
-     * implicit val handler = Macros.reader[User]
+     * implicit val handler: BSONDocumentHandler[User] = Macros.handler[User]
      *
      * def findUser(coll: BSONCollection, name: String)(
      *   implicit ec: ExecutionContext): Future[Option[User]] =
@@ -603,12 +605,14 @@ trait QueryBuilderFactory[P <: SerializationPack]
      * import scala.concurrent.{ ExecutionContext, Future }
      *
      * import reactivemongo.api.ReadPreference
-     * import reactivemongo.api.bson.{ BSONDocument, Macros }
+     * import reactivemongo.api.bson.{
+     *   BSONDocument, BSONDocumentHandler, Macros
+     * }
      * import reactivemongo.api.bson.collection.BSONCollection
      *
      * case class User(name: String, pass: String)
      *
-     * implicit val handler = Macros.handler[User]
+     * implicit val handler: BSONDocumentHandler[User] = Macros.handler[User]
      *
      * def findUser(coll: BSONCollection, name: String)(
      *   implicit ec: ExecutionContext): Future[User] =
@@ -690,8 +694,6 @@ trait QueryBuilderFactory[P <: SerializationPack]
 
           case HintDocument(doc) =>
             elements += element(f"$$hint", doc)
-
-          case _ =>
         }
 
         maxTimeMs.foreach { l =>
@@ -858,7 +860,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
       reader: pack.Reader[T]): Cursor.WithOps[T] = {
 
       val body = {
-        if (version.compareTo(MongoWireVersion.V32) < 0) { _: Int =>
+        if (version.compareTo(MongoWireVersion.V32) < 0) { (_: Int) =>
           val buffer = pack.writeToBuffer(
             WritableBuffer.empty,
             merge(readPreference, Int.MaxValue))
@@ -867,7 +869,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
             projection.fold(buffer) { pack.writeToBuffer(buffer, _) }.
               buffer)
 
-        } else { maxDocs: Int =>
+        } else { (maxDocs: Int) =>
           // if MongoDB 3.2+, projection is managed in merge
           def prepared = pack.writeToBuffer(
             WritableBuffer.empty,

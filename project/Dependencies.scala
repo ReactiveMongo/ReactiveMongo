@@ -21,7 +21,8 @@ object Dependencies {
     val ver = sys.env.get("AKKA_VERSION").getOrElse {
       val v = scalaBinaryVersion.value
 
-      if (v == "2.12" || v == "2.13") "2.5.32"
+      if (v startsWith "3") "2.6.18"
+      else if (v == "2.12" || v == "2.13") "2.5.32"
       else "2.3.13"
     }
 
@@ -36,11 +37,11 @@ object Dependencies {
   }
 
   val specs = Def.setting[ModuleID] {
-    "org.specs2" %% "specs2-core" % specsVer.value % Test
+    ("org.specs2" %% "specs2-core" % specsVer.value).
+      cross(CrossVersion.for3Use2_13) % Test
   }
 
   val slf4jVer = "1.7.32"
-  val log4jVer = "2.17.0"
 
   val slf4j = "org.slf4j" % "slf4j-api" % slf4jVer
   val slf4jSimple = "org.slf4j" % "slf4j-simple" % slf4jVer
@@ -48,8 +49,7 @@ object Dependencies {
   val logApi = Seq(
     slf4j % Provided,
     "com.lmax" % "disruptor" % "3.4.4" % Test
-  ) ++ Seq("log4j-core", "log4j-slf4j-impl").map(
-    "org.apache.logging.log4j" % _ % log4jVer % Test)
+  )
 
   val shapelessTest = "com.chuusai" %% "shapeless" % "2.3.7"
 

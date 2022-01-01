@@ -21,7 +21,7 @@ final class IndexesSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with org.specs2.specification.AfterAll {
 
-  "Indexes management" title
+  "Indexes management".title
 
   sequential
   stopOnFail

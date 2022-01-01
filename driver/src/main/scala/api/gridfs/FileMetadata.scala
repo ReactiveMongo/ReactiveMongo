@@ -19,7 +19,7 @@ private[api] trait FileMetadata[+Id, Document] {
 }
 
 /** Computed file metadata */
-private[api] trait ComputedMetadata { _: FileMetadata[_, _] =>
+private[api] trait ComputedMetadata { _self: FileMetadata[_, _] =>
   /** The length of the file. */
   def length: Long
 

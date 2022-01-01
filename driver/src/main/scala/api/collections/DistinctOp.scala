@@ -97,7 +97,7 @@ private[api] trait DistinctOp[P <: SerializationPack] extends DistinctOpCompat[P
 
     pack.writer[DistinctCmd] {
       if (version.compareTo(MongoWireVersion.V32) >= 0) {
-        { distinct: DistinctCmd =>
+        { (distinct: DistinctCmd) =>
           val elements = Seq.newBuilder[pack.ElementProducer]
 
           elements += element("distinct", string(distinct.collection))
@@ -111,7 +111,7 @@ private[api] trait DistinctOp[P <: SerializationPack] extends DistinctOpCompat[P
 
           document(elements.result())
         }
-      } else { d: DistinctCmd =>
+      } else { (d: DistinctCmd) =>
         val elements = Seq.newBuilder[pack.ElementProducer]
 
         elements += element("distinct", string(d.collection))

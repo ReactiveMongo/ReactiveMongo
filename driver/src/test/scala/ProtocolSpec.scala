@@ -9,7 +9,7 @@ import org.specs2.concurrent.ExecutionEnv
 final class ProtocolSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
-  "Protocol" title
+  "Protocol".title
 
   import reactivemongo.api.tests.{
     Response,

@@ -26,12 +26,12 @@ import reactivemongo.util.LazyLogger
  * import scala.concurrent.{ ExecutionContext, Future }
  *
  * import reactivemongo.api.Cursor
- * import reactivemongo.api.bson.{ BSONDocument, Macros }
+ * import reactivemongo.api.bson.{ BSONDocument, BSONDocumentReader, Macros }
  * import reactivemongo.api.bson.collection.BSONCollection
  *
  * case class User(name: String, pass: String)
  *
- * implicit val handler = Macros.reader[User]
+ * implicit val reader: BSONDocumentReader[User] = Macros.reader[User]
  *
  * def findUsers(coll: BSONCollection)(
  *   implicit ec: ExecutionContext): Future[List[User]] =

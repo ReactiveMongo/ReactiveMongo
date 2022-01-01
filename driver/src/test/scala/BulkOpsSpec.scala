@@ -11,7 +11,7 @@ import org.specs2.concurrent.ExecutionEnv
 final class BulkOpsSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
-  "Bulk operations" title
+  "Bulk operations".title
 
   val doc1 = BSONDocument("foo" -> 1)
   val doc2 = BSONDocument("bar" -> "lorem ipsum", "int" -> 2)
@@ -31,7 +31,8 @@ final class BulkOpsSpec(implicit ee: ExecutionEnv)
     maxBsonSize = bsonSize2,
     maxBulkSize = 2)(_.byteSize)
 
-  implicit val docOrdering = math.Ordering.by[BSONDocument, Int](_.hashCode)
+  implicit val docOrdering: math.Ordering[BSONDocument] =
+    math.Ordering.by[BSONDocument, Int](_.hashCode)
 
   // ---
 

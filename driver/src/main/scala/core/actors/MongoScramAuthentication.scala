@@ -8,8 +8,7 @@ import reactivemongo.api.{
   AuthenticationMode,
   ReadPreference,
   ScramSha1Authentication,
-  ScramSha256Authentication,
-  SerializationPack
+  ScramSha256Authentication
 }
 
 import reactivemongo.core.errors.CommandException
@@ -89,10 +88,6 @@ private[reactivemongo] trait MongoScramSha256Authentication
 
 private[reactivemongo] sealed trait MongoScramAuthentication[M <: AuthenticationMode.Scram] { system: MongoDBSystem =>
   import org.apache.commons.codec.binary.Base64
-
-  protected type Pack <: SerializationPack
-
-  protected val pack: Pack
 
   protected val mechanism: M
 
@@ -240,7 +235,7 @@ private[reactivemongo] sealed trait MongoScramAuthentication[M <: Authentication
       updateNodeSet(s"ScramNegociation($mechanism, $chanId)") { ns =>
         resp.fold(
           { r => handleAuthResponse(ns, response)(r) },
-          { payload: Array[Byte] =>
+          { (payload: Array[Byte]) =>
             debug(s"2-phase $mechanism negotiation")
 
             ns.pickByChannelId(chanId).fold(ns) { byChan =>

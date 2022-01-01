@@ -12,7 +12,7 @@ import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 final class FindAndModifySpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
-  "FindAndModify" title
+  "FindAndModify".title
 
   import reactivemongo.api.TestCompat._
   import tests.Common, Common._

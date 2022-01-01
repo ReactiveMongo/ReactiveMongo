@@ -79,8 +79,6 @@ private[api] trait CountOp[P <: SerializationPack] {
 
         case HintDocument(spec) =>
           elements += element("hint", spec)
-
-        case hint => println(s"Unsupported count hint: $hint") // should never
       }
 
       elements ++= writeReadConcern(count.command.readConcern)

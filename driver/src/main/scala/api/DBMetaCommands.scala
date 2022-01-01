@@ -5,6 +5,7 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.api.commands.{
   AuthenticationRestriction,
   CreateUserCommand,
+  CollectionNames,
   CommandCodecs,
   RenameCollection
 }
@@ -24,7 +25,7 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
     PingCommand,
     UserRole
   }
-  private implicit lazy val dropWriter =
+  private implicit lazy val dropWriter: pack.Writer[DropDatabase.type] =
     DropDatabase.writer(internalSerializationPack)
 
   /**
@@ -84,7 +85,7 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    *
    * def listIndexes(db: DB)(
    *   implicit ec: ExecutionContext): Future[List[String]] =
-   *   db.indexesManager.list().map(_.flatMap { ni: NSIndex =>
+   *   db.indexesManager.list().map(_.flatMap { (ni: NSIndex) =>
    *     ni.index.name.toList
    *   })
    * }}}
@@ -93,10 +94,9 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
 
   private[api] def indexesManager[P <: SerializationPack](pack: P)(implicit ec: ExecutionContext): IndexesManager.Aux[P] = IndexesManager[P](pack, self)
 
-  private implicit lazy val colNamesWriter =
-    ListCollectionNames.writer(internalSerializationPack)
+  private implicit lazy val colNamesWriter: pack.Writer[ListCollectionNames.type] = ListCollectionNames.writer(internalSerializationPack)
 
-  private implicit lazy val colNamesReader =
+  private implicit lazy val colNamesReader: pack.Reader[CollectionNames] =
     ListCollectionNames.reader(internalSerializationPack)
 
   /**
@@ -114,7 +114,7 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
   final def collectionNames(implicit ec: ExecutionContext): Future[List[String]] = Command.run(internalSerializationPack, failoverStrategy)(
     self, ListCollectionNames, ReadPreference.primary).map(_.names)
 
-  private lazy implicit val renameWriter =
+  private lazy implicit val renameWriter: pack.Writer[RenameCollection] =
     RenameCollection.writer(internalSerializationPack)
 
   /**
@@ -152,8 +152,8 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
       ReadPreference.primary).map(_ => self.collection(to))
   }
 
-  private implicit lazy val createUserWriter = super.createUserWriter(
-    connectionState.metadata.maxWireVersion)
+  private implicit lazy val createUserWriter: pack.Writer[CreateUser] =
+    super.createUserWriter(connectionState.metadata.maxWireVersion)
 
   /**
    * [[https://docs.mongodb.com/manual/reference/command/createUser/ Create the user]] with given properties.
@@ -223,8 +223,7 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
     pack.writer[PingCommand.type] { _ => cmd }
   }
 
-  private implicit lazy val pingReader: pack.Reader[Boolean] =
-    CommandCodecs.dealingWithGenericCommandExceptionsReader[Pack, Boolean](internalSerializationPack) { _ => true }
+  private implicit lazy val pingReader: pack.Reader[Boolean] = CommandCodecs.commandBooleanReader(pack)
 
   /**
    * Tests if the server, resolved according to the given read preference, responds to commands.
@@ -246,5 +245,5 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
     implicit
     ec: ExecutionContext): Future[Boolean] =
     Command.run(internalSerializationPack, failoverStrategy).
-      apply(self, PingCommand, readPreference)
+      apply[Boolean, PingCommand.type](self, PingCommand, readPreference)
 }

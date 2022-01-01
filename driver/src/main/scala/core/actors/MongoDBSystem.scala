@@ -19,7 +19,7 @@ import java.nio.channels.ClosedChannelException
 
 import java.net.InetSocketAddress
 
-import scala.concurrent.{ Await, Future, Promise }
+import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
 
 import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
@@ -150,7 +150,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
   private val monitors = scala.collection.mutable.ListBuffer[ActorRef]()
 
-  @inline implicit def ec = context.system.dispatcher
+  @inline implicit def ec: ExecutionContext = context.system.dispatcher
 
   // Inner jobs
   private var connectAllJob: Cancellable = NoJob
@@ -228,8 +228,6 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     new InternalState(snap.foldLeft(Array.empty[StackTraceElement]) {
       case (trace, (time, event: String)) => new StackTraceElement(
         "reactivemongo", event, s"<time:$time>", -1) +: trace
-
-      case (trace, _) => trace
     })
   }
 
@@ -591,7 +589,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     }
   }
 
-  private def acceptBalancedCon(chans: IMap[ChannelId, Int]): Connection => Boolean = { c: Connection =>
+  private def acceptBalancedCon(chans: IMap[ChannelId, Int]): Connection => Boolean = { (c: Connection) =>
     val count: Int = chans.getOrElse(c.channel.id, 0)
 
     !c.signaling && options.maxInFlightRequestsPerChannel.forall(count < _)
@@ -1795,7 +1793,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
   }
 
   private object NoJob extends Cancellable {
-    val cancel = false
+    def cancel() = false
     val isCancelled = false
   }
 

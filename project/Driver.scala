@@ -18,6 +18,13 @@ final class Driver(core: Project) {
   lazy val module = Project("ReactiveMongo", file("driver")).
     settings(Seq(
         description := "ReactiveMongo is a Scala driver that provides fully non-blocking and asynchronous I/O operations ",
+        scalacOptions ++= {
+          if (scalaBinaryVersion.value == "3") {
+            Seq("-Wconf:cat=deprecation&msg=.*(MongoWireVersion|reflectiveSelectableFromLangReflectiveCalls|right-biased|scheduleAtFixedRate|filterInPlace|AtlasSearch).*:s")
+          } else {
+            Seq.empty
+          }
+        },
         Compile / unmanagedSourceDirectories ++= {
           val v = scalaBinaryVersion.value
 
@@ -63,12 +70,15 @@ final class Driver(core: Project) {
         libraryDependencies ++= akka.value ++ Seq(
           "dnsjava" % "dnsjava" % "3.4.3",
           commonsCodec,
-          shapelessTest % Test, specs.value) ++ logApi,
+          specs.value,
+          "ch.qos.logback" % "logback-classic" % "1.2.10" % Test,
+        ) ++ logApi,
         mimaBinaryIssueFilters ++= {
           import com.typesafe.tools.mima.core._
 
           val mtp = ProblemFilters.exclude[MissingTypesProblem](_)
           val fcp = ProblemFilters.exclude[FinalClassProblem](_)
+          val fmp = ProblemFilters.exclude[FinalMethodProblem](_)
 
           Seq(
             mtp("reactivemongo.api.ConnectionState$"),
@@ -80,7 +90,8 @@ final class Driver(core: Project) {
             fcp("reactivemongo.core.protocol.Request"),
             mtp("reactivemongo.core.protocol.Request$"),
             fcp("reactivemongo.core.protocol.RequestMaker"),
-            mtp("reactivemongo.core.protocol.RequestMaker$")
+            mtp("reactivemongo.core.protocol.RequestMaker$"),
+            fmp("reactivemongo.api.DefaultCursor#GetMoreCursor.builder")
           )
         },
         Test / testOptions += {

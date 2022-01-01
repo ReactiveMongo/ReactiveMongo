@@ -13,7 +13,7 @@ import reactivemongo.api.{
 }
 
 final class SessionSpec extends org.specs2.mutable.Specification {
-  "Session" title
+  "Session".title
 
   sequential
   stopOnFail

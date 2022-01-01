@@ -23,7 +23,7 @@ import reactivemongo.api.bson.{
 import reactivemongo.api.tests, tests.Pack
 
 final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
-  "Query builder" title
+  "Query builder".title
 
   section("unit")
 

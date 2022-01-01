@@ -23,8 +23,8 @@ trait Command {
 
 trait CollectionCommand extends Command
 
-trait CommandWithResult[R] { _: Command => }
-trait CommandWithPack[P <: SerializationPack] { _: Command => }
+trait CommandWithResult[R] { _self: Command => }
+trait CommandWithPack[P <: SerializationPack] { _self: Command => }
 
 /**
  * @param response the response associated with the result

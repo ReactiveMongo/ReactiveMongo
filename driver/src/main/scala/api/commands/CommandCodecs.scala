@@ -48,6 +48,8 @@ private[reactivemongo] object CommandCodecs {
     }
   }
 
+  def commandBooleanReader[P <: SerializationPack](pack: P): pack.Reader[Boolean] = dealingWithGenericCommandExceptionsReader[pack.type, Boolean](pack) { _ => true }
+
   /**
    * Helper to read a command result, with error handling.
    */
@@ -95,7 +97,7 @@ private[reactivemongo] object CommandCodecs {
 
   def unitReader[P <: SerializationPack](pack: P): pack.Reader[Unit] = dealingWithGenericCommandExceptionsReader[pack.type, Unit](pack) { _ => () }
 
-  def writeReadConcern[P <: SerializationPack](builder: SerializationPack.Builder[P]): ReadConcern => Seq[builder.pack.ElementProducer] = { c: ReadConcern => Seq(builder.elementProducer("level", builder.string(c.level))) }
+  def writeReadConcern[P <: SerializationPack](builder: SerializationPack.Builder[P]): ReadConcern => Seq[builder.pack.ElementProducer] = { (c: ReadConcern) => Seq(builder.elementProducer("level", builder.string(c.level))) }
 
   def writeSessionReadConcern[P <: SerializationPack](builder: SerializationPack.Builder[P]): Option[Session] => ReadConcern => Seq[builder.pack.ElementProducer] = {
     import builder.{ document, elementProducer => element, pack }
@@ -116,7 +118,7 @@ private[reactivemongo] object CommandCodecs {
           if (!s.transaction.filter(_.flagSent).isSuccess) {
             // No transaction, or flag not yet send (first tx command)
             s.operationTime match {
-              case Some(opTime) => { c: ReadConcern =>
+              case Some(opTime) => { (c: ReadConcern) =>
                 elements += element("readConcern", document(
                   simpleReadConcern(c) :+ element(
                     "afterClusterTime", builder.timestamp(opTime))))
@@ -124,13 +126,13 @@ private[reactivemongo] object CommandCodecs {
                 elements.result()
               }
 
-              case _ => { rc: ReadConcern =>
+              case _ => { (rc: ReadConcern) =>
                 elements += simpleRead(rc)
 
                 elements.result()
               }
             }
-          } else { _: ReadConcern =>
+          } else { (_: ReadConcern) =>
             // Ignore: Only the first command in a transaction
             // may specify a readConcern (code=72)
 
@@ -138,7 +140,7 @@ private[reactivemongo] object CommandCodecs {
           }
         }
 
-        case _ => { c: ReadConcern => Seq(simpleRead(c)) }
+        case _ => { (c: ReadConcern) => Seq(simpleRead(c)) }
       }
     }
   }
@@ -156,7 +158,7 @@ private[reactivemongo] object CommandCodecs {
     builder: SerializationPack.Builder[P]): WriteConcern => builder.pack.Document = {
     val writeGLEW = writeWriteConcernWWriter(builder)
 
-    { writeConcern: WriteConcern =>
+    { (writeConcern: WriteConcern) =>
       import builder.{ elementProducer => element, int }
 
       val elements = Seq.newBuilder[builder.pack.ElementProducer]
@@ -175,7 +177,7 @@ private[reactivemongo] object CommandCodecs {
   def writeSession[P <: SerializationPack](builder: SerializationPack.Builder[P]): Session => Seq[builder.pack.ElementProducer] = {
     import builder.{ elementProducer => element }
 
-    { session: Session =>
+    { (session: Session) =>
       val idElmt = builder.document(Seq(
         element("id", builder.uuid(session.lsid))))
 

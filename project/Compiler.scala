@@ -25,60 +25,100 @@ object Compiler {
       unmanaged(scalaVersion.value, (Test / sourceDirectory).value)
     },
     scalacOptions ++= Seq(
-      "-encoding", "UTF-8",
+      "-encoding",
+      "UTF-8",
       "-unchecked",
       "-deprecation",
       "-feature",
-      "-language:higherKinds",
       "-Xfatal-warnings",
-      "-Xlint",
-      "-Ywarn-numeric-widen",
-      "-Ywarn-dead-code",
-      "-Ywarn-value-discard",
-      "-g:vars"
+      "-language:higherKinds"
     ),
-    Compile / scalacOptions ++= {
-      val ver = scalaBinaryVersion.value
-
-      if (ver == "2.12") {
+    scalacOptions ++= {
+      if (scalaBinaryVersion.value startsWith "2.") {
         Seq(
-          "-Xmax-classfile-name", "128",
-          "-Ywarn-macros:after")
-      } else if (ver != "2.11") { // 2.13
-        Seq("-Wmacros:after")
-      } else Seq(
-        "-Xmax-classfile-name", "128",
-        "-Yconst-opt",
-        "-Yclosure-elim",
-        "-Ydead-code",
-        "-Yopt:_"
+          "-target:jvm-1.8",
+          "-Xlint",
+          "-g:vars"
+        )
+      } else Seq()
+    },
+    scalacOptions ++= {
+      val sv = scalaBinaryVersion.value
+
+      if (sv == "2.12") {
+        Seq(
+          "-Xmax-classfile-name",
+          "128",
+          "-Ywarn-numeric-widen",
+          "-Ywarn-dead-code",
+          "-Ywarn-value-discard",
+          "-Ywarn-infer-any",
+          "-Ywarn-unused",
+          "-Ywarn-unused-import",
+          "-Xlint:missing-interpolator",
+          "-Ywarn-macros:after"
+        )
+      } else if (sv == "2.11") {
+        Seq(
+          "-Xmax-classfile-name",
+          "128",
+          "-Yopt:_",
+          "-Ydead-code",
+          "-Yclosure-elim",
+          "-Yconst-opt"
+        )
+      } else if (sv == "2.13") {
+        Seq(
+          "-explaintypes",
+          "-Werror",
+          "-Wnumeric-widen",
+          "-Wdead-code",
+          "-Wvalue-discard",
+          "-Wextra-implicit",
+          "-Wmacros:after",
+          "-Wunused"
+        )
+      } else {
+        Seq("-Wunused:all", "-language:implicitConversions")
+      }
+    },
+    Compile / console / scalacOptions ~= {
+      _.filterNot(o =>
+        o.startsWith("-X") || o.startsWith("-Y") || o.startsWith("-P:silencer")
       )
     },
-    libraryDependencies ++= Seq(
-      compilerPlugin(
-        ("com.github.ghik" %% "silencer-plugin" % silencerVersion.value).
-          cross(CrossVersion.full)),
-      ("com.github.ghik" %% "silencer-lib" % silencerVersion.
-        value % Provided).cross(CrossVersion.full)),
+    Test / scalacOptions ~= {
+      _.filterNot(_ == "-Xfatal-warnings")
+    },
+    libraryDependencies ++= {
+      // Silencer
+      if (!scalaBinaryVersion.value.startsWith("3")) {
+        val silencerVersion = "1.7.7"
+
+        Seq(
+          compilerPlugin(
+            ("com.github.ghik" %% "silencer-plugin" % silencerVersion)
+              .cross(CrossVersion.full)
+          ),
+          ("com.github.ghik" %% "silencer-lib" % silencerVersion % Provided)
+            .cross(CrossVersion.full)
+        )
+      } else Seq.empty
+    },
     Compile / scalacOptions ++= {
       val v = scalaBinaryVersion.value
 
       val mongo30eol = "MongoDB\\ 3\\.0\\ EOL\\ reached\\ by\\ Feb\\ 2018"
       val rightBiaised = "Either\\ is\\ now\\ right-biased"
 
-      val silencer = s"-P:silencer:globalFilters=$mongo30eol;$rightBiaised"
-
-      if (v == "2.13") {
-        Seq(silencer)
+      if (v startsWith "3") {
+        Seq.empty
       } else {
-        Seq(
-          "-Ywarn-infer-any",
-          "-Ywarn-unused",
-          "-Ywarn-unused-import",
-          "-Xlint:missing-interpolator",
-          silencer
-        )
+        Seq(s"-P:silencer:globalFilters=$mongo30eol;$rightBiaised")
       }
+    },
+    Compile / doc / scalacOptions ~= {
+      _.filterNot(excludeOpt)
     },
     Compile / console / scalacOptions ~= {
       _.filterNot(excludeOpt)
@@ -91,6 +131,6 @@ object Compiler {
 
   private lazy val excludeOpt: String => Boolean = { opt =>
     opt.startsWith("-X") || opt.startsWith("-Y") ||
-    opt.startsWith("-P:silencer")
+    opt.startsWith("-W") || opt.startsWith("-P:silencer")
   }
 }

@@ -34,12 +34,13 @@ import _root_.tests.Common
 final class MonitorSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
-  "Monitor" title
+  "Monitor".title
 
   import reactivemongo.api.tests._
   import Common.{ timeout, tryUntil }
 
-  implicit val nodeDummyOrdering = math.Ordering.by[Node, String](_.name)
+  implicit val nodeDummyOrdering: math.Ordering[Node] =
+    math.Ordering.by[Node, String](_.name)
 
   "Monitor" should {
     "manage a single node DB system" in {
@@ -67,7 +68,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
             }
 
             // #1
-            history1 aka "history #1" must not(beEmpty) and {
+            history1 aka "history #1" must not(beEmpty[Iterable[(Long, String)]]) and {
               eventually(1, timeout) {
                 nodeset1 = nodeSet(dbsystem)
                 primary1 = nodeset1.primary
@@ -132,12 +133,12 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
       )
 
       // Disable logging (as simulating errors)
-      val log = org.apache.logging.log4j.LogManager.
+      val log = org.slf4j.LoggerFactory.
         getLogger("akka.actor.OneForOneStrategy").
-        asInstanceOf[org.apache.logging.log4j.core.Logger]
+        asInstanceOf[ch.qos.logback.classic.Logger]
 
       val level = log.getLevel
-      log.setLevel(org.apache.logging.log4j.Level.OFF)
+      log.setLevel(ch.qos.logback.classic.Level.OFF)
       //
 
       withConAndSys(options = opts) { (con, sysRef) =>
@@ -157,7 +158,8 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
                 _.authenticatedConnections.toList
               }
 
-              authCon1 aka "connections #1" must not(beEmpty)
+              authCon1 aka "connections #1" must not(
+                beEmpty[Vector[Connection]])
             }
           } and {
             nodeset1.pick(ReadPreference.Primary, 1, _ => true).

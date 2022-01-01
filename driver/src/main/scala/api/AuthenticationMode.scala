@@ -15,7 +15,7 @@ private[reactivemongo] object AuthenticationMode {
 // SCRAM
 
 private[reactivemongo] sealed trait ScramAuthentication {
-  _: AuthenticationMode =>
+  _self: AuthenticationMode =>
 }
 
 /** [[https://docs.mongodb.com/manual/core/security-scram/index.html SCRAM]]-SHA-1 authentication (since MongoDB 3.6) */

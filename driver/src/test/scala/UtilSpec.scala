@@ -6,7 +6,7 @@ import scala.concurrent.duration._
 final class UtilSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
-  "Utilities" title
+  "Utilities".title
 
   section("unit")
   "URI" should {

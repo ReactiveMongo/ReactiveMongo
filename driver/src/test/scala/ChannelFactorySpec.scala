@@ -20,7 +20,7 @@ import _root_.tests.{ Common, NettyEmbedder }
 final class ChannelFactorySpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification with AfterAll {
 
-  "Channel factory" title
+  "Channel factory".title
 
   import reactivemongo.api.tests.{
     channelFactory,
@@ -40,7 +40,7 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
   }, IsMasterCommand.IsMasterResult
 
   import Common.timeout
-  implicit def actorSys = Common.driverSystem
+  implicit def actorSys: akka.actor.ActorSystem = Common.driverSystem
 
   val factory = channelFactory("sup-1", "con-2", Common.DefaultOptions)
 

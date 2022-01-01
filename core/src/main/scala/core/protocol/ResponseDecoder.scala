@@ -84,21 +84,19 @@ private[reactivemongo] class ResponseDecoder
     allocDirect: Int => ByteBuf): Response = {
     val originalOpCode = frame.readIntLE
     val uncompressedSize = frame.readIntLE
-    val compressorId = frame.readUnsignedByte
+    val compressorId: Short = frame.readUnsignedByte
 
-    val uncompress: Function2[ByteBuf, ByteBuf, Try[Int]] = compressorId match {
-      case Compressor.Zlib.id =>
+    val uncompress: Function2[ByteBuf, ByteBuf, Try[Int]] = {
+      if (compressorId == Compressor.Zlib.id) {
         buffer.Zlib.DefaultCompressor.decode(_: ByteBuf, _: ByteBuf)
-
-      case Compressor.Zstd.id =>
+      } else if (compressorId == Compressor.Zstd.id) {
         buffer.Zstd(allocDirect = allocDirect).decode(_: ByteBuf, _: ByteBuf)
-
-      case Compressor.Snappy.id =>
+      } else if (compressorId == Compressor.Snappy.id) {
         buffer.Snappy.DefaultCompressor.decode(_: ByteBuf, _: ByteBuf)
-
-      case id =>
+      } else {
         throw new IllegalStateException(
-          s"Unexpected compressor ID: ${id}")
+          s"Unexpected compressor ID: ${compressorId}")
+      }
     }
 
     val newHeader = header.copy(

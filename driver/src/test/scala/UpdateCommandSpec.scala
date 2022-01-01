@@ -20,7 +20,7 @@ import reactivemongo.api.commands.{
 }
 
 final class UpdateCommandSpec extends org.specs2.mutable.Specification {
-  "Update command" title
+  "Update command".title
 
   section("unit")
   "Update command" should {

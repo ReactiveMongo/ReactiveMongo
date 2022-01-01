@@ -63,7 +63,7 @@ trait AggregationOps[P <: SerializationPack] {
     val comment: Option[String],
     val collation: Option[Collation]) {
 
-    def prepared[AC[_] <: Cursor.WithOps[_]](
+    def prepared[AC[U] <: Cursor.WithOps[U]](
       implicit
       cp: CursorProducer.Aux[T, AC]): Aggregator[T, AC] =
       new Aggregator[T, AC](this, cp)
@@ -77,7 +77,7 @@ trait AggregationOps[P <: SerializationPack] {
 
     def cursor: AC[T] = {
       def batchSz = context.batchSize.getOrElse(defaultCursorBatchSize)
-      implicit def writer = commandWriter[T]
+      implicit def writer: pack.Writer[AggregateCmd[T]] = commandWriter[T]
       implicit def aggReader: pack.Reader[T] = context.reader
 
       val cmd = new Aggregate[T](
@@ -171,8 +171,6 @@ trait AggregationOps[P <: SerializationPack] {
 
         case HintDocument(doc) =>
           elements += element("hint", doc)
-
-        case _ =>
       }
 
       cmd.collation.foreach { collation =>

@@ -122,7 +122,7 @@ package object util extends UtilCompat {
     srvPrefix: String = "_mongodb._tcp",
     timeout: FiniteDuration = dnsTimeout): SRVRecordResolver = {
     implicit ec: ExecutionContext =>
-      { name: String =>
+      { (name: String) =>
         val service = Name.fromConstantString(name + '.')
 
         if (service.labels < 3) {
@@ -155,7 +155,7 @@ package object util extends UtilCompat {
   def txtRecords(
     timeout: FiniteDuration = dnsTimeout)(
     implicit
-    ec: ExecutionContext): TXTResolver = { name: String =>
+    ec: ExecutionContext): TXTResolver = { (name: String) =>
     val lookup = new Lookup(name, Type.TXT)
 
     lookup.setResolver {

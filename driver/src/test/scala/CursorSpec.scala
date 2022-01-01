@@ -15,7 +15,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification with CursorSpecEnv
   with Cursor1Spec with TailableCursorSpec {
 
-  "Cursor" title
+  "Cursor".title
 
   sequential
   stopOnFail

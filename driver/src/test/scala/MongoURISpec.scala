@@ -24,7 +24,7 @@ import reactivemongo.api.tests.{ ParsedURI, parseURIWithDB }
 final class MongoURISpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
-  "Mongo URI" title
+  "Mongo URI".title
 
   import MongoConnectionOptions.Credential
   import tests.Common, Common.timeout
@@ -643,14 +643,14 @@ final class MongoURISpec(implicit ee: ExecutionEnv)
   private def srvRecResolver(
     services: String => Array[Record] = _ => Array.empty): SRVRecordResolver = {
     _ =>
-      { name: String =>
+      { (name: String) =>
         Future(services(name))
       }
   }
 
   private def txtResolver(
     resolve: String => ListSet[String] = _ => ListSet.empty): TXTResolver = {
-    name: String => Future(resolve(name))
+    (name: String) => Future(resolve(name))
   }
 
   def parseURI(

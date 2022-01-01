@@ -19,14 +19,14 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification
   with WithTemporaryDb with MongoSkips {
 
-  "Change stream" title
+  "Change stream".title
 
   import tests.Common.timeout
 
   "Change stream of a collection" should {
     "have an empty cursor when a new cursor is opened without resuming" in {
       skipIfNotRSAndNotVersionAtLeast(MongoWireVersion.V36) {
-        withTmpCollection(db) { coll: BSONCollection =>
+        withTmpCollection(db) { (coll: BSONCollection) =>
           // given
           val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
           val testDocument = BSONDocument(
@@ -51,7 +51,7 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
 
     "return the next change event when a new cursor is folded upon" in {
       skipIfNotRSAndNotVersionAtLeast(MongoWireVersion.V36) {
-        withTmpCollection(db) { coll: BSONCollection =>
+        withTmpCollection(db) { (coll: BSONCollection) =>
           // given
           val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
           val testDocument = BSONDocument("_id" -> "test", "foo" -> "bar")
@@ -88,7 +88,7 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
 
     "resume with the next event after a known id" in {
       skipIfNotRSAndNotVersionAtLeast(MongoWireVersion.V36) {
-        withTmpCollection(db) { coll: BSONCollection =>
+        withTmpCollection(db) { (coll: BSONCollection) =>
           import coll.AggregationFramework.ChangeStream.ResumeAfter
 
           // given
@@ -135,7 +135,7 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
 
     "resume with the same event after a known operation time" in {
       skipIfNotRSAndNotVersionAtLeast(MongoWireVersion.V40) {
-        withTmpCollection(db) { coll: BSONCollection =>
+        withTmpCollection(db) { (coll: BSONCollection) =>
           import coll.AggregationFramework.ChangeStream.StartAt
 
           // given
@@ -184,7 +184,7 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
 
     "lookup the most recent document version" in {
       skipIfNotRSAndNotVersionAtLeast(MongoWireVersion.V36) {
-        withTmpCollection(db) { coll: BSONCollection =>
+        withTmpCollection(db) { (coll: BSONCollection) =>
           type R = (String, Future[Unit], Future[BSONDocument])
 
           val fieldName = "foo"

@@ -2,11 +2,11 @@ package reactivemongo.core.nodeset
 
 sealed trait NodeStatus { def queryable = false }
 
-sealed trait QueryableNodeStatus { _: NodeStatus =>
+sealed trait QueryableNodeStatus { _self: NodeStatus =>
   override def queryable = true
 }
 
-sealed trait CanonicalNodeStatus { _: NodeStatus => }
+sealed trait CanonicalNodeStatus { _self: NodeStatus => }
 
 object NodeStatus {
   object Uninitialized extends NodeStatus {

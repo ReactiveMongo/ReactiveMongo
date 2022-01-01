@@ -12,7 +12,7 @@ import org.specs2.concurrent.ExecutionEnv
 final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
   extends org.specs2.mutable.Specification with DBSessionSpec {
 
-  "Database" title
+  "Database".title
 
   sequential
   stopOnFail
@@ -37,7 +37,7 @@ final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
         val fos1 = FailoverStrategy(FiniteDuration(50, "ms"), 20,
           { n => val w = n * 2; ws += w; w.toDouble })
         val fos2 = FailoverStrategy(FiniteDuration(50, "ms"), 20,
-          _ * 2 toDouble) // without accumulator
+          _ * 2D) // without accumulator
 
         val before = System.currentTimeMillis()
         val estmout = estTimeout(fos2)

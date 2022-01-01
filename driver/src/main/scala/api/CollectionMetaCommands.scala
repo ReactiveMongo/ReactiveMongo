@@ -15,10 +15,12 @@ import reactivemongo.api.indexes.CollectionIndexesManager
  * @define writeConcernParam the write concern for collection operations
  */
 private[api] trait CollectionMetaCommands { self: Collection =>
-  private implicit lazy val unitBoxReader =
-    CommandCodecs.unitReader(command.pack)
+  import command.pack
 
-  private implicit lazy val createWriter = CreateCollection.writer(command.pack)
+  private implicit lazy val unitBoxReader: pack.Reader[Unit] =
+    CommandCodecs.unitReader(pack)
+
+  private implicit lazy val createWriter: pack.Writer[ResolvedCollectionCommand[Create]] = CreateCollection.writer(pack)
 
   /**
    * $createDescription.
@@ -106,7 +108,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
   def drop()(implicit ec: ExecutionContext): Future[Unit] =
     drop(false).map(_ => {})
 
-  private implicit lazy val dropWriter = DropCollection.writer(command.pack)
+  private implicit lazy val dropWriter: pack.Writer[ResolvedCollectionCommand[DropCollection.type]] = DropCollection.writer(command.pack)
 
   /**
    * Drops this collection.
@@ -140,7 +142,7 @@ private[api] trait CollectionMetaCommands { self: Collection =>
       }
   }
 
-  private implicit lazy val convertWriter = ConvertToCapped.writer(command.pack)
+  private implicit lazy val convertWriter: pack.Writer[ResolvedCollectionCommand[ConvertToCapped]] = ConvertToCapped.writer(command.pack)
 
   /**
    * Converts this collection to a [[https://docs.mongodb.com/manual/core/capped-collections/ capped one]].
@@ -158,9 +160,10 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    */
   final def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] = command(self, new ConvertToCapped(new Capped(size, maxDocuments)), ReadPreference.primary)
 
-  private implicit lazy val statsWriter = CollStats.writer(command.pack)
+  private implicit lazy val statsWriter: pack.Writer[ResolvedCollectionCommand[CollStats]] = CollStats.writer(command.pack)
 
-  private implicit lazy val statsReader = CollStats.reader(command.pack)
+  private implicit lazy val statsReader: pack.Reader[CollectionStats] =
+    CollStats.reader(command.pack)
 
   /**
    * Returns various information about this collection.

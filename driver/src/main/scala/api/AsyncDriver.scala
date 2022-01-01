@@ -177,7 +177,8 @@ final class AsyncDriver(
    * }}}
    */
   def connect(uriStrict: String, name: Option[String]): Future[MongoConnection] = {
-    implicit def ec = reactivemongo.util.sameThreadExecutionContext
+    implicit def ec: ExecutionContext =
+      reactivemongo.util.sameThreadExecutionContext
 
     MongoConnection.fromString(uriStrict).flatMap {
       connect(_, name)
@@ -444,7 +445,7 @@ final class AsyncDriver(
         } else {
           context.become(closing)
 
-          implicit def timeout = close.timeout
+          implicit def timeout: FiniteDuration = close.timeout
           implicit def ec: ExecutionContext = context.dispatcher
 
           Future.sequence(driver.connectionMonitors.values.map(_.close()))

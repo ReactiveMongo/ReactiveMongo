@@ -21,7 +21,7 @@ private[reactivemongo] object QueryCodecs {
   @inline def writeReadPref[P <: SerializationPack](pack: P): ReadPreference => pack.Document = writeReadPref[pack.type](pack.newBuilder)
 
   def writeReadPref[P <: SerializationPack](builder: SerializationPack.Builder[P]): ReadPreference => builder.pack.Document =
-    { readPreference: ReadPreference =>
+    { (readPreference: ReadPreference) =>
       import builder.{ elementProducer => element, document, string }
 
       val mode = readPreference match {

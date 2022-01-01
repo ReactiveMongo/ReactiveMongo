@@ -9,7 +9,7 @@ import reactivemongo.api.tests._
 final class FailoverSpec(implicit ee: ExecutionEnv)
   extends org.specs2.mutable.Specification {
 
-  "Failover" title
+  "Failover".title
 
   import tests.Common
   import Common._

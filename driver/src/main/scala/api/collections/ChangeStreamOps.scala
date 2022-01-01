@@ -91,7 +91,7 @@ trait ChangeStreamOps[P <: SerializationPack] { collection: GenericCollection[P]
      * established, if there is is some next event. Therefore, `head` is guaranteed to eventually return the next
      * change event beyond the resume point, when such an event appears.
      */
-    def cursor[AC[_] <: Cursor.WithOps[_]](implicit cp: CursorProducer.Aux[T, AC]): AC[T] = context.prepared[AC].cursor
+    def cursor[AC[U] <: Cursor.WithOps[U]](implicit cp: CursorProducer.Aux[T, AC]): AC[T] = context.prepared[AC].cursor
 
   }
 
