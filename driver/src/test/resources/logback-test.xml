@@ -1,0 +1,36 @@
+<configuration debug="false">
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <!-- encoders are assigned the type
+         ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
+
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) %cyan(%logger{10}) - %replace(%msg){'://([^:])[^:]+:[^@]+@', '://$1####:####@'} [%thread]%n%xException</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Akka related -->
+  <logger name="akka" level="warn" />
+  <logger name="com.typesafe.sslconfig" level="warn" />
+  <logger name="serval-api" level="debug" />
+
+  <logger name="reactivemongo.api.Cursor" level="off" />
+  <logger name="reactivemongo.api.Failover" level="off" />
+  <logger name="reactivemongo.api.MongoConnection" level="off" />
+
+  <logger name="reactivemongo.api.commands" level="error" />
+
+  <logger name="reactivemongo.core" level="off" />
+
+  <logger name="reactivemongo.io.netty" level="warn" />
+  <!-- logger name="reactivemongo.io.netty.util.ResourceLeakDetector" level="trace" / -->
+
+  <!-- logger name="reactivemongo.core.netty" level="info" />
+  21:55:15.915 INFO  [r.c.n.Pack] :: Instanciated NettyPack(class reactivemongo.io.netty.channel.kqueue.KQueueSocketChannel)
+  -->
+
+  <logger name="NettyProxy" level="debug" />
+
+  <root level="warn">
+    <appender-ref ref="STDOUT" />
+  </root>
+</configuration>

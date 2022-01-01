@@ -42,7 +42,6 @@ object Dependencies {
   }
 
   val slf4jVer = "1.7.32"
-  val log4jVer = "2.17.0" // TODO: Remove
 
   val slf4j = "org.slf4j" % "slf4j-api" % slf4jVer
   val slf4jSimple = "org.slf4j" % "slf4j-simple" % slf4jVer
@@ -50,8 +49,7 @@ object Dependencies {
   val logApi = Seq(
     slf4j % Provided,
     "com.lmax" % "disruptor" % "3.4.4" % Test
-  ) ++ Seq("log4j-core", "log4j-slf4j-impl").map(
-    "org.apache.logging.log4j" % _ % log4jVer % Test)
+  )
 
   val shapelessTest = "com.chuusai" %% "shapeless" % "2.3.7"
 

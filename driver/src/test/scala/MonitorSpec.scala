@@ -133,12 +133,12 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
       )
 
       // Disable logging (as simulating errors)
-      val log = org.apache.logging.log4j.LogManager.
+      val log = org.slf4j.LoggerFactory.
         getLogger("akka.actor.OneForOneStrategy").
-        asInstanceOf[org.apache.logging.log4j.core.Logger]
+        asInstanceOf[ch.qos.logback.classic.Logger]
 
       val level = log.getLevel
-      log.setLevel(org.apache.logging.log4j.Level.OFF)
+      log.setLevel(ch.qos.logback.classic.Level.OFF)
       //
 
       withConAndSys(options = opts) { (con, sysRef) =>

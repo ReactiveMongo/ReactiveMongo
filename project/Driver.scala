@@ -70,7 +70,9 @@ final class Driver(core: Project) {
         libraryDependencies ++= akka.value ++ Seq(
           "dnsjava" % "dnsjava" % "3.4.3",
           commonsCodec,
-          /* TODO: shapelessTest % Test, */ specs.value) ++ logApi,
+          specs.value,
+          "ch.qos.logback" % "logback-classic" % "1.2.10" % Test,
+        ) ++ logApi,
         mimaBinaryIssueFilters ++= {
           import com.typesafe.tools.mima.core._
 
