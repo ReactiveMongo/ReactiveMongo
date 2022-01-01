@@ -117,6 +117,9 @@ object Compiler {
         Seq(s"-P:silencer:globalFilters=$mongo30eol;$rightBiaised")
       }
     },
+    Compile / doc / scalacOptions ~= {
+      _.filterNot(excludeOpt)
+    },
     Compile / console / scalacOptions ~= {
       _.filterNot(excludeOpt)
     },
@@ -128,6 +131,6 @@ object Compiler {
 
   private lazy val excludeOpt: String => Boolean = { opt =>
     opt.startsWith("-X") || opt.startsWith("-Y") ||
-    opt.startsWith("-P:silencer")
+    opt.startsWith("-W") || opt.startsWith("-P:silencer")
   }
 }

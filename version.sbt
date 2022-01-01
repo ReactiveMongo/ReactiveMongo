@@ -1,6 +1,6 @@
 ThisBuild / dynverVTagPrefix := false
 
-ThisBuild / version := "1.1.0-RC2-SNAPSHOT" // TODO: Remove
+ThisBuild / version := "1.1.0-RC2" // TODO: Remove
 
 /* TODO: Once 1.1.0-RC2 published
 

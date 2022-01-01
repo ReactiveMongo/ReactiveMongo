@@ -33,7 +33,7 @@ object Common extends AutoPlugin {
 
   val scala211 = "2.11.12"
   val scala213 = "2.13.7"
-  val scala3 = "3.1.2-RC1-bin-20211222-c94b333-NIGHTLY"
+  val scala31 = "3.1.2-RC1-bin-20211222-c94b333-NIGHTLY"
 
   def majorVersion = {
     val Major = """([0-9]+)\.([0-9]+)\..*""".r
@@ -54,7 +54,7 @@ object Common extends AutoPlugin {
 
   override def projectSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
     scalaVersion := "2.12.15",
-    crossScalaVersions := Seq(scala211, scalaVersion.value, scala213, scala3),
+    crossScalaVersions := Seq(scala211, scalaVersion.value, scala213, scala31),
     crossVersion := CrossVersion.binary,
     useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
     target := {
@@ -82,10 +82,6 @@ object Common extends AutoPlugin {
 
       Seq((Compile / sourceDirectory).value / jdir)
     },
-    Compile / doc / scalacOptions ++= Seq("-unchecked", "-deprecation",
-      /*"-diagrams", */"-implicits", "-skip-packages", "samples"),
-    Compile / doc / scalacOptions ++= Opts.doc.title("ReactiveMongo API"),
-    Compile / doc / scalacOptions ++= Opts.doc.version(majorVersion.value),
     Compile / packageBin / mappings ~= filter,
     Compile / packageSrc / mappings ~= filter,
     Compile / packageDoc / mappings ~= filter,

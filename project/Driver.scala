@@ -78,6 +78,7 @@ final class Driver(core: Project) {
 
           val mtp = ProblemFilters.exclude[MissingTypesProblem](_)
           val fcp = ProblemFilters.exclude[FinalClassProblem](_)
+          val fmp = ProblemFilters.exclude[FinalMethodProblem](_)
 
           Seq(
             mtp("reactivemongo.api.ConnectionState$"),
@@ -89,7 +90,8 @@ final class Driver(core: Project) {
             fcp("reactivemongo.core.protocol.Request"),
             mtp("reactivemongo.core.protocol.Request$"),
             fcp("reactivemongo.core.protocol.RequestMaker"),
-            mtp("reactivemongo.core.protocol.RequestMaker$")
+            mtp("reactivemongo.core.protocol.RequestMaker$"),
+            fmp("reactivemongo.api.DefaultCursor#GetMoreCursor.builder")
           )
         },
         Test / testOptions += {
