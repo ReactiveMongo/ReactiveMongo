@@ -1,9 +1,5 @@
 ThisBuild / dynverVTagPrefix := false
 
-ThisBuild / version := "1.1.0-RC2" // TODO: Remove
-
-/* TODO: Once 1.1.0-RC2 published
-
 ThisBuild / version := {
   val Stable = """([0-9]+)\.([0-9]+)\.([0-9]+)""".r
 
@@ -37,4 +33,3 @@ ThisBuild / version := {
       sys.error("Fails to resolve Git information")
   }
 }
- */
