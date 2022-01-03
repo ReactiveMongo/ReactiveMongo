@@ -428,7 +428,9 @@ final class AsyncDriver(
         sender() ! connection
       }
 
-      case Terminated(actor) => {
+      case term: Terminated => {
+        import term.actor
+
         logger.debug(
           s"[$supervisorName] Connection is terminated: ${actor.path}")
 
@@ -462,7 +464,9 @@ final class AsyncDriver(
         case AddConnection(name, _, _, _) =>
           logger.warn(s"[$supervisorName] Refusing to add connection while the driver is closing: $name")
 
-        case Terminated(actor) =>
+        case term: Terminated =>
+          import term.actor
+
           driver.connectionMonitors.remove(actor).foreach { con =>
             logger.debug(s"[$supervisorName] Connection is terminated: ${con.name}")
 
