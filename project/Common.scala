@@ -32,7 +32,7 @@ object Common extends AutoPlugin {
   private val java8 = scala.util.Properties.isJavaAtLeast("1.8")
 
   val scala211 = "2.11.12"
-  val scala213 = "2.13.7"
+  val scala213 = "2.13.8"
   val scala31 = "3.1.2-RC1-bin-20220106-0b4c6e7-NIGHTLY"
 
   def majorVersion = {
