@@ -1,6 +1,5 @@
 package reactivemongo
 
-import reactivemongo.api.bson.BSONDocument.pretty
 import reactivemongo.api.bson.{ BSONArray, BSONDocument }
 import reactivemongo.api.commands.{ DeleteCommand, ResolvedCollectionCommand }
 import reactivemongo.api.{ PackSupport, Session, WriteConcern }
