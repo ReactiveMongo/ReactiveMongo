@@ -13,7 +13,7 @@ import reactivemongo.api.{
  */
 private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackSupport[P] =>
 
-  private[api] final class Delete(
+  private[reactivemongo] final class Delete(
     val deletes: Seq[DeleteElement],
     val ordered: Boolean,
     val writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[DeleteResult] {
@@ -21,7 +21,7 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackS
   }
 
   /** Delete command element */
-  final class DeleteElement private[api] (
+  final class DeleteElement private[reactivemongo] (
     _q: pack.Document,
     _limit: Int,
     _collation: Option[Collation]) {
@@ -53,11 +53,11 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackS
   /** Result for a delete command */
   final type DeleteResult = DefaultWriteResult
 
-  protected final type DeleteCmd = ResolvedCollectionCommand[Delete]
+  protected[reactivemongo] final type DeleteCmd = ResolvedCollectionCommand[Delete]
 
   private[reactivemongo] def session(): Option[Session]
 
-  protected final implicit lazy val deleteWriter: pack.Writer[DeleteCmd] =
+  protected[reactivemongo] final implicit lazy val deleteWriter: pack.Writer[DeleteCmd] =
     deleteWriter(self.session())
 
   protected final def deleteWriter(
@@ -84,7 +84,7 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackS
       delete.command.deletes.headOption.foreach { first =>
         elements += element("deletes", builder.array(
           writeElement(builder, first) +:
-            delete.command.deletes.map(writeElement(builder, _))))
+            delete.command.deletes.tail.map(writeElement(builder, _))))
       }
 
       builder.document(elements.result())
