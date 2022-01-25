@@ -41,7 +41,7 @@ object Dependencies {
       cross(CrossVersion.for3Use2_13) % Test
   }
 
-  val slf4jVer = "1.7.33"
+  val slf4jVer = "1.7.35"
 
   val slf4j = "org.slf4j" % "slf4j-api" % slf4jVer
   val slf4jSimple = "org.slf4j" % "slf4j-simple" % slf4jVer
