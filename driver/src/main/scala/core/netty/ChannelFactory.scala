@@ -122,8 +122,6 @@ private[reactivemongo] final class ChannelFactory(
     val pipeline = channel.pipeline
     val idleTimeMS = maxIdleTimeMS.toLong
 
-    println(s"initChannel: idleTimeMS = $idleTimeMS")
-
     pipeline.addLast("idleState", new IdleStateHandler(
       idleTimeMS, idleTimeMS, 0, TimeUnit.MILLISECONDS))
 

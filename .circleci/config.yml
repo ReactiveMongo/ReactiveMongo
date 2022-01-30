@@ -190,12 +190,16 @@ commands:
       - deploy:
           name: Publish artifacts to Sonatype Snapshots
           command: |
+                    sbt || echo 'Missing SBT'
+                    export JAVA_HOME=/usr/local/openjdk-8/
+                    export PATH=$PATH:~/sbt/bin:$JAVA_HOME/bin
+
                     if [ ! "${CIRCLE_BRANCH}" = "master" ]; then
                       echo "Skipped on branch ${CIRCLE_BRANCH}"
                       exit 0
                     fi
 
-                    V=`sbt 'show version' 2>&1 | tail -n 2 | cut -d ']' -f 2 | grep SNAPSHOT | sed -e 's/[ \t]*//g'`
+                    V=`sbt ';project ReactiveMongo-Core ;show version' | grep -A 1 ReactiveMongo-Core | grep -v ReactiveMongo-Core | cut -d ' ' -f 2`
 
                     if [ `echo "$V" | grep -- '-SNAPSHOT' | wc -l` -eq 0 ]; then
                       S=`echo "$V" | perl -pe 's/([0-9]+)$/${\($1 + 1)}-SNAPSHOT/'`

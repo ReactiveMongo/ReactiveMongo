@@ -33,9 +33,7 @@ private[reactivemongo] class MongoHandler(
   override def userEventTriggered(
     ctx: ChannelHandlerContext, evt: Any): Unit = {
     evt match {
-      case e: IdleStateEvent => {
-        println(s"IdleStateEvent($e)")
-
+      case _: IdleStateEvent => {
         if (last != -1L) {
           val now = System.nanoTime()
 
@@ -56,8 +54,6 @@ private[reactivemongo] class MongoHandler(
   @SuppressWarnings(Array("NullParameter"))
   override def channelInactive(ctx: ChannelHandlerContext): Unit = {
     val now = System.nanoTime()
-
-    println("-> channelInactive")
 
     if (last != -1) {
       val chan = ctx.channel

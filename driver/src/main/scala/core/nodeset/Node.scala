@@ -63,7 +63,6 @@ private[reactivemongo] final class Node(
     case Some(_) => Success(this)
 
     case _ =>
-      println("createSignaling")
       createConnection(
         channelFactory, heartbeatFrequencyMS, receiver, true).map { con =>
         copy(connections = con +: connections)

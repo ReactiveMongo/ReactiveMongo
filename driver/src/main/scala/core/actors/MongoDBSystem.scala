@@ -1102,8 +1102,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
         updateHistory(s"SetUnavailable(${ns.toShortString})")
       } else {
-        //debug
-        _println("The entire node set is still unreachable, is there a network problem?")
+        debug("The entire node set is still unreachable, is there a network problem?")
       }
     } else if (!ns.primary.isDefined) {
       if (primaryWasAvailable) {
@@ -1113,8 +1112,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
         updateHistory(s"OnDisconnect$$PrimaryUnavailable(${ns.toShortString})")
       } else {
-        //debug
-        _println("The primary is still unavailable, is there a network problem?")
+        debug("The primary is still unavailable, is there a network problem?")
       }
     }
 
@@ -1159,8 +1157,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
   private def onIsMaster(response: Response): Unit = {
     val isMaster = pack.readAndDeserialize(response, isMasterReader)
 
-    //trace
-    _println(s"IsMaster response document: $isMaster")
+    trace(s"IsMaster response document: $isMaster")
 
     val updated = {
       val respTo = response.header.responseTo

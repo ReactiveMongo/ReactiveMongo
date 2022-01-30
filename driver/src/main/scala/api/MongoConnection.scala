@@ -185,8 +185,7 @@ final class MongoConnection private[reactivemongo] (
     implicit
     ec: ExecutionContext): Future[ConnectionState] = {
 
-    //debug
-    println("Waiting is available...")
+    debug("Waiting is available...")
 
     val timeoutFactor = 1.25D
     val timeout: FiniteDuration = (1 to failoverStrategy.retries).
@@ -250,8 +249,6 @@ final class MongoConnection private[reactivemongo] (
         else IsPrimaryAvailable(p)
       }
 
-      println(s"check = $check")
-
       monitor ! check
 
       import akka.pattern.after
@@ -301,8 +298,7 @@ final class MongoConnection private[reactivemongo] (
 
     val receive: Receive = {
       case available: PrimaryAvailable => {
-        //debug
-        println(s"A primary is available: ${available.metadata}")
+        debug(s"A primary is available: ${available.metadata}")
 
         _metadata = Some(available.metadata)
 
@@ -315,8 +311,7 @@ final class MongoConnection private[reactivemongo] (
       }
 
       case PrimaryUnavailable => {
-        //debug
-        println("There is no primary available")
+        debug("There is no primary available")
 
         if (!setUnavailable.trySuccess({})) {
           setUnavailable = Promise.successful({})
@@ -353,13 +348,11 @@ final class MongoConnection private[reactivemongo] (
       }
 
       case IsAvailable(result) => {
-        println(s"?IsAvail: ${setAvailable.future.value}")
         result.completeWith(setAvailable.future)
         ()
       }
 
       case IsPrimaryAvailable(result) => {
-        println(s"?IsPrimAvail: ${primaryAvailable.future.value}")
         result.completeWith(primaryAvailable.future)
         ()
       }
