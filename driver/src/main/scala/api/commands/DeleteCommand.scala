@@ -74,8 +74,15 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackS
 
       elements ++= Seq(
         element("delete", builder.string(delete.collection)),
-        element("ordered", builder.boolean(delete.command.ordered)),
-        element("writeConcern", writeWriteConcern(delete.command.writeConcern)))
+        element("ordered", builder.boolean(delete.command.ordered)))
+
+      if (!session.exists(_.transaction.isSuccess)) {
+        // writeConcern is not allowed within a multi-statement transaction
+        // code=72
+
+        elements += element(
+          "writeConcern", writeWriteConcern(delete.command.writeConcern))
+      }
 
       session.foreach { s =>
         elements ++= writeSession(s)
