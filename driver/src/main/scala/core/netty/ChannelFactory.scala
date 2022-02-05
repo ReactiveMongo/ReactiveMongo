@@ -60,6 +60,7 @@ private[reactivemongo] final class ChannelFactory(
   private[reactivemongo] def create(
     host: String = "localhost",
     port: Int = 27017,
+    maxIdleTimeMS: Int = options.maxIdleTimeMS,
     receiver: ActorRef): Try[Channel] = {
     if (parentGroup.isShuttingDown ||
       parentGroup.isShutdown || parentGroup.isTerminated) {
@@ -77,6 +78,7 @@ private[reactivemongo] final class ChannelFactory(
       f.attr(ChannelFactory.hostKey, host)
       f.attr(ChannelFactory.portKey, port)
       f.attr(ChannelFactory.actorRefKey, receiver)
+      f.attr(ChannelFactory.maxIdleTimeKey, maxIdleTimeMS)
 
       val resolution = f.connect(host, port).addListener(
         new ChannelFutureListener {
@@ -104,19 +106,21 @@ private[reactivemongo] final class ChannelFactory(
   def initChannel(channel: Channel): Unit = {
     val host = channel.attr(ChannelFactory.hostKey).get
     val port = channel.attr(ChannelFactory.portKey).get
+    val maxIdleTimeMS = channel.attr(ChannelFactory.maxIdleTimeKey).get
     val receiver = channel.attr(ChannelFactory.actorRefKey).get
 
-    initChannel(channel, host, port, receiver)
+    initChannel(channel, host, port, maxIdleTimeMS, receiver)
   }
 
   private[reactivemongo] def initChannel(
     channel: Channel,
     host: String, port: Int,
+    maxIdleTimeMS: Int,
     receiver: ActorRef): Unit = {
     debug(s"Initializing channel ${channel.id} to ${host}:${port} ($receiver)")
 
     val pipeline = channel.pipeline
-    val idleTimeMS = options.maxIdleTimeMS.toLong
+    val idleTimeMS = maxIdleTimeMS.toLong
 
     pipeline.addLast("idleState", new IdleStateHandler(
       idleTimeMS, idleTimeMS, 0, TimeUnit.MILLISECONDS))
@@ -269,4 +273,6 @@ private[reactivemongo] object ChannelFactory {
   val portKey = AttributeKey.newInstance[Int]("mongoPort")
 
   val actorRefKey = AttributeKey.newInstance[ActorRef]("actorRef")
+
+  val maxIdleTimeKey = AttributeKey.newInstance[Int]("maxIdleTimeMS")
 }

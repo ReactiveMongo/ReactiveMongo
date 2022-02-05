@@ -58,11 +58,13 @@ private[reactivemongo] final class Node(
   @SuppressWarnings(Array("VariableShadowing"))
   def createSignalingConnection(
     channelFactory: ChannelFactory,
+    heartbeatFrequencyMS: Int,
     receiver: ActorRef): Try[Node] = signaling match {
     case Some(_) => Success(this)
 
     case _ =>
-      createConnection(channelFactory, receiver, true).map { con =>
+      createConnection(
+        channelFactory, heartbeatFrequencyMS, receiver, true).map { con =>
         copy(connections = con +: connections)
       }
   }
@@ -71,29 +73,33 @@ private[reactivemongo] final class Node(
   @SuppressWarnings(Array("VariableShadowing"))
   private[core] def createUserConnections(
     channelFactory: ChannelFactory,
+    maxIdleTimeMS: Int,
     receiver: ActorRef,
     upTo: Int): Try[Node] = {
     val count = connections.count(!_.signaling)
 
     if (count < upTo) {
       createChannels(
-        channelFactory, receiver, upTo - count, Vector.empty).map { created =>
-        copy(connections = connections ++ created)
-      }
+        channelFactory,
+        maxIdleTimeMS,
+        receiver,
+        upTo - count,
+        Vector.empty).map { created => copy(connections = connections ++ created) }
     } else Success(this)
   }
 
   @annotation.tailrec
   private def createChannels(
     channelFactory: ChannelFactory,
+    maxIdleTimeMS: Int,
     receiver: ActorRef,
     count: Int,
     created: Vector[Connection]): Try[Vector[Connection]] = {
     if (count > 0) {
-      createConnection(channelFactory, receiver, false) match {
+      createConnection(channelFactory, maxIdleTimeMS, receiver, false) match {
         case Success(con) =>
           createChannels(
-            channelFactory, receiver, count - 1, con +: created)
+            channelFactory, maxIdleTimeMS, receiver, count - 1, con +: created)
 
         case Failure(cause) => Failure(cause)
       }
@@ -104,9 +110,10 @@ private[reactivemongo] final class Node(
 
   @inline private[core] def createConnection(
     channelFactory: ChannelFactory,
+    maxIdleTimeMS: Int,
     receiver: ActorRef,
     _signaling: Boolean): Try[Connection] =
-    channelFactory.create(host, port, receiver).map { chan =>
+    channelFactory.create(host, port, maxIdleTimeMS, receiver).map { chan =>
       new Connection(
         chan, ConnectionStatus.Connecting, Set.empty, None, _signaling)
     }

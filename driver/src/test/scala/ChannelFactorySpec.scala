@@ -89,7 +89,7 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
       val sentRequest = Promise[Array[Byte]]()
 
       NettyEmbedder.withChannel2(cid, true) { chan =>
-        initChannel(factory, chan, "foo", 27017, actorRef)
+        initChannel(factory, 0, chan, "foo", 27017, actorRef)
 
         chan.writeAndFlush(req).addListener(printOnError).
           addListener(new ChannelFutureListener {
@@ -135,7 +135,7 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
 
         val actorRef = akka.testkit.TestActorRef(actor, "test3")
 
-        createChannel(factory, actorRef, "foo", 27017).
+        createChannel(factory, actorRef, "foo", 27017, 0).
           aka("channel") must beSuccessfulTry[Channel].like {
             case chan => arch must beLike[String] {
               case "osx" =>
@@ -183,7 +183,8 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
 
       createChannel(factory, actorRef,
         host = Common.primaryHost.takeWhile(_ != ':'),
-        port = Common.primaryHost.dropWhile(_ != ':').drop(1).toInt).
+        port = Common.primaryHost.dropWhile(_ != ':').drop(1).toInt,
+        0).
         aka("channel") must beSuccessfulTry[Channel].like {
           case chan =>
             chanConnected.future must beEqualTo({}).await(1, timeout) and {
