@@ -79,6 +79,7 @@ private[reactivemongo] class MongoHandler(
 
     msg match {
       case response: Response => {
+
         log(ctx, s"Channel received message $response; Will be send to ${receiver.path}")
 
         receiver ! response

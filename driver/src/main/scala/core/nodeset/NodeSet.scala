@@ -156,6 +156,7 @@ private[reactivemongo] class NodeSet(
    */
   private[core] def createUserConnections(
     channelFactory: ChannelFactory,
+    maxIdleTimeMS: Int,
     receiver: ActorRef,
     upTo: Int): Try[NodeSet] = {
 
@@ -163,7 +164,8 @@ private[reactivemongo] class NodeSet(
     def update(ns: Vector[Node], upd: Vector[Node]): Try[Vector[Node]] =
       ns.headOption match {
         case Some(node) =>
-          node.createUserConnections(channelFactory, receiver, upTo) match {
+          node.createUserConnections(
+            channelFactory, maxIdleTimeMS, receiver, upTo) match {
             case Failure(cause) =>
               Failure(cause)
 

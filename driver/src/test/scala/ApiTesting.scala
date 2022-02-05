@@ -245,7 +245,8 @@ package object tests { self =>
     factory: ChannelFactory,
     receiver: ActorRef,
     host: String,
-    port: Int): Try[Channel] = factory.create(host, port, receiver)
+    port: Int,
+    idleMS: Int): Try[Channel] = factory.create(host, port, idleMS, receiver)
 
   @inline def releaseChannelFactory(f: ChannelFactory, clb: Promise[Unit]) =
     f.release(clb)
@@ -322,9 +323,11 @@ package object tests { self =>
 
   @inline def initChannel(
     factory: ChannelFactory,
+    idleMS: Int,
     channel: Channel,
     host: String, port: Int,
-    receiver: ActorRef) = factory.initChannel(channel, host, port, receiver)
+    receiver: ActorRef) = factory.initChannel(
+    channel, host, port, idleMS, receiver)
 
   def getBytes(buf: ByteBuf, size: Int): Array[Byte] = {
     val bytes = Array.ofDim[Byte](size)

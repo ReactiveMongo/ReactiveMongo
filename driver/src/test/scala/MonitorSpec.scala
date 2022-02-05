@@ -321,7 +321,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
                 // was unregistered
 
                 n.copy(connections = Vector.empty).createSignalingConnection(
-                  dbsystem.channelFactory, sysRef) match {
+                  dbsystem.channelFactory, 0, sysRef) match {
                     case Success(upd) => {
                       signaling.success({})
                       upd

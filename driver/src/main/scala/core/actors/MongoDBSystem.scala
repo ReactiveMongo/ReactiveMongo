@@ -241,7 +241,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     debug(s"Initial node set: ${seedNodeSet.toShortString}")
 
     seedNodeSet.updateAll { n =>
-      n.createSignalingConnection(channelFactory, self) match {
+      n.createSignalingConnection(
+        channelFactory, options.heartbeatFrequencyMS, self) match {
         case Success(node) => node
 
         case Failure(cause) => {
@@ -250,7 +251,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
           n
         }
       }
-    }.createUserConnections(channelFactory, self, 1) match {
+    }.createUserConnections(
+      channelFactory, options.maxIdleTimeMS, self, 1) match {
       case inited @ Success(ns) => {
         _nodeSet = ns
         _setInfo = ns.info
@@ -497,19 +499,21 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
             // #cch5: replace channel
 
             n.updateByChannelId(channelId)({ con =>
-              n.createConnection(channelFactory, self, con.signaling) match {
-                case Success(c) =>
-                  c
+              n.createConnection(
+                channelFactory,
+                options.maxIdleTimeMS, self, con.signaling) match {
+                  case Success(c) =>
+                    c
 
-                case Failure(cause) => {
-                  val msg = s"Cannot create connection for $n"
+                  case Failure(cause) => {
+                    val msg = s"Cannot create connection for $n"
 
-                  if (!closingFactory) warn(msg, cause)
-                  else info(msg)
+                    if (!closingFactory) warn(msg, cause)
+                    else info(msg)
 
-                  con //.copy(status = ConnectionStatus.Disconnected)
+                    con //.copy(status = ConnectionStatus.Disconnected)
+                  }
                 }
-              }
             })(identity)
           }
         }
@@ -723,14 +727,15 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
       updateNodeSet(s"ConnectAll($statusInfo)") { ns =>
         ns.createUserConnections(
-          channelFactory, self, userConnectionsPerNode) match {
-          case Success(upd) => connectAll(upd)
+          channelFactory,
+          options.maxIdleTimeMS, self, userConnectionsPerNode) match {
+            case Success(upd) => connectAll(upd)
 
-          case Failure(cause) => {
-            warn("Fails to create channels for the NodeSet", cause)
-            ns
+            case Failure(cause) => {
+              warn("Fails to create channels for the NodeSet", cause)
+              ns
+            }
           }
-        }
       }
 
       debug(s"ConnectAll Job running... Status: $statusInfo")
@@ -1230,7 +1235,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
                 Vector.empty, Set.empty, tags = Map.empty[String, String],
                 ProtocolMetadata.Default, PingInfo(), false, nanow)
 
-              n.createSignalingConnection(channelFactory, self) match {
+              n.createSignalingConnection(
+                channelFactory, options.heartbeatFrequencyMS, self) match {
                 case Success(upd) =>
                   upd
 
@@ -1309,7 +1315,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
       updateNodeSet(event) { ns =>
         ns.createUserConnections(
-          channelFactory, self, options.minIdleChannelsPerNode) match {
+          channelFactory, options.maxIdleTimeMS,
+          self, options.minIdleChannelsPerNode) match {
           case Success(upd) => upd
 
           case Failure(cause) => {

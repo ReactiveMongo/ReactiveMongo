@@ -306,7 +306,9 @@ final class DriverSpec(implicit ee: ExecutionEnv)
         "with the slow connection" in {
           def con = driver.connect(
             List(slowPrimary),
-            options = slowOpts.copy(credentials = invalidCreds))
+            options = slowOpts.copy(
+              heartbeatFrequencyMS = slowOpts.maxIdleTimeMS,
+              credentials = invalidCreds))
 
           slowProxy.isStarted must beTrue and {
             eventually(2, timeout) {
@@ -317,7 +319,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
                 await(0, slowTimeout + timeout)
             }
           }
-        }
+        } tag "wip"
       }
     }
   }
