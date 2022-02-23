@@ -6,7 +6,7 @@ lazy val `ReactiveMongo-Core` = project.in(file("core")).settings(
 
     ("org.reactivemongo" %% "reactivemongo-bson-api" % version.
       value) +: deps ++: Seq(
-        "com.github.luben" % "zstd-jni" % "1.5.2-1",
+        "com.github.luben" % "zstd-jni" % "1.5.2-2",
         "org.xerial.snappy" % "snappy-java" % "1.1.8.4",
         Dependencies.specs.value
       )
