@@ -18,7 +18,7 @@ import reactivemongo.core.actors.ExpectingResponse
 import reactivemongo.core.errors.GenericDriverException
 
 trait Command {
-  private[reactivemongo] def commandKind: CommandKind
+  protected[reactivemongo] def commandKind: CommandKind
 }
 
 trait CollectionCommand extends Command
