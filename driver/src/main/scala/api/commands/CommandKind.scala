@@ -1,8 +1,6 @@
 package reactivemongo.api.commands
 
-private[reactivemongo] final class CommandKind private (
-  val name: String) extends AnyVal {
-
+final class CommandKind(val name: String) extends AnyVal {
   override def toString = name
 }
 
