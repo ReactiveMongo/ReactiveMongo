@@ -20,7 +20,7 @@ final class Driver(core: Project) {
         description := "ReactiveMongo is a Scala driver that provides fully non-blocking and asynchronous I/O operations ",
         scalacOptions ++= {
           if (scalaBinaryVersion.value == "3") {
-            Seq("-Wconf:cat=deprecation&msg=.*(MongoWireVersion|reflectiveSelectableFromLangReflectiveCalls|right-biased|scheduleAtFixedRate|filterInPlace|AtlasSearch).*:s")
+            Seq("-Wconf:cat=deprecation&msg=.*(MongoWireVersion|reflectiveSelectableFromLangReflectiveCalls|right-biased|scheduleAtFixedRate|filterInPlace|AtlasSearch|Experimental).*:s")
           } else {
             Seq.empty
           }

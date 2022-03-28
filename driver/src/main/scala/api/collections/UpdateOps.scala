@@ -95,13 +95,39 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
     final def one[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi, collation, arrayFilters).flatMap { upd => execute(upd) }
 
     /**
+     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateElement]]) with a [[https://docs.mongodb.com/manual/reference/command/update/#update-with-an-aggregation-pipeline aggregation pipeline]].
+     *
+     * @since MongoDB 4.2
+     */
+    @com.github.ghik.silencer.silent("deprecated")
+    final def one[Q](q: Q, u: AggregationFramework.Pipeline, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[UpdateWriteResult] = element[Q](q, u, upsert, multi, collation, arrayFilters).flatMap { upd => execute(upd) }
+
+    /**
      * '''EXPERIMENTAL:'''
      * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateElement]]) with a [[https://docs.mongodb.com/manual/reference/command/update/#update-with-an-aggregation-pipeline aggregation pipeline]].
      *
      * @since MongoDB 4.2
      */
     @deprecated("Experimental", "1.0.5-SNAPSHOT")
-    final def one[Q](q: Q, u: AggregationFramework.Pipeline, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[UpdateWriteResult] = element[Q](q, u, upsert, multi, collation, arrayFilters).flatMap { upd => execute(upd) }
+    final def one[Q](q: Q, u: AggregationFramework.Pipeline, upsert: Boolean, multi: Boolean)(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[UpdateWriteResult] = element[Q](q, u, upsert, multi, None, Seq.empty).flatMap { upd => execute(upd) }
+
+    /**
+     * '''EXPERIMENTAL:'''
+     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateElement]]) with a [[https://docs.mongodb.com/manual/reference/command/update/#update-with-an-aggregation-pipeline aggregation pipeline]].
+     *
+     * @since MongoDB 4.2
+     */
+    @deprecated("Experimental", "1.0.5-SNAPSHOT")
+    final def one[Q](q: Q, u: AggregationFramework.Pipeline, upsert: Boolean)(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[UpdateWriteResult] = element[Q](q, u, upsert, false, None, Seq.empty).flatMap { upd => execute(upd) }
+
+    /**
+     * '''EXPERIMENTAL:'''
+     * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateElement]]) with a [[https://docs.mongodb.com/manual/reference/command/update/#update-with-an-aggregation-pipeline aggregation pipeline]].
+     *
+     * @since MongoDB 4.2
+     */
+    @deprecated("Experimental", "1.0.5-SNAPSHOT")
+    final def one[Q](q: Q, u: AggregationFramework.Pipeline)(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[UpdateWriteResult] = element[Q](q, u, false, false, None, Seq.empty).flatMap { upd => execute(upd) }
 
     @deprecated("Experimental", "1.0.5")
     final def one(update: UpdateElement)(implicit ec: ExecutionContext): Future[UpdateWriteResult] = execute(update)
