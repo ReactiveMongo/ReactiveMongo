@@ -140,17 +140,26 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
     {
       def spec[T](c: DefaultCollection, timeout: FiniteDuration, f: => T)(upd: T => T)(implicit w: c.pack.Writer[T], r: c.pack.Reader[T]) = {
         val person = f
+        val update = c.update
 
-        c.update.one(
+        import c.AggregationFramework._
+
+        val res: Future[c.UpdateWriteResult] = update.one[T](
           q = person,
-          u = BSONDocument(f"$$set" -> BSONDocument("age" -> 66))) must beLike[c.UpdateWriteResult] {
-            case result => result.nModified must_=== 1 and {
-              c.find(
-                selector = BSONDocument("age" -> 66),
-                projection = Option.empty[BSONDocument]).
-                one[T] must beSome(upd(person)).await(1, timeout)
-            }
-          }.await(1, timeout)
+          u = List(Set(BSONDocument("age" -> 66))),
+          upsert = false,
+          multi = false,
+          collation = None,
+          arrayFilters = Seq.empty)
+
+        res must beLike[c.UpdateWriteResult] {
+          case result => result.nModified must_=== 1 and {
+            c.find(
+              selector = BSONDocument("age" -> 66),
+              projection = Option.empty[BSONDocument]).
+              one[T] must beSome(upd(person)).await(1, timeout)
+          }
+        }.await(1, timeout)
       }
 
       section("gt_mongo32")
