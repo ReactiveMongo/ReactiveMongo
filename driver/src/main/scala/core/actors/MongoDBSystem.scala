@@ -15,6 +15,8 @@
  */
 package reactivemongo.core.actors
 
+import java.util.concurrent.TimeoutException
+
 import java.nio.channels.ClosedChannelException
 
 import java.net.InetSocketAddress
@@ -294,12 +296,17 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
       // close all connections
       val done = Promise[Unit]()
-      val relistener = new ChannelGroupFutureListener {
-        def operationComplete(future: ChannelGroupFuture): Unit =
-          factory.release(done)
-      }
 
-      allChannelGroup(ns).close().addListener(relistener)
+      if (ns.nodes.nonEmpty) {
+        val relistener = new ChannelGroupFutureListener {
+          def operationComplete(future: ChannelGroupFuture): Unit =
+            factory.release(done)
+        }
+
+        allChannelGroup(ns).close().addListener(relistener)
+      } else {
+        done.success({})
+      }
 
       // fail all requests waiting for a response
       val istate = internalState()
@@ -394,7 +401,12 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
   override def postStop(): Unit = {
     info("Stopping the MongoDBSystem")
 
-    Await.result(release("PostStop"), heartbeatFrequency)
+    try {
+      Await.result(release("PostStop"), heartbeatFrequency)
+    } catch {
+      case NonFatal(_: TimeoutException) =>
+        warn("Fails to stop in a timely manner")
+    }
 
     ()
   }

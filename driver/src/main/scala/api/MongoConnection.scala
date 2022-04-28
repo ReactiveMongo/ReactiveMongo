@@ -159,8 +159,15 @@ final class MongoConnection private[reactivemongo] (
    *   }
    * }}}
    */
-  def close()(implicit timeout: FiniteDuration): Future[_] = whenActive {
-    ask(monitor, Close("MongoConnection.askClose", timeout))(Timeout(timeout))
+  def close()(implicit timeout: FiniteDuration): Future[_] = {
+    if (!monitorInited) {
+      Future.successful({})
+    } else {
+      whenActive {
+        ask(monitor, Close("MongoConnection.askClose", timeout))(
+          Timeout(timeout))
+      }
+    }
   }
 
   /** Returns true if the connection has not been killed. */
@@ -204,7 +211,7 @@ final class MongoConnection private[reactivemongo] (
 
   private def whenActive[T](f: => Future[T]): Future[T] = {
     if (killed) {
-      debug("Cannot send request when the connection is killed")
+      debug("Cannot send request when the connection is not active")
       Future.failed(new ClosedException(supervisor, name, history()))
     } else f
   }
@@ -279,8 +286,16 @@ final class MongoConnection private[reactivemongo] (
         })))
     }
 
-  private[api] lazy val monitor = actorSystem.actorOf(
-    Props(new MonitorActor), s"Monitor-$name")
+  private var monitorInited: Boolean = false
+
+  private[api] lazy val monitor = {
+    val ref = actorSystem.actorOf(
+      Props(new MonitorActor), s"Monitor-$name")
+
+    monitorInited = true
+
+    ref
+  }
 
   @volatile private[api] var _metadata = Option.empty[ProtocolMetadata]
 
