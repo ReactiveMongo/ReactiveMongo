@@ -54,7 +54,7 @@ private[reactivemongo] class NodeSet(
       fold(ProtocolMetadata.Default)(_.protocolMetadata)
 
   def primary(authenticated: Authenticated): Option[Node] =
-    primary.filter(_.authenticated.contains(authenticated))
+    primary.filter(_.authenticated contains authenticated)
 
   def isReachable = primary.nonEmpty || _secondaries.nonEmpty
 

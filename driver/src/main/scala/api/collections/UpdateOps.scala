@@ -99,7 +99,7 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
      *
      * @since MongoDB 4.2
      */
-    @com.github.ghik.silencer.silent("deprecated")
+    @com.github.ghik.silencer.silent(".*Experimental.*")
     final def one[Q](q: Q, u: AggregationFramework.Pipeline, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[UpdateWriteResult] = element[Q](q, u, upsert, multi, collation, arrayFilters).flatMap { upd => execute(upd) }
 
     /**
