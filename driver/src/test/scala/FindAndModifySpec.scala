@@ -125,14 +125,22 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
       }
     }
 
-    "modify a document and fetch its previous value" in {
-      val incrementAge = BSONDocument(f"$$inc" -> BSONDocument("age" -> 1))
+    section("ge_mongo4")
 
+    "modify a document and fetch its previous value" in {
       eventually(2, timeout) {
         val colName = s"fam${System identityHashCode this}-3-${System.currentTimeMillis()}"
         val collection = db(colName)
 
-        def findAndUpd = collection.findAndUpdate(jack2, incrementAge)
+        val incrementAge = {
+          import collection.AggregationFramework.{ PipelineOperator, Set }
+
+          List[PipelineOperator](Set(BSONDocument(
+            "age" -> BSONDocument(f"$$add" -> BSONArray(f"$$age", 1)))))
+        }
+
+        def findAndUpd = collection.findAndUpdateWithPipeline(
+          jack2, incrementAge)
 
         collection.update.one(jack2, jack2, upsert = true).
           map(_.n) must beTypedEqualTo(1).await(1, timeout) and {
@@ -160,8 +168,6 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
     }
 
     if (replSetOn) {
-      section("ge_mongo4")
-
       val james = Person("James", "Joyce", 27)
 
       "support transaction & rollback" in eventually(2, timeout) {
@@ -201,9 +207,9 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
             }.await(1, timeout)
         }.await(1, slowTimeout)
       }
-
-      section("ge_mongo4")
     }
+
+    section("ge_mongo4")
 
     "support arrayFilters" in {
       // See https://docs.mongodb.com/manual/reference/method/db.collection.findAndModify/#findandmodify-arrayfilters

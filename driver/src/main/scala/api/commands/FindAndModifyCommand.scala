@@ -60,6 +60,33 @@ trait FindAndModifyCommand[P <: SerializationPack] {
     override def toString = s"FindAndUpdate${tupled.toString}"
   }
 
+  /**
+   * Update (part of a FindAndModify command).
+   *
+   * @param update the aggregation pipeline
+   * @param fetchNewObject the command result must be the new object instead of the old one.
+   * @param upsert if true, creates a new document if no document matches the query, or if documents match the query, findAndModify performs an update
+   */
+  final class FindAndUpdateWithAggregateOp private[api] (
+    private[api] val update: Seq[pack.Document],
+    private[api] val fetchNewObject: Boolean,
+    private[api] val upsert: Boolean)
+    extends FindAndModifyOp {
+    private[api] lazy val tupled = Tuple3(update, fetchNewObject, upsert)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        this.tupled == other.tupled
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString = s"FindAndUpdateWithAggregate${tupled.toString}"
+  }
+
   /** Remove (part of a FindAndModify command). */
   object FindAndRemoveOp extends FindAndModifyOp
 
@@ -177,6 +204,12 @@ trait FindAndModifyCommand[P <: SerializationPack] {
           elements ++= Seq(
             element("upsert", boolean(op.upsert)),
             element("update", op.update),
+            element("new", boolean(op.fetchNewObject)))
+
+        case op: FindAndUpdateWithAggregateOp =>
+          elements ++= Seq(
+            element("upsert", boolean(op.upsert)),
+            element("update", array(op.update)),
             element("new", boolean(op.fetchNewObject)))
 
         case _ =>
