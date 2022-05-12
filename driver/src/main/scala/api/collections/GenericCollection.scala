@@ -56,8 +56,7 @@ trait GenericCollectionProducer[P <: SerializationPack, +C <: GenericCollection[
  * @define fieldsParam the [[http://docs.mongodb.org/manual/tutorial/project-fields-from-query-results/#read-operations-projection projection]] fields
  * @define modifierParam the modify operator to be applied
  * @define readConcernParam the read concern
- * @define firstOpParam the first [[https://docs.mongodb.com/manual/reference/operator/aggregation/ aggregation operator]] of the pipeline
- * @define otherOpsParam the sequence of MongoDB aggregation operations
+ * @define pipelineParam the [[https://docs.mongodb.com/manual/reference/operator/aggregation/ aggregation]] pipeline
  * @define explainParam if true indicates to return the information on the processing
  * @define allowDiskUseParam if true enables writing to temporary files
  * @define bypassParam if true enables to bypass document validation during the operation
@@ -75,6 +74,7 @@ trait GenericCollectionProducer[P <: SerializationPack, +C <: GenericCollection[
  * @define hintParam the index to use (either the index name or the index document)
  * @define maxTimeParam the time limit for processing operations on a cursor (`maxTimeMS`)
  * @define useDefaultWC Uses the default write concern
+ * @define fetchNewObjectParam the command result must be the new object instead of the old one
  */
 trait GenericCollection[P <: SerializationPack]
   extends Collection with PackSupport[P] with GenericCollectionWithCommands[P]
@@ -484,10 +484,20 @@ trait GenericCollection[P <: SerializationPack]
    * Returns an update modifier, to be used with `findAndModify`.
    *
    * @param update $updateParam
-   * @param fetchNewObject the command result must be the new object instead of the old one.
+   * @param fetchNewObject $fetchNewObjectParam
    * @param upsert $upsertParam
    */
   def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): FindAndUpdateOp = new FindAndUpdateOp(pack.serialize(update, updateWriter), fetchNewObject, upsert)
+
+  /**
+   * '''EXPERIMENTAL:'''
+   * Returns an update modifier, to be used with `findAndModify`.
+   *
+   * @param update $pipelineParam
+   * @param fetchNewObject $fetchNewObjectParam
+   * @param upsert $upsertParam
+   */
+  def aggregationUpdateModifier(update: AggregationPipeline, fetchNewObject: Boolean = false, upsert: Boolean = false): FindAndUpdateWithAggregateOp = new FindAndUpdateWithAggregateOp(update.map(_.makePipe), fetchNewObject, upsert)
 
   /** Returns a removal modifier, to be used with `findAndModify`. */
   @inline def removeModifier = FindAndRemoveOp
@@ -621,6 +631,73 @@ trait GenericCollection[P <: SerializationPack]
   }
 
   /**
+   * '''EXPERIMENTAL:'''
+   * Finds some matching document, and updates it (using `findAndModify`).
+   *
+   * {{{
+   * import scala.concurrent.{ ExecutionContext, Future }
+   *
+   * import reactivemongo.api.bson.{ BSONArray, BSONDocument }
+   * import reactivemongo.api.bson.collection.BSONCollection
+   *
+   * def findPerson(coll: BSONCollection)(
+   *   implicit ec: ExecutionContext): Future[Option[BSONDocument]] = {
+   *   import coll.AggregationFramework.{ PipelineOperator, Set }
+   *
+   *   val pipeline = List[PipelineOperator](
+   *     Set(BSONDocument("age" -> BSONDocument(
+   *       f"$$add" -> BSONArray(f"$$age", 2)))))
+   *
+   *   coll.findAndUpdateWithPipeline(
+   *     BSONDocument("name" -> "James"),
+   *     pipeline,
+   *     fetchNewObject = true).map(_.value)
+   *     // on success, return the update document: { "age": 17 }
+   * }
+   * }}}
+   *
+   * @tparam selectorTParam
+   *
+   * @param selector $selectorParam
+   * @param update $pipelineParam
+   * @param fetchNewObject the command result must be the new object instead of the old one (default: `false`)
+   * @param upsert $upsertParam (default: `false`)
+   * @param sort $sortParam (default: `None`)
+   * @param fields $fieldsParam
+   * @param bypassDocumentValidation $bypassDocumentValidationParam (default: `false`)
+   * @param writeConcern $writeConcernParam
+   * @param swriter $swriterParam
+   * @param writer $writerParam
+   * @param maxTime $maxTimeParam
+   * @param collation $collationParam
+   * @param arrayFilters $arrayFiltersParam
+   */
+  def findAndUpdateWithPipeline[S](
+    selector: S,
+    update: AggregationPipeline,
+    fetchNewObject: Boolean = false,
+    upsert: Boolean = false,
+    sort: Option[pack.Document] = None,
+    fields: Option[pack.Document] = None,
+    bypassDocumentValidation: Boolean = false,
+    writeConcern: WriteConcern = this.writeConcern,
+    maxTime: Option[FiniteDuration] = None,
+    collation: Option[Collation] = None,
+    arrayFilters: Seq[pack.Document] = Seq.empty)(
+    implicit
+    swriter: pack.Writer[S],
+    ec: ExecutionContext): Future[FindAndModifyResult] = {
+    val updateOp = aggregationUpdateModifier(update, fetchNewObject, upsert)
+
+    findAndModify(selector, updateOp, sort, fields,
+      bypassDocumentValidation = bypassDocumentValidation,
+      writeConcern = writeConcern,
+      maxTime = maxTime,
+      collation = collation,
+      arrayFilters = arrayFilters)
+  }
+
+  /**
    * Finds some matching document, and removes it (using `findAndModify`).
    *
    * {{{
@@ -731,7 +808,7 @@ trait GenericCollection[P <: SerializationPack]
    *
    * @tparam T $resultTParam
    *
-   * @param firstOperator $firstOpParam
+   * @param pipeline $pipelineParam
    * @param otherOperators $otherOpsParam
    * @param cursor aggregation cursor option (optional)
    * @param explain $explainParam of the pipeline (default: `false`)
