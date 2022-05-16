@@ -12,6 +12,14 @@ trait DBSessionSpec { specs: DatabaseSpec =>
   def sessionSpecs = "manage session" >> {
     section("gt_mongo32")
 
+    "foo" in {
+      (for {
+        db <- _db
+        sd <- db.startSession()
+        _ <- sd.startTransaction(None)
+      } yield ()) must beTypedEqualTo({}).await
+    } tag "wip"
+
     "start & end" in {
       (for {
         db <- _db.flatMap(_.startSession())

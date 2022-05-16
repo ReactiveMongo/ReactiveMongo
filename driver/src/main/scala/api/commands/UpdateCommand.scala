@@ -34,6 +34,8 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
     }
 
     @inline override def hashCode: Int = tupled.hashCode
+
+    override def toString: String = s"Update${tupled.toString}"
   }
 
   final protected[reactivemongo] type UpdateCmd = ResolvedCollectionCommand[Update]
@@ -66,7 +68,14 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
       case _                => false
     }
 
-    override def toString: String = s"UpdateElement${data.toString}"
+    override def toString: String = {
+      val qStr = pack.pretty(q)
+
+      val uStr = u.fold(Seq(_), identity).
+        map(pack.pretty).mkString("[", ", ", "]")
+
+      s"UpdateElement(q = $qStr, u = $uStr, upsert = $upsert, multi = $multi)"
+    }
   }
 
   final protected[reactivemongo] def writeElement(

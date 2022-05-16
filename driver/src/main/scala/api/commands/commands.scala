@@ -91,16 +91,24 @@ private[reactivemongo] object Command {
       def requestMaker = buildRequestMaker(pack)(
         kind, command, writer, readPreference, db.name)
 
+      val a = System.currentTimeMillis()
+      println(s"_one_a[$a] :: $command")
+
       val contextSTE = reactivemongo.util.Trace.currentTraceElements
 
       Failover(db.connection, failover) { () =>
-        db.connection.sendExpectingResponse(new ExpectingResponse(
+        val r = new ExpectingResponse(
           requestMaker = requestMaker,
           pinnedNode = for {
             s <- db.session
             t <- s.transaction.toOption
             n <- t.pinnedNode
-          } yield n))
+          } yield n)
+
+        val b = System.currentTimeMillis()
+        println(s"_one_b[$b] :: send($command @ $r) = ${b - a}")
+
+        db.connection.sendExpectingResponse(r)
       }.future.recoverWith {
         case cause => Future.failed[Response] {
           cause.setStackTrace(contextSTE.toArray)
@@ -158,7 +166,13 @@ private[reactivemongo] object Command {
     def apply[C <: Command](db: DB, command: C)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = defaultCursorFetcher(db, pack, command.commandKind, command, failover)
 
     // collection
-    def apply[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R], rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = defaultCursorFetcher(collection.db, pack, command.commandKind, new ResolvedCollectionCommand(collection.name, command), failover).one[R](rp)
+    def apply[R, C <: CollectionCommand with CommandWithResult[R]](collection: Collection, command: C with CommandWithResult[R], rp: ReadPreference)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = {
+      println(s"command{${System.currentTimeMillis()}} :: run($command)")
+
+      val fetcher = defaultCursorFetcher(collection.db, pack, command.commandKind, new ResolvedCollectionCommand(collection.name, command), failover)
+
+      fetcher.one[R](rp)
+    }
 
     def apply[C <: CollectionCommand](collection: Collection, command: C)(implicit writer: pack.Writer[ResolvedCollectionCommand[C]]): CursorFetcher[pack.type, Cursor] = defaultCursorFetcher(collection.db, pack, command.commandKind, new ResolvedCollectionCommand(collection.name, command), failover)
 

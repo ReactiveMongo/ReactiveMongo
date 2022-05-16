@@ -319,7 +319,7 @@ final class DriverSpec(implicit ee: ExecutionEnv)
                 await(0, slowTimeout + timeout)
             }
           }
-        } tag "wip"
+        }
       }
     }
   }

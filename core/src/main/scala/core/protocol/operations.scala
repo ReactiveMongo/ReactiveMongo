@@ -100,10 +100,10 @@ private[reactivemongo] object Reply extends ChannelBufferReadable[Reply] {
 
   /** Once the [[Reply]] is parsed, the buffer can immediately be released. */
   def readFrom(buffer: ByteBuf): Reply = Reply(
-    buffer.readIntLE,
-    buffer.readLongLE,
-    buffer.readIntLE,
-    buffer.readIntLE)
+    flags = buffer.readIntLE,
+    cursorID = buffer.readLongLE,
+    startingFrom = buffer.readIntLE,
+    numberReturned = buffer.readIntLE)
 
 }
 

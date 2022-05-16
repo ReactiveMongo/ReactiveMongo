@@ -103,8 +103,7 @@ private[reactivemongo] sealed class NodeSetSession(
     before.flagSent // was not sent before, so need to send it now
   }
 
-  final override private[reactivemongo] def endTransaction(): Option[SessionTransaction] =
-    Option(txState getAndUpdate Session.EndTxIfStarted).filter(_.isStarted)
+  final override private[reactivemongo] def endTransaction(): Option[SessionTransaction] = Option(txState getAndUpdate Session.EndTxIfStarted).filter(_.isStarted)
 }
 
 private[reactivemongo] final class DistributedSession(
