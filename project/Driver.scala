@@ -68,7 +68,7 @@ final class Driver(core: Project) {
           }
         },
         libraryDependencies ++= akka.value ++ Seq(
-          "dnsjava" % "dnsjava" % "3.5.0",
+          "dnsjava" % "dnsjava" % "3.5.1",
           commonsCodec,
           specs.value,
           "ch.qos.logback" % "logback-classic" % "1.2.11" % Test,
