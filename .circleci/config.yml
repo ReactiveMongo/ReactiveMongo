@@ -410,7 +410,7 @@ workflows:
             name: openjdk
             version: 10
           jdk_version: openjdk10
-          scala_version: 2.12.15
+          scala_version: 2.12.16
 
       - integration_test_suite:
           name: mongo3_openjdk8_scala211_akka23
