@@ -12,11 +12,9 @@ object Common extends AutoPlugin {
 
   val baseSettings = Seq(
     organization := "org.reactivemongo",
-    resolvers ++= Seq(
-      Resolver.typesafeRepo("releases"),
-      Resolver.sonatypeRepo("snapshots"),
-      Resolver.sonatypeRepo("staging")
-    ),
+    resolvers += Resolver.typesafeRepo("releases"),
+    resolvers ++= Resolver.sonatypeOssRepos("snapshots"),
+    resolvers ++= Resolver.sonatypeOssRepos("staging"),
     mimaFailOnNoPrevious := false,
     Test / logBuffered := false
   )
