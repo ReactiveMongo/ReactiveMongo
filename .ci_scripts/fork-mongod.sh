@@ -12,7 +12,7 @@ export PATH
 MONGOD_CMD="mongod -f $MONGO_CONF --fork"
 
 if [ `which numactl | wc -l` -gt 0 ]; then
-    numactl --interleave=all $MONGOD_CMD
-else
-    $MONGOD_CMD
+    MONGOD_CMD="numactl --interleave=all $MONGOD_CMD"
 fi
+
+while true; do ($MONGOD_CMD); done

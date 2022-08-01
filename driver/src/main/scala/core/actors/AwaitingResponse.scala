@@ -55,6 +55,8 @@ private[actors] final class AwaitingResponse(
     request, channelID, promise, isGetLastError,
     pinnedNode, retry, writeConcern)
 
+  override def toString: String =
+    s"AwaitingResponse[request=${request}, channelID=${channelID}]"
 }
 
 private[actors] object AwaitingResponse {

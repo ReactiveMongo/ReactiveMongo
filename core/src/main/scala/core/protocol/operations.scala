@@ -165,6 +165,29 @@ private[reactivemongo] case class Query(
 }
 
 /**
+ * Message operation ([[https://github.com/mongodb/specifications/blob/master/source/message/OP_MSG.rst `OpMsg` since 6.0+]]).
+ *
+ * @param flags the operation flags (`flagBits`)
+ */
+private[reactivemongo] case class Message(
+  flags: Int,
+  checksum: Option[Int],
+  override val requiresPrimary: Boolean) extends RequestOp {
+  override val expectsResponse = true
+  val code = Message.code
+  val size = 4
+
+  val writeTo: ByteBuf => Unit = { (buf: ByteBuf) =>
+    buf.writeIntLE(flags)
+    ()
+  } // TODO: checksum must be written at end of request, not here
+}
+
+private[reactivemongo] object Message {
+  val code = 2013
+}
+
+/**
  * Query flags.
  */
 private[reactivemongo] object QueryFlags {

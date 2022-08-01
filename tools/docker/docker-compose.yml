@@ -4,7 +4,7 @@ services:
     container_name: reactivemongo_db_1
     environment:
       - SCRIPT_DIR=/root/.ci_scripts
-    image: reactivemongo-db:0.1-${MONGO_VER:-4}${MONGO_PROFILE}${SSL_PASS}
+    image: reactivemongo-db:0.2-${MONGO_VER:-4}${MONGO_PROFILE}${SSL_PASS}
     build:
       context: ../..
       dockerfile: tools/docker/mongodb-dockerfile
@@ -28,7 +28,7 @@ services:
       context: .
       dockerfile: java-dockerfile 
       args:
-        - mongoMajor=${MONGO_VER:-4}
+        - mongoMajor=${MONGO_VER:-5}
         - mongoProfile=${MONGO_PROFILE:-default}
         - akkaVersion=${AKKA_VERSION:-2.5.23}
         - iterateesVersion=${ITERATEES_VERSION:-2.6.1}

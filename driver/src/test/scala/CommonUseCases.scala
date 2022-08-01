@@ -51,7 +51,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
           _ /*result*/ <- collection.insert(ordered = true).many(docs)
           count <- collection.count(Some(BSONDocument(
             "age" -> BSONDocument(f"$$gte" -> 18, f"$$lte" -> 60))))
-        } yield count) must beEqualTo(43).awaitFor(timeout)
+        } yield count) must beTypedEqualTo(43L).awaitFor(timeout)
       }
     }
 
@@ -75,7 +75,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
       collection.find(BSONDocument("name" -> regex("ack2", ""))).
         cursor[BSONDocument]().
         collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).
-        map(_.size) must beTypedEqualTo(10).await(1, timeout)
+        map(_.size) must beTypedEqualTo(10).awaitFor(timeout)
     }
 
     "find by regexp with flag" in {

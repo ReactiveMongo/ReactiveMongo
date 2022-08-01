@@ -23,7 +23,9 @@ echo "[INFO] MongoDB major version: $MONGO_VER"
 
 MONGO_MINOR="3.2.10"
 
-if [ "v$MONGO_VER" = "v5" ]; then
+if [ "v$MONGO_VER" = "v6" ]; then
+    MONGO_MINOR="6.0.0"
+elif [ "v$MONGO_VER" = "v5" ]; then
     MONGO_MINOR="5.0.1"
 elif [ "v$MONGO_VER" = "v4" ]; then
     MONGO_MINOR="4.4.4"
@@ -71,6 +73,17 @@ echo "[INFO] Installing MongoDB ${MONGO_MINOR} ..."
 cd "$HOME"
 
 MONGO_ARCH="x86_64-amazon"
+
+if [ "v$MONGO_VER" = "v6" ]; then
+  MONGO_ARCH="x86_64-amazon2"
+  MONGOSH="mongosh-1.5.4-linux-x64"
+
+  curl -s -o - "https://downloads.mongodb.com/compass/$MONGOSH.tgz" | tar -xzf -
+  export PATH="$PATH:$PWD/$MONGOSH/bin"
+
+  ln -s "$PWD/$MONGOSH/bin/mongosh" "$MONGOSH/bin/mongo"
+fi
+
 MONGO_HOME="$HOME/mongodb-linux-$MONGO_ARCH-$MONGO_MINOR"
 
 if [ ! -x "$MONGO_HOME/bin/mongod" ]; then

@@ -1,6 +1,9 @@
 FROM centos
 
-RUN yum install -y perl make gcc which psmisc
+RUN curl -o centos-gpg-keys-8-3.el8.noarch.rpm 'http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/centos-gpg-keys-8-3.el8.noarch.rpm' && \
+rpm -i 'centos-gpg-keys-8-3.el8.noarch.rpm' && \
+dnf -y --disablerepo '*' --enablerepo=extras swap centos-linux-repos centos-stream-repos && \
+yum install -y perl make gcc which psmisc
 
 ARG mongoMajor
 ARG mongoProfile
@@ -13,9 +16,8 @@ ENV MONGO_VER=${mongoMajor} MONGO_PROFILE=${mongoProfile} SSL_PASS=${sslPass}
 
 COPY .ci_scripts /root/.ci_scripts
 
-RUN cd /usr/bin && \
-cd /root && \
-sed -e 's/`hostname`/"db"/' < /root/.ci_scripts/ssl-props.sh > /tmp/ssl-props.sh && mv /tmp/ssl-props.sh /root/.ci_scripts/ssl-props.sh && \
+RUN cd /root && \
+sed -e 's/`hostname`/"db"/' < /root/.ci_scripts/ssl-props.sh > /tmp/ssl-props.sh && mv -f /tmp/ssl-props.sh /root/.ci_scripts/ssl-props.sh && \
 ./.ci_scripts/beforeInstall.sh INTEGRATION_TESTS $MONGO_VER $MONGO_PROFILE /tmp/integration-env.sh && \
 source /tmp/integration-env.sh && \
 sed -e 's|/tmp/mongod.log|/dev/stdout|' < $MONGO_CONF > .tmp && mv .tmp $MONGO_CONF && \

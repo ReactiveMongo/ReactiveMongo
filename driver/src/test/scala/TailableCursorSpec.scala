@@ -38,13 +38,14 @@ trait TailableCursorSpec { specs: CursorSpec =>
       @inline def tailable(n: String, database: DB = db) = {
         implicit val reader = docReader[Int] { decoder.int(_, "id").get }
 
-        collection(n, database).find(matchAll("cursorspec50")).
+        collection(s"${n}_${System.currentTimeMillis()}", database).
+          find(matchAll("cursorspec50")).
           tailable.batchSize(512).cursor[Int]()
       }
 
       "using tailable" >> {
         "to fold bulks" in {
-          tailable("foldw0a").foldBulks(List.empty[Int], 6)(
+          tailable(s"foldw0a").foldBulks(List.empty[Int], 6)(
             (s, bulk) => Cursor.Cont(s ++ bulk)) must beTypedEqualTo(List(
               0, 1, 2, 3, 4, 5)).await(1, timeout)
         }

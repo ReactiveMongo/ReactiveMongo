@@ -30,6 +30,10 @@ private[reactivemongo] class ResponseDecoder
     ()
   }
 
+  @inline private def accepts(h: MessageHeader): Boolean =
+    h.opCode == Message.code || h.opCode == Reply.code ||
+      h.opCode == CompressedOp.code
+
   private[reactivemongo] def decodeResponse(
     context: ChannelHandlerContext,
     channelId: Option[ChannelId],
@@ -62,16 +66,16 @@ private[reactivemongo] class ResponseDecoder
       throw new IllegalStateException(
         s"Invalid message length: ${header.messageLength} < ${readableBytes}")
 
-    } else if (header.opCode != Reply.code && header.opCode != CompressedOp.code) {
+    } else if (!accepts(header)) {
       frame.discardReadBytes()
 
-      throw new IllegalStateException(
-        s"Unexpected opCode ${header.opCode} != ${Reply.code}")
-
+      throw new IllegalStateException(s"Unexpected opCode: ${header.opCode}")
     }
 
     if (header.opCode == CompressedOp.code) {
       decompress(channelId, frame, header, context.alloc.directBuffer(_: Int))
+    } else if (header.opCode == Message.code) { // OpMsg
+      decodeMessage(channelId, frame, header)
     } else {
       decodeReply(channelId, frame, header)
     }
@@ -115,19 +119,55 @@ private[reactivemongo] class ResponseDecoder
 
       frame.discardReadBytes()
 
-      decodeReply(channelId, buf, newHeader)
+      if (originalOpCode == Message.code) { // OpMsg
+        decodeMessage(channelId, buf, newHeader)
+      } else {
+        decodeReply(channelId, buf, newHeader)
+      }
     } finally {
       buf.release()
       ()
     }
   }
 
-  private def decodeReply(
+  private def decodeMessage(
     channelId: Option[ChannelId],
     frame: ByteBuf,
     header: MessageHeader): Response = {
 
-    val reply = Reply(frame)
+    val flags = frame.readIntLE()
+
+    val _ /*hasChecksum*/ = (flags & (1 << 0)) != 0
+
+    val payloadType = frame.readByte()
+
+    if (payloadType == 1) {
+      // TODO
+      throw new UnsupportedOperationException("Unsupported OpMessage section")
+    }
+
+    val reply = Reply(
+      flags = 0,
+      cursorID = 0L,
+      startingFrom = 0,
+      numberReturned = 1)
+
+    decodeReply(channelId, frame, header, reply)
+
+    // TODO: Checksum if hasChecksum
+  }
+
+  @inline private def decodeReply(
+    channelId: Option[ChannelId],
+    frame: ByteBuf,
+    header: MessageHeader): Response =
+    decodeReply(channelId, frame, header, Reply(frame))
+
+  private def decodeReply(
+    channelId: Option[ChannelId],
+    frame: ByteBuf,
+    header: MessageHeader,
+    reply: Reply): Response = {
     val chanId = channelId.orNull
     def info = new ResponseInfo(chanId)
 
