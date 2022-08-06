@@ -17,6 +17,8 @@ package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
 
+import reactivemongo.io.netty.buffer.ByteBuf
+
 import reactivemongo.api.bson.buffer.WritableBuffer
 
 import reactivemongo.core.protocol.{
@@ -25,7 +27,6 @@ import reactivemongo.core.protocol.{
   QueryFlags,
   MongoWireVersion
 }
-import reactivemongo.core.netty.BufferSequence
 
 import reactivemongo.api.{
   Collation,
@@ -872,10 +873,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
                 WritableBuffer.empty,
                 merge(readPreference, Int.MaxValue))
 
-              BufferSequence(
-                projection.fold(buffer) { pack.writeToBuffer(buffer, _) }.
-                  buffer)
-
+              projection.fold(buffer) { pack.writeToBuffer(buffer, _) }.buffer
             }
           } else {
             collection.db.name + f".$$cmd" /* Command 'find' for 3.2+ */ -> {
@@ -885,7 +883,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
                   WritableBuffer.empty,
                   merge(readPreference, maxDocs))
 
-                BufferSequence(prepared.buffer)
+                prepared.buffer
             }
           }
         }
@@ -902,7 +900,7 @@ trait QueryBuilderFactory[P <: SerializationPack]
           collection.fullCollectionName, maxAwaitTimeMs)(reader)
 
       } else {
-        val body: Int => BufferSequence = { (maxDocs: Int) =>
+        val body: Int => ByteBuf = { (maxDocs: Int) =>
           val builder = pack.newBuilder
 
           import builder.{ elementProducer => elmt }
@@ -916,9 +914,10 @@ trait QueryBuilderFactory[P <: SerializationPack]
 
           val buffer = WritableBuffer.empty
 
+          buffer.writeByte(0) // OpMsg payload type
           pack.writeToBuffer(buffer, section)
 
-          BufferSequence(buffer.buffer)
+          buffer.buffer
         }
 
         val op = Message(

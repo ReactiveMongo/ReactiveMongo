@@ -1,9 +1,7 @@
 package reactivemongo.core.protocol
 
-import reactivemongo.io.netty.buffer.Unpooled
 import reactivemongo.io.netty.channel.ChannelId
-
-import reactivemongo.core.netty.BufferSequence
+import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
 import reactivemongo.api.ReadPreference
 import reactivemongo.api.commands.CommandKind
@@ -19,7 +17,7 @@ import reactivemongo.api.commands.CommandKind
 private[reactivemongo] final class RequestMaker(
   kind: CommandKind,
   val op: RequestOp,
-  val documents: BufferSequence,
+  val payload: ByteBuf,
   val readPreference: ReadPreference,
   val channelIdHint: Option[ChannelId],
   parentSTE: Seq[StackTraceElement]) {
@@ -39,7 +37,7 @@ private[reactivemongo] final class RequestMaker(
   }
 
   @inline def apply(requestID: Int): Request =
-    Request(kind, requestID, 0, op, documents, readPreference,
+    Request(kind, requestID, 0, op, payload, readPreference,
       channelIdHint, callerSTE)
 
 }
@@ -48,41 +46,35 @@ private[reactivemongo] object RequestMaker {
   def apply(
     kind: CommandKind,
     op: Query,
-    documents: BufferSequence,
+    document: ByteBuf,
     readPreference: ReadPreference,
     channelIdHint: Option[ChannelId],
     callerSTE: Seq[StackTraceElement]): RequestMaker =
     new RequestMaker(
-      kind, op, documents, readPreference, channelIdHint, callerSTE)
+      kind, op, document, readPreference, channelIdHint, callerSTE)
 
   def apply(
     op: KillCursors,
     readPreference: ReadPreference): RequestMaker = new RequestMaker(
-    CommandKind.KillCursors, op, BufferSequence.empty, readPreference, None, Seq.empty)
+    CommandKind.KillCursors, op, Unpooled.EMPTY_BUFFER, readPreference, None, Seq.empty)
 
   def apply(
     op: GetMore,
-    documents: BufferSequence,
+    document: ByteBuf,
     readPreference: ReadPreference,
     channelIdHint: Option[ChannelId]): RequestMaker = new RequestMaker(
-    CommandKind.Query, op, documents, readPreference, channelIdHint, Seq.empty)
-
-  private lazy val opMsgPayloadType0 = Unpooled.copiedBuffer(Array[Byte](0))
+    CommandKind.Query, op, document, readPreference, channelIdHint, Seq.empty)
 
   def apply(
     kind: CommandKind,
     op: Message,
-    document: BufferSequence,
+    section: ByteBuf,
     readPreference: ReadPreference,
     channelIdHint: Option[ChannelId],
-    callerSTE: Seq[StackTraceElement]): RequestMaker = {
-    val BufferSequence(head, tail @ _*) = document
-    val payload0 = BufferSequence(opMsgPayloadType0, (head +: tail): _*)
-
+    callerSTE: Seq[StackTraceElement]): RequestMaker =
     new RequestMaker(
-      kind, op, payload0, readPreference, channelIdHint, callerSTE)
-  }
+      kind, op, section, readPreference, channelIdHint, callerSTE)
 
-  def unapply(maker: RequestMaker): Option[(RequestOp, BufferSequence, ReadPreference, Option[ChannelId])] = Some((maker.op, maker.documents, maker.readPreference, maker.channelIdHint))
+  def unapply(maker: RequestMaker): Option[(RequestOp, ByteBuf, ReadPreference, Option[ChannelId])] = Some((maker.op, maker.payload, maker.readPreference, maker.channelIdHint))
 
 }

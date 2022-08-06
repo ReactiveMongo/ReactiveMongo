@@ -58,7 +58,6 @@ private[reactivemongo] object Command {
     Failover,
     FailoverStrategy
   }
-  import reactivemongo.core.netty.BufferSequence
   import reactivemongo.core.protocol.{
     Message,
     Query,
@@ -167,9 +166,10 @@ private[reactivemongo] object Command {
               elem(f"$$db", builder.string(db.name)),
               elem(f"$$readPreference", pref)))
 
+          buffer.writeByte(0) // OpMsg payload type
           pack.writeToBuffer(buffer, section)
 
-          BufferSequence(buffer.buffer)
+          buffer.buffer
         }
 
         val tailable = (options.
@@ -191,7 +191,7 @@ private[reactivemongo] object Command {
           val buffer = WritableBuffer.empty
           pack.serializeAndWrite(buffer, command, writer)
 
-          BufferSequence(buffer.buffer)
+          buffer.buffer
         }
 
         DefaultCursor.query(
@@ -290,11 +290,10 @@ private[reactivemongo] object Command {
 
     pack.serializeAndWrite(buffer, command, writer)
 
-    val documents = BufferSequence(buffer.buffer)
     val flags = if (readPreference.slaveOk) QueryFlags.SlaveOk else 0
     val query = Query(flags, db + f".$$cmd", 0, 1)
 
-    RequestMaker(kind, query, documents, readPreference,
+    RequestMaker(kind, query, buffer.buffer, readPreference,
       channelIdHint = None,
       callerSTE = Seq.empty)
   }
@@ -326,16 +325,15 @@ private[reactivemongo] object Command {
         elem(f"$$db", builder.string(db)),
         elem(f"$$readPreference", pref)))
 
+    buffer.writeByte(0) // OpMsg payload type
     pack.writeToBuffer(buffer, section)
-
-    val document = BufferSequence(buffer.buffer)
 
     val msg = Message(
       flags = 0 /* TODO: OpMsg flags */ ,
       checksum = None /* TODO: OpMsg checksum */ ,
       requiresPrimary = !readPreference.slaveOk)
 
-    RequestMaker(kind, msg, document, readPreference,
+    RequestMaker(kind, msg, buffer.buffer, readPreference,
       channelIdHint = None, callerSTE = Seq.empty)
   }
 }

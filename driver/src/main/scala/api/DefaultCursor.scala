@@ -8,7 +8,7 @@ import reactivemongo.util.ExtendedFutures.delayedFuture
 
 import reactivemongo.api.bson.buffer.WritableBuffer
 
-import reactivemongo.core.netty.BufferSequence
+import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
 import reactivemongo.core.protocol.{
   GetMore,
@@ -40,7 +40,7 @@ private[reactivemongo] object DefaultCursor {
   private[reactivemongo] def query[P <: SerializationPack, A](
     pack: P,
     query: Message,
-    requestBuffer: Int => BufferSequence,
+    requestBuffer: Int => ByteBuf,
     readPreference: ReadPreference,
     db: DB,
     failover: FailoverStrategy,
@@ -115,12 +115,13 @@ private[reactivemongo] object DefaultCursor {
           val cmd = builder.document(cmdOpts.result())
           val buffer = WritableBuffer.empty
 
+          buffer.writeByte(0) // OpMsg payload type
           pack.writeToBuffer(buffer, cmd)
 
           RequestMaker(
             kind = CommandKind.Query,
             op = moreQry,
-            document = BufferSequence(buffer.buffer),
+            section = buffer.buffer,
             readPreference,
             channelIdHint = None,
             callerSTE = Seq.empty)
@@ -134,7 +135,7 @@ private[reactivemongo] object DefaultCursor {
   private[reactivemongo] def query[P <: SerializationPack, A](
     pack: P,
     query: Query,
-    requestBuffer: Int => BufferSequence,
+    requestBuffer: Int => ByteBuf,
     readPreference: ReadPreference,
     db: DB,
     failover: FailoverStrategy,
@@ -204,7 +205,7 @@ private[reactivemongo] object DefaultCursor {
         if (lessThenV32) { (cursorId, ntr) =>
           RequestMaker(
             op = GetMore(fullCollectionName, ntr, cursorId),
-            documents = BufferSequence.empty,
+            document = Unpooled.EMPTY_BUFFER,
             readPreference,
             channelIdHint = None)
 
@@ -225,11 +226,14 @@ private[reactivemongo] object DefaultCursor {
             }
 
             val cmd = builder.document(cmdOpts.result())
+            val buf = WritableBuffer.empty
+
+            pack.writeToBuffer(buf, cmd)
 
             RequestMaker(
               kind = CommandKind.Query,
               op = moreQry,
-              documents = BufferSequence.single[pack.type](pack)(cmd),
+              document = buf.buffer,
               readPreference,
               channelIdHint = None,
               callerSTE = Seq.empty)
@@ -308,7 +312,7 @@ private[reactivemongo] object DefaultCursor {
       if (lessThenV32) { (cursorId, ntr) =>
         RequestMaker(
           GetMore(fullCollectionName, ntr, cursorId),
-          BufferSequence.empty, readPreference, None)
+          Unpooled.EMPTY_BUFFER, readPreference, None)
 
       } else {
         val collName = fullCollectionName.span(_ != '.')._2.tail
@@ -326,10 +330,13 @@ private[reactivemongo] object DefaultCursor {
           }
 
           val cmd = builder.document(cmdOpts.result())
+          val buf = WritableBuffer.empty
+
+          _pack.writeToBuffer(buf, cmd)
 
           RequestMaker(
             GetMore(fullCollectionName, ntr, cursorId),
-            BufferSequence.single[_pack.type](_pack)(cmd),
+            buf.buffer,
             readPreference, None)
 
         } else { (cursorId, ntr) =>
@@ -354,11 +361,15 @@ private[reactivemongo] object DefaultCursor {
             elem(f"$$readPreference", pref))
 
           val cmd = builder.document(cmdOpts.result())
+          val buffer = WritableBuffer.empty
+
+          buffer.writeByte(0) // OpMsg payload type
+          _pack.writeToBuffer(buffer, cmd)
 
           RequestMaker(
             kind = CommandKind.Query,
             op = moreQry,
-            document = BufferSequence.single[_pack.type](_pack)(cmd), // TODO
+            section = buffer.buffer,
             readPreference,
             channelIdHint = None,
             callerSTE = Seq.empty)

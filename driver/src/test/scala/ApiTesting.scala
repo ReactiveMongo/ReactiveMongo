@@ -165,10 +165,9 @@ package object tests { self =>
     val buf = reactivemongo.api.bson.buffer.WritableBuffer.empty
 
     BSONSerializationPack.writeToBuffer(buf, doc)
-  }
 
-  @inline def bufferSeq(doc: BSONDocument) =
-    reactivemongo.core.netty.BufferSequence.single(BSONSerializationPack)(doc)
+    buf
+  }
 
   def fakeResponse(
     doc: BSONDocument,
@@ -181,7 +180,7 @@ package object tests { self =>
       startingFrom = 0,
       numberReturned = 1)
 
-    val message = bufferSeq(doc).merged
+    val message = channelBuffer(doc).buffer
 
     val header = new MessageHeader(
       messageLength = message.capacity,
@@ -207,7 +206,7 @@ package object tests { self =>
       startingFrom = 0,
       numberReturned = 1)
 
-    val message = bufferSeq(doc).merged
+    val message = channelBuffer(doc).buffer
 
     val header = new MessageHeader(
       messageLength = message.capacity,

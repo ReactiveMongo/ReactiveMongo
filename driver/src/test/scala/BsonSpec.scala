@@ -171,7 +171,7 @@ final class BsonSpec extends org.specs2.mutable.Specification {
     }
 
     "parse a message" in {
-      def message = buffer.ReadableBuffer(bufferSeq(doc).merged)
+      def message = buffer.ReadableBuffer(channelBuffer(doc).buffer)
 
       val ser = BSONSerializationPack
 

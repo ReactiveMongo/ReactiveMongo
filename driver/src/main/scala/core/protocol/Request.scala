@@ -7,8 +7,6 @@ import scala.util.control.NonFatal
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 import reactivemongo.io.netty.channel.ChannelId
 
-import reactivemongo.core.netty.BufferSequence
-
 import reactivemongo.core.protocol.buffer.ChannelBufferWritable
 
 import reactivemongo.api.{ Compressor, ReadPreference }
@@ -71,13 +69,12 @@ private[reactivemongo] object Request {
     requestID: Int,
     responseTo: Int,
     op: RequestOp,
-    documents: BufferSequence,
+    documents: ByteBuf,
     readPreference: ReadPreference = ReadPreference.primary,
     channelIdHint: Option[ChannelId] = None,
     callerSTE: Seq[StackTraceElement] = Seq.empty): Request = try {
     new Request(
-      kind, requestID, responseTo, op, documents.merged,
-      readPreference, channelIdHint)
+      kind, requestID, responseTo, op, documents, readPreference, channelIdHint)
   } catch {
     case NonFatal(cause) =>
       val trace = cause.getStackTrace
