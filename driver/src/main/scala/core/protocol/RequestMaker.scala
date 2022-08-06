@@ -1,8 +1,7 @@
 package reactivemongo.core.protocol
 
 import reactivemongo.io.netty.channel.ChannelId
-
-import reactivemongo.core.netty.BufferSequence
+import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
 import reactivemongo.api.ReadPreference
 import reactivemongo.api.commands.CommandKind
@@ -18,7 +17,7 @@ import reactivemongo.api.commands.CommandKind
 private[reactivemongo] final class RequestMaker(
   kind: CommandKind,
   val op: RequestOp,
-  val documents: BufferSequence,
+  val payload: ByteBuf,
   val readPreference: ReadPreference,
   val channelIdHint: Option[ChannelId],
   parentSTE: Seq[StackTraceElement]) {
@@ -38,7 +37,7 @@ private[reactivemongo] final class RequestMaker(
   }
 
   @inline def apply(requestID: Int): Request =
-    Request(kind, requestID, 0, op, documents, readPreference,
+    Request(kind, requestID, 0, op, payload, readPreference,
       channelIdHint, callerSTE)
 
 }
@@ -46,13 +45,36 @@ private[reactivemongo] final class RequestMaker(
 private[reactivemongo] object RequestMaker {
   def apply(
     kind: CommandKind,
-    op: RequestOp,
-    documents: BufferSequence = BufferSequence.empty,
-    readPreference: ReadPreference = ReadPreference.primary,
-    channelIdHint: Option[ChannelId] = None,
-    callerSTE: Seq[StackTraceElement] = Seq.empty): RequestMaker = new RequestMaker(
-    kind, op, documents, readPreference, channelIdHint, callerSTE)
+    op: Query,
+    document: ByteBuf,
+    readPreference: ReadPreference,
+    channelIdHint: Option[ChannelId],
+    callerSTE: Seq[StackTraceElement]): RequestMaker =
+    new RequestMaker(
+      kind, op, document, readPreference, channelIdHint, callerSTE)
 
-  def unapply(maker: RequestMaker): Option[(RequestOp, BufferSequence, ReadPreference, Option[ChannelId])] = Some((maker.op, maker.documents, maker.readPreference, maker.channelIdHint))
+  def apply(
+    op: KillCursors,
+    readPreference: ReadPreference): RequestMaker = new RequestMaker(
+    CommandKind.KillCursors, op, Unpooled.EMPTY_BUFFER, readPreference, None, Seq.empty)
+
+  def apply(
+    op: GetMore,
+    document: ByteBuf,
+    readPreference: ReadPreference,
+    channelIdHint: Option[ChannelId]): RequestMaker = new RequestMaker(
+    CommandKind.Query, op, document, readPreference, channelIdHint, Seq.empty)
+
+  def apply(
+    kind: CommandKind,
+    op: Message,
+    section: ByteBuf,
+    readPreference: ReadPreference,
+    channelIdHint: Option[ChannelId],
+    callerSTE: Seq[StackTraceElement]): RequestMaker =
+    new RequestMaker(
+      kind, op, section, readPreference, channelIdHint, callerSTE)
+
+  def unapply(maker: RequestMaker): Option[(RequestOp, ByteBuf, ReadPreference, Option[ChannelId])] = Some((maker.op, maker.payload, maker.readPreference, maker.channelIdHint))
 
 }

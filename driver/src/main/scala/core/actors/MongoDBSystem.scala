@@ -57,6 +57,7 @@ import reactivemongo.core.errors.{ CommandException, GenericDriverException }
 import reactivemongo.core.protocol.{
   GetMore,
   Query,
+  Message => OpMsg,
   QueryFlags,
   KillCursors,
   MongoWireVersion,
@@ -727,7 +728,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
             addListener(new OperationHandler(
               error(s"Fails to send request expecting response $reqId", _),
               { chanId =>
-                trace(s"Request $reqId successful on channel #${chanId}")
+                trace(s"Request ${request.kind} ($reqId) successfully sent on channel #${chanId}")
+
               }))
 
           ()
@@ -838,7 +840,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
       debug(s"Received an expecting response request during closing process: $req, completing its promise with a failure")
 
-      updateHistory("Closing$$RejectExpectingResponse")
+      updateHistory(f"Closing$$$$RejectExpectingResponse")
 
       promise.failure(new ClosedException(supervisor, name, internalState()))
       ()
@@ -1477,9 +1479,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
   private def secondaryOK(message: Request): Boolean =
     !message.op.requiresPrimary && (message.op match {
       case Query(flags, _, _, _) => (flags & QueryFlags.SlaveOk) != 0
-      case KillCursors(_)        => true
-      case GetMore(_, _, _)      => true
-      case _                     => false
+      case OpMsg(_, _, _) | KillCursors(_) | GetMore(_, _, _) => true
+      case _ => false
     })
 
   private def nodeInfo(reqAuth: Boolean, node: Node): String = {

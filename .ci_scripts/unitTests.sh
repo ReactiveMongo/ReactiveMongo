@@ -62,8 +62,10 @@ if [ "x$SPECS_TESTS" = "x" ]; then
   SPECS_TESTS="$SPECS_TESTS reactivemongo.UpdateCommandSpec"
 fi
 
-TEST_ARGS="$TEST_ARGS testQuick $SPECS_TESTS -- include unit"
+TEST_ARGS="testQuick $SPECS_TESTS -- include unit"
 
 sed -e 's/"-deprecation", //' < project/Driver.scala > .tmp && mv .tmp project/Driver.scala
+
+java -version
 
 sbt ++$SCALA_VERSION "$TEST_ARGS ;doc"

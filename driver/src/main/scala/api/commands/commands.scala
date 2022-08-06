@@ -13,7 +13,7 @@ import reactivemongo.api.{
 }
 import reactivemongo.api.bson.buffer.WritableBuffer
 
-import reactivemongo.core.protocol.{ Reply, Response }
+import reactivemongo.core.protocol.{ Reply, Response, MongoWireVersion }
 import reactivemongo.core.actors.ExpectingResponse
 import reactivemongo.core.errors.GenericDriverException
 
@@ -58,8 +58,8 @@ private[reactivemongo] object Command {
     Failover,
     FailoverStrategy
   }
-  import reactivemongo.core.netty.BufferSequence
   import reactivemongo.core.protocol.{
+    Message,
     Query,
     QueryFlags,
     RequestMaker,
@@ -88,8 +88,14 @@ private[reactivemongo] object Command {
     @inline protected def defaultReadPreference = db.defaultReadPreference
 
     def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = {
-      def requestMaker = buildRequestMaker(pack)(
-        kind, command, writer, readPreference, db.name)
+      def requestMaker: RequestMaker = {
+        if (db.connectionState.metadata.maxWireVersion.compareTo(MongoWireVersion.V60) >= 0) {
+          buildOpMsgMaker(pack)(kind, command, writer, readPreference, db.name)
+        } else {
+          buildRequestMaker(pack)(
+            kind, command, writer, readPreference, db.name)
+        }
+      }
 
       val contextSTE = reactivemongo.util.Trace.currentTraceElements
 
@@ -136,19 +142,63 @@ private[reactivemongo] object Command {
     }
 
     def cursor[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T]): DefaultCursor.Impl[T] = {
-      val flags = {
-        if (readPreference.slaveOk) options.slaveOk.flags
-        else options.flags
+      if (db.connectionState.metadata.maxWireVersion.compareTo(MongoWireVersion.V60) >= 0) {
+        import reactivemongo.api.collections.QueryCodecs
+
+        val op = Message(
+          flags = 0 /* TODO: OpMsg flags */ ,
+          checksum = None /* TODO: OpMsg checksum */ ,
+          requiresPrimary = !readPreference.slaveOk)
+
+        val builder = pack.newBuilder
+        val writeReadPref = QueryCodecs.writeReadPref(builder)
+
+        val payload = (_: Int) => {
+          import builder.{ elementProducer => elem }
+
+          val buffer = WritableBuffer.empty
+          val doc = pack.serialize(command, writer)
+          val pref = writeReadPref(readPreference)
+
+          val section: pack.Document = builder.document(
+            Seq(
+              elem(doc),
+              elem(f"$$db", builder.string(db.name)),
+              elem(f"$$readPreference", pref)))
+
+          buffer.writeByte(0) // OpMsg payload type
+          pack.writeToBuffer(buffer, section)
+
+          buffer.buffer
+        }
+
+        val tailable = (options.
+          flags & QueryFlags.TailableCursor) == QueryFlags.TailableCursor
+
+        DefaultCursor.query(
+          pack, op, payload, readPreference, db,
+          failover, fullCollectionName, maxAwaitTimeMS, tailable)
+
+      } else {
+        val flags = {
+          if (readPreference.slaveOk) options.slaveOk.flags
+          else options.flags
+        }
+
+        val op = Query(flags, db.name + f".$$cmd", 0, 1)
+
+        val payload = (_: Int) => {
+          val buffer = WritableBuffer.empty
+          pack.serializeAndWrite(buffer, command, writer)
+
+          buffer.buffer
+        }
+
+        DefaultCursor.query(
+          pack, op, payload, readPreference, db,
+          failover, fullCollectionName, maxAwaitTimeMS)
+
       }
-
-      val op = Query(flags, db.name + f".$$cmd", 0, 1)
-
-      DefaultCursor.query(pack, op, (_: Int) => {
-        val buffer = WritableBuffer.empty
-        pack.serializeAndWrite(buffer, command, writer)
-
-        BufferSequence(buffer.buffer)
-      }, readPreference, db, failover, fullCollectionName, maxAwaitTimeMS)
     }
   }
 
@@ -229,7 +279,6 @@ private[reactivemongo] object Command {
   /**
    * @param command the command to be requested
    * @param db the database name
-   * @param compressors the available compressors
    */
   def buildRequestMaker[P <: SerializationPack, A](pack: P)(
     kind: CommandKind,
@@ -241,11 +290,51 @@ private[reactivemongo] object Command {
 
     pack.serializeAndWrite(buffer, command, writer)
 
-    val documents = BufferSequence(buffer.buffer)
     val flags = if (readPreference.slaveOk) QueryFlags.SlaveOk else 0
     val query = Query(flags, db + f".$$cmd", 0, 1)
 
-    RequestMaker(kind, query, documents, readPreference)
+    RequestMaker(kind, query, buffer.buffer, readPreference,
+      channelIdHint = None,
+      callerSTE = Seq.empty)
+  }
+
+  /**
+   * @param command the command to be requested
+   * @param db the database name
+   */
+  def buildOpMsgMaker[P <: SerializationPack, A](pack: P)(
+    kind: CommandKind,
+    command: A,
+    writer: pack.Writer[A],
+    readPreference: ReadPreference,
+    db: String): RequestMaker = {
+    import reactivemongo.api.collections.QueryCodecs
+
+    val buffer = WritableBuffer.empty
+    val builder = pack.newBuilder
+    val writeReadPref = QueryCodecs.writeReadPref(builder)
+
+    import builder.{ elementProducer => elem }
+
+    val doc = pack.serialize(command, writer)
+    val pref = writeReadPref(readPreference)
+
+    val section: pack.Document = builder.document(
+      Seq(
+        elem(doc),
+        elem(f"$$db", builder.string(db)),
+        elem(f"$$readPreference", pref)))
+
+    buffer.writeByte(0) // OpMsg payload type
+    pack.writeToBuffer(buffer, section)
+
+    val msg = Message(
+      flags = 0 /* TODO: OpMsg flags */ ,
+      checksum = None /* TODO: OpMsg checksum */ ,
+      requiresPrimary = !readPreference.slaveOk)
+
+    RequestMaker(kind, msg, buffer.buffer, readPreference,
+      channelIdHint = None, callerSTE = Seq.empty)
   }
 }
 

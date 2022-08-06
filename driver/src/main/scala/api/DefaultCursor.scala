@@ -6,16 +6,18 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.util.ExtendedFutures.delayedFuture
 
-import reactivemongo.core.netty.BufferSequence
+import reactivemongo.api.bson.buffer.WritableBuffer
+
+import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
 import reactivemongo.core.protocol.{
   GetMore,
+  Message,
   KillCursors,
   MongoWireVersion,
   Query,
   QueryFlags,
   RequestMaker,
-  RequestOp,
   Response,
   ReplyDocumentIterator,
   ReplyDocumentIteratorExhaustedException
@@ -33,12 +35,107 @@ private[reactivemongo] object DefaultCursor {
   import CursorOps.UnrecoverableException
 
   /**
+   * Since MongoDB 6+
+   */
+  private[reactivemongo] def query[P <: SerializationPack, A](
+    pack: P,
+    query: Message,
+    requestBuffer: Int => ByteBuf,
+    readPreference: ReadPreference,
+    db: DB,
+    failover: FailoverStrategy,
+    collectionName: String,
+    _maxAwaitTimeMs: Option[Long],
+    _tailable: Boolean)(implicit reader: pack.Reader[A]): Impl[A] =
+    new Impl[A] {
+      val preference = readPreference
+      val database = db
+      val failoverStrategy = failover
+      val fullCollectionName = collectionName
+      val maxAwaitTimeMs = _maxAwaitTimeMs
+
+      val numberToReturn = 1
+
+      val tailable = _tailable
+
+      val makeIterator = ReplyDocumentIterator.parse(pack)(_: Response)(reader)
+
+      @inline def makeRequest(maxDocs: Int)(implicit ec: ExecutionContext): Future[Response] =
+        Failover(connection, failoverStrategy) { () =>
+          val req = new ExpectingResponse(
+            requestMaker = RequestMaker(
+              CommandKind.Query, query, requestBuffer(maxDocs),
+              readPreference,
+              channelIdHint = None, callerSTE = callerSTE),
+            pinnedNode = transaction.flatMap(_.pinnedNode))
+
+          requester(0, maxDocs, req)(ec)
+        }.future.flatMap {
+          case Response.CommandError(_, _, _, cause) =>
+            Future.failed[Response](cause)
+
+          case response =>
+            Future.successful(response)
+        }
+
+      val builder = pack.newBuilder
+
+      override val getMoreOpCmd: Function2[Long, Int, RequestMaker] = {
+        import reactivemongo.api.collections.QueryCodecs
+
+        val writeReadPref = QueryCodecs.writeReadPref(builder)
+
+        def baseElmts: Seq[pack.ElementProducer] = db.session match {
+          case Some(session) =>
+            CommandCodecs.writeSession(builder)(session)
+
+          case _ =>
+            Seq.empty[pack.ElementProducer]
+        }
+
+        val moreQry = query.copy(flags = 0) //numberToSkip = 0, numberToReturn = 1)
+        val collName = fullCollectionName.span(_ != '.')._2.tail
+
+        { (cursorId, ntr) =>
+          import builder.{ elementProducer => elem, int, long, string }
+
+          val pref = writeReadPref(readPreference)
+
+          val cmdOpts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+            elem("getMore", long(cursorId)),
+            elem(f"$$db", builder.string(database.name)),
+            elem(f"$$readPreference", pref),
+            elem("collection", string(collName)),
+            elem("batchSize", int(ntr))) ++= baseElmts
+
+          maxAwaitTimeMs.foreach { ms =>
+            cmdOpts += elem("maxTimeMS", long(ms))
+          }
+
+          val cmd = builder.document(cmdOpts.result())
+          val buffer = WritableBuffer.empty
+
+          buffer.writeByte(0) // OpMsg payload type
+          pack.writeToBuffer(buffer, cmd)
+
+          RequestMaker(
+            kind = CommandKind.Query,
+            op = moreQry,
+            section = buffer.buffer,
+            readPreference,
+            channelIdHint = None,
+            callerSTE = Seq.empty)
+        }
+      }
+    }
+
+  /**
    * @param collectionName the fully qualified collection name (even if `query.fullCollectionName` is `\$cmd`)
    */
   private[reactivemongo] def query[P <: SerializationPack, A](
     pack: P,
     query: Query,
-    requestBuffer: Int => BufferSequence,
+    requestBuffer: Int => ByteBuf,
     readPreference: ReadPreference,
     db: DB,
     failover: FailoverStrategy,
@@ -80,7 +177,9 @@ private[reactivemongo] object DefaultCursor {
           val req = new ExpectingResponse(
             requestMaker = RequestMaker(
               CommandKind.Query, op, requestBuffer(maxDocs),
-              readPreference, callerSTE = callerSTE),
+              readPreference,
+              channelIdHint = None,
+              callerSTE = callerSTE),
             pinnedNode = transaction.flatMap(_.pinnedNode))
 
           requester(0, maxDocs, req)(ec)
@@ -94,7 +193,7 @@ private[reactivemongo] object DefaultCursor {
 
       val builder = pack.newBuilder
 
-      val getMoreOpCmd: Function2[Long, Int, (RequestOp, BufferSequence)] = {
+      val getMoreOpCmd: Function2[Long, Int, RequestMaker] = {
         def baseElmts: Seq[pack.ElementProducer] = db.session match {
           case Some(session) =>
             CommandCodecs.writeSession(builder)(session)
@@ -104,7 +203,12 @@ private[reactivemongo] object DefaultCursor {
         }
 
         if (lessThenV32) { (cursorId, ntr) =>
-          GetMore(fullCollectionName, ntr, cursorId) -> BufferSequence.empty
+          RequestMaker(
+            op = GetMore(fullCollectionName, ntr, cursorId),
+            document = Unpooled.EMPTY_BUFFER,
+            readPreference,
+            channelIdHint = None)
+
         } else {
           val moreQry = query.copy(numberToSkip = 0, numberToReturn = 1)
           val collName = fullCollectionName.span(_ != '.')._2.tail
@@ -122,8 +226,17 @@ private[reactivemongo] object DefaultCursor {
             }
 
             val cmd = builder.document(cmdOpts.result())
+            val buf = WritableBuffer.empty
 
-            moreQry -> BufferSequence.single[pack.type](pack)(cmd)
+            pack.writeToBuffer(buf, cmd)
+
+            RequestMaker(
+              kind = CommandKind.Query,
+              op = moreQry,
+              document = buf.buffer,
+              readPreference,
+              channelIdHint = None,
+              callerSTE = Seq.empty)
           }
         }
       }
@@ -147,9 +260,6 @@ private[reactivemongo] object DefaultCursor {
     @inline def fullCollectionName = _ref.collectionName
 
     val numberToReturn = {
-      val version = connection._metadata.
-        fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion)
-
       if (version.compareTo(MongoWireVersion.V32) < 0) {
         // see QueryBuilder.batchSizeN
 
@@ -170,10 +280,8 @@ private[reactivemongo] object DefaultCursor {
 
       Failover(connection, failoverStrategy) { () =>
         // MongoDB2.6: Int.MaxValue
-        val op = getMoreOpCmd(_ref.cursorId, maxDocs)
         val req = new ExpectingResponse(
-          requestMaker = RequestMaker(
-            CommandKind.Query, op._1, op._2, readPreference),
+          requestMaker = getMoreOpCmd(_ref.cursorId, maxDocs),
           pinnedNode = pinnedNode)
 
         requester(0, maxDocs, req)(ec)
@@ -188,7 +296,9 @@ private[reactivemongo] object DefaultCursor {
 
     final lazy val builder = _pack.newBuilder
 
-    val getMoreOpCmd: Function2[Long, Int, (RequestOp, BufferSequence)] = {
+    lazy val getMoreOpCmd: Function2[Long, Int, RequestMaker] = {
+      import reactivemongo.api.collections.QueryCodecs
+
       def baseElmts: Seq[_pack.ElementProducer] = db.session match {
         case Some(session) =>
           CommandCodecs.writeSession(builder)(session)
@@ -197,16 +307,19 @@ private[reactivemongo] object DefaultCursor {
           Seq.empty[_pack.ElementProducer]
       }
 
+      val writeReadPref = QueryCodecs.writeReadPref(builder)
+
       if (lessThenV32) { (cursorId, ntr) =>
-        GetMore(fullCollectionName, ntr, cursorId) -> BufferSequence.empty
+        RequestMaker(
+          GetMore(fullCollectionName, ntr, cursorId),
+          Unpooled.EMPTY_BUFFER, readPreference, None)
+
       } else {
         val collName = fullCollectionName.span(_ != '.')._2.tail
 
-        { (cursorId, ntr) =>
-          import builder.{ elementProducer => elem, int, long, string }
+        import builder.{ elementProducer => elem, int, long, string }
 
-          val moreQry = GetMore(fullCollectionName, ntr, cursorId)
-
+        if (version.compareTo(MongoWireVersion.V60) < 0) { (cursorId, ntr) =>
           val cmdOpts = Seq.newBuilder[_pack.ElementProducer] ++= Seq(
             elem("getMore", long(cursorId)),
             elem("collection", string(collName)),
@@ -217,8 +330,49 @@ private[reactivemongo] object DefaultCursor {
           }
 
           val cmd = builder.document(cmdOpts.result())
+          val buf = WritableBuffer.empty
 
-          moreQry -> BufferSequence.single[_pack.type](_pack)(cmd)
+          _pack.writeToBuffer(buf, cmd)
+
+          RequestMaker(
+            GetMore(fullCollectionName, ntr, cursorId),
+            buf.buffer,
+            readPreference, None)
+
+        } else { (cursorId, ntr) =>
+          val cmdOpts = Seq.newBuilder[_pack.ElementProducer] ++= Seq(
+            elem("getMore", long(cursorId)),
+            elem("collection", string(collName)),
+            elem("batchSize", int(ntr))) ++= baseElmts
+
+          maxTimeMS.foreach { ms =>
+            cmdOpts += elem("maxTimeMS", long(ms))
+          }
+
+          val moreQry = Message(
+            flags = 0,
+            checksum = None,
+            requiresPrimary = !readPreference.slaveOk)
+
+          val pref = writeReadPref(readPreference)
+
+          cmdOpts ++= Seq(
+            elem(f"$$db", string(db.name)),
+            elem(f"$$readPreference", pref))
+
+          val cmd = builder.document(cmdOpts.result())
+          val buffer = WritableBuffer.empty
+
+          buffer.writeByte(0) // OpMsg payload type
+          _pack.writeToBuffer(buffer, cmd)
+
+          RequestMaker(
+            kind = CommandKind.Query,
+            op = moreQry,
+            section = buffer.buffer,
+            readPreference,
+            channelIdHint = None,
+            callerSTE = Seq.empty)
         }
       }
     }
@@ -311,7 +465,7 @@ private[reactivemongo] object DefaultCursor {
     }
 
     // cursorId: Long, toReturn: Int
-    protected def getMoreOpCmd: Function2[Long, Int, (RequestOp, BufferSequence)]
+    protected def getMoreOpCmd: Function2[Long, Int, RequestMaker]
 
     private def next(response: Response, maxDocs: Int)(implicit ec: ExecutionContext): Future[Option[Response]] = {
       if (response.reply.cursorID != 0) {
@@ -321,14 +475,12 @@ private[reactivemongo] object DefaultCursor {
         val nextOffset = nextBatchOffset(response)
         val ntr = toReturn(reply.numberReturned, maxDocs, nextOffset)
 
-        val (op, cmd) = getMoreOpCmd(reply.cursorID, ntr)
+        val reqMaker = getMoreOpCmd(reply.cursorID, ntr)
 
-        logger.trace(s"Asking for the next batch of $ntr documents on cursor #${reply.cursorID}, after ${nextOffset}: $op")
+        logger.trace(s"Asking for the next batch of $ntr documents on cursor #${reply.cursorID}, after ${nextOffset}: ${reqMaker.op}")
 
         def req = new ExpectingResponse(
-          requestMaker = RequestMaker(CommandKind.Query, op, cmd,
-            readPreference = preference,
-            channelIdHint = Some(response.info.channelId)),
+          requestMaker = reqMaker,
           pinnedNode = transaction.flatMap(_.pinnedNode))
 
         Failover(connection, failoverStrategy) { () =>
@@ -386,7 +538,6 @@ private[reactivemongo] object DefaultCursor {
         val result = connection.sendExpectingResponse(
           new ExpectingResponse(
             requestMaker = RequestMaker(
-              CommandKind.KillCursors,
               KillCursors(Set(cursorID)),
               readPreference = preference),
             pinnedNode = transaction.flatMap(_.pinnedNode)))

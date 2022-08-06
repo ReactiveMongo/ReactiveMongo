@@ -57,8 +57,20 @@ object MongoWireVersion {
     override val toString = "5.0"
   }
 
+  object V51 extends MongoWireVersion {
+    val value = 14
+    override val toString = "5.1"
+  }
+
+  object V60 extends MongoWireVersion {
+    val value = 17
+    override val toString = "6.0"
+  }
+
   def apply(v: Int): MongoWireVersion = {
-    if (v >= V50.value) V50
+    if (v >= V60.value) V60
+    else if (v >= V51.value) V51
+    else if (v >= V50.value) V50
     else if (v >= V42.value) V42
     else if (v >= V40.value) V40
     else if (v >= V36.value) V36

@@ -11,4 +11,6 @@ fi
 
 #JVM_OPTS="-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap"
 
-export _JAVA_OPTIONS="$JVM_OPTS"
+if [ ! `uname` = "Darwin" ]; then
+  export _JAVA_OPTIONS="$JVM_OPTS"
+fi

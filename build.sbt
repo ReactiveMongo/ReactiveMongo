@@ -6,11 +6,24 @@ lazy val `ReactiveMongo-Core` = project.in(file("core")).settings(
 
     ("org.reactivemongo" %% "reactivemongo-bson-api" % version.
       value) +: deps ++: Seq(
-        "com.github.luben" % "zstd-jni" % "1.5.2-3",
+      "com.github.luben" % "zstd-jni" % "1.5.2-3",
         "org.xerial.snappy" % "snappy-java" % "1.1.8.4",
         Dependencies.specs.value
-      )
+    )
   },
+  // Silent mock for Scala3
+  Test / doc / scalacOptions ++= List("-skip-packages", "com.github.ghik"),
+  Compile / packageBin / mappings ~= {
+    _.filter {
+      case (_, path) => !path.startsWith("com/github/ghik")
+    }
+  },
+  Compile / packageSrc / mappings ~= {
+    _.filter {
+      case (_, path) => path != "silent.scala"
+    }
+  },
+  //
   mimaBinaryIssueFilters ++= {
     import com.typesafe.tools.mima.core._
 

@@ -17,10 +17,16 @@ package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
 
+import reactivemongo.io.netty.buffer.ByteBuf
+
 import reactivemongo.api.bson.buffer.WritableBuffer
 
-import reactivemongo.core.protocol.{ Query, QueryFlags, MongoWireVersion }
-import reactivemongo.core.netty.BufferSequence
+import reactivemongo.core.protocol.{
+  Message,
+  Query,
+  QueryFlags,
+  MongoWireVersion
+}
 
 import reactivemongo.api.{
   Collation,
@@ -859,44 +865,74 @@ trait QueryBuilderFactory[P <: SerializationPack]
       implicit
       reader: pack.Reader[T]): Cursor.WithOps[T] = {
 
-      val body = {
-        if (version.compareTo(MongoWireVersion.V32) < 0) { (_: Int) =>
-          val buffer = pack.writeToBuffer(
-            WritableBuffer.empty,
-            merge(readPreference, Int.MaxValue))
+      if (version.compareTo(MongoWireVersion.V60) < 0) {
+        val (name, body) = {
+          if (version.compareTo(MongoWireVersion.V32) < 0) {
+            collection.fullCollectionName -> { (_: Int) =>
+              val buffer = pack.writeToBuffer(
+                WritableBuffer.empty,
+                merge(readPreference, Int.MaxValue))
 
-          BufferSequence(
-            projection.fold(buffer) { pack.writeToBuffer(buffer, _) }.
-              buffer)
+              projection.fold(buffer) { pack.writeToBuffer(buffer, _) }.buffer
+            }
+          } else {
+            collection.db.name + f".$$cmd" /* Command 'find' for 3.2+ */ -> {
+              (maxDocs: Int) =>
+                // if MongoDB 3.2+, projection is managed in merge
+                def prepared = pack.writeToBuffer(
+                  WritableBuffer.empty,
+                  merge(readPreference, maxDocs))
 
-        } else { (maxDocs: Int) =>
-          // if MongoDB 3.2+, projection is managed in merge
-          def prepared = pack.writeToBuffer(
-            WritableBuffer.empty,
-            merge(readPreference, maxDocs))
-
-          BufferSequence(prepared.buffer)
+                prepared.buffer
+            }
+          }
         }
-      }
 
-      val flags = {
-        if (readPreference.slaveOk) cursorOptions.flags | QueryFlags.SlaveOk
-        else cursorOptions.flags
-      }
-
-      val name = {
-        if (version.compareTo(MongoWireVersion.V32) < 0) {
-          collection.fullCollectionName
-        } else {
-          collection.db.name + f".$$cmd" // Command 'find' for 3.2+
+        val flags = {
+          if (readPreference.slaveOk) cursorOptions.flags | QueryFlags.SlaveOk
+          else cursorOptions.flags
         }
+
+        val op = Query(flags, name, skip, batchSize)
+
+        DefaultCursor.query(pack, op, body, readPreference,
+          collection.db, failoverStrategy,
+          collection.fullCollectionName, maxAwaitTimeMs)(reader)
+
+      } else {
+        val body: Int => ByteBuf = { (maxDocs: Int) =>
+          val builder = pack.newBuilder
+
+          import builder.{ elementProducer => elmt }
+
+          val doc = merge(readPreference, maxDocs)
+
+          val section: pack.Document = builder.document(
+            Seq(
+              elmt(doc),
+              elmt(f"$$db", builder.string(collection.db.name))))
+
+          val buffer = WritableBuffer.empty
+
+          buffer.writeByte(0) // OpMsg payload type
+          pack.writeToBuffer(buffer, section)
+
+          buffer.buffer
+        }
+
+        val op = Message(
+          flags = 0 /* TODO: OpMsg flags */ ,
+          checksum = None /* TODO: OpMsg checksum */ ,
+          requiresPrimary = !readPreference.slaveOk)
+
+        val tailable = (cursorOptions.
+          flags & QueryFlags.TailableCursor) == QueryFlags.TailableCursor
+
+        DefaultCursor.query(pack, op, body, readPreference,
+          collection.db, failoverStrategy,
+          collection.fullCollectionName, maxAwaitTimeMs, tailable)(reader)
+
       }
-
-      val op = Query(flags, name, skip, batchSize)
-
-      DefaultCursor.query(pack, op, body, readPreference,
-        collection.db, failoverStrategy,
-        collection.fullCollectionName, maxAwaitTimeMs)(reader)
     }
   }
 }
