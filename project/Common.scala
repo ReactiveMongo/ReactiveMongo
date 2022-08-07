@@ -48,41 +48,48 @@ object Common extends AutoPlugin {
   }
 
   val useShaded = settingKey[Boolean](
-    "Use ReactiveMongo-Shaded (see system property 'reactivemongo.shaded')")
+    "Use ReactiveMongo-Shaded (see system property 'reactivemongo.shaded')"
+  )
 
-  override def projectSettings = Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
-    scalaVersion := "2.12.16",
-    crossScalaVersions := Seq(scala211, scalaVersion.value, scala213, scala31),
-    crossVersion := CrossVersion.binary,
-    useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
-    target := {
-      if (useShaded.value) target.value / "shaded"
-      else target.value / "noshaded"
-    },
-    version := { 
-      val ver = (ThisBuild / version).value
-      val suffix = {
-        if (useShaded.value) "" // default ~> no suffix
-        else "-noshaded"
-      }
+  override def projectSettings =
+    Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
+      scalaVersion := "2.12.16",
+      crossScalaVersions := Seq(
+        scala211,
+        scalaVersion.value,
+        scala213,
+        scala31
+      ),
+      crossVersion := CrossVersion.binary,
+      useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
+      target := {
+        if (useShaded.value) target.value / "shaded"
+        else target.value / "noshaded"
+      },
+      version := {
+        val ver = (ThisBuild / version).value
+        val suffix = {
+          if (useShaded.value) "" // default ~> no suffix
+          else "-noshaded"
+        }
 
-      ver.span(_ != '-') match {
-        case (a, b) => s"${a}${suffix}${b}"
-      }
-    },
-    Compile / unmanagedSourceDirectories ++= {
-      val jdir = if (java8) "java8" else "java7"
+        ver.span(_ != '-') match {
+          case (a, b) => s"${a}${suffix}${b}"
+        }
+      },
+      Compile / unmanagedSourceDirectories ++= {
+        val jdir = if (java8) "java8" else "java7"
 
-      Seq((Compile / sourceDirectory).value / jdir)
-    },
-    Test / unmanagedSourceDirectories ++= {
-      val jdir = if (java8) "java8" else "java7"
+        Seq((Compile / sourceDirectory).value / jdir)
+      },
+      Test / unmanagedSourceDirectories ++= {
+        val jdir = if (java8) "java8" else "java7"
 
-      Seq((Compile / sourceDirectory).value / jdir)
-    },
-    Compile / packageBin / mappings ~= filter,
-    Compile / packageSrc / mappings ~= filter,
-    Compile / packageDoc / mappings ~= filter,
-    testFrameworks ~= { _.filterNot(_ == TestFrameworks.ScalaTest) }
-  ) ++ Publish.settings ++ Format.settings ++ Publish.mimaSettings
+        Seq((Compile / sourceDirectory).value / jdir)
+      },
+      Compile / packageBin / mappings ~= filter,
+      Compile / packageSrc / mappings ~= filter,
+      Compile / packageDoc / mappings ~= filter,
+      testFrameworks ~= { _.filterNot(_ == TestFrameworks.ScalaTest) }
+    ) ++ Publish.settings ++ Publish.mimaSettings
 }

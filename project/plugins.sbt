@@ -1,17 +1,11 @@
 scalacOptions ++= Seq("-deprecation", "-unchecked", "-feature")
 
 resolvers ++= Seq(
-  "Tatami Releases" at "https://raw.github.com/cchantep/tatami/master/releases",
-  Resolver.url("sbt-repo", url(
-    "https://dl.bintray.com/sbt/sbt-plugin-releases/"))(Resolver.ivyStylePatterns),
-  Resolver.url("typesafe-repo", url(
-   "https://dl.bintray.com/typesafe/sbt-plugins/"))(Resolver.ivyStylePatterns),
-  Resolver.url("eed3si9n-repo", url(
-    "https://dl.bintray.com/eed3si9n/sbt-plugins/"))(Resolver.ivyStylePatterns),
-  Resolver.url("jsuereth-repo", url(
-    "https://dl.bintray.com/jsuereth/sbt-plugins/"))(Resolver.ivyStylePatterns))
+  Resolver.bintrayIvyRepo("typesafe", "sbt-plugins"),
+  "Tatami Releases" at "https://raw.github.com/cchantep/tatami/master/releases"
+)
 
-addSbtPlugin("org.scalariform" % "sbt-scalariform" % "1.8.3")
+addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.6")
 
 addSbtPlugin("com.github.sbt" % "sbt-git" % "2.0.0")
 

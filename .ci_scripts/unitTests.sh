@@ -15,11 +15,14 @@ sbt ++$SCALA_VERSION update
 
 if [ "$SCALA_VERSION" = "2.11.12" ]; then
     echo "[INFO] Checking the source format ..."
-    sbt ++$SCALA_VERSION error scalariformFormat test:scalariformFormat > /dev/null
-    git diff --exit-code || (cat >> /dev/stdout <<EOF
-[ERROR] Scalariform check failed, see differences above.
-To fix, format your sources using sbt scalariformFormat test:scalariformFormat before submitting a pull request.
+
+    sbt ++$SCALA_VERSION error scalafmtSbtCheck scalafmtCheckAll > /dev/null || (
+        cat >> /dev/stdout <<EOF
+[ERROR] Scalafmt check failed, see differences above.
+To fix, format your sources using ./build scalafmtAll before submitting a pull request.
+Additionally, please squash your commits (eg, use git commit --amend) if you're going to update this pull request.
 EOF
+
         false
     )
 

@@ -126,7 +126,7 @@ object Compiler {
     Test / console / scalacOptions ~= {
       _.filterNot(excludeOpt)
     },
-    Test / console / scalacOptions += "-Yrepl-class-based",
+    Test / console / scalacOptions += "-Yrepl-class-based"
   )
 
   private lazy val excludeOpt: String => Boolean = { opt =>

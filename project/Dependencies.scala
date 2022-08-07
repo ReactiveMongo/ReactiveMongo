@@ -11,9 +11,7 @@ object Dependencies {
     if (Common.useShaded.value) {
       Seq(organization.value % "reactivemongo-shaded" % v)
     } else {
-      Seq(
-        netty % Provided,
-        "org.reactivemongo" %% "reactivemongo-alias" % v)
+      Seq(netty % Provided, "org.reactivemongo" %% "reactivemongo-alias" % v)
     }
   }
 
@@ -29,16 +27,17 @@ object Dependencies {
     Seq(
       "com.typesafe.akka" %% "akka-actor" % ver,
       "com.typesafe.akka" %% "akka-testkit" % ver % Test,
-      "com.typesafe.akka" %% "akka-slf4j" % ver % Test)
+      "com.typesafe.akka" %% "akka-slf4j" % ver % Test
+    )
   }
 
   val specsVer = Def.setting[String] {
-    "4.5.1"/*"4.3.5"*/
+    "4.5.1" /*"4.3.5"*/
   }
 
   val specs = Def.setting[ModuleID] {
-    ("org.specs2" %% "specs2-core" % specsVer.value).
-      cross(CrossVersion.for3Use2_13) % Test
+    ("org.specs2" %% "specs2-core" % specsVer.value)
+      .cross(CrossVersion.for3Use2_13) % Test
   }
 
   val slf4jVer = "1.7.36"
