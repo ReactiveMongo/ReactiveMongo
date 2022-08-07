@@ -27,20 +27,31 @@ trait SerializationPack extends SerializationPackCompat { self: Singleton =>
   def deserialize[A](document: Document, reader: Reader[A]): A
 
   private[reactivemongo] def writeToBuffer(
-    buffer: WritableBuffer,
-    document: Document): WritableBuffer
+      buffer: WritableBuffer,
+      document: Document
+    ): WritableBuffer
 
   private[reactivemongo] def readFromBuffer(buffer: ReadableBuffer): Document
 
-  private[reactivemongo] final def readAndDeserialize[A](buffer: ReadableBuffer, reader: Reader[A]): A = deserialize(readFromBuffer(buffer), reader)
+  private[reactivemongo] final def readAndDeserialize[A](
+      buffer: ReadableBuffer,
+      reader: Reader[A]
+    ): A = deserialize(readFromBuffer(buffer), reader)
 
-  private[reactivemongo] def readAndDeserialize[A](response: Response, reader: Reader[A]): A = {
+  private[reactivemongo] def readAndDeserialize[A](
+      response: Response,
+      reader: Reader[A]
+    ): A = {
     val channelBuf = ReadableBuffer(response.documents)
 
     readAndDeserialize(channelBuf, reader)
   }
 
-  private[reactivemongo] final def serializeAndWrite[A](buffer: WritableBuffer, document: A, writer: Writer[A]): WritableBuffer = writeToBuffer(buffer, serialize(document, writer))
+  private[reactivemongo] final def serializeAndWrite[A](
+      buffer: WritableBuffer,
+      document: A,
+      writer: Writer[A]
+    ): WritableBuffer = writeToBuffer(buffer, serialize(document, writer))
 
   /** Prepares a writer from the given serialization function. */
   def writer[A](f: A => Document): Writer[A]
@@ -50,16 +61,22 @@ trait SerializationPack extends SerializationPackCompat { self: Singleton =>
 
   def widenReader[T](r: NarrowValueReader[T]): WidenValueReader[T]
 
-  private[reactivemongo] def readValue[A](value: Value, reader: WidenValueReader[A]): Try[A]
+  private[reactivemongo] def readValue[A](
+      value: Value,
+      reader: WidenValueReader[A]
+    ): Try[A]
 
   // Returns a Reader from a function
   private[reactivemongo] def reader[A](f: Document => A): Reader[A]
 
-  private[reactivemongo] final def readerOpt[A](f: Document => Option[A]): Reader[A] = reader[A] { doc =>
+  private[reactivemongo] final def readerOpt[A](
+      f: Document => Option[A]
+    ): Reader[A] = reader[A] { doc =>
     f(doc) match {
       case Some(v) => v
-      case _ => throw reactivemongo.api.bson.exceptions.
-        ValueDoesNotMatchException(pretty(doc))
+      case _ =>
+        throw reactivemongo.api.bson.exceptions
+          .ValueDoesNotMatchException(pretty(doc))
     }
   }
 
@@ -75,6 +92,7 @@ trait SerializationPack extends SerializationPackCompat { self: Singleton =>
 }
 
 object SerializationPack {
+
   /** A builder for serialization simple values (useful for the commands) */
   private[reactivemongo] trait Builder[P <: SerializationPack] {
     protected[reactivemongo] val pack: P
@@ -152,17 +170,23 @@ object SerializationPack {
      */
     @com.github.ghik.silencer.silent(".*\\ ev\\ .*is\\ never\\ used.*")
     final def value[T](
-      document: pack.Document,
-      name: String)(
-      implicit
-      ev: T <:< pack.Value, cls: ClassTag[T]): Option[T] =
+        document: pack.Document,
+        name: String
+      )(implicit
+        ev: T <:< pack.Value,
+        cls: ClassTag[T]
+      ): Option[T] =
       get(document, name).collect { case `cls`(t) => t }
 
-    final def read[T](document: pack.Document, name: String)(implicit r: pack.NarrowValueReader[T]): Option[T] = {
+    final def read[T](
+        document: pack.Document,
+        name: String
+      )(implicit
+        r: pack.NarrowValueReader[T]
+      ): Option[T] = {
       val widenReader = pack.widenReader[T](r)
 
-      get(document, name).flatMap(
-        pack.readValue[T](_, widenReader).toOption)
+      get(document, name).flatMap(pack.readValue[T](_, widenReader).toOption)
     }
 
     /**
@@ -170,7 +194,12 @@ object SerializationPack {
      */
     def array(document: pack.Document, name: String): Option[Seq[pack.Value]]
 
-    final def values[T](document: pack.Document, name: String)(implicit r: pack.NarrowValueReader[T]): Option[Seq[T]] = {
+    final def values[T](
+        document: pack.Document,
+        name: String
+      )(implicit
+        r: pack.NarrowValueReader[T]
+      ): Option[Seq[T]] = {
       val widenReader = pack.widenReader[T](r)
 
       array(document, name).map {

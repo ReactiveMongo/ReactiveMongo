@@ -20,7 +20,8 @@ private[api] trait CollectionMetaCommands { self: Collection =>
   private implicit lazy val unitBoxReader: pack.Reader[Unit] =
     CommandCodecs.unitReader(pack)
 
-  private implicit lazy val createWriter: pack.Writer[ResolvedCollectionCommand[Create]] = CreateCollection.writer(pack)
+  private implicit lazy val createWriter: pack.Writer[ResolvedCollectionCommand[Create]] =
+    CreateCollection.writer(pack)
 
   /**
    * $createDescription.
@@ -61,15 +62,20 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    * @param writeConcern $writeConcernParam
    */
   final def create(
-    failsIfExists: Boolean = false,
-    writeConcern: WriteConcern = db.defaultWriteConcern)(implicit ec: ExecutionContext): Future[Unit] = command(
-    self, Create(
-    capped = None,
-    writeConcern = writeConcern), ReadPreference.primary).recover {
+      failsIfExists: Boolean = false,
+      writeConcern: WriteConcern = db.defaultWriteConcern
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Unit] = command(
+    self,
+    Create(capped = None, writeConcern = writeConcern),
+    ReadPreference.primary
+  ).recover {
     case CommandException.Code(48 /* already exists */ ) if !failsIfExists => ()
 
-    case CommandException.Message(
-      "collection already exists") if !failsIfExists => ()
+    case CommandException.Message("collection already exists")
+        if !failsIfExists =>
+      ()
 
   }
 
@@ -92,12 +98,16 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    * @see [[convertToCapped]]
    */
   final def createCapped(
-    size: Long,
-    maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] =
+      size: Long,
+      maxDocuments: Option[Int]
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Unit] =
     command(
       self,
       Create(Some(new Capped(size, maxDocuments))),
-      ReadPreference.primary)
+      ReadPreference.primary
+    )
 
   /**
    * Drops this collection.
@@ -108,7 +118,8 @@ private[api] trait CollectionMetaCommands { self: Collection =>
   def drop()(implicit ec: ExecutionContext): Future[Unit] =
     drop(false).map(_ => {})
 
-  private implicit lazy val dropWriter: pack.Writer[ResolvedCollectionCommand[DropCollection.type]] = DropCollection.writer(command.pack)
+  private implicit lazy val dropWriter: pack.Writer[ResolvedCollectionCommand[DropCollection.type]] =
+    DropCollection.writer(command.pack)
 
   /**
    * Drops this collection.
@@ -121,7 +132,6 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *
    * Otherwise in case, the future will be completed with the encountered error.
    *
-   *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
    * import reactivemongo.api.collections.GenericCollection
@@ -133,16 +143,22 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *
    * @param failIfNotFound the flag to request whether it should fail
    */
-  final def drop(failIfNotFound: Boolean)(implicit ec: ExecutionContext): Future[Boolean] = {
-    command(self, DropCollection, ReadPreference.primary).
-      map(_ => true).recoverWith {
+  final def drop(
+      failIfNotFound: Boolean
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Boolean] = {
+    command(self, DropCollection, ReadPreference.primary)
+      .map(_ => true)
+      .recoverWith {
         case CommandException.Code(26) if !failIfNotFound =>
           Future.successful(false)
 
       }
   }
 
-  private implicit lazy val convertWriter: pack.Writer[ResolvedCollectionCommand[ConvertToCapped]] = ConvertToCapped.writer(command.pack)
+  private implicit lazy val convertWriter: pack.Writer[ResolvedCollectionCommand[ConvertToCapped]] =
+    ConvertToCapped.writer(command.pack)
 
   /**
    * Converts this collection to a [[https://docs.mongodb.com/manual/core/capped-collections/ capped one]].
@@ -158,9 +174,19 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    * @param size $cappedSizeParam
    * @param maxDocuments $cappedMaxParam
    */
-  final def convertToCapped(size: Long, maxDocuments: Option[Int])(implicit ec: ExecutionContext): Future[Unit] = command(self, new ConvertToCapped(new Capped(size, maxDocuments)), ReadPreference.primary)
+  final def convertToCapped(
+      size: Long,
+      maxDocuments: Option[Int]
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Unit] = command(
+    self,
+    new ConvertToCapped(new Capped(size, maxDocuments)),
+    ReadPreference.primary
+  )
 
-  private implicit lazy val statsWriter: pack.Writer[ResolvedCollectionCommand[CollStats]] = CollStats.writer(command.pack)
+  private implicit lazy val statsWriter: pack.Writer[ResolvedCollectionCommand[CollStats]] =
+    CollStats.writer(command.pack)
 
   private implicit lazy val statsReader: pack.Reader[CollectionStats] =
     CollStats.reader(command.pack)
@@ -192,7 +218,12 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *
    * @param scale the scale factor (for example, to get all the sizes in kilobytes)
    */
-  final def stats(scale: Int)(implicit ec: ExecutionContext): Future[CollectionStats] = command(self, new CollStats(Some(scale)), ReadPreference.primary)
+  final def stats(
+      scale: Int
+    )(implicit
+      ec: ExecutionContext
+    ): Future[CollectionStats] =
+    command(self, new CollStats(Some(scale)), ReadPreference.primary)
 
   /**
    * Returns an index manager for this collection.
@@ -208,7 +239,11 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *   })
    * }}}
    */
-  final def indexesManager(implicit ec: ExecutionContext): CollectionIndexesManager.Aux[Serialization.Pack] = CollectionIndexesManager(self.db, name)
+  final def indexesManager(
+      implicit
+      ec: ExecutionContext
+    ): CollectionIndexesManager.Aux[Serialization.Pack] =
+    CollectionIndexesManager(self.db, name)
 
   // Command runner
   private lazy val command =

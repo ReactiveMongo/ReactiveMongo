@@ -14,8 +14,8 @@ import reactivemongo.util.LazyLogger
  * @param channelClassTag the channel class tag
  */
 private[core] final class Pack(
-  val eventLoopGroup: () => EventLoopGroup,
-  val channelClass: Class[_ <: Channel]) {
+    val eventLoopGroup: () => EventLoopGroup,
+    val channelClass: Class[_ <: Channel]) {
 
   override def equals(that: Any): Boolean = that match {
     case other: Pack =>
@@ -30,14 +30,16 @@ private[core] final class Pack(
 }
 
 private[core] object Pack {
-  private val shaded: Boolean = try {
-    // Type alias but no class if not shaded
-    Class.forName("reactivemongo.io.netty.channel.Channel")
 
-    true
-  } catch {
-    case NonFatal(_) => false
-  }
+  private val shaded: Boolean =
+    try {
+      // Type alias but no class if not shaded
+      Class.forName("reactivemongo.io.netty.channel.Channel")
+
+      true
+    } catch {
+      case NonFatal(_) => false
+    }
 
   private val logger = LazyLogger("reactivemongo.core.netty.Pack")
 
@@ -55,25 +57,28 @@ private[core] object Pack {
   }
 
   @SuppressWarnings(Array("AsInstanceOf"))
-  private[core] def kqueue: Option[Pack] = try {
-    Some(Class.forName(
-      s"${kqueuePkg}.KQueueSocketChannel")).map { cls =>
-      val chanClass = cls.asInstanceOf[Class[_ <: Channel]]
-      val groupClass = Class.forName(s"${kqueuePkg}.KQueueEventLoopGroup").
-        asInstanceOf[Class[_ <: EventLoopGroup]]
+  private[core] def kqueue: Option[Pack] =
+    try {
+      Some(Class.forName(s"${kqueuePkg}.KQueueSocketChannel")).map { cls =>
+        val chanClass = cls.asInstanceOf[Class[_ <: Channel]]
+        val groupClass = Class
+          .forName(s"${kqueuePkg}.KQueueEventLoopGroup")
+          .asInstanceOf[Class[_ <: EventLoopGroup]]
 
-      val pack = new Pack(() =>
-        groupClass.getDeclaredConstructor().newInstance(), chanClass)
+        val pack = new Pack(
+          () => groupClass.getDeclaredConstructor().newInstance(),
+          chanClass
+        )
 
-      logger.info(s"Netty KQueue successfully loaded (shaded: $shaded)")
+        logger.info(s"Netty KQueue successfully loaded (shaded: $shaded)")
 
-      pack
+        pack
+      }
+    } catch {
+      case NonFatal(cause) =>
+        logger.debug(s"Cannot use Netty KQueue (shaded: $shaded)", cause)
+        None
     }
-  } catch {
-    case NonFatal(cause) =>
-      logger.debug(s"Cannot use Netty KQueue (shaded: $shaded)", cause)
-      None
-  }
 
   private val epollPkg: String = {
     if (shaded) "reactivemongo.io.netty.channel.epoll"
@@ -81,28 +86,30 @@ private[core] object Pack {
   }
 
   @SuppressWarnings(Array("AsInstanceOf"))
-  private[core] def epoll: Option[Pack] = try {
-    Some(Class.forName(
-      s"${epollPkg}.EpollSocketChannel")).map { cls =>
+  private[core] def epoll: Option[Pack] =
+    try {
+      Some(Class.forName(s"${epollPkg}.EpollSocketChannel")).map { cls =>
+        val chanClass = cls.asInstanceOf[Class[_ <: Channel]]
+        val groupClass = Class
+          .forName(s"${epollPkg}.EpollEventLoopGroup")
+          .asInstanceOf[Class[_ <: EventLoopGroup]]
 
-      val chanClass = cls.asInstanceOf[Class[_ <: Channel]]
-      val groupClass = Class.forName(s"${epollPkg}.EpollEventLoopGroup").
-        asInstanceOf[Class[_ <: EventLoopGroup]]
+        val pack = new Pack(
+          () => groupClass.getDeclaredConstructor().newInstance(),
+          chanClass
+        )
 
-      val pack = new Pack(() =>
-        groupClass.getDeclaredConstructor().newInstance(), chanClass)
+        logger.info(s"Netty EPoll successfully loaded (shaded: $shaded)")
 
-      logger.info(s"Netty EPoll successfully loaded (shaded: $shaded)")
-
-      pack
+        pack
+      }
+    } catch {
+      case NonFatal(cause) =>
+        logger.debug(s"Cannot use Netty EPoll (shaded: $shaded)", cause)
+        None
     }
-  } catch {
-    case NonFatal(cause) =>
-      logger.debug(s"Cannot use Netty EPoll (shaded: $shaded)", cause)
-      None
-  }
 
-  @inline private[core] def nio = new Pack(
-    () => new NioEventLoopGroup(), classOf[NioSocketChannel])
+  @inline private[core] def nio =
+    new Pack(() => new NioEventLoopGroup(), classOf[NioSocketChannel])
 
 }

@@ -15,6 +15,7 @@ import reactivemongo.core.protocol.MongoWireVersion
  * @param name the role name (e.g. `readWrite`)
  */
 sealed class UserRole private[api] (val name: String) {
+
   override def equals(that: Any): Boolean = that match {
     case other: UserRole => this.name == other.name
     case _               => false
@@ -26,6 +27,7 @@ sealed class UserRole private[api] (val name: String) {
 }
 
 object UserRole {
+
   /**
    * @param name the role name (e.g. `readWrite`)
    */
@@ -37,8 +39,9 @@ object UserRole {
  * @param db the name of the database
  */
 final class DBUserRole private[api] (
-  override val name: String,
-  val db: String) extends UserRole(name) {
+    override val name: String,
+    val db: String)
+    extends UserRole(name) {
 
   private[api] lazy val tupled = name -> db
 
@@ -56,6 +59,7 @@ final class DBUserRole private[api] (
 }
 
 object DBUserRole {
+
   /**
    * @param name the role name
    * @param db the name of the database
@@ -70,8 +74,8 @@ object DBUserRole {
  * @param serverAddress the server list of IP addresses and/or CIDR ranges
  */
 final class AuthenticationRestriction private[api] (
-  val clientSource: List[String],
-  val serverAddress: List[String]) {
+    val clientSource: List[String],
+    val serverAddress: List[String]) {
 
   override def equals(that: Any): Boolean = that match {
     case other: AuthenticationRestriction => tupled == other.tupled
@@ -80,15 +84,22 @@ final class AuthenticationRestriction private[api] (
 
   override def hashCode: Int = tupled.hashCode
 
-  override def toString: String = s"""AuthenticationRestriction(clientSource = ${clientSource.mkString("[", ",", "]")}, serverAddress = ${serverAddress.mkString("[", ", ", "]")})"""
+  override def toString: String =
+    s"""AuthenticationRestriction(clientSource = ${clientSource.mkString(
+        "[",
+        ",",
+        "]"
+      )}, serverAddress = ${serverAddress.mkString("[", ", ", "]")})"""
 
   private lazy val tupled = clientSource -> serverAddress
 }
 
 object AuthenticationRestriction {
+
   def apply(
-    clientSource: List[String],
-    serverAddress: List[String]): AuthenticationRestriction =
+      clientSource: List[String],
+      serverAddress: List[String]
+    ): AuthenticationRestriction =
     new AuthenticationRestriction(clientSource, serverAddress)
 }
 
@@ -106,29 +117,30 @@ private[reactivemongo] trait CreateUserCommand[P <: SerializationPack] {
    * @param customData the custom data to associate with the user account
    */
   protected final class CreateUser(
-    val name: String,
-    val pwd: Option[String],
-    val customData: Option[pack.Document],
-    val roles: List[UserRole],
-    val digestPassword: Boolean,
-    val writeConcern: Option[WriteConcern],
-    val authenticationRestrictions: List[AuthenticationRestriction],
-    val mechanisms: List[AuthenticationMode])
-    extends Command with CommandWithPack[P]
-    with CommandWithResult[Unit] {
+      val name: String,
+      val pwd: Option[String],
+      val customData: Option[pack.Document],
+      val roles: List[UserRole],
+      val digestPassword: Boolean,
+      val writeConcern: Option[WriteConcern],
+      val authenticationRestrictions: List[AuthenticationRestriction],
+      val mechanisms: List[AuthenticationMode])
+      extends Command
+      with CommandWithPack[P]
+      with CommandWithResult[Unit] {
     val commandKind = CommandKind.CreateUser
   }
 
-  protected final def createUserWriter(version: MongoWireVersion): pack.Writer[CreateUser] = {
+  protected final def createUserWriter(
+      version: MongoWireVersion
+    ): pack.Writer[CreateUser] = {
     val builder = pack.newBuilder
 
     import builder.{ document, elementProducer => elmt, string }
 
     def writeRole(role: UserRole): pack.Value = role match {
       case r: DBUserRole =>
-        document(Seq(
-          elmt("role", string(r.name)),
-          elmt("db", string(r.db))))
+        document(Seq(elmt("role", string(r.name)), elmt("db", string(r.db))))
 
       case r =>
         string(r.name)
@@ -156,7 +168,8 @@ private[reactivemongo] trait CreateUserCommand[P <: SerializationPack] {
     pack.writer[CreateUser] { create =>
       val base = Seq[pack.ElementProducer](
         elmt("createUser", string(create.name)),
-        elmt("digestPassword", builder.boolean(create.digestPassword)))
+        elmt("digestPassword", builder.boolean(create.digestPassword))
+      )
 
       val roles: Seq[pack.ElementProducer] = {
         if (create.roles.isEmpty) Seq.empty
@@ -167,26 +180,26 @@ private[reactivemongo] trait CreateUserCommand[P <: SerializationPack] {
 
       val extra = Seq.newBuilder[pack.ElementProducer]
 
-      create.customData.foreach { data =>
-        extra += elmt("customData", data)
-      }
+      create.customData.foreach { data => extra += elmt("customData", data) }
 
-      create.pwd.foreach { pwd =>
-        extra += elmt("pwd", string(pwd))
-      }
+      create.pwd.foreach { pwd => extra += elmt("pwd", string(pwd)) }
 
       create.writeConcern.foreach { wc =>
         extra += elmt("writeConcern", writeWriteConcern(wc))
       }
 
       if (create.authenticationRestrictions.nonEmpty) {
-        extra += elmt("authenticationRestrictions", builder.array(
-          create.authenticationRestrictions.map(writeRestriction)))
+        extra += elmt(
+          "authenticationRestrictions",
+          builder.array(create.authenticationRestrictions.map(writeRestriction))
+        )
       }
 
       if (version >= MongoWireVersion.V40 && create.mechanisms.nonEmpty) {
-        extra += elmt("mechanisms", builder.array(
-          create.mechanisms.map { m => string(m.name) }))
+        extra += elmt(
+          "mechanisms",
+          builder.array(create.mechanisms.map { m => string(m.name) })
+        )
       }
 
       document(base ++ roles ++ extra.result())

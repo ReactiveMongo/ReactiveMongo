@@ -17,6 +17,7 @@ package reactivemongo.api
  * }}}
  */
 sealed trait ReadConcern {
+
   /** The read concern level */
   def level: String
 
@@ -31,6 +32,7 @@ sealed trait ReadConcern {
 }
 
 object ReadConcern {
+
   /**
    * [[https://docs.mongodb.com/manual/reference/read-concern-local/#readconcern.%22local%22 Read Concern 'local']]
    */

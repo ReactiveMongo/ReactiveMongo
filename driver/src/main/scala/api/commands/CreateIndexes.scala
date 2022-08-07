@@ -11,9 +11,10 @@ import reactivemongo.api.indexes.{ Index, IndexesManager, NSIndex }
  * @param indexes the indexes to be created
  */
 private[reactivemongo] final class CreateIndexes(
-  val db: String,
-  val indexes: List[Index])
-  extends CollectionCommand with CommandWithResult[WriteResult] {
+    val db: String,
+    val indexes: List[Index])
+    extends CollectionCommand
+    with CommandWithResult[WriteResult] {
 
   val commandKind = CommandKind.CreateIndexes
 
@@ -33,7 +34,10 @@ private[reactivemongo] final class CreateIndexes(
 }
 
 private[reactivemongo] object CreateIndexes {
-  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[Command[P]]] = {
+
+  private[api] def writer[P <: SerializationPack](
+      pack: P
+    ): pack.Writer[ResolvedCollectionCommand[Command[P]]] = {
     val builder = pack.newBuilder
     val nsIndexWriter = IndexesManager.nsIndexWriter[P](pack)
 
@@ -61,8 +65,10 @@ private[reactivemongo] object CreateIndexes {
   // ---
 
   private[api] class Command[P <: SerializationPack](
-    val db: String,
-    val indexes: List[Index.Aux[P]]) extends CollectionCommand with CommandWithResult[WriteResult] {
+      val db: String,
+      val indexes: List[Index.Aux[P]])
+      extends CollectionCommand
+      with CommandWithResult[WriteResult] {
 
     val commandKind = CommandKind.CreateIndexes
 

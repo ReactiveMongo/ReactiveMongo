@@ -14,22 +14,22 @@ import reactivemongo.io.netty.channel.{
 import reactivemongo.io.netty.channel.embedded.EmbeddedChannel
 
 object NettyEmbedder extends LowPriorityNettyEmbedder {
+
   sealed trait OnComplete[T] {
     def onComplete(underlying: T, f: () => Unit): Unit
   }
 
   implicit def futureOnComplete[T]: OnComplete[Future[T]] =
     new OnComplete[Future[T]] {
+
       def onComplete(underlying: Future[T], f: () => Unit): Unit =
-        underlying.onComplete {
-          case _ => f()
-        }
+        underlying.onComplete { case _ => f() }
     }
 
   private[tests] final class EmChannel(
-    chanId: ChannelId,
-    initiallyActive: Boolean = false)
-    extends EmbeddedChannel(chanId, false, false) {
+      chanId: ChannelId,
+      initiallyActive: Boolean = false)
+      extends EmbeddedChannel(chanId, false, false) {
 
     import java.net.SocketAddress
 
@@ -69,9 +69,10 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
       }
 
     override def connect(
-      r: SocketAddress,
-      l: SocketAddress,
-      p: ChannelPromise): ChannelFuture = lock.synchronized {
+        r: SocketAddress,
+        l: SocketAddress,
+        p: ChannelPromise
+      ): ChannelFuture = lock.synchronized {
       toggleActiveCtrl()
       super.connect(r, l, p)
     }
@@ -81,16 +82,19 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
   }
 
   private def withChannel[T: OnComplete](
-    chanId: ChannelId,
-    connected: Boolean,
-    beforeWrite: (Channel, Object) => Unit)(f: EmbeddedChannel => T): T = {
+      chanId: ChannelId,
+      connected: Boolean,
+      beforeWrite: (Channel, Object) => Unit
+    )(f: EmbeddedChannel => T
+    ): T = {
     object WithChannelHandler
-      extends reactivemongo.io.netty.channel.ChannelOutboundHandlerAdapter {
+        extends reactivemongo.io.netty.channel.ChannelOutboundHandlerAdapter {
 
       override def write(
-        ctx: ChannelHandlerContext,
-        msg: Object,
-        promise: ChannelPromise): Unit = {
+          ctx: ChannelHandlerContext,
+          msg: Object,
+          promise: ChannelPromise
+        ): Unit = {
         beforeWrite(ctx.channel, msg)
 
         ctx.write(msg, promise)
@@ -105,8 +109,9 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
 
     val ready = Promise[Unit]()
 
-    chan.connect(new java.net.InetSocketAddress(27017)).
-      addListener(new ChannelFutureListener {
+    chan
+      .connect(new java.net.InetSocketAddress(27017))
+      .addListener(new ChannelFutureListener {
         def operationComplete(op: ChannelFuture) = {
           if (op.isSuccess) ready.success({})
           else ready.failure(op.cause)
@@ -116,14 +121,15 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
       })
 
     @annotation.tailrec
-    def release(): Unit = Option(chan.readOutbound[reactivemongo.io.netty.buffer.ByteBuf]) match {
-      case Some(remaining) => {
-        remaining.release()
-        release()
-      }
+    def release(): Unit =
+      Option(chan.readOutbound[reactivemongo.io.netty.buffer.ByteBuf]) match {
+        case Some(remaining) => {
+          remaining.release()
+          release()
+        }
 
-      case _ => chan.close(); ()
-    }
+        case _ => chan.close(); ()
+      }
 
     def close(): Unit = {
       if (chan.finish) release()
@@ -138,9 +144,7 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
 
       val res = f(chan)
 
-      implicitly[OnComplete[T]].onComplete(res, { () =>
-        close()
-      })
+      implicitly[OnComplete[T]].onComplete(res, { () => close() })
 
       res
     } catch {
@@ -150,14 +154,22 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
     }
   }
 
-  def withChannel2[T](chanId: ChannelId, connected: Boolean)(f: EmbeddedChannel => T): T = withChannel(chanId, connected, (_, _) => {})(f)
+  def withChannel2[T](
+      chanId: ChannelId,
+      connected: Boolean
+    )(f: EmbeddedChannel => T
+    ): T = withChannel(chanId, connected, (_, _) => {})(f)
 
-  def simpleChannel(chanId: ChannelId, connected: Boolean): Future[EmbeddedChannel] = {
+  def simpleChannel(
+      chanId: ChannelId,
+      connected: Boolean
+    ): Future[EmbeddedChannel] = {
     val chan = new EmChannel(chanId, connected)
     val ready = Promise[EmbeddedChannel]()
 
-    chan.connect(new java.net.InetSocketAddress(27017)).
-      addListener(new ChannelFutureListener {
+    chan
+      .connect(new java.net.InetSocketAddress(27017))
+      .addListener(new ChannelFutureListener {
         def operationComplete(op: ChannelFuture) = {
           if (op.isSuccess) ready.success(chan)
           else ready.failure(op.cause)
@@ -169,14 +181,18 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
     ready.future
   }
 
-  def simpleChannel(chanId: ChannelId, handler: (Channel, Object) => Unit): Future[EmbeddedChannel] = {
+  def simpleChannel(
+      chanId: ChannelId,
+      handler: (Channel, Object) => Unit
+    ): Future[EmbeddedChannel] = {
     object WithChannelHandler
-      extends reactivemongo.io.netty.channel.ChannelOutboundHandlerAdapter {
+        extends reactivemongo.io.netty.channel.ChannelOutboundHandlerAdapter {
 
       override def write(
-        ctx: ChannelHandlerContext,
-        msg: Object,
-        promise: ChannelPromise): Unit = {
+          ctx: ChannelHandlerContext,
+          msg: Object,
+          promise: ChannelPromise
+        ): Unit = {
         handler(ctx.channel, msg)
 
         ctx.write(msg, promise)
@@ -191,8 +207,9 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
 
     val ready = Promise[EmbeddedChannel]()
 
-    chan.connect(new java.net.InetSocketAddress(27017)).
-      addListener(new ChannelFutureListener {
+    chan
+      .connect(new java.net.InetSocketAddress(27017))
+      .addListener(new ChannelFutureListener {
         def operationComplete(op: ChannelFuture) = {
           if (op.isSuccess) ready.success(chan)
           else ready.failure(op.cause)
@@ -206,6 +223,7 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
 }
 
 sealed trait LowPriorityNettyEmbedder { _self: NettyEmbedder.type =>
+
   implicit def defaultOnComplete[T]: OnComplete[T] = new OnComplete[T] {
     def onComplete(underlying: T, f: () => Unit): Unit = f()
   }

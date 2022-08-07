@@ -22,7 +22,10 @@ object TestCompat {
 
   type BSONJavaScript = reactivemongo.api.bson.BSONJavaScript
 
-  def dateReader: BSONReader[Date] = implicitly[BSONReader[java.time.Instant]].afterRead { i => new Date(i.toEpochMilli) }
+  def dateReader: BSONReader[Date] =
+    implicitly[BSONReader[java.time.Instant]].afterRead { i =>
+      new Date(i.toEpochMilli)
+    }
 
   @inline def BSONObjectID(data: Array[Byte]) =
     reactivemongo.api.bson.BSONObjectID.parse(data).get

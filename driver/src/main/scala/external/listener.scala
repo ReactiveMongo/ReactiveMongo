@@ -12,6 +12,7 @@ import reactivemongo.core.nodeset.NodeSetInfo
  * @define connectionParam the name of the connection pool
  */
 trait ConnectionListener {
+
   /** Logger available for the listener implementation. */
   lazy val logger: org.slf4j.Logger = ConnectionListener.logger
 
@@ -23,9 +24,10 @@ trait ConnectionListener {
    * @param connection $connectionParam
    */
   def poolCreated(
-    options: MongoConnectionOptions,
-    supervisor: String,
-    connection: String): Unit
+      options: MongoConnectionOptions,
+      supervisor: String,
+      connection: String
+    ): Unit
 
   /**
    * The node set of the connection pool has been updated.
@@ -37,10 +39,11 @@ trait ConnectionListener {
    * @param updated the new/updated node set
    */
   def nodeSetUpdated(
-    supervisor: String,
-    connection: String,
-    previous: NodeSetInfo,
-    updated: NodeSetInfo): Unit
+      supervisor: String,
+      connection: String,
+      previous: NodeSetInfo,
+      updated: NodeSetInfo
+    ): Unit
 
   /**
    * The connection is being shut down.
@@ -82,13 +85,18 @@ object ConnectionListener {
 
     binderPathSet.headOption.flatMap { first =>
       if (binderPathSet.tail.nonEmpty) {
-        logger.warn(s"Class path contains multiple StaticListenerBinder: $first, ${binderPathSet.tail mkString ", "}")
+        logger.warn(
+          s"Class path contains multiple StaticListenerBinder: $first, ${binderPathSet.tail mkString ", "}"
+        )
       }
 
       val `try` = Try(new StaticListenerBinder().connectionListener())
 
       `try`.failed.foreach { reason =>
-        logger.warn("Fails to create connection listener; Fallbacks to the default one", reason)
+        logger.warn(
+          "Fails to create connection listener; Fallbacks to the default one",
+          reason
+        )
       }
 
       `try`.toOption
@@ -97,6 +105,7 @@ object ConnectionListener {
 }
 
 final class StaticListenerBinder {
+
   /**
    * Returns a new listener instance;
    * At most one will be used per driver.

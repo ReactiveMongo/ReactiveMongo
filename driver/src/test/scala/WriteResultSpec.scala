@@ -13,7 +13,8 @@ final class WriteResultSpec extends org.specs2.mutable.Specification {
       writeErrors = Nil,
       writeConcernError = None,
       code = Some(23),
-      errmsg = Some("Foo"))
+      errmsg = Some("Foo")
+    )
 
     "be matched as a CommandException when failed" in {
       error must beLike {
@@ -26,7 +27,7 @@ final class WriteResultSpec extends org.specs2.mutable.Specification {
     "not be matched as a CommandException when successful" in {
       (error.copy(ok = true) match {
         case CommandException.Code(_) | CommandException.Message(_) => true
-        case _ => false
+        case _                                                      => false
       }) must beFalse
     }
   }

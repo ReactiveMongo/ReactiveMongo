@@ -75,7 +75,8 @@ private[reactivemongo] object CommandKind {
 
   def canCompress(kind: CommandKind): Boolean = kind match {
     case Hello | SaslStart | SaslContinue | GetNonce | Authenticate |
-      CreateUser | Undefined => false
+        CreateUser | Undefined =>
+      false
 
     case _ => true
   }

@@ -25,6 +25,7 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
     PingCommand,
     UserRole
   }
+
   private implicit lazy val dropWriter: pack.Writer[DropDatabase.type] =
     DropDatabase.writer(internalSerializationPack)
 
@@ -40,8 +41,9 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    * }}}
    */
   final def drop()(implicit ec: ExecutionContext): Future[Unit] =
-    Command.run(internalSerializationPack, failoverStrategy).
-      apply(self, DropDatabase, ReadPreference.primary)
+    Command
+      .run(internalSerializationPack, failoverStrategy)
+      .apply(self, DropDatabase, ReadPreference.primary)
 
   /**
    * The GridFS with the default serialization and collection prefix.
@@ -61,8 +63,7 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    * @param prefix the collection prefix
    */
   @inline final def gridfs(prefix: String): GridFS[Serialization.Pack] =
-    gridfs[Serialization.Pack](
-      Serialization.internalSerializationPack, prefix)
+    gridfs[Serialization.Pack](Serialization.internalSerializationPack, prefix)
 
   /**
    * The GridFS with the default serialization.
@@ -72,7 +73,9 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    * @param prefix the collection prefix
    */
   final def gridfs[P <: SerializationPack](
-    pack: P, prefix: String): GridFS[P] = GridFS[P](pack, this, prefix)
+      pack: P,
+      prefix: String
+    ): GridFS[P] = GridFS[P](pack, this, prefix)
 
   /**
    * Returns an index manager for this database.
@@ -92,9 +95,14 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    */
   final def indexesManager(implicit ec: ExecutionContext) = IndexesManager(self)
 
-  private[api] def indexesManager[P <: SerializationPack](pack: P)(implicit ec: ExecutionContext): IndexesManager.Aux[P] = IndexesManager[P](pack, self)
+  private[api] def indexesManager[P <: SerializationPack](
+      pack: P
+    )(implicit
+      ec: ExecutionContext
+    ): IndexesManager.Aux[P] = IndexesManager[P](pack, self)
 
-  private implicit lazy val colNamesWriter: pack.Writer[ListCollectionNames.type] = ListCollectionNames.writer(internalSerializationPack)
+  private implicit lazy val colNamesWriter: pack.Writer[ListCollectionNames.type] =
+    ListCollectionNames.writer(internalSerializationPack)
 
   private implicit lazy val colNamesReader: pack.Reader[CollectionNames] =
     ListCollectionNames.reader(internalSerializationPack)
@@ -111,8 +119,16 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    *   db.collectionNames
    * }}}
    */
-  final def collectionNames(implicit ec: ExecutionContext): Future[List[String]] = Command.run(internalSerializationPack, failoverStrategy)(
-    self, ListCollectionNames, ReadPreference.primary).map(_.names)
+  final def collectionNames(
+      implicit
+      ec: ExecutionContext
+    ): Future[List[String]] = Command
+    .run(internalSerializationPack, failoverStrategy)(
+      self,
+      ListCollectionNames,
+      ReadPreference.primary
+    )
+    .map(_.names)
 
   private lazy implicit val renameWriter: pack.Writer[RenameCollection] =
     RenameCollection.writer(internalSerializationPack)
@@ -140,16 +156,23 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    * @return a failure if the dropExisting option is false and the target collection already exists
    */
   final def renameCollection[C <: Collection](
-    db: String,
-    from: String,
-    to: String,
-    dropExisting: Boolean = false,
-    failoverStrategy: FailoverStrategy = failoverStrategy)(
-    implicit
-    ec: ExecutionContext, producer: CollectionProducer[C] = Serialization.defaultCollectionProducer): Future[C] = {
-    Command.run(internalSerializationPack, failoverStrategy).apply(
-      self, RenameCollection(s"${db}.$from", s"${db}.$to", dropExisting),
-      ReadPreference.primary).map(_ => self.collection(to))
+      db: String,
+      from: String,
+      to: String,
+      dropExisting: Boolean = false,
+      failoverStrategy: FailoverStrategy = failoverStrategy
+    )(implicit
+      ec: ExecutionContext,
+      producer: CollectionProducer[C] = Serialization.defaultCollectionProducer
+    ): Future[C] = {
+    Command
+      .run(internalSerializationPack, failoverStrategy)
+      .apply(
+        self,
+        RenameCollection(s"${db}.$from", s"${db}.$to", dropExisting),
+        ReadPreference.primary
+      )
+      .map(_ => self.collection(to))
   }
 
   private implicit lazy val createUserWriter: pack.Writer[CreateUser] =
@@ -193,14 +216,18 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    * @param mechanisms the authentication mechanisms (e.g. [[ScramSha1Authentication]])
    */
   final def createUser[T](
-    user: String,
-    pwd: Option[String],
-    customData: Option[T] = Option.empty[Pack#Document],
-    roles: List[UserRole] = List.empty,
-    digestPassword: Boolean = true,
-    writeConcern: WriteConcern = connection.options.writeConcern,
-    restrictions: List[AuthenticationRestriction] = List.empty,
-    mechanisms: List[AuthenticationMode] = List.empty)(implicit ec: ExecutionContext, w: pack.Writer[T]): Future[Unit] = {
+      user: String,
+      pwd: Option[String],
+      customData: Option[T] = Option.empty[Pack#Document],
+      roles: List[UserRole] = List.empty,
+      digestPassword: Boolean = true,
+      writeConcern: WriteConcern = connection.options.writeConcern,
+      restrictions: List[AuthenticationRestriction] = List.empty,
+      mechanisms: List[AuthenticationMode] = List.empty
+    )(implicit
+      ec: ExecutionContext,
+      w: pack.Writer[T]
+    ): Future[Unit] = {
     val command: CreateUser = new CreateUser(
       name = user,
       pwd = pwd,
@@ -209,21 +236,25 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
       digestPassword = digestPassword,
       writeConcern = Some(writeConcern),
       authenticationRestrictions = restrictions,
-      mechanisms = mechanisms)
+      mechanisms = mechanisms
+    )
 
-    Command.run(pack, failoverStrategy)(
-      self, command, ReadPreference.primary).map(_ => {})
+    Command
+      .run(pack, failoverStrategy)(self, command, ReadPreference.primary)
+      .map(_ => {})
   }
 
   private implicit lazy val pingWriter: pack.Writer[PingCommand.type] = {
     val builder = internalSerializationPack.newBuilder
-    val cmd = builder.document(Seq(builder.elementProducer(
-      "ping", builder.double(1.0D))))
+    val cmd = builder.document(
+      Seq(builder.elementProducer("ping", builder.double(1.0D)))
+    )
 
     pack.writer[PingCommand.type] { _ => cmd }
   }
 
-  private implicit lazy val pingReader: pack.Reader[Boolean] = CommandCodecs.commandBooleanReader(pack)
+  private implicit lazy val pingReader: pack.Reader[Boolean] =
+    CommandCodecs.commandBooleanReader(pack)
 
   /**
    * Tests if the server, resolved according to the given read preference, responds to commands.
@@ -241,9 +272,12 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    *
    * @return true if successful (even if the server is write locked)
    */
-  final def ping(readPreference: ReadPreference = ReadPreference.nearest)(
-    implicit
-    ec: ExecutionContext): Future[Boolean] =
-    Command.run(internalSerializationPack, failoverStrategy).
-      apply[Boolean, PingCommand.type](self, PingCommand, readPreference)
+  final def ping(
+      readPreference: ReadPreference = ReadPreference.nearest
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Boolean] =
+    Command
+      .run(internalSerializationPack, failoverStrategy)
+      .apply[Boolean, PingCommand.type](self, PingCommand, readPreference)
 }

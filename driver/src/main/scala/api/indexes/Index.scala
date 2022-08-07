@@ -153,12 +153,34 @@ sealed abstract class Index {
   def options: pack.Document
 
   /** The name of the index (a default one is computed if none). */
-  lazy val eventualName: String = name.getOrElse(key.foldLeft("") {
-    (name, kv) =>
+  lazy val eventualName: String =
+    name.getOrElse(key.foldLeft("") { (name, kv) =>
       name + (if (name.length > 0) "_" else "") + kv._1 + "_" + kv._2.valueStr
-  })
+    })
 
-  private[api] lazy val tupled = Tuple21(key, name, background, unique, partialFilter, sparse, expireAfterSeconds, storageEngine, weights, defaultLanguage, languageOverride, textIndexVersion, _2dsphereIndexVersion, bits, min, max, bucketSize, collation, wildcardProjection, version, options)
+  private[api] lazy val tupled = Tuple21(
+    key,
+    name,
+    background,
+    unique,
+    partialFilter,
+    sparse,
+    expireAfterSeconds,
+    storageEngine,
+    weights,
+    defaultLanguage,
+    languageOverride,
+    textIndexVersion,
+    _2dsphereIndexVersion,
+    bits,
+    min,
+    max,
+    bucketSize,
+    collation,
+    wildcardProjection,
+    version,
+    options
+  )
 
   @SuppressWarnings(Array("ComparingUnrelatedTypes"))
   override def equals(that: Any): Boolean = that match {
@@ -176,7 +198,8 @@ object Index {
 
   type Default = Aux[Serialization.Pack]
 
-  @inline private def defaultOpts = Serialization.internalSerializationPack.newBuilder.document(Seq.empty)
+  @inline private def defaultOpts =
+    Serialization.internalSerializationPack.newBuilder.document(Seq.empty)
 
   /**
    * {{{
@@ -209,28 +232,30 @@ object Index {
    * }}}
    */
   @SuppressWarnings(Array("MaxParameters", "VariableShadowing"))
-  def apply[P <: SerializationPack](_pack: P)(
-    key: Seq[(String, IndexType)],
-    name: Option[String],
-    unique: Boolean,
-    background: Boolean,
-    sparse: Boolean,
-    expireAfterSeconds: Option[Int],
-    storageEngine: Option[_pack.Document],
-    weights: Option[_pack.Document],
-    defaultLanguage: Option[String],
-    languageOverride: Option[String],
-    textIndexVersion: Option[Int],
-    sphereIndexVersion: Option[Int],
-    bits: Option[Int],
-    min: Option[Double],
-    max: Option[Double],
-    bucketSize: Option[Double],
-    collation: Option[Collation],
-    wildcardProjection: Option[_pack.Document],
-    version: Option[Int],
-    partialFilter: Option[_pack.Document],
-    options: _pack.Document): Index.Aux[P] = {
+  def apply[P <: SerializationPack](
+      _pack: P
+    )(key: Seq[(String, IndexType)],
+      name: Option[String],
+      unique: Boolean,
+      background: Boolean,
+      sparse: Boolean,
+      expireAfterSeconds: Option[Int],
+      storageEngine: Option[_pack.Document],
+      weights: Option[_pack.Document],
+      defaultLanguage: Option[String],
+      languageOverride: Option[String],
+      textIndexVersion: Option[Int],
+      sphereIndexVersion: Option[Int],
+      bits: Option[Int],
+      min: Option[Double],
+      max: Option[Double],
+      bucketSize: Option[Double],
+      collation: Option[Collation],
+      wildcardProjection: Option[_pack.Document],
+      version: Option[Int],
+      partialFilter: Option[_pack.Document],
+      options: _pack.Document
+    ): Index.Aux[P] = {
     def k = key
     def n = name
     def u = unique
@@ -311,27 +336,28 @@ object Index {
    */
   @SuppressWarnings(Array("MaxParameters"))
   def apply(
-    key: Seq[(String, IndexType)],
-    name: Option[String] = None,
-    unique: Boolean = false,
-    background: Boolean = false,
-    sparse: Boolean = false,
-    expireAfterSeconds: Option[Int] = None,
-    storageEngine: Option[Serialization.Pack#Document] = None,
-    weights: Option[Serialization.Pack#Document] = None,
-    defaultLanguage: Option[String] = None,
-    languageOverride: Option[String] = None,
-    textIndexVersion: Option[Int] = None,
-    sphereIndexVersion: Option[Int] = None,
-    bits: Option[Int] = None,
-    min: Option[Double] = None,
-    max: Option[Double] = None,
-    bucketSize: Option[Double] = None,
-    collation: Option[Collation] = None,
-    wildcardProjection: Option[Serialization.Pack#Document] = None,
-    version: Option[Int] = None,
-    partialFilter: Option[Serialization.Pack#Document] = None,
-    options: Serialization.Pack#Document = defaultOpts): Index.Aux[Serialization.Pack] =
+      key: Seq[(String, IndexType)],
+      name: Option[String] = None,
+      unique: Boolean = false,
+      background: Boolean = false,
+      sparse: Boolean = false,
+      expireAfterSeconds: Option[Int] = None,
+      storageEngine: Option[Serialization.Pack#Document] = None,
+      weights: Option[Serialization.Pack#Document] = None,
+      defaultLanguage: Option[String] = None,
+      languageOverride: Option[String] = None,
+      textIndexVersion: Option[Int] = None,
+      sphereIndexVersion: Option[Int] = None,
+      bits: Option[Int] = None,
+      min: Option[Double] = None,
+      max: Option[Double] = None,
+      bucketSize: Option[Double] = None,
+      collation: Option[Collation] = None,
+      wildcardProjection: Option[Serialization.Pack#Document] = None,
+      version: Option[Int] = None,
+      partialFilter: Option[Serialization.Pack#Document] = None,
+      options: Serialization.Pack#Document = defaultOpts
+    ): Index.Aux[Serialization.Pack] =
     apply[Serialization.Pack](Serialization.internalSerializationPack)(
       key,
       name,
@@ -353,10 +379,12 @@ object Index {
       wildcardProjection,
       version,
       partialFilter,
-      options)
+      options
+    )
 
   /** '''EXPERIMENTAL:''' API may change */
   object Key {
+
     def unapplySeq(index: Index): Option[Seq[(String, IndexType)]] =
       Option(index).map(_.key)
   }
@@ -406,7 +434,9 @@ object NSIndex {
 
   @SuppressWarnings(Array("VariableShadowing"))
   def apply[P <: SerializationPack](
-    namespace: String, index: Index.Aux[P]): NSIndex.Aux[P] = {
+      namespace: String,
+      index: Index.Aux[P]
+    ): NSIndex.Aux[P] = {
     @inline def nsp = namespace
     @inline def i = index
     new NSIndex {

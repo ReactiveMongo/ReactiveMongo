@@ -11,7 +11,8 @@ import reactivemongo.api.{
   SerializationPack
 }
 
-trait ChangeStreamOps[P <: SerializationPack] { collection: GenericCollection[P] =>
+trait ChangeStreamOps[P <: SerializationPack] {
+  collection: GenericCollection[P] =>
 
   import collection.AggregationFramework.ChangeStream
 
@@ -39,16 +40,20 @@ trait ChangeStreamOps[P <: SerializationPack] { collection: GenericCollection[P]
    * @tparam T the type into which Change Events are deserialized
    */
   final def watch[T](
-    offset: Option[ChangeStream.Offset] = None,
-    pipeline: List[PipelineOperator] = Nil,
-    maxTime: Option[FiniteDuration] = None,
-    fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None)(implicit reader: pack.Reader[T]): WatchBuilder[T] = {
+      offset: Option[ChangeStream.Offset] = None,
+      pipeline: List[PipelineOperator] = Nil,
+      maxTime: Option[FiniteDuration] = None,
+      fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None
+    )(implicit
+      reader: pack.Reader[T]
+    ): WatchBuilder[T] = {
     new WatchBuilder[T] {
       protected val context: AggregatorContext[T] = aggregatorContext[T](
         pipeline = (new ChangeStream(offset, fullDocumentStrategy)) +: pipeline,
         readConcern = ReadConcern.Majority,
         cursorOptions = CursorOptions.empty.tailable,
-        maxTime = maxTime)
+        maxTime = maxTime
+      )
     }
   }
 
@@ -91,7 +96,10 @@ trait ChangeStreamOps[P <: SerializationPack] { collection: GenericCollection[P]
      * established, if there is is some next event. Therefore, `head` is guaranteed to eventually return the next
      * change event beyond the resume point, when such an event appears.
      */
-    def cursor[AC[U] <: Cursor.WithOps[U]](implicit cp: CursorProducer.Aux[T, AC]): AC[T] = context.prepared[AC].cursor
+    def cursor[AC[U] <: Cursor.WithOps[U]](
+        implicit
+        cp: CursorProducer.Aux[T, AC]
+      ): AC[T] = context.prepared[AC].cursor
 
   }
 

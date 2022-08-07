@@ -43,9 +43,10 @@ import reactivemongo.api.MongoConnectionOptions
  * @param connection the name of the connection pool
  */
 private[reactivemongo] final class ChannelFactory(
-  supervisor: String,
-  connection: String,
-  options: MongoConnectionOptions) extends ChannelInitializer[Channel] {
+    supervisor: String,
+    connection: String,
+    options: MongoConnectionOptions)
+    extends ChannelInitializer[Channel] {
 
   private val pack = reactivemongo.core.netty.Pack()
   private val parentGroup: EventLoopGroup = pack.eventLoopGroup()
@@ -58,12 +59,15 @@ private[reactivemongo] final class ChannelFactory(
   private val timeoutMs = Integer.valueOf(options.connectTimeoutMS)
 
   private[reactivemongo] def create(
-    host: String = "localhost",
-    port: Int = 27017,
-    maxIdleTimeMS: Int = options.maxIdleTimeMS,
-    receiver: ActorRef): Try[Channel] = {
-    if (parentGroup.isShuttingDown ||
-      parentGroup.isShutdown || parentGroup.isTerminated) {
+      host: String = "localhost",
+      port: Int = 27017,
+      maxIdleTimeMS: Int = options.maxIdleTimeMS,
+      receiver: ActorRef
+    ): Try[Channel] = {
+    if (
+      parentGroup.isShuttingDown ||
+      parentGroup.isShutdown || parentGroup.isTerminated
+    ) {
 
       val msg =
         s"Cannot create channel to '${host}:${port}' from inactive factory"
@@ -80,15 +84,17 @@ private[reactivemongo] final class ChannelFactory(
       f.attr(ChannelFactory.actorRefKey, receiver)
       f.attr(ChannelFactory.maxIdleTimeKey, maxIdleTimeMS)
 
-      val resolution = f.connect(host, port).addListener(
-        new ChannelFutureListener {
+      val resolution = f
+        .connect(host, port)
+        .addListener(new ChannelFutureListener {
           def operationComplete(op: ChannelFuture): Unit = {
             if (!op.isSuccess) {
               val chanId = op.channel.id
 
               debug(
                 s"Connection to ${host}:${port} refused for channel #${chanId}",
-                op.cause)
+                op.cause
+              )
 
               receiver ! ChannelDisconnected(chanId)
             }
@@ -113,21 +119,28 @@ private[reactivemongo] final class ChannelFactory(
   }
 
   private[reactivemongo] def initChannel(
-    channel: Channel,
-    host: String, port: Int,
-    maxIdleTimeMS: Int,
-    receiver: ActorRef): Unit = {
+      channel: Channel,
+      host: String,
+      port: Int,
+      maxIdleTimeMS: Int,
+      receiver: ActorRef
+    ): Unit = {
     debug(s"Initializing channel ${channel.id} to ${host}:${port} ($receiver)")
 
     val pipeline = channel.pipeline
     val idleTimeMS = maxIdleTimeMS.toLong
 
-    pipeline.addLast("idleState", new IdleStateHandler(
-      idleTimeMS, idleTimeMS, 0, TimeUnit.MILLISECONDS))
+    pipeline.addLast(
+      "idleState",
+      new IdleStateHandler(idleTimeMS, idleTimeMS, 0, TimeUnit.MILLISECONDS)
+    )
 
     if (options.sslEnabled) {
       val sslEng = reactivemongo.core.SSL.createEngine(sslContext, host, port)
-      val sslHandler = new reactivemongo.io.netty.handler.ssl.SslHandler(sslEng, false /* TLS */ )
+      val sslHandler = new reactivemongo.io.netty.handler.ssl.SslHandler(
+        sslEng,
+        false /* TLS */
+      )
       pipeline.addLast("ssl", sslHandler)
     }
 
@@ -135,7 +148,8 @@ private[reactivemongo] final class ChannelFactory(
       new ResponseFrameDecoder(),
       new ResponseDecoder(),
       new RequestEncoder(),
-      new MongoHandler(supervisor, connection, receiver))
+      new MongoHandler(supervisor, connection, receiver)
+    )
 
     trace(s"Netty channel configuration:\n- connectTimeoutMS: ${options.connectTimeoutMS}\n- maxIdleTimeMS: ${options.maxIdleTimeMS}ms\n- tcpNoDelay: ${options.tcpNoDelay}\n- keepAlive: ${options.keepAlive}\n- sslEnabled: ${options.sslEnabled}\n- keyStore: ${options.keyStore.fold("None")(_.toString)}")
   }
@@ -146,9 +160,10 @@ private[reactivemongo] final class ChannelFactory(
         MongoConnectionOptions.KeyStore(
           resource = new java.io.File(path).toURI,
           storeType = sys.props.getOrElse("javax.net.ssl.keyStoreType", "JKS"),
-          password = sys.props.get(
-            "javax.net.ssl.keyStorePassword").map(_.toCharArray),
-          trust = true)
+          password =
+            sys.props.get("javax.net.ssl.keyStorePassword").map(_.toCharArray),
+          trust = true
+        )
 
       }
     }
@@ -176,8 +191,8 @@ private[reactivemongo] final class ChannelFactory(
     val keyManagers = loadedStore.map {
       case (ks, password) =>
         val kmf = {
-          val res = KeyManagerFactory.getInstance(
-            KeyManagerFactory.getDefaultAlgorithm)
+          val res =
+            KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm)
 
           res.init(ks, password)
           res
@@ -195,15 +210,17 @@ private[reactivemongo] final class ChannelFactory(
 
         if (options.sslAllowsInvalidCert) Array(TrustAny)
         else if (!trust) null
-        else loadedStore.fold(null.asInstanceOf[Array[TrustManager]]) {
-          case (ks, _) =>
-            val tmf = TrustManagerFactory.getInstance(
-              TrustManagerFactory.getDefaultAlgorithm)
+        else
+          loadedStore.fold(null.asInstanceOf[Array[TrustManager]]) {
+            case (ks, _) =>
+              val tmf = TrustManagerFactory.getInstance(
+                TrustManagerFactory.getDefaultAlgorithm
+              )
 
-            tmf.init(ks)
+              tmf.init(ks)
 
-            tmf.getTrustManagers()
-        }
+              tmf.getTrustManagers()
+          }
       }
 
       val rand = new scala.util.Random(System.identityHashCode(tm))
@@ -218,20 +235,22 @@ private[reactivemongo] final class ChannelFactory(
     sslCtx
   }
 
-  @inline private def channelFactory() = new Bootstrap().
-    group(parentGroup).
-    channel(pack.channelClass).
-    option(TCP_NODELAY, tcpNoDelay).
-    option(SO_KEEPALIVE, keepAlive).
-    option(CONNECT_TIMEOUT_MILLIS, timeoutMs).
-    handler(this)
+  @inline private def channelFactory() = new Bootstrap()
+    .group(parentGroup)
+    .channel(pack.channelClass)
+    .option(TCP_NODELAY, tcpNoDelay)
+    .option(SO_KEEPALIVE, keepAlive)
+    .option(CONNECT_TIMEOUT_MILLIS, timeoutMs)
+    .handler(this)
 
   private[reactivemongo] def release(callback: Promise[Unit]): Unit = {
-    parentGroup.shutdownGracefully().
-      addListener(new GenericFutureListener[Future[Any]] {
+    parentGroup
+      .shutdownGracefully()
+      .addListener(new GenericFutureListener[Future[Any]] {
         def operationComplete(f: Future[Any]): Unit = {
-          childGroup.shutdownGracefully().
-            addListener(new GenericFutureListener[Future[Any]] {
+          childGroup
+            .shutdownGracefully()
+            .addListener(new GenericFutureListener[Future[Any]] {
               def operationComplete(g: Future[Any]): Unit = {
                 callback.success({}); ()
               }

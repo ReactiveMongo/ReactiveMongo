@@ -19,13 +19,15 @@ object `package` {
   /**
    * Instance of collection producer for `BSONCollection`
    */
-  implicit object BSONCollectionProducer extends GenericCollectionProducer[this.Pack, this.BSONCollection] {
+  implicit object BSONCollectionProducer
+      extends GenericCollectionProducer[this.Pack, this.BSONCollection] {
     val pack = BSONSerializationPack
 
     def apply(
-      db: DB,
-      name: String,
-      failoverStrategy: FailoverStrategy): BSONCollection =
+        db: DB,
+        name: String,
+        failoverStrategy: FailoverStrategy
+      ): BSONCollection =
       new CollectionImpl(db, name, failoverStrategy, db.defaultReadPreference)
   }
 }

@@ -72,12 +72,13 @@ import reactivemongo.api.commands.{
  * @define txWriteConcernParam the write concern for the transaction operation
  */
 final class DB private[api] (
-  val name: String,
-  val connection: MongoConnection,
-  private[api] val connectionState: ConnectionState,
-  val failoverStrategy: FailoverStrategy = FailoverStrategy.default,
-  private[reactivemongo] val session: Option[Session] = Option.empty)
-  extends DBMetaCommands with PackSupport[Serialization.Pack] {
+    val name: String,
+    val connection: MongoConnection,
+    private[api] val connectionState: ConnectionState,
+    val failoverStrategy: FailoverStrategy = FailoverStrategy.default,
+    private[reactivemongo] val session: Option[Session] = Option.empty)
+    extends DBMetaCommands
+    with PackSupport[Serialization.Pack] {
 
   import Serialization.{ internalSerializationPack, unitReader }
 
@@ -91,7 +92,12 @@ final class DB private[api] (
    * @param failoverStrategy $failoverStrategyParam
    */
   @SuppressWarnings(Array("VariableShadowing"))
-  def apply[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = Serialization.defaultCollectionProducer): C = collection(name, failoverStrategy)
+  def apply[C <: Collection](
+      name: String,
+      failoverStrategy: FailoverStrategy = failoverStrategy
+    )(implicit
+      producer: CollectionProducer[C] = Serialization.defaultCollectionProducer
+    ): C = collection(name, failoverStrategy)
 
   /**
    * $resolveDescription.
@@ -107,7 +113,12 @@ final class DB private[api] (
    * }}}
    */
   @SuppressWarnings(Array("VariableShadowing"))
-  def collection[C <: Collection](name: String, failoverStrategy: FailoverStrategy = failoverStrategy)(implicit producer: CollectionProducer[C] = Serialization.defaultCollectionProducer): C = producer(this, name, failoverStrategy)
+  def collection[C <: Collection](
+      name: String,
+      failoverStrategy: FailoverStrategy = failoverStrategy
+    )(implicit
+      producer: CollectionProducer[C] = Serialization.defaultCollectionProducer
+    ): C = producer(this, name, failoverStrategy)
 
   /**
    * Authenticates the connection on this database.
@@ -117,7 +128,13 @@ final class DB private[api] (
    *
    * @see `MongoConnection.authenticate`
    */
-  def authenticate(user: String, password: String)(implicit ec: ExecutionContext): Future[SuccessfulAuthentication] = connection.authenticate(name, user, password, failoverStrategy)
+  def authenticate(
+      user: String,
+      password: String
+    )(implicit
+      ec: ExecutionContext
+    ): Future[SuccessfulAuthentication] =
+    connection.authenticate(name, user, password, failoverStrategy)
 
   /**
    * $startSessionDescription, does nothing if a session has already being started .
@@ -132,7 +149,8 @@ final class DB private[api] (
    *
    * @return The database reference updated with a new session
    */
-  @inline def startSession()(implicit ec: ExecutionContext): Future[DB] = startSession(failIfAlreadyStarted = false)
+  @inline def startSession()(implicit ec: ExecutionContext): Future[DB] =
+    startSession(failIfAlreadyStarted = false)
 
   /**
    * $startSessionDescription.
@@ -150,10 +168,15 @@ final class DB private[api] (
    * @return The database reference updated with a new session,
    * if none is already started with the current reference.
    */
-  def startSession(failIfAlreadyStarted: Boolean)(implicit ec: ExecutionContext): Future[DB] = session match {
+  def startSession(
+      failIfAlreadyStarted: Boolean
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] = session match {
     case Some(s) if failIfAlreadyStarted =>
-      Future.failed[DB](new GenericDriverException(
-        s"Session '${s.lsid}' is already started"))
+      Future.failed[DB](
+        new GenericDriverException(s"Session '${s.lsid}' is already started")
+      )
 
     case Some(_) =>
       Future.successful(this) // NoOp
@@ -165,19 +188,22 @@ final class DB private[api] (
       implicit def r: pack.Reader[StartSessionResult] =
         StartSessionResult.reader(internalSerializationPack)
 
-      Command.run(internalSerializationPack, failoverStrategy).
-        apply(this, StartSession, defaultReadPreference).map { res =>
-          withNewSession(res)
-        }
+      Command
+        .run(internalSerializationPack, failoverStrategy)
+        .apply(this, StartSession, defaultReadPreference)
+        .map { res => withNewSession(res) }
     }
   }
 
   private def withNewSession(r: StartSessionResult): DB = withSession {
     if (connectionState.setName.isDefined) {
       new NodeSetSession(r.id)
-    } else if (connectionState.isMongos &&
-      connectionState.metadata.
-      maxWireVersion.compareTo(MongoWireVersion.V42) >= 0) {
+    } else if (
+      connectionState.isMongos &&
+      connectionState.metadata.maxWireVersion.compareTo(
+        MongoWireVersion.V42
+      ) >= 0
+    ) {
 
       new DistributedSession(r.id)
     } else {
@@ -186,8 +212,8 @@ final class DB private[api] (
   }
 
   @SuppressWarnings(Array("VariableShadowing"))
-  @inline private def withSession(session: Session): DB = new DB(
-    name, connection, connectionState, failoverStrategy, Some(session))
+  @inline private def withSession(session: Session): DB =
+    new DB(name, connection, connectionState, failoverStrategy, Some(session))
 
   /**
    * $startTxDescription, if none is already started with
@@ -208,9 +234,16 @@ final class DB private[api] (
    *
    * @return The database reference with transaction.
    */
-  @inline def startTransaction(writeConcern: Option[WriteConcern])(implicit ec: ExecutionContext): Future[DB] = startTransaction(writeConcern, false)
+  @inline def startTransaction(
+      writeConcern: Option[WriteConcern]
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] = startTransaction(writeConcern, false)
 
-  private def transactionNode()(implicit ec: ExecutionContext): Future[Option[String]] = {
+  private def transactionNode(
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Option[String]] = {
     if (connectionState.isMongos) { // node required to pin transaction
       connection.pickNode(defaultReadPreference).map(Option(_))
     } else {
@@ -223,7 +256,6 @@ final class DB private[api] (
    * the current client session otherwise does nothing.
    *
    * It fails if no session is previously started (see `startSession`).
-   *
    *
    * {{{
    * import scala.concurrent.ExecutionContext
@@ -238,29 +270,43 @@ final class DB private[api] (
    *
    * @return The database reference with transaction.
    */
-  def startTransaction(writeConcern: Option[WriteConcern], failIfAlreadyStarted: Boolean)(implicit ec: ExecutionContext): Future[DB] = session match {
-    case Some(s) => transactionNode().flatMap { txNode =>
-      val wc = writeConcern getOrElse defaultWriteConcern
+  def startTransaction(
+      writeConcern: Option[WriteConcern],
+      failIfAlreadyStarted: Boolean
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] = session match {
+    case Some(s) =>
+      transactionNode().flatMap { txNode =>
+        val wc = writeConcern getOrElse defaultWriteConcern
 
-      s.startTransaction(wc, txNode) match {
-        case Failure(cause) =>
-          Future.failed[DB](cause)
+        s.startTransaction(wc, txNode) match {
+          case Failure(cause) =>
+            Future.failed[DB](cause)
 
-        case Success((tx, false)) if failIfAlreadyStarted =>
-          Future.failed[DB](new GenericDriverException(s"Transaction ${tx.txnNumber} was already started with session '${s.lsid}'"))
+          case Success((tx, false)) if failIfAlreadyStarted =>
+            Future.failed[DB](
+              new GenericDriverException(
+                s"Transaction ${tx.txnNumber} was already started with session '${s.lsid}'"
+              )
+            )
 
-        case Success(_) =>
-          // Dummy find, to make sure a CRUD command is sent
-          // with 'startTransaction' right now
-          collection(s"startx${Thread.currentThread().getId}").
-            find(pack.newBuilder.document(Seq.empty)).
-            one[pack.Document].map(_ => this)
+          case Success(_) =>
+            // Dummy find, to make sure a CRUD command is sent
+            // with 'startTransaction' right now
+            collection(s"startx${Thread.currentThread().getId}")
+              .find(pack.newBuilder.document(Seq.empty))
+              .one[pack.Document]
+              .map(_ => this)
+        }
       }
-    }
 
     case _ =>
-      Future.failed[DB](new GenericDriverException(
-        "Cannot start a transaction without a started session"))
+      Future.failed[DB](
+        new GenericDriverException(
+          "Cannot start a transaction without a started session"
+        )
+      )
   }
 
   /**
@@ -276,14 +322,19 @@ final class DB private[api] (
    *
    * @return The database reference with transaction aborted (but not session)
    */
-  @inline def abortTransaction()(implicit ec: ExecutionContext): Future[DB] = abortTransaction(failIfNotStarted = false)
+  @inline def abortTransaction()(implicit ec: ExecutionContext): Future[DB] =
+    abortTransaction(failIfNotStarted = false)
 
   /**
    * $abortTxDescription, if any otherwise does nothing .
    *
    * @return The database reference with transaction aborted (but not session)
    */
-  def abortTransaction(failIfNotStarted: Boolean)(implicit ec: ExecutionContext): Future[DB] = endTransaction(failIfNotStarted) { (s, wc) =>
+  def abortTransaction(
+      failIfNotStarted: Boolean
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] = endTransaction(failIfNotStarted) { (s, wc) =>
     EndTransaction.abort(s, wc)
   }
 
@@ -300,7 +351,8 @@ final class DB private[api] (
    *
    * @return The database reference with transaction commited (but not session)
    */
-  @inline def commitTransaction()(implicit ec: ExecutionContext): Future[DB] = commitTransaction(failIfNotStarted = false)
+  @inline def commitTransaction()(implicit ec: ExecutionContext): Future[DB] =
+    commitTransaction(failIfNotStarted = false)
 
   /**
    * $commitTxDescription, if any otherwise does nothing .
@@ -315,61 +367,87 @@ final class DB private[api] (
    *
    * @return The database reference with transaction commited (but not session)
    */
-  def commitTransaction(failIfNotStarted: Boolean)(implicit ec: ExecutionContext): Future[DB] = endTransaction(failIfNotStarted) { (s, wc) =>
+  def commitTransaction(
+      failIfNotStarted: Boolean
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] = endTransaction(failIfNotStarted) { (s, wc) =>
     EndTransaction.commit(s, wc)
   }
 
-  private def endTransaction(failIfNotStarted: Boolean)(
-    command: (Session, WriteConcern) => EndTransaction)(
-    implicit
-    ec: ExecutionContext): Future[DB] = session match {
-    case Some(s) => s.transaction match {
-      case Failure(cause) if failIfNotStarted =>
-        Future.failed[DB](new GenericDriverException(
-          s"Cannot end failed transaction (${cause.getMessage})"))
+  private def endTransaction(
+      failIfNotStarted: Boolean
+    )(command: (Session, WriteConcern) => EndTransaction
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] = session match {
+    case Some(s) =>
+      s.transaction match {
+        case Failure(cause) if failIfNotStarted =>
+          Future.failed[DB](
+            new GenericDriverException(
+              s"Cannot end failed transaction (${cause.getMessage})"
+            )
+          )
 
-      case Failure(_) =>
-        Future.successful(this)
-
-      case Success(tx) => tx.writeConcern match {
-        case Some(wc) => {
-          implicit def w: Serialization.Pack#Writer[EndTransaction] =
-            EndTransaction.commandWriter
-
-          connection.database("admin").flatMap { adminDb =>
-            Command.run(internalSerializationPack, failoverStrategy).apply(
-              adminDb.withSession(s), command(s, wc), defaultReadPreference).
-              map(_ => {}).recoverWith {
-                case CommandException.Code(251) =>
-                  // Transaction isn't in progress (started but no op within)
-                  Future.successful({})
-              }.flatMap { _ =>
-                s.endTransaction() match {
-                  case Some(_) =>
-                    Future.successful(this)
-
-                  case _ if failIfNotStarted =>
-                    Future.failed[DB](
-                      new GenericDriverException("Cannot end transaction"))
-
-                  case _ =>
-                    Future.successful(this)
-                }
-              }
-          }
-        }
-
-        case _ if failIfNotStarted =>
-          Future.failed[DB](new GenericDriverException(s"Cannot end transaction without write concern (session '${s.lsid}')"))
-
-        case _ =>
+        case Failure(_) =>
           Future.successful(this)
+
+        case Success(tx) =>
+          tx.writeConcern match {
+            case Some(wc) => {
+              implicit def w: Serialization.Pack#Writer[EndTransaction] =
+                EndTransaction.commandWriter
+
+              connection.database("admin").flatMap { adminDb =>
+                Command
+                  .run(internalSerializationPack, failoverStrategy)
+                  .apply(
+                    adminDb.withSession(s),
+                    command(s, wc),
+                    defaultReadPreference
+                  )
+                  .map(_ => {})
+                  .recoverWith {
+                    case CommandException.Code(251) =>
+                      // Transaction isn't in progress (started but no op within)
+                      Future.successful({})
+                  }
+                  .flatMap { _ =>
+                    s.endTransaction() match {
+                      case Some(_) =>
+                        Future.successful(this)
+
+                      case _ if failIfNotStarted =>
+                        Future.failed[DB](
+                          new GenericDriverException("Cannot end transaction")
+                        )
+
+                      case _ =>
+                        Future.successful(this)
+                    }
+                  }
+              }
+            }
+
+            case _ if failIfNotStarted =>
+              Future.failed[DB](
+                new GenericDriverException(
+                  s"Cannot end transaction without write concern (session '${s.lsid}')"
+                )
+              )
+
+            case _ =>
+              Future.successful(this)
+          }
       }
-    }
 
     case _ if failIfNotStarted =>
-      Future.failed[DB](new GenericDriverException(
-        "Cannot end transaction without a started session"))
+      Future.failed[DB](
+        new GenericDriverException(
+          "Cannot end transaction without a started session"
+        )
+      )
 
     case _ =>
       Future.successful(this)
@@ -388,14 +466,21 @@ final class DB private[api] (
    *
    * @return The database reference with session ended
    */
-  @inline def endSession()(implicit ec: ExecutionContext): Future[DB] = endSession(failIfNotStarted = false)
+  @inline def endSession()(implicit ec: ExecutionContext): Future[DB] =
+    endSession(failIfNotStarted = false)
 
   /**
    * $endSessionDescription, if any otherwise does nothing .
    *
    * @return The database reference with session ended
    */
-  def endSession(failIfNotStarted: Boolean)(implicit ec: ExecutionContext): Future[DB] = endSessionById(failIfNotStarted) { lsid => EndSessions.end(lsid) }
+  def endSession(
+      failIfNotStarted: Boolean
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] = endSessionById(failIfNotStarted) { lsid =>
+    EndSessions.end(lsid)
+  }
 
   /**
    * $killSessionDescription, if any otherwise does nothing .
@@ -410,31 +495,51 @@ final class DB private[api] (
    *
    * @return The database reference with session aborted
    */
-  @inline def killSession()(implicit ec: ExecutionContext): Future[DB] = killSession(failIfNotStarted = false)
+  @inline def killSession()(implicit ec: ExecutionContext): Future[DB] =
+    killSession(failIfNotStarted = false)
 
   /**
    * $killSessionDescription, if any otherwise does nothing .
    *
    * @return The database reference with session aborted
    */
-  def killSession(failIfNotStarted: Boolean)(implicit ec: ExecutionContext): Future[DB] = endSessionById(failIfNotStarted) { lsid => EndSessions.kill(lsid) }
+  def killSession(
+      failIfNotStarted: Boolean
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] = endSessionById(failIfNotStarted) { lsid =>
+    EndSessions.kill(lsid)
+  }
 
-  private def endSessionById(failIfNotStarted: Boolean)(command: java.util.UUID => EndSessions)(implicit ec: ExecutionContext): Future[DB] = session.map(_.lsid) match {
+  private def endSessionById(
+      failIfNotStarted: Boolean
+    )(command: java.util.UUID => EndSessions
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] = session.map(_.lsid) match {
     case Some(lsid) => {
       implicit def w: pack.Writer[EndSessions] =
         EndSessions.commandWriter(internalSerializationPack)
 
-      Command.run(internalSerializationPack, failoverStrategy).
-        apply(this, command(lsid), defaultReadPreference).map(_ =>
+      Command
+        .run(internalSerializationPack, failoverStrategy)
+        .apply(this, command(lsid), defaultReadPreference)
+        .map(_ =>
           new DB(
-            name, connection, connectionState, failoverStrategy,
-            session = None))
+            name,
+            connection,
+            connectionState,
+            failoverStrategy,
+            session = None
+          )
+        )
 
     }
 
     case _ if failIfNotStarted =>
-      Future.failed[DB](new GenericDriverException(
-        "Cannot end not started session"))
+      Future.failed[DB](
+        new GenericDriverException("Cannot end not started session")
+      )
 
     case _ =>
       Future.successful(this) // NoOp
@@ -445,14 +550,15 @@ final class DB private[api] (
    */
   @SuppressWarnings(Array("VariableShadowing"))
   def getMore[P <: SerializationPack, T](
-    pack: P,
-    reference: Cursor.Reference,
-    readPreference: ReadPreference = defaultReadPreference,
-    failoverStrategy: FailoverStrategy = this.failoverStrategy,
-    maxTimeMS: Option[Long] = None)(
-    implicit
-    reader: pack.Reader[T],
-    cp: CursorProducer[T]): cp.ProducedCursor = {
+      pack: P,
+      reference: Cursor.Reference,
+      readPreference: ReadPreference = defaultReadPreference,
+      failoverStrategy: FailoverStrategy = this.failoverStrategy,
+      maxTimeMS: Option[Long] = None
+    )(implicit
+      reader: pack.Reader[T],
+      cp: CursorProducer[T]
+    ): cp.ProducedCursor = {
     @inline def r = reader
 
     val cur = new DefaultCursor.GetMoreCursor[T](
@@ -460,7 +566,8 @@ final class DB private[api] (
       _ref = reference,
       readPreference = readPreference,
       failover = failoverStrategy,
-      maxTimeMS = maxTimeMS) {
+      maxTimeMS = maxTimeMS
+    ) {
       type P = pack.type
       val _pack: P = pack
       val reader = r
@@ -482,7 +589,16 @@ final class DB private[api] (
    * @return $singleResult
    */
   @SuppressWarnings(Array("VariableShadowing"))
-  def runCommand[R, C <: Command with CommandWithResult[R]](command: C with CommandWithResult[R], failoverStrategy: FailoverStrategy = FailoverStrategy.default, readPreference: ReadPreference = this.defaultReadPreference)(implicit writer: pack.Writer[C], reader: pack.Reader[R], ec: ExecutionContext): Future[R] = Command.run(pack, failoverStrategy).apply(this, command, readPreference)
+  def runCommand[R, C <: Command with CommandWithResult[R]](
+      command: C with CommandWithResult[R],
+      failoverStrategy: FailoverStrategy = FailoverStrategy.default,
+      readPreference: ReadPreference = this.defaultReadPreference
+    )(implicit
+      writer: pack.Writer[C],
+      reader: pack.Reader[R],
+      ec: ExecutionContext
+    ): Future[R] =
+    Command.run(pack, failoverStrategy).apply(this, command, readPreference)
 
   /**
    * @tparam C $commandTParam
@@ -493,7 +609,13 @@ final class DB private[api] (
    * @return $cursorFetcher
    */
   @SuppressWarnings(Array("VariableShadowing"))
-  def runCommand[C <: Command](command: C, failoverStrategy: FailoverStrategy)(implicit writer: pack.Writer[C]): CursorFetcher[pack.type, Cursor] = Command.run(pack, failoverStrategy).apply(this, command)
+  def runCommand[C <: Command](
+      command: C,
+      failoverStrategy: FailoverStrategy
+    )(implicit
+      writer: pack.Writer[C]
+    ): CursorFetcher[pack.type, Cursor] =
+    Command.run(pack, failoverStrategy).apply(this, command)
 
   /**
    * Run a raw command (represented by a document).
@@ -513,8 +635,9 @@ final class DB private[api] (
    */
   @SuppressWarnings(Array("VariableShadowing"))
   def runCommand(
-    command: pack.Document,
-    failoverStrategy: FailoverStrategy): CursorFetcher[pack.type, Cursor] = {
+      command: pack.Document,
+      failoverStrategy: FailoverStrategy
+    ): CursorFetcher[pack.type, Cursor] = {
     val runner = Command.run[pack.type](pack, failoverStrategy)
     implicit def w: pack.Writer[pack.Document] = pack.IdentityWriter
     import runner.RawCommand.writer

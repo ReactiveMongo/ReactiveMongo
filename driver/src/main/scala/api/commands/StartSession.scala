@@ -6,16 +6,20 @@ import reactivemongo.api.SerializationPack
 
 // See https://docs.mongodb.com/manual/reference/command/startSession/
 private[reactivemongo] object StartSession
-  extends Command with CommandWithResult[StartSessionResult] {
+    extends Command
+    with CommandWithResult[StartSessionResult] {
 
   val commandKind = CommandKind.StartSession
 
-  def commandWriter[P <: SerializationPack](pack: P): pack.Writer[StartSession.type] = {
+  def commandWriter[P <: SerializationPack](
+      pack: P
+    ): pack.Writer[StartSession.type] = {
     val builder = pack.newBuilder
 
     pack.writer[StartSession.type] { _ =>
-      builder.document(Seq(
-        builder.elementProducer("startSession", builder.int(1))))
+      builder.document(
+        Seq(builder.elementProducer("startSession", builder.int(1)))
+      )
     }
   }
 
@@ -23,13 +27,17 @@ private[reactivemongo] object StartSession
 }
 
 private[reactivemongo] case class StartSessionResult(
-  id: UUID,
-  timeoutMinutes: Int)
+    id: UUID,
+    timeoutMinutes: Int)
 
 private[reactivemongo] object StartSessionResult {
-  import CommandCodecs.{ dealingWithGenericCommandExceptionsReaderOpt => cmdReader }
+  import CommandCodecs.{
+    dealingWithGenericCommandExceptionsReaderOpt => cmdReader
+  }
 
-  def reader[P <: SerializationPack](pack: P): pack.Reader[StartSessionResult] = {
+  def reader[P <: SerializationPack](
+      pack: P
+    ): pack.Reader[StartSessionResult] = {
     val decoder = pack.newDecoder
 
     cmdReader[pack.type, StartSessionResult](pack) { doc =>

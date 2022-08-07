@@ -35,8 +35,8 @@ package object util extends UtilCompat {
     val hex = new Array[Char](2 * bytes.length)
     var i = 0
     while (i < bytes.length) {
-      hex(2 * i) = HEX_CHARS((bytes(i) & 0xF0) >>> 4)
-      hex(2 * i + 1) = HEX_CHARS(bytes(i) & 0x0F)
+      hex(2 * i) = HEX_CHARS((bytes(i) & 0xf0) >>> 4)
+      hex(2 * i + 1) = HEX_CHARS(bytes(i) & 0x0f)
       i = i + 1
     }
     new String(hex)
@@ -66,14 +66,22 @@ package object util extends UtilCompat {
     java.security.MessageDigest.getInstance("MD5").digest(bytes)
 
   /** Makes an option of the value matching the condition. */
-  private[reactivemongo] def option[T](cond: => Boolean, value: => T): Option[T] = if (cond) Some(value) else None
+  private[reactivemongo] def option[T](
+      cond: => Boolean,
+      value: => T
+    ): Option[T] = if (cond) Some(value) else None
 
   // ---
 
-  private[reactivemongo] def withContent[T](uri: URI)(f: InputStream => T): T = {
+  private[reactivemongo] def withContent[T](
+      uri: URI
+    )(f: InputStream => T
+    ): T = {
     lazy val in = if (uri.getScheme == "classpath") {
-      Thread.currentThread().getContextClassLoader.
-        getResourceAsStream(uri.getPath)
+      Thread
+        .currentThread()
+        .getContextClassLoader
+        .getResourceAsStream(uri.getPath)
 
     } else {
       uri.toURL.openStream()
@@ -103,10 +111,12 @@ package object util extends UtilCompat {
    * @param name the DNS name (e.g. `mycluster.mongodb.com`)
    * @param resolver the record resolver
    */
-  private[reactivemongo] def srvRecords(name: String)(
-    resolver: SRVRecordResolver)(
-    implicit
-    ec: ExecutionContext): Future[List[(String, Int)]] = {
+  private[reactivemongo] def srvRecords(
+      name: String
+    )(resolver: SRVRecordResolver
+    )(implicit
+      ec: ExecutionContext
+    ): Future[List[(String, Int)]] = {
     val resolve = new DefaultSRVResolver(resolver)
 
     resolve(name)
@@ -119,30 +129,35 @@ package object util extends UtilCompat {
    * @param timeout the resolution timeout (default: 5 seconds)
    */
   private[reactivemongo] def dnsResolve(
-    srvPrefix: String = "_mongodb._tcp",
-    timeout: FiniteDuration = dnsTimeout): SRVRecordResolver = {
+      srvPrefix: String = "_mongodb._tcp",
+      timeout: FiniteDuration = dnsTimeout
+    ): SRVRecordResolver = {
     implicit ec: ExecutionContext =>
       { (name: String) =>
         val service = Name.fromConstantString(name + '.')
 
         if (service.labels < 3) {
-          Future.failed[Array[Record]](new GenericDriverException(
-            s"Invalid DNS service name (e.g. 'service.domain.tld'): $service"))
+          Future.failed[Array[Record]](
+            new GenericDriverException(
+              s"Invalid DNS service name (e.g. 'service.domain.tld'): $service"
+            )
+          )
 
-        } else Future {
-          val srvName = Name.concatenate(
-            Name.fromConstantString(srvPrefix), service)
+        } else
+          Future {
+            val srvName =
+              Name.concatenate(Name.fromConstantString(srvPrefix), service)
 
-          val lookup = new Lookup(srvName, Type.SRV)
+            val lookup = new Lookup(srvName, Type.SRV)
 
-          lookup.setResolver {
-            val r = Lookup.getDefaultResolver
-            r.setTimeout(java.time.Duration ofSeconds timeout.toSeconds)
-            r
+            lookup.setResolver {
+              val r = Lookup.getDefaultResolver
+              r.setTimeout(java.time.Duration ofSeconds timeout.toSeconds)
+              r
+            }
+
+            lookup.run()
           }
-
-          lookup.run()
-        }
       }
   }
 
@@ -153,9 +168,10 @@ package object util extends UtilCompat {
    * @param timeout the resolution timeout (default: 5 seconds)
    */
   def txtRecords(
-    timeout: FiniteDuration = dnsTimeout)(
-    implicit
-    ec: ExecutionContext): TXTResolver = { (name: String) =>
+      timeout: FiniteDuration = dnsTimeout
+    )(implicit
+      ec: ExecutionContext
+    ): TXTResolver = { (name: String) =>
     val lookup = new Lookup(name, Type.TXT)
 
     lookup.setResolver {

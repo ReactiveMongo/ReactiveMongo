@@ -33,23 +33,24 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
             "q" -> BSONDocument("_id" -> 1),
             "u" -> BSONDocument(f"$$set" -> BSONDocument("value" -> 1)),
             "upsert" -> true,
-            "multi" -> false),
+            "multi" -> false
+          ),
           BSONDocument(
             "q" -> BSONDocument("value" -> 2),
             "u" -> BSONDocument(f"$$set" -> BSONDocument("label" -> "two")),
             "upsert" -> false,
-            "multi" -> true)))
+            "multi" -> true
+          )
+        )
+      )
 
       lazy val session = new NodeSetSession(java.util.UUID.randomUUID())
 
-      val lsid = BSONDocument(
-        "lsid" -> BSONDocument(
-          "id" -> BSONBinary(session.lsid)))
+      val lsid =
+        BSONDocument("lsid" -> BSONDocument("id" -> BSONBinary(session.lsid)))
 
-      val writeConcern = BSONDocument(
-        "writeConcern" -> BSONDocument(
-          "w" -> 1,
-          "j" -> false))
+      val writeConcern =
+        BSONDocument("writeConcern" -> BSONDocument("w" -> 1, "j" -> false))
 
       // ---
 
@@ -57,8 +58,8 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
         val cmd = new Command(None)
 
         withUpdate(cmd) { update =>
-          cmd.pack.serialize(
-            update, cmd.updateWriter) must_=== (base ++ writeConcern)
+          cmd.pack
+            .serialize(update, cmd.updateWriter) must_=== (base ++ writeConcern)
         }
       }
 
@@ -70,20 +71,26 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
 
           // w/o transaction started
           write(update) must_=== (base ++ lsid ++ writeConcern) and {
-            session.startTransaction(WriteConcern.Default, None).
-              aka("transaction") must beSuccessfulTry[(SessionTransaction, Boolean)].which { _ =>
-                // w/ transaction started
+            session
+              .startTransaction(WriteConcern.Default, None)
+              .aka("transaction") must beSuccessfulTry[
+              (SessionTransaction, Boolean)
+            ].which { _ =>
+              // w/ transaction started
 
-                write(update) must_=== (base ++ lsid ++ BSONDocument(
-                  "txnNumber" -> 1L,
-                  "startTransaction" -> true, // as first command in tx
-                  "autocommit" -> false))
-              }
+              write(update) must_=== (base ++ lsid ++ BSONDocument(
+                "txnNumber" -> 1L,
+                "startTransaction" -> true, // as first command in tx
+                "autocommit" -> false
+              ))
+            }
           } and {
             // w/o 'startTransaction' flag after first command in tx
 
             write(update) must_=== (base ++ lsid ++ BSONDocument(
-              "txnNumber" -> 1L, "autocommit" -> false))
+              "txnNumber" -> 1L,
+              "autocommit" -> false
+            ))
           }
         }
       }
@@ -101,9 +108,13 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
               BSONDocument(
                 "q" -> BSONDocument("value" -> 2),
                 "u" -> Seq(
-                  BSONDocument(f"$$set" -> BSONDocument("value" -> 1))),
+                  BSONDocument(f"$$set" -> BSONDocument("value" -> 1))
+                ),
                 "upsert" -> false,
-                "multi" -> true))) ++ writeConcern)
+                "multi" -> true
+              )
+            )
+          ) ++ writeConcern)
         }
       }
     }
@@ -119,7 +130,8 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
       upsert = true,
       multi = false,
       collation = None,
-      arrayFilters = Seq.empty)
+      arrayFilters = Seq.empty
+    )
 
     val element2 = new cmd.UpdateElement(
       q = BSONDocument("value" -> 2),
@@ -127,16 +139,21 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
       upsert = false,
       multi = true,
       collation = None,
-      arrayFilters = Seq.empty)
+      arrayFilters = Seq.empty
+    )
 
-    f(new ResolvedCollectionCommand(
-      collection = "foo",
-      command = new cmd.Update(
-        ordered = true,
-        writeConcern = WriteConcern.Default,
-        bypassDocumentValidation = false,
-        firstUpdate = element1,
-        updates = Seq(element2))))
+    f(
+      new ResolvedCollectionCommand(
+        collection = "foo",
+        command = new cmd.Update(
+          ordered = true,
+          writeConcern = WriteConcern.Default,
+          bypassDocumentValidation = false,
+          firstUpdate = element1,
+          updates = Seq(element2)
+        )
+      )
+    )
   }
 
   private def updatePipeline[T](cmd: Command)(f: cmd.UpdateCmd => T): T = {
@@ -146,23 +163,30 @@ final class UpdateCommandSpec extends org.specs2.mutable.Specification {
       upsert = false,
       multi = true,
       collation = None,
-      arrayFilters = Seq.empty)
+      arrayFilters = Seq.empty
+    )
 
-    f(new ResolvedCollectionCommand(
-      collection = "foo",
-      command = new cmd.Update(
-        ordered = true,
-        writeConcern = WriteConcern.Default,
-        bypassDocumentValidation = false,
-        firstUpdate = element,
-        updates = Seq.empty)))
+    f(
+      new ResolvedCollectionCommand(
+        collection = "foo",
+        command = new cmd.Update(
+          ordered = true,
+          writeConcern = WriteConcern.Default,
+          bypassDocumentValidation = false,
+          firstUpdate = element,
+          updates = Seq.empty
+        )
+      )
+    )
   }
 
   import reactivemongo.api.tests.Pack
 
   private final class Command(s: Option[Session])
-    extends PackSupport[Pack] with UpdateCommand[Pack]
-    with UpsertedFactory[Pack] with UpdateWriteResultFactory[Pack] {
+      extends PackSupport[Pack]
+      with UpdateCommand[Pack]
+      with UpsertedFactory[Pack]
+      with UpdateWriteResultFactory[Pack] {
 
     private[reactivemongo] def session(): Option[Session] = s
 

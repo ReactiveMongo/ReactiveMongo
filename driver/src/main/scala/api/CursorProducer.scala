@@ -11,6 +11,7 @@ trait CursorProducer[T] {
 }
 
 object CursorProducer {
+
   private[api] type Aux[T, C[_] <: Cursor[_]] = CursorProducer[T] {
     type ProducedCursor = C[T]
   }
@@ -36,13 +37,16 @@ object CursorProducer {
  * }}}
  */
 trait CursorFlattener[C[_] <: Cursor[_]] {
+
   /** Flatten a future of cursor as cursor. */
   def flatten[T](future: Future[C[T]]): C[T]
 }
 
 /** Flatteners helper */
 object CursorFlattener {
+
   implicit object defaultCursorFlattener extends CursorFlattener[Cursor] {
+
     def flatten[T](future: Future[Cursor[T]]): Cursor[T] =
       new FlattenedCursor[T](future)
   }

@@ -14,8 +14,8 @@ import reactivemongo.api.gridfs.FileToSave
 import org.specs2.concurrent.ExecutionEnv
 
 final class GridFSSpec(implicit ee: ExecutionEnv)
-  extends org.specs2.mutable.Specification
-  with org.specs2.specification.AfterAll {
+    extends org.specs2.mutable.Specification
+    with org.specs2.specification.AfterAll {
 
   "GridFS".title
 
@@ -27,7 +27,12 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
   import tests.Common
   import Common.{ timeout, slowTimeout }
 
-  lazy val (db, slowDb) = Common.databases(s"reactivemongo-gridfs-${System identityHashCode this}", Common.connection, Common.slowConnection, retries = 1)
+  lazy val (db, slowDb) = Common.databases(
+    s"reactivemongo-gridfs-${System identityHashCode this}",
+    Common.connection,
+    Common.slowConnection,
+    retries = 1
+  )
 
   def afterAll() = { db.drop(); () }
 
@@ -48,9 +53,12 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
   // ---
 
   def gridFsSpec(
-    db: DB,
-    prefix: String,
-    timeout: FiniteDuration)(implicit ev: scala.reflect.ClassTag[pack.Value]) = {
+      db: DB,
+      prefix: String,
+      timeout: FiniteDuration
+    )(implicit
+      ev: scala.reflect.ClassTag[pack.Value]
+    ) = {
 
     val gfs = db.gridfs(prefix)
     type GFile = gfs.ReadFile[pack.Value]
@@ -59,8 +67,7 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
     implicit def dw: pack.Writer[pack.Document] = pack.IdentityWriter
 
     val filename1 = s"file1-${System identityHashCode gfs}"
-    lazy val file1 = gfs.fileToSave(
-      Some(filename1), Some("application/file"))
+    lazy val file1 = gfs.fileToSave(Some(filename1), Some("application/file"))
 
     lazy val content1 = (1 to 100).view.map(_.toByte).toArray
 
@@ -79,9 +86,10 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
     "store a file without a computed MD5" in {
       def in = new ByteArrayInputStream(content1)
 
-      gfs.writeFromInputStream(file1, in).andThen {
-        case _ => in.close()
-      }.map(_.filename) must beSome(filename1).await(1, timeout)
+      gfs
+        .writeFromInputStream(file1, in)
+        .andThen { case _ => in.close() }
+        .map(_.filename) must beSome(filename1).await(1, timeout)
     }
 
     val filename2 = s"file2-${System identityHashCode gfs}"
@@ -90,22 +98,26 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
       contentType = Some("text/plain"),
       uploadDate = None,
       metadata = document(Seq(elem("foo", str("bar")))),
-      id = str(filename2))
+      id = str(filename2)
+    )
 
     lazy val content2 = (100 to 200).view.map(_.toByte).toArray
 
     def countFile2Chunks(): Future[Long] =
-      db.collection(s"${prefix}.chunks").
-        count(Some(BSONDocument("files_id" -> file2.id)))
+      db.collection(s"${prefix}.chunks")
+        .count(Some(BSONDocument("files_id" -> file2.id)))
 
     "store a file with computed MD5" in {
       def in = new ByteArrayInputStream(content2)
 
-      gfs.writeFromInputStream(file2, in,
-        chunkSize = content2.size / 2 // enforce at least 2 chunks
-      ).andThen {
-        case _ => in.close()
-      }.map(_.filename) must beSome(filename2).await(1, timeout) and {
+      gfs
+        .writeFromInputStream(
+          file2,
+          in,
+          chunkSize = content2.size / 2 // enforce at least 2 chunks
+        )
+        .andThen { case _ => in.close() }
+        .map(_.filename) must beSome(filename2).await(1, timeout) and {
         countFile2Chunks() must beTypedEqualTo(3L).await(1, timeout)
       }
     }
@@ -113,32 +125,41 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
     lazy val customField = s"foo-${System identityHashCode content2}"
 
     "update a file metadata" in {
-      val update = document(Seq(elem(f"$$set", document(Seq(
-        elem("_custom", str(customField)))))))
+      val update = document(
+        Seq(elem(f"$$set", document(Seq(elem("_custom", str(customField))))))
+      )
 
-      gfs.update(file2.id, update).
-        map(_.n) must beTypedEqualTo(1).awaitFor(timeout)
+      gfs.update(file2.id, update).map(_.n) must beTypedEqualTo(1).awaitFor(
+        timeout
+      )
     }
 
     "find the files" in {
       def find(n: String): Future[Option[GFile]] =
-        gfs.find[pack.Document, pack.Value](
-          document(Seq(elem("filename", str(n))))).headOption
+        gfs
+          .find[pack.Document, pack.Value](
+            document(Seq(elem("filename", str(n))))
+          )
+          .headOption
 
       def matchFile(
-        actual: GFile,
-        expected: FileToSave[_, _],
-        content: Array[Byte]) = actual.filename must_=== expected.filename and {
+          actual: GFile,
+          expected: FileToSave[_, _],
+          content: Array[Byte]
+        ) = actual.filename must_=== expected.filename and {
         actual.uploadDate must beSome
       } and (actual.contentType must_=== expected.contentType) and {
         val buf = new java.io.ByteArrayOutputStream()
 
-        gfs.readToOutputStream(actual, buf).
-          map(_ => buf.toByteArray) must beTypedEqualTo(content).
-          await(1, timeout) and {
-            gfs.chunks(actual).fold(Array.empty[Byte]) { _ ++ _ }.
-              aka("chunks") must beTypedEqualTo(content).awaitFor(timeout)
-          }
+        gfs
+          .readToOutputStream(actual, buf)
+          .map(_ => buf.toByteArray) must beTypedEqualTo(content)
+          .await(1, timeout) and {
+          gfs
+            .chunks(actual)
+            .fold(Array.empty[Byte]) { _ ++ _ }
+            .aka("chunks") must beTypedEqualTo(content).awaitFor(timeout)
+        }
       }
 
       {
@@ -156,8 +177,9 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
         val cursor = gfs.find(document(Seq(elem("filename", str(filename1)))))
 
         cursor.foo must_=== "Bar" and {
-          cursor.headOption must beSome[GFile].
-            which(matchFile(_, file1, content1)).await(1, timeout / 3L * 2L)
+          cursor.headOption must beSome[GFile]
+            .which(matchFile(_, file1, content1))
+            .await(1, timeout / 3L * 2L)
         }
       } and {
         find(filename2) aka "file #2" must beSome[GFile].which { actual =>
@@ -170,10 +192,13 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
           }
         }.await(1, timeout + (timeout / 3L))
       } and {
-        gfs.find[pack.Document, pack.Value](
-          document(Seq(elem("_custom", str(customField))))).
-          headOption.map(_.map(_.id)) must beSome(file2.id).
-          await(1, timeout + (timeout / 3L))
+        gfs
+          .find[pack.Document, pack.Value](
+            document(Seq(elem("_custom", str(customField))))
+          )
+          .headOption
+          .map(_.map(_.id)) must beSome(file2.id)
+          .await(1, timeout + (timeout / 3L))
       }
     }
 
@@ -194,7 +219,8 @@ final class GridFSSpec(implicit ee: ExecutionEnv)
   private sealed trait FooExtCursor[T] extends FooCursor[T]
 
   private class DefaultFooCursor[T](val wrappee: Cursor[T])
-    extends FooExtCursor[T] with WrappedCursor[T] {
+      extends FooExtCursor[T]
+      with WrappedCursor[T] {
     val foo = "Bar"
   }
 }

@@ -9,6 +9,7 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
    * [[https://docs.mongodb.org/v3.0/reference/operator/aggregation/meta/#exp._S_meta Keyword of metadata]].
    */
   sealed trait MetadataKeyword {
+
     /** Keyword name */
     def name: String
   }
@@ -23,17 +24,19 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
    * should be ascending or descending.
    */
   sealed trait SortOrder {
+
     /** The name of the field to be used to sort. */
     def field: String
   }
 
   /** Ascending sort order */
   final class Ascending private (val field: String) extends SortOrder {
+
     @SuppressWarnings(Array("NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.field == null && other.field == null) || (
-          this.field != null && this.field.equals(other.field))
+        (this.field == null && other.field == null) || (this.field != null && this.field
+          .equals(other.field))
 
       case _ =>
         false
@@ -55,11 +58,12 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
 
   /** Descending sort order */
   final class Descending private (val field: String) extends SortOrder {
+
     @SuppressWarnings(Array("NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.field == null && other.field == null) || (
-          this.field != null && this.field.equals(other.field))
+        (this.field == null && other.field == null) || (this.field != null && this.field
+          .equals(other.field))
 
       case _ =>
         false
@@ -85,8 +89,9 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
    * @param keyword the metadata keyword to sort by
    */
   final class MetadataSort private (
-    val field: String,
-    val keyword: MetadataKeyword) extends SortOrder {
+      val field: String,
+      val keyword: MetadataKeyword)
+      extends SortOrder {
 
     private[api] lazy val tupled = field -> keyword
 
@@ -103,10 +108,15 @@ private[commands] trait SortAggregation[P <: SerializationPack] {
   }
 
   object MetadataSort {
+
     def apply(field: String, keyword: MetadataKeyword): MetadataSort =
       new MetadataSort(field, keyword)
 
-    private[api] def unapply(other: MetadataSort): Option[(String, MetadataKeyword)] = Option(other).map { i => i.field -> i.keyword }
+    private[api] def unapply(
+        other: MetadataSort
+      ): Option[(String, MetadataKeyword)] = Option(other).map { i =>
+      i.field -> i.keyword
+    }
 
   }
 }

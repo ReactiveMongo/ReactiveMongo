@@ -14,9 +14,9 @@ import com.github.luben.zstd.{ Zstd => Z }
  * Inspired from https://github.com/netty/netty/blob/master/codec/src/main/java/io/netty/handler/codec/compression/ZstdEncoder.java
  */
 private[reactivemongo] final class Zstd(
-  blockSize: Int,
-  compressionLevel: Int,
-  allocDirect: Int => ByteBuf) {
+    blockSize: Int,
+    compressionLevel: Int,
+    allocDirect: Int => ByteBuf) {
 
   def decode(in: ByteBuf, out: ByteBuf): Try[Int] = Try {
     val inNioBuffer: ByteBuffer = in.nioBuffer()
@@ -36,7 +36,8 @@ private[reactivemongo] final class Zstd(
     compress(in, out, buffer = allocDirect(blockSize))
 
   def compress(in: ByteBuf, out: ByteBuf, buffer: ByteBuf): Try[Unit] = {
-    @annotation.tailrec def go(): Unit = {
+    @annotation.tailrec
+    def go(): Unit = {
       val length = in.readableBytes
 
       if (length > 0) {
@@ -82,7 +83,8 @@ private[reactivemongo] final class Zstd(
       val compressedLength = Z.compress(
         outNioBuffer,
         buffer.internalNioBuffer(buffer.readerIndex(), flushableBytes),
-        compressionLevel)
+        compressionLevel
+      )
 
       out.writerIndex(idx + compressedLength)
       buffer.clear()
@@ -93,6 +95,7 @@ private[reactivemongo] final class Zstd(
 }
 
 private[reactivemongo] object Zstd {
+
   /**
    * Default compression level
    */
@@ -104,12 +107,14 @@ private[reactivemongo] object Zstd {
   val DefaultBlockSize: Int = 1 << 16 // 64 KB
 
   def apply(
-    blockSize: Int = DefaultBlockSize,
-    compressionLevel: Int = DefaultCompressionLevel,
-    allocDirect: Int => ByteBuf = buffer(_)): Zstd = new Zstd(
+      blockSize: Int = DefaultBlockSize,
+      compressionLevel: Int = DefaultCompressionLevel,
+      allocDirect: Int => ByteBuf = buffer(_)
+    ): Zstd = new Zstd(
     blockSize = blockSize,
     compressionLevel = compressionLevel,
-    allocDirect = allocDirect)
+    allocDirect = allocDirect
+  )
 
   @inline def buffer(blockSize: Int): ByteBuf =
     PooledByteBufAllocator.DEFAULT.directBuffer(blockSize)

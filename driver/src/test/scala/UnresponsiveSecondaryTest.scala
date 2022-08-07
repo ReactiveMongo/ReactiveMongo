@@ -65,14 +65,15 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
 
                   val chan = Await.result(
                     NettyEmbedder.simpleChannel(cid, nettyHandler(ref)(hfun)),
-                    Common.timeout)
+                    Common.timeout
+                  )
 
                   channels += chan
 
                   n.copy(
-                    authenticated = Set(
-                      Authenticated(Common.commonDb, "test")),
-                    connections = Vector(connectedCon(chan, true)))
+                    authenticated = Set(Authenticated(Common.commonDb, "test")),
+                    connections = Vector(connectedCon(chan, true))
+                  )
                 }
               }
 
@@ -90,9 +91,12 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
                 _.updateAll { n =>
                   if (n.name startsWith "nodesetspec.node2:") {
                     // Simulate a isMaster timeout for node2
-                    n.copy(pingInfo = n.pingInfo.copy(
-                      lastIsMasterId = 1,
-                      lastIsMasterTime = System.nanoTime() - pingTimeout))
+                    n.copy(pingInfo =
+                      n.pingInfo.copy(
+                        lastIsMasterId = 1,
+                        lastIsMasterTime = System.nanoTime() - pingTimeout
+                      )
+                    )
                   } else n
                 }
               }
@@ -100,37 +104,39 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
               ref ! RefreshAll
             }
           } yield {
-            val unregistered = Common.tryUntil(
-              (0 to 5).map(_ * 500).toList)(
-                nodeSet(ref.underlyingActor).nodes,
-                (_: Vector[Node]).exists { node =>
-                  if (node.name startsWith "nodesetspec.node2:") {
-                    node.status == NodeStatus.Unknown
-                  } else false
-                })
+            val unregistered = Common.tryUntil((0 to 5).map(_ * 500).toList)(
+              nodeSet(ref.underlyingActor).nodes,
+              (_: Vector[Node]).exists { node =>
+                if (node.name startsWith "nodesetspec.node2:") {
+                  node.status == NodeStatus.Unknown
+                } else false
+              }
+            )
 
             (state1, unregistered, nsState)
           }).map {
             case (st1, unregistered, st2) => {
               st1 must_== Set[(String, NodeStatus)](
                 "nodesetspec.node1:27017" -> NodeStatus.Primary,
-                "nodesetspec.node2:27017" -> NodeStatus.Secondary) and {
-                  // Node2 has been detected as unresponsive
+                "nodesetspec.node2:27017" -> NodeStatus.Secondary
+              ) and {
+                // Node2 has been detected as unresponsive
 
-                  unregistered aka "unregistered node2" must beTrue
-                } and {
-                  // Then ...
+                unregistered aka "unregistered node2" must beTrue
+              } and {
+                // Then ...
 
-                  st2 must_== Set[(String, NodeStatus)](
-                    "nodesetspec.node1:27017" -> NodeStatus.Primary,
-                    "nodesetspec.node2:27017" -> NodeStatus.Unknown)
-                }
+                st2 must_== Set[(String, NodeStatus)](
+                  "nodesetspec.node1:27017" -> NodeStatus.Primary,
+                  "nodesetspec.node2:27017" -> NodeStatus.Unknown
+                )
+              }
             }
           }.andThen {
             case _ => // Cleanup fake NodeSet
               updateNodeSet(ref.underlyingActor, "Test") {
                 _.updateAll { n =>
-                  //n.connections.foreach(_.channel.close())
+                  // n.connections.foreach(_.channel.close())
                   // ... no need as channels were created by withChannel
 
                   n.copy(authenticated = Set.empty, connections = Vector.empty)
@@ -146,13 +152,12 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
     }
 
     "evict non-queryable node after timeout" in {
-      val opts = MongoConnectionOptions.default.copy(
-        nbChannelsPerNode = 1,
-        heartbeatFrequencyMS = 10000).
-        withMaxNonQueryableHeartbeats(1)
+      val opts = MongoConnectionOptions.default
+        .copy(nbChannelsPerNode = 1, heartbeatFrequencyMS = 10000)
+        .withMaxNonQueryableHeartbeats(1)
       val nonQueryableTimeout = 2L * (opts.heartbeatFrequencyMS * 1000000L)
 
-      withConAndSys(usd, opts) { (_ /*con*/ , ref) =>
+      withConAndSys(usd, opts) { (_ /*con*/, ref) =>
         def ns(): Set[String] =
           nodeSet(ref.underlyingActor).nodes.map(_.name).toSet
 
@@ -165,10 +170,10 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
                 val lastTime = System.nanoTime() - nonQueryableTimeout
 
                 n.copy(
-                  pingInfo = n.pingInfo.copy(
-                    lastIsMasterId = 1,
-                    lastIsMasterTime = lastTime),
-                  statusChanged = lastTime)
+                  pingInfo = n.pingInfo
+                    .copy(lastIsMasterId = 1, lastIsMasterTime = lastTime),
+                  statusChanged = lastTime
+                )
               } else n
             }
           }
@@ -205,8 +210,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
 
           check()
 
-          node.future.map(
-            _ must beTypedEqualTo("nodesetspec.node1:27017"))
+          node.future.map(_ must beTypedEqualTo("nodesetspec.node1:27017"))
 
         }
       }.andThen { case _ => usd.close() }.await(1, timeout)
@@ -215,9 +219,11 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
 
   // ---
 
-  private def withConMon1[T](name: String)(f: ActorRef => Future[MatchResult[T]]): Future[MatchResult[T]] =
-    usSys.actorSelection(s"/user/Monitor-$name").
-      resolveOne(timeout).flatMap(f)
+  private def withConMon1[T](
+      name: String
+    )(f: ActorRef => Future[MatchResult[T]]
+    ): Future[MatchResult[T]] =
+    usSys.actorSelection(s"/user/Monitor-$name").resolveOne(timeout).flatMap(f)
 
   private def connectedCon(channel: Channel, signaling: Boolean) =
     new Connection(
@@ -225,7 +231,8 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
       status = ConnectionStatus.Connected,
       authenticated = Set(Authenticated(Common.commonDb, "test")),
       authenticating = None,
-      signaling = signaling)
+      signaling = signaling
+    )
 
   private def isPrim = BSONDocument(
     "ok" -> 1,
@@ -237,7 +244,8 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
     "setVersion" -> 0,
     "secondary" -> false,
     "hosts" -> nodes,
-    "primary" -> "nodesetspec.node1:27017")
+    "primary" -> "nodesetspec.node1:27017"
+  )
 
   private def isSeco = BSONDocument(
     "ok" -> 1,
@@ -249,14 +257,18 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
     "setVersion" -> 0,
     "secondary" -> true, // !!
     "hosts" -> nodes,
-    "primary" -> "nodesetspec.node1:27017")
+    "primary" -> "nodesetspec.node1:27017"
+  )
 
   @volatile private var secAvail = true
 
-  private def nettyHandler(ref: TestActorRef[StandardDBSystem])(isMasterResp: Boolean => Option[BSONDocument]): (Channel, Object) => Unit = {
+  private def nettyHandler(
+      ref: TestActorRef[StandardDBSystem]
+    )(isMasterResp: Boolean => Option[BSONDocument]
+    ): (Channel, Object) => Unit = {
     case (chan, req: Request) => {
-      val bson = BSONSerializationPack.readFromBuffer(
-        ReadableBuffer(req.payload))
+      val bson =
+        BSONSerializationPack.readFromBuffer(ReadableBuffer(req.payload))
 
       bson.int("ismaster") match {
         case Some(1) => {
@@ -265,7 +277,8 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
               resp,
               reqID = isMasterReqId(),
               respTo = req.requestID,
-              chanId = chan.id)
+              chanId = chan.id
+            )
           }
         }
 
@@ -277,9 +290,11 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
   }
 
   private def node1Handler(secAvail: Boolean): Option[BSONDocument] = {
-    def prim = if (secAvail) isPrim else {
-      isPrim -- "hosts" ++ (
-        "hosts" -> nodes.filter(_ startsWith "nodesetspec.node1"))
+    def prim = if (secAvail) isPrim
+    else {
+      isPrim -- "hosts" ++ ("hosts" -> nodes.filter(
+        _ startsWith "nodesetspec.node1"
+      ))
     }
 
     Option(prim)

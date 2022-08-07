@@ -193,15 +193,23 @@ sealed trait IndexesManager {
 }
 
 private[api] sealed abstract class AbstractIndexesManager(
-  db: DB with DBMetaCommands)(
-  implicit
-  ec: ExecutionContext) extends IndexesManager { self =>
+    db: DB with DBMetaCommands
+  )(implicit
+    ec: ExecutionContext)
+    extends IndexesManager { self =>
 
   protected val pack: Pack
 
-  private def listIndexes(collections: List[String], indexes: List[NSIndex]): Future[List[NSIndex]] = collections match {
-    case c :: cs => onCollection(c).list().flatMap(ix =>
-      listIndexes(cs, indexes ++ ix.map(NSIndex[Pack](s"${db.name}.$c", _))))
+  private def listIndexes(
+      collections: List[String],
+      indexes: List[NSIndex]
+    ): Future[List[NSIndex]] = collections match {
+    case c :: cs =>
+      onCollection(c)
+        .list()
+        .flatMap(ix =>
+          listIndexes(cs, indexes ++ ix.map(NSIndex[Pack](s"${db.name}.$c", _)))
+        )
 
     case _ => Future.successful(indexes)
   }
@@ -221,14 +229,18 @@ private[api] sealed abstract class AbstractIndexesManager(
   def dropAll(collectionName: String): Future[Int] =
     onCollection(collectionName).dropAll()
 
-  def onCollection(collectionName: String): CollectionIndexesManager.Aux[self.Pack] = new CollectionManager(collectionName)
+  def onCollection(
+      collectionName: String
+    ): CollectionIndexesManager.Aux[self.Pack] =
+    new CollectionManager(collectionName)
 
   // ---
 
   private lazy val runner = Command.run[Pack](pack, db.failoverStrategy)
 
   private final class CollectionManager(
-    collectionName: String) extends CollectionIndexesManager {
+      collectionName: String)
+      extends CollectionIndexesManager {
 
     import reactivemongo.api.commands.{ CreateIndexes, ListIndexes }
 
@@ -238,7 +250,8 @@ private[api] sealed abstract class AbstractIndexesManager(
 
     private lazy val listCommand = new ListIndexes.Command[Pack](db.name)
 
-    private implicit lazy val listWriter: pack.Writer[ResolvedCollectionCommand[ListIndexes.Command[Pack]]] = ListIndexes.writer[Pack](pack)
+    private implicit lazy val listWriter: pack.Writer[ResolvedCollectionCommand[ListIndexes.Command[Pack]]] =
+      ListIndexes.writer[Pack](pack)
 
     private implicit lazy val indexReader: pack.Reader[Index] =
       IndexesManager.indexReader[Pack](pack)
@@ -267,7 +280,8 @@ private[api] sealed abstract class AbstractIndexesManager(
       }
     }
 
-    private implicit val createWriter: pack.Writer[ResolvedCollectionCommand[CreateIndexes.Command[Pack]]] = CreateIndexes.writer[Pack](pack)
+    private implicit val createWriter: pack.Writer[ResolvedCollectionCommand[CreateIndexes.Command[Pack]]] =
+      CreateIndexes.writer[Pack](pack)
 
     private implicit lazy val writeResultReader: pack.Reader[WriteResult] =
       CommandCodecs.writeResultReader[WriteResult, Pack](pack)
@@ -276,16 +290,18 @@ private[api] sealed abstract class AbstractIndexesManager(
       runner(
         collection,
         new CreateIndexes.Command[Pack](db.name, List(index)),
-        ReadPreference.primary)
+        ReadPreference.primary
+      )
 
-    private implicit def dropWriter: pack.Writer[ResolvedCollectionCommand[DropIndexes]] = DropIndexes.writer[Pack](pack)
+    private implicit def dropWriter: pack.Writer[ResolvedCollectionCommand[DropIndexes]] =
+      DropIndexes.writer[Pack](pack)
 
     private implicit def dropReader: pack.Reader[DropIndexesResult] =
       DropIndexes.reader[Pack](pack)
 
     def drop(indexName: String): Future[Int] = {
-      runner(
-        collection, DropIndexes(indexName), ReadPreference.primary).map(_.value)
+      runner(collection, DropIndexes(indexName), ReadPreference.primary)
+        .map(_.value)
     }
 
     @inline def dropAll(): Future[Int] = drop("*")
@@ -297,9 +313,11 @@ private[api] sealed abstract class AbstractIndexesManager(
  *
  * @param db the subject database
  */
-private[reactivemongo] class DefaultIndexesManager(db: DB with DBMetaCommands)(
-  implicit
-  ec: ExecutionContext) extends AbstractIndexesManager(db) {
+private[reactivemongo] class DefaultIndexesManager(
+    db: DB with DBMetaCommands
+  )(implicit
+    ec: ExecutionContext)
+    extends AbstractIndexesManager(db) {
 
   type Pack = Serialization.Pack
   val pack: Pack = Serialization.internalSerializationPack
@@ -422,16 +440,13 @@ sealed trait CollectionIndexesManager {
 }
 
 private class DefaultCollectionIndexesManager(
-  db: DB,
-  collectionName: String)(
-  implicit
-  ec: ExecutionContext) extends CollectionIndexesManager {
+    db: DB,
+    collectionName: String
+  )(implicit
+    ec: ExecutionContext)
+    extends CollectionIndexesManager {
 
-  import reactivemongo.api.commands.{
-    CreateIndexes,
-    Command,
-    ListIndexes
-  }
+  import reactivemongo.api.commands.{ CreateIndexes, Command, ListIndexes }
 
   import Serialization.{ internalSerializationPack, writeResultReader }
 
@@ -444,7 +459,8 @@ private class DefaultCollectionIndexesManager(
 
   private lazy val runner = Command.run[Pack](pack, db.failoverStrategy)
 
-  private implicit lazy val listWriter: pack.Writer[ResolvedCollectionCommand[ListIndexes.Command[Pack]]] = ListIndexes.writer[Pack](pack)
+  private implicit lazy val listWriter: pack.Writer[ResolvedCollectionCommand[ListIndexes.Command[Pack]]] =
+    ListIndexes.writer[Pack](pack)
 
   private implicit lazy val indexReader: pack.Reader[Index] =
     IndexesManager.indexReader[Pack](pack)
@@ -473,22 +489,25 @@ private class DefaultCollectionIndexesManager(
     }
   }
 
-  private implicit val createWriter: pack.Writer[ResolvedCollectionCommand[CreateIndexes.Command[Pack]]] = CreateIndexes.writer[Pack](pack)
+  private implicit val createWriter: pack.Writer[ResolvedCollectionCommand[CreateIndexes.Command[Pack]]] =
+    CreateIndexes.writer[Pack](pack)
 
   def create(index: Index): Future[WriteResult] =
     runner(
       collection,
       new CreateIndexes.Command[Pack](db.name, List(index)),
-      ReadPreference.primary)
+      ReadPreference.primary
+    )
 
-  private implicit def dropWriter: pack.Writer[ResolvedCollectionCommand[DropIndexes]] = DropIndexes.writer(Serialization.internalSerializationPack)
+  private implicit def dropWriter: pack.Writer[ResolvedCollectionCommand[DropIndexes]] =
+    DropIndexes.writer(Serialization.internalSerializationPack)
 
   private implicit def dropReader: pack.Reader[DropIndexesResult] =
     DropIndexes.reader(Serialization.internalSerializationPack)
 
   def drop(indexName: String): Future[Int] = {
-    runner(
-      collection, DropIndexes(indexName), ReadPreference.primary).map(_.value)
+    runner(collection, DropIndexes(indexName), ReadPreference.primary)
+      .map(_.value)
   }
 
   @inline def dropAll(): Future[Int] = drop("*")
@@ -496,7 +515,10 @@ private class DefaultCollectionIndexesManager(
 
 /** Factory for indexes manager scoped with a specified collection. */
 object CollectionIndexesManager {
-  private[api] type Aux[P <: SerializationPack] = CollectionIndexesManager { type Pack = P }
+
+  private[api] type Aux[P <: SerializationPack] = CollectionIndexesManager {
+    type Pack = P
+  }
 
   /**
    * Returns an indexes manager for specified collection.
@@ -504,7 +526,13 @@ object CollectionIndexesManager {
    * @param db the database
    * @param collectionName the collection name
    */
-  def apply(db: DB, collectionName: String)(implicit ec: ExecutionContext): CollectionIndexesManager.Aux[Serialization.Pack] = new DefaultCollectionIndexesManager(db, collectionName)
+  def apply(
+      db: DB,
+      collectionName: String
+    )(implicit
+      ec: ExecutionContext
+    ): CollectionIndexesManager.Aux[Serialization.Pack] =
+    new DefaultCollectionIndexesManager(db, collectionName)
 }
 
 object IndexesManager {
@@ -515,7 +543,11 @@ object IndexesManager {
    *
    * @param db the database
    */
-  def apply(db: DB with DBMetaCommands)(implicit ec: ExecutionContext): IndexesManager.Aux[Serialization.Pack] = new DefaultIndexesManager(db)
+  def apply(
+      db: DB with DBMetaCommands
+    )(implicit
+      ec: ExecutionContext
+    ): IndexesManager.Aux[Serialization.Pack] = new DefaultIndexesManager(db)
 
   /**
    * Returns an indexes manager for specified database.
@@ -524,7 +556,12 @@ object IndexesManager {
    * @param db the database
    */
   @SuppressWarnings(Array("VariableShadowing"))
-  def apply[P <: SerializationPack](pack: P, db: DB with DBMetaCommands)(implicit ec: ExecutionContext): IndexesManager.Aux[P] = {
+  def apply[P <: SerializationPack](
+      pack: P,
+      db: DB with DBMetaCommands
+    )(implicit
+      ec: ExecutionContext
+    ): IndexesManager.Aux[P] = {
     @inline def p: P = pack
 
     new AbstractIndexesManager(db) {
@@ -533,7 +570,9 @@ object IndexesManager {
     }
   }
 
-  private[reactivemongo] def nsIndexWriter[P <: SerializationPack](pack: P): pack.Writer[NSIndex.Aux[P]] = {
+  private[reactivemongo] def nsIndexWriter[P <: SerializationPack](
+      pack: P
+    ): pack.Writer[NSIndex.Aux[P]] = {
     val builder = pack.newBuilder
     val decoder = pack.newDecoder
     val writeIndexType = IndexType.write[P](pack)(builder)
@@ -542,7 +581,7 @@ object IndexesManager {
     import builder.{ boolean, document, elementProducer => element, string }
 
     pack.writer[NSIndex.Aux[P]] { nsIndex =>
-      //import nsIndex.{ idx => index }
+      // import nsIndex.{ idx => index }
 
       @inline def index: Index.Aux[P] = nsIndex.index
 
@@ -555,9 +594,13 @@ object IndexesManager {
       elements ++= Seq(
         element("ns", string(nsIndex.namespace)),
         element("name", string(index.eventualName)),
-        element("key", document(index.key.collect {
-          case (k, v) => element(k, writeIndexType(v))
-        })))
+        element(
+          "key",
+          document(index.key.collect {
+            case (k, v) => element(k, writeIndexType(v))
+          })
+        )
+      )
 
       if (index.background) {
         elements += element("background", boolean(true))
@@ -640,11 +683,10 @@ object IndexesManager {
       }
 
       index.options match {
-        case pack.IsDocument(opts) => decoder.names(opts).foreach { nme =>
-          decoder.get(opts, nme).foreach { v =>
-            elements += element(nme, v)
+        case pack.IsDocument(opts) =>
+          decoder.names(opts).foreach { nme =>
+            decoder.get(opts, nme).foreach { v => elements += element(nme, v) }
           }
-        }
 
         case _ => ()
       }
@@ -653,7 +695,9 @@ object IndexesManager {
     }
   }
 
-  private[reactivemongo] def indexReader[P <: SerializationPack](pack: P): pack.Reader[Index.Aux[P]] = {
+  private[reactivemongo] def indexReader[P <: SerializationPack](
+      pack: P
+    ): pack.Reader[Index.Aux[P]] = {
     val decoder = pack.newDecoder
     val builder = pack.newBuilder
     val readCollation = Collation.read[P](pack)
@@ -662,77 +706,107 @@ object IndexesManager {
 
     pack.reader[Index.Aux[P]] { doc =>
       child(doc, "key").fold[Index.Aux[P]](
-        throw new Exception("the key must be defined")) { k =>
-          val ks = decoder.names(k).flatMap { nme =>
-            IndexType.read(pack)(k, nme).map(nme -> _)
-          }
+        throw new Exception("the key must be defined")
+      ) { k =>
+        val ks = decoder.names(k).flatMap { nme =>
+          IndexType.read(pack)(k, nme).map(nme -> _)
+        }
 
-          val key = child(doc, "weights").fold(ks) { w =>
+        val key = child(doc, "weights")
+          .fold(ks) { w =>
             val fields = decoder.names(w)
 
             reactivemongo.util.lazyZip(ks, fields).map {
               case ((_, tpe), name) => name -> tpe
             }
-          }.toSeq
+          }
+          .toSeq
 
-          val name = string(doc, "name")
-          val unique = booleanLike(doc, "unique").getOrElse(false)
-          val background = booleanLike(doc, "background").getOrElse(false)
-          val sparse = booleanLike(doc, "sparse").getOrElse(false)
-          val expireAfterSeconds = int(doc, "expireAfterSeconds")
-          val storageEngine = child(doc, "storageEngine")
-          val weights = child(doc, "weights")
-          val defaultLanguage = string(doc, "default_language")
-          val languageOverride = string(doc, "language_override")
-          val textIndexVersion = int(doc, "textIndexVersion")
-          val sphereIndexVersion = int(doc, "2dsphereIndexVersion")
-          val bits = int(doc, "bits")
-          val min = double(doc, "min")
-          val max = double(doc, "max")
-          val bucketSize = double(doc, "bucketSize")
-          val wildcardProjection = child(doc, "wildcardProjection")
-          val collation = child(doc, "collation").flatMap(readCollation)
-          val version = int(doc, "v")
+        val name = string(doc, "name")
+        val unique = booleanLike(doc, "unique").getOrElse(false)
+        val background = booleanLike(doc, "background").getOrElse(false)
+        val sparse = booleanLike(doc, "sparse").getOrElse(false)
+        val expireAfterSeconds = int(doc, "expireAfterSeconds")
+        val storageEngine = child(doc, "storageEngine")
+        val weights = child(doc, "weights")
+        val defaultLanguage = string(doc, "default_language")
+        val languageOverride = string(doc, "language_override")
+        val textIndexVersion = int(doc, "textIndexVersion")
+        val sphereIndexVersion = int(doc, "2dsphereIndexVersion")
+        val bits = int(doc, "bits")
+        val min = double(doc, "min")
+        val max = double(doc, "max")
+        val bucketSize = double(doc, "bucketSize")
+        val wildcardProjection = child(doc, "wildcardProjection")
+        val collation = child(doc, "collation").flatMap(readCollation)
+        val version = int(doc, "v")
 
-          val options = builder.document(decoder.names(doc).flatMap {
-            case "ns" | "key" | "name" | "unique" | "background" |
-              "sparse" | "v" | "partialFilterExpression" |
-              "expireAfterSeconds" | "storageEngine" | "weights" |
-              "defaultLanguage" | "languageOverride" | "textIndexVersion" |
-              "2dsphereIndexVersion" | "bits" | "min" | "max" |
-              "bucketSize" | "collation" | "wildcardProjection" =>
-              Seq.empty[pack.ElementProducer]
+        val options = builder.document(
+          decoder
+            .names(doc)
+            .flatMap {
+              case "ns" | "key" | "name" | "unique" | "background" | "sparse" |
+                  "v" | "partialFilterExpression" | "expireAfterSeconds" |
+                  "storageEngine" | "weights" |
+                  "defaultLanguage" | "languageOverride" | "textIndexVersion" |
+                  "2dsphereIndexVersion" | "bits" | "min" | "max" |
+                  "bucketSize" | "collation" | "wildcardProjection" =>
+                Seq.empty[pack.ElementProducer]
 
-            case nme =>
-              decoder.get(doc, nme).map { v =>
-                builder.elementProducer(nme, v)
-              }
-          }.toSeq)
+              case nme =>
+                decoder.get(doc, nme).map { v =>
+                  builder.elementProducer(nme, v)
+                }
+            }
+            .toSeq
+        )
 
-          val partialFilter =
-            child(doc, "partialFilterExpression")
+        val partialFilter =
+          child(doc, "partialFilterExpression")
 
-          Index[P](pack)(key, name, unique, background,
-            sparse, expireAfterSeconds, storageEngine, weights,
-            defaultLanguage, languageOverride, textIndexVersion,
-            sphereIndexVersion, bits, min, max, bucketSize, collation,
-            wildcardProjection, version, partialFilter, options)
-        }
+        Index[P](pack)(
+          key,
+          name,
+          unique,
+          background,
+          sparse,
+          expireAfterSeconds,
+          storageEngine,
+          weights,
+          defaultLanguage,
+          languageOverride,
+          textIndexVersion,
+          sphereIndexVersion,
+          bits,
+          min,
+          max,
+          bucketSize,
+          collation,
+          wildcardProjection,
+          version,
+          partialFilter,
+          options
+        )
+      }
     }
   }
 
-  private[reactivemongo] def nsIndexReader[P <: SerializationPack](pack: P): pack.Reader[NSIndex.Aux[P]] = {
+  private[reactivemongo] def nsIndexReader[P <: SerializationPack](
+      pack: P
+    ): pack.Reader[NSIndex.Aux[P]] = {
     val decoder = pack.newDecoder
     val indexReader: pack.Reader[Index.Aux[P]] = this.indexReader[P](pack)
 
     pack.reader[NSIndex.Aux[P]] { doc =>
-      decoder.string(doc, "ns").fold[NSIndex.Aux[P]](
-        throw new Exception("the namespace ns must be defined")) { ns =>
-          NSIndex[P](ns, pack.deserialize(doc, indexReader))
-        }
+      decoder
+        .string(doc, "ns")
+        .fold[NSIndex.Aux[P]](
+          throw new Exception("the namespace ns must be defined")
+        ) { ns => NSIndex[P](ns, pack.deserialize(doc, indexReader)) }
     }
   }
 
-  private[api] implicit lazy val nsIndexReader: Serialization.Pack#Reader[NSIndex.Aux[Serialization.Pack]] = nsIndexReader[Serialization.Pack](Serialization.internalSerializationPack)
+  private[api] implicit lazy val nsIndexReader: Serialization.Pack#Reader[NSIndex.Aux[Serialization.Pack]] =
+    nsIndexReader[Serialization.Pack](Serialization.internalSerializationPack)
 
 }

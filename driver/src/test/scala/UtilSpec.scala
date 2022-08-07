@@ -4,7 +4,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 final class UtilSpec(implicit ee: ExecutionEnv)
-  extends org.specs2.mutable.Specification {
+    extends org.specs2.mutable.Specification {
 
   "Utilities".title
 
@@ -17,7 +17,8 @@ final class UtilSpec(implicit ee: ExecutionEnv)
 
       reactivemongo.api.tests.withContent(resource.toURI) { in =>
         Source.fromInputStream(in).mkString must beTypedEqualTo(
-          Source.fromFile(resource).mkString)
+          Source.fromFile(resource).mkString
+        )
       }
     }
 
@@ -26,7 +27,8 @@ final class UtilSpec(implicit ee: ExecutionEnv)
 
       reactivemongo.api.tests.withContent(resource.toURI) { in =>
         Source.fromInputStream(in).mkString must beTypedEqualTo(
-          Source.fromURL(resource).mkString)
+          Source.fromURL(resource).mkString
+        )
       }
     }
   }
@@ -74,9 +76,9 @@ final class UtilSpec(implicit ee: ExecutionEnv)
 
   "DNS resolver" should {
     "handle empty/null record" in eventually(2, 1.seconds) {
-      reactivemongo.api.tests.
-        srvRecords("gmail.com") { _ => _ => Future.successful(null)
-        } must beTypedEqualTo(List.empty[(String, Int)]).await
+      reactivemongo.api.tests.srvRecords("gmail.com") { _ => _ =>
+        Future.successful(null)
+      } must beTypedEqualTo(List.empty[(String, Int)]).await
 
     }
 
@@ -84,14 +86,15 @@ final class UtilSpec(implicit ee: ExecutionEnv)
       eventually(2, 1.seconds) {
         reactivemongo.api.tests.srvRecords(
           name = "gmail.com",
-          srvPrefix = "_imaps._tcp") must beTypedEqualTo(
-          List("imap.gmail.com" -> 993)).await
+          srvPrefix = "_imaps._tcp"
+        ) must beTypedEqualTo(List("imap.gmail.com" -> 993)).await
       }
     }
 
     "resolve TXT record for gmail.com" in eventually(2, 1.seconds) {
       reactivemongo.util.txtRecords().apply("gmail.com") must contain(
-        ===("v=spf1 redirect=_spf.google.com")).await
+        ===("v=spf1 redirect=_spf.google.com")
+      ).await
 
     }
   }

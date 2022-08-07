@@ -6,7 +6,9 @@ import scala.concurrent.{ Future, ExecutionContext }
 
 import reactivemongo.api.{ Collation, ReadConcern, SerializationPack }
 
-private[collections] trait GenericCollectionWithDistinctOps[P <: SerializationPack] { self: GenericCollection[P] with DistinctOp[P] with HintFactory[P] =>
+private[collections] trait GenericCollectionWithDistinctOps[
+    P <: SerializationPack] {
+  self: GenericCollection[P] with DistinctOp[P] with HintFactory[P] =>
 
   /**
    * Returns the distinct values for a specified field
@@ -31,12 +33,15 @@ private[collections] trait GenericCollectionWithDistinctOps[P <: SerializationPa
    * }}}
    */
   def distinct[T, M[_] <: Iterable[_]](
-    key: String,
-    selector: Option[pack.Document] = None,
-    readConcern: ReadConcern = self.readConcern,
-    collation: Option[Collation] = None)(implicit
-    reader: pack.NarrowValueReader[T],
-    ec: ExecutionContext, cbf: Factory[T, M[T]]): Future[M[T]] =
+      key: String,
+      selector: Option[pack.Document] = None,
+      readConcern: ReadConcern = self.readConcern,
+      collation: Option[Collation] = None
+    )(implicit
+      reader: pack.NarrowValueReader[T],
+      ec: ExecutionContext,
+      cbf: Factory[T, M[T]]
+    ): Future[M[T]] =
     distinctDocuments[T, M](key, selector, readConcern, collation)
 
 }

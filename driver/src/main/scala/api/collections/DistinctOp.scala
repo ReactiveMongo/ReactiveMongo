@@ -21,23 +21,28 @@ import reactivemongo.api.commands.{
 
 // TODO: distinct in GenericCollection
 // TODO: single field BSONDocumentReader
-private[api] trait DistinctOp[P <: SerializationPack] extends DistinctOpCompat[P] {
+private[api] trait DistinctOp[P <: SerializationPack]
+    extends DistinctOpCompat[P] {
   collection: GenericCollection[P] =>
 
-  implicit private lazy val distinctWriter: pack.Writer[DistinctCmd] = commandWriter
+  implicit private lazy val distinctWriter: pack.Writer[DistinctCmd] =
+    commandWriter
 
-  implicit private lazy val distinctReader: pack.Reader[DistinctResult] = resultReader
+  implicit private lazy val distinctReader: pack.Reader[DistinctResult] =
+    resultReader
 
   private type DistinctCmd = ResolvedCollectionCommand[Distinct]
 
   protected def distinctDocuments[T, M[_] <: Iterable[_]](
-    key: String,
-    query: Option[pack.Document],
-    readConcern: ReadConcern,
-    collation: Option[Collation],
-    builder: Builder[T, M[T]])(implicit
-    reader: pack.NarrowValueReader[T],
-    ec: ExecutionContext): Future[M[T]] = {
+      key: String,
+      query: Option[pack.Document],
+      readConcern: ReadConcern,
+      collation: Option[Collation],
+      builder: Builder[T, M[T]]
+    )(implicit
+      reader: pack.NarrowValueReader[T],
+      ec: ExecutionContext
+    ): Future[M[T]] = {
 
     val widenReader = pack.widenReader(reader)
     val cmd = Distinct(key, query, readConcern, collation)
@@ -53,11 +58,13 @@ private[api] trait DistinctOp[P <: SerializationPack] extends DistinctOpCompat[P
   // ---
 
   private case class Distinct(
-    key: String,
-    query: Option[pack.Document],
-    readConcern: ReadConcern,
-    collation: Option[Collation]) extends CollectionCommand
-    with CommandWithPack[pack.type] with CommandWithResult[DistinctResult] {
+      key: String,
+      query: Option[pack.Document],
+      readConcern: ReadConcern,
+      collation: Option[Collation])
+      extends CollectionCommand
+      with CommandWithPack[pack.type]
+      with CommandWithResult[DistinctResult] {
     val commandKind = CommandKind.Distinct
   }
 
@@ -65,30 +72,35 @@ private[api] trait DistinctOp[P <: SerializationPack] extends DistinctOpCompat[P
    * @param values the raw values (should not contain duplicate)
    */
   protected case class DistinctResult(values: Iterable[pack.Value]) {
+
     @SuppressWarnings(Array("RedundantFinalModifierOnMethod"))
     @annotation.tailrec
     protected final def result[T, M[_]](
-      vs: Iterable[pack.Value],
-      reader: pack.WidenValueReader[T],
-      out: Builder[T, M[T]]): Try[M[T]] = vs.headOption match {
-      case Some(t) => pack.readValue(t, reader) match {
-        case Failure(e) => Failure(e)
-        case Success(v) => result(vs.drop(1), reader, out += v)
-      }
+        vs: Iterable[pack.Value],
+        reader: pack.WidenValueReader[T],
+        out: Builder[T, M[T]]
+      ): Try[M[T]] = vs.headOption match {
+      case Some(t) =>
+        pack.readValue(t, reader) match {
+          case Failure(e) => Failure(e)
+          case Success(v) => result(vs.drop(1), reader, out += v)
+        }
 
       case _ => Success(out.result())
     }
 
     @inline def result[T, M[_]](
-      reader: pack.WidenValueReader[T],
-      cbf: Builder[T, M[T]]): Try[M[T]] =
+        reader: pack.WidenValueReader[T],
+        cbf: Builder[T, M[T]]
+      ): Try[M[T]] =
       result(values, reader, cbf)
   }
 
   private def commandWriter: pack.Writer[DistinctCmd] = {
     val builder = pack.newBuilder
-    val session = collection.db.session.filter(
-      _ => (version.compareTo(MongoWireVersion.V36) >= 0))
+    val session = collection.db.session.filter(_ =>
+      (version.compareTo(MongoWireVersion.V36) >= 0)
+    )
 
     val writeReadConcern =
       CommandCodecs.writeSessionReadConcern(builder)(session)
@@ -117,9 +129,7 @@ private[api] trait DistinctOp[P <: SerializationPack] extends DistinctOpCompat[P
         elements += element("distinct", string(d.collection))
         elements += element("key", string(d.command.key))
 
-        d.command.query.foreach { query =>
-          elements += element("query", query)
-        }
+        d.command.query.foreach { query => elements += element("query", query) }
 
         document(elements.result())
       }

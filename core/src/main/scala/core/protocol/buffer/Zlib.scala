@@ -10,6 +10,7 @@ import scala.util.control.NonFatal
 import reactivemongo.io.netty.buffer.{ ByteBuf, ByteBufOutputStream }
 
 private[reactivemongo] final class Zlib(compressionLevel: Int) {
+
   def decode(in: ByteBuf, out: ByteBuf): Try[Int] = Try {
     val outStream = new InflaterOutputStream(new ByteBufOutputStream(out))
 
@@ -27,8 +28,8 @@ private[reactivemongo] final class Zlib(compressionLevel: Int) {
   def encode(in: ByteBuf, out: ByteBuf): Try[Unit] = Try {
     val deflater = new Deflater(compressionLevel)
 
-    val outStream = new DeflaterOutputStream(
-      new ByteBufOutputStream(out), deflater)
+    val outStream =
+      new DeflaterOutputStream(new ByteBufOutputStream(out), deflater)
 
     try {
       copy(in, outStream, blockSize = 8192)

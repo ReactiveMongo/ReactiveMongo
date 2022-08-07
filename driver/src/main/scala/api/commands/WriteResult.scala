@@ -7,10 +7,11 @@ import reactivemongo.api.{ PackSupport, SerializationPack, WriteConcern }
 import reactivemongo.core.errors.DatabaseException
 
 sealed trait WriteResult {
+
   /** The status of the write operation */
   protected[reactivemongo] def ok: Boolean
 
-  /** The number of selected documents  */
+  /** The number of selected documents */
   def n: Int
 
   def writeErrors: Seq[WriteError]
@@ -31,6 +32,7 @@ sealed trait WriteResult {
 }
 
 object WriteResult {
+
   /**
    * Code extractor for [[WriteResult]]
    *
@@ -80,6 +82,7 @@ object WriteResult {
    * }}}
    */
   object Exception {
+
     def unapply(result: WriteResult): Option[DatabaseException] =
       result match {
         case error: DatabaseException =>
@@ -91,7 +94,13 @@ object WriteResult {
   }
 
   private[reactivemongo] def empty: WriteResult = new DefaultWriteResult(
-    true, 0, Seq.empty, Option.empty, Option.empty, Option.empty)
+    true,
+    0,
+    Seq.empty,
+    Option.empty,
+    Option.empty,
+    Option.empty
+  )
 
   private[reactivemongo] trait Internal extends WriteResult
 }
@@ -101,20 +110,23 @@ private[reactivemongo] trait LastErrorFactory[P <: SerializationPack] {
 
   @SuppressWarnings(Array("IncorrectlyNamedExceptions"))
   private[reactivemongo] final class LastError(
-    protected[reactivemongo] val ok: Boolean,
-    val errmsg: Option[String],
-    val code: Option[Int],
-    val lastOp: Option[Long],
-    val n: Int,
-    val singleShard: Option[String],
-    val updatedExisting: Boolean,
-    val upserted: Option[Upserted],
-    val wnote: Option[WriteConcern.W],
-    val wtimeout: Boolean,
-    val waited: Option[Int],
-    val wtime: Option[Int],
-    val writeErrors: Seq[WriteError],
-    val writeConcernError: Option[WriteConcernError]) extends DatabaseException with WriteResult with NoStackTrace {
+      protected[reactivemongo] val ok: Boolean,
+      val errmsg: Option[String],
+      val code: Option[Int],
+      val lastOp: Option[Long],
+      val n: Int,
+      val singleShard: Option[String],
+      val updatedExisting: Boolean,
+      val upserted: Option[Upserted],
+      val wnote: Option[WriteConcern.W],
+      val wtimeout: Boolean,
+      val waited: Option[Int],
+      val wtime: Option[Int],
+      val writeErrors: Seq[WriteError],
+      val writeConcernError: Option[WriteConcernError])
+      extends DatabaseException
+      with WriteResult
+      with NoStackTrace {
 
     type Document = Nothing
 
@@ -124,7 +136,22 @@ private[reactivemongo] trait LastErrorFactory[P <: SerializationPack] {
 
     override lazy val message = errmsg.getOrElse("<none>")
 
-    override protected lazy val tupled = Tuple14(ok, errmsg, code, lastOp, n, singleShard, updatedExisting, upserted, wnote, wtimeout, waited, wtime, writeErrors, writeConcernError)
+    override protected lazy val tupled = Tuple14(
+      ok,
+      errmsg,
+      code,
+      lastOp,
+      n,
+      singleShard,
+      updatedExisting,
+      upserted,
+      wnote,
+      wtimeout,
+      waited,
+      wtime,
+      writeErrors,
+      writeConcernError
+    )
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
@@ -141,21 +168,25 @@ private[reactivemongo] trait LastErrorFactory[P <: SerializationPack] {
     result match {
       case error: LastError @unchecked => Some(error)
       case _ if (result.ok)            => None
-      case _ => Some(new LastError(
-        false, // ok
-        result.errmsg,
-        result.code,
-        None, // lastOp
-        result.n,
-        None, // singleShard
-        false, // updatedExisting,
-        None, // upserted
-        None, // wnote
-        false, // wtimeout,
-        None, // waited,
-        None, // wtime,
-        result.writeErrors,
-        result.writeConcernError))
+      case _ =>
+        Some(
+          new LastError(
+            false, // ok
+            result.errmsg,
+            result.code,
+            None, // lastOp
+            result.n,
+            None, // singleShard
+            false, // updatedExisting,
+            None, // upserted
+            None, // wnote
+            false, // wtimeout,
+            None, // waited,
+            None, // wtime,
+            result.writeErrors,
+            result.writeConcernError
+          )
+        )
     }
 }
 
@@ -164,17 +195,18 @@ private[reactivemongo] trait LastErrorFactory[P <: SerializationPack] {
  * @param errmsg the error message
  */
 private[reactivemongo] final class WriteError private[api] (
-  val index: Int,
-  val code: Int,
-  val errmsg: String) {
+    val index: Int,
+    val code: Int,
+    val errmsg: String) {
 
   private[api] lazy val tupled = Tuple3(index, code, errmsg)
 
   @SuppressWarnings(Array("VariableShadowing"))
   private[api] def copy(
-    index: Int = this.index,
-    code: Int = this.code,
-    errmsg: String = this.errmsg): WriteError =
+      index: Int = this.index,
+      code: Int = this.code,
+      errmsg: String = this.errmsg
+    ): WriteError =
     new WriteError(index, code, errmsg)
 
   override def equals(that: Any): Boolean = that match {
@@ -191,6 +223,7 @@ private[reactivemongo] final class WriteError private[api] (
 }
 
 private[reactivemongo] object WriteError {
+
   def apply(index: Int, code: Int, errmsg: String): WriteError =
     new WriteError(index, code, errmsg)
 }
@@ -200,8 +233,8 @@ private[reactivemongo] object WriteError {
  * @param errmsg the error message
  */
 final class WriteConcernError private[api] (
-  val code: Int,
-  val errmsg: String) {
+    val code: Int,
+    val errmsg: String) {
 
   private[api] lazy val tupled = code -> errmsg
 
@@ -219,12 +252,14 @@ final class WriteConcernError private[api] (
 }
 
 private[reactivemongo] case class DefaultWriteResult(
-  protected[reactivemongo] val ok: Boolean,
-  n: Int,
-  writeErrors: Seq[WriteError],
-  writeConcernError: Option[WriteConcernError],
-  code: Option[Int],
-  errmsg: Option[String]) extends WriteResult {
+    protected[reactivemongo] val ok: Boolean,
+    n: Int,
+    writeErrors: Seq[WriteError],
+    writeConcernError: Option[WriteConcernError],
+    code: Option[Int],
+    errmsg: Option[String])
+    extends WriteResult {
+
   private[api] def flatten = writeErrors.headOption.fold(this) { firstError =>
     DefaultWriteResult(
       ok = false,
@@ -232,7 +267,8 @@ private[reactivemongo] case class DefaultWriteResult(
       writeErrors = writeErrors,
       writeConcernError = writeConcernError,
       code = code.orElse(Some(firstError.code)),
-      errmsg = errmsg.orElse(Some(firstError.errmsg)))
+      errmsg = errmsg.orElse(Some(firstError.errmsg))
+    )
   }
 }
 
@@ -248,14 +284,15 @@ private[reactivemongo] trait UpdateWriteResultFactory[P <: SerializationPack] {
    * @param upserted the upserted documents
    */
   final class UpdateWriteResult private[api] (
-    protected[reactivemongo] val ok: Boolean,
-    val n: Int,
-    val nModified: Int,
-    val upserted: Seq[Upserted],
-    val writeErrors: Seq[WriteError],
-    val writeConcernError: Option[WriteConcernError],
-    val code: Option[Int],
-    val errmsg: Option[String]) extends WriteResult {
+      protected[reactivemongo] val ok: Boolean,
+      val n: Int,
+      val nModified: Int,
+      val upserted: Seq[Upserted],
+      val writeErrors: Seq[WriteError],
+      val writeConcernError: Option[WriteConcernError],
+      val code: Option[Int],
+      val errmsg: Option[String])
+      extends WriteResult {
 
     private[api] def flatten = writeErrors.headOption.fold(this) { firstError =>
       new UpdateWriteResult(
@@ -266,10 +303,20 @@ private[reactivemongo] trait UpdateWriteResultFactory[P <: SerializationPack] {
         writeErrors = writeErrors,
         writeConcernError = writeConcernError,
         code = code.orElse(Some(firstError.code)),
-        errmsg = errmsg.orElse(Some(firstError.errmsg)))
+        errmsg = errmsg.orElse(Some(firstError.errmsg))
+      )
     }
 
-    private lazy val tupled = Tuple8(ok, n, nModified, upserted, writeErrors, writeConcernError, code, errmsg)
+    private lazy val tupled = Tuple8(
+      ok,
+      n,
+      nModified,
+      upserted,
+      writeErrors,
+      writeConcernError,
+      code,
+      errmsg
+    )
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>

@@ -35,27 +35,50 @@ import scala.concurrent.{ ExecutionContext, Future }
 class TestCursor[T] extends Cursor[T] {
   import Cursor.NoSuchResultException
 
-  def collect[M[_]](maxDocs: Int, err: Cursor.ErrorHandler[M[T]])(
-    implicit
-    cbf: Factory[T, M[T]],
-    ec: ExecutionContext): Future[M[T]] = Future.failed[M[T]](NoSuchResultException)
+  def collect[M[_]](
+      maxDocs: Int,
+      err: Cursor.ErrorHandler[M[T]]
+    )(implicit
+      cbf: Factory[T, M[T]],
+      ec: ExecutionContext
+    ): Future[M[T]] = Future.failed[M[T]](NoSuchResultException)
 
-  def foldBulks[A](z: => A, maxDocs: Int)(suc: (A, Iterator[T]) => Cursor.State[A], err: Cursor.ErrorHandler[A])(
-    implicit
-    ctx: ExecutionContext): Future[A] = Future.failed[A](NoSuchResultException)
+  def foldBulks[A](
+      z: => A,
+      maxDocs: Int
+    )(suc: (A, Iterator[T]) => Cursor.State[A],
+      err: Cursor.ErrorHandler[A]
+    )(implicit
+      ctx: ExecutionContext
+    ): Future[A] = Future.failed[A](NoSuchResultException)
 
-  def foldBulksM[A](z: => A, maxDocs: Int)(
-    suc: (A, Iterator[T]) => Future[Cursor.State[A]],
-    err: Cursor.ErrorHandler[A])(implicit ctx: ExecutionContext): Future[A] =
+  def foldBulksM[A](
+      z: => A,
+      maxDocs: Int
+    )(suc: (A, Iterator[T]) => Future[Cursor.State[A]],
+      err: Cursor.ErrorHandler[A]
+    )(implicit
+      ctx: ExecutionContext
+    ): Future[A] =
     Future.failed[A](NoSuchResultException)
 
-  def foldWhile[A](z: => A, maxDocs: Int)(suc: (A, T) => Cursor.State[A], err: Cursor.ErrorHandler[A])(
-    implicit
-    ctx: ExecutionContext): Future[A] = Future.failed[A](NoSuchResultException)
+  def foldWhile[A](
+      z: => A,
+      maxDocs: Int
+    )(suc: (A, T) => Cursor.State[A],
+      err: Cursor.ErrorHandler[A]
+    )(implicit
+      ctx: ExecutionContext
+    ): Future[A] = Future.failed[A](NoSuchResultException)
 
-  def foldWhileM[A](z: => A, maxDocs: Int)(suc: (A, T) => Future[Cursor.State[A]], err: Cursor.ErrorHandler[A])(
-    implicit
-    ctx: ExecutionContext): Future[A] = Future.failed[A](NoSuchResultException)
+  def foldWhileM[A](
+      z: => A,
+      maxDocs: Int
+    )(suc: (A, T) => Future[Cursor.State[A]],
+      err: Cursor.ErrorHandler[A]
+    )(implicit
+      ctx: ExecutionContext
+    ): Future[A] = Future.failed[A](NoSuchResultException)
 
   def head(implicit ctx: ExecutionContext): Future[T] =
     Future.failed[T](NoSuchResultException)
@@ -64,5 +87,10 @@ class TestCursor[T] extends Cursor[T] {
     Future.failed[Option[T]](NoSuchResultException)
 
   def peek[M[_]](
-    maxDocs: Int)(implicit cbf: Factory[T, M[T]], ec: ExecutionContext): Future[Cursor.Result[M[T]]] = Future.failed[Cursor.Result[M[T]]](NoSuchResultException)
+      maxDocs: Int
+    )(implicit
+      cbf: Factory[T, M[T]],
+      ec: ExecutionContext
+    ): Future[Cursor.Result[M[T]]] =
+    Future.failed[Cursor.Result[M[T]]](NoSuchResultException)
 }

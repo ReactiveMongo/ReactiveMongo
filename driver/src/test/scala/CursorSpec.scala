@@ -12,8 +12,10 @@ import _root_.tests.Common
 import reactivemongo.api.TestCompat._
 
 final class CursorSpec(implicit val ee: ExecutionEnv)
-  extends org.specs2.mutable.Specification with CursorSpecEnv
-  with Cursor1Spec with TailableCursorSpec {
+    extends org.specs2.mutable.Specification
+    with CursorSpecEnv
+    with Cursor1Spec
+    with TailableCursorSpec {
 
   "Cursor".title
 
@@ -27,11 +29,13 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
       lazy val cursorDrv = Common.newAsyncDriver()
       lazy val cursorCon = Await.result(
         cursorDrv.connect(List(primaryHost), DefaultOptions),
-        timeout)
+        timeout
+      )
 
       lazy val slowCursorCon = Await.result(
         cursorDrv.connect(List(slowPrimary), SlowOptions),
-        slowTimeout)
+        slowTimeout
+      )
 
       lazy val (cursorDb, slowCursorDb) =
         Common.databases(Common.commonDb, cursorCon, slowCursorCon)
@@ -49,12 +53,14 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
           val c = defaultColl
           val cursor = c.find(matchAll("cursorspec18")).batchSize(64).cursor()
 
-          cursor.foldBulksM({}, 128)(
-            { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #18")) },
-            Cursor.FailOnError[Unit](onError)).
-            map(_ => -1).recover {
-              case _ => count
-            } must beTypedEqualTo(1).await(1, timeout)
+          cursor
+            .foldBulksM({}, 128)(
+              { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #18")) },
+              Cursor.FailOnError[Unit](onError)
+            )
+            .map(_ => -1)
+            .recover { case _ => count } must beTypedEqualTo(1)
+            .await(1, timeout)
         }
 
         "if fails while processing w/o documents" in {
@@ -66,11 +72,14 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
           val c = cursorDb(System.identityHashCode(onError).toString)
           val cursor = c.find(matchAll("cursorspec19")).batchSize(64).cursor()
 
-          cursor.foldBulks({}, 128)(
-            { (_, _) => sys.error("Foo #19"): Cursor.State[Unit] },
-            Cursor.FailOnError[Unit](onError)).
-            map(_ => -1).recover({ case _ => count }).
-            aka("folding") must beTypedEqualTo(1).await(1, timeout)
+          cursor
+            .foldBulks({}, 128)(
+              { (_, _) => sys.error("Foo #19"): Cursor.State[Unit] },
+              Cursor.FailOnError[Unit](onError)
+            )
+            .map(_ => -1)
+            .recover({ case _ => count })
+            .aka("folding") must beTypedEqualTo(1).await(1, timeout)
         }
 
         "if fails with initial value" in {
@@ -82,11 +91,14 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
           val c = cursorDb(System.identityHashCode(onError).toString)
           val cursor = c.find(matchAll("cursorspec20")).batchSize(64).cursor()
 
-          cursor.foldBulksM[Unit](sys.error("Foo #20"), 128)(
-            (_, _) => Future.successful(Cursor.Cont({})),
-            Cursor.FailOnError[Unit](onError)).map(_ => -1).recover {
-              case _ => count
-            } must beTypedEqualTo(0).await(1, timeout)
+          cursor
+            .foldBulksM[Unit](sys.error("Foo #20"), 128)(
+              (_, _) => Future.successful(Cursor.Cont({})),
+              Cursor.FailOnError[Unit](onError)
+            )
+            .map(_ => -1)
+            .recover { case _ => count } must beTypedEqualTo(0)
+            .await(1, timeout)
         }
 
         "if fails to send request" in {
@@ -96,29 +108,37 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             count = count + 1
           }
           val con21 = driver.connect(
-            List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
+            List(primaryHost),
+            DefaultOptions.copy(nbChannelsPerNode = 1)
+          )
 
-          val db21 = Await.result(
-            con21.flatMap(_.database("dbspec21")), timeout)
+          val db21 =
+            Await.result(con21.flatMap(_.database("dbspec21")), timeout)
 
           lazy val c = db21(collName)
-          lazy val cursor = c.find(matchAll("cursorspec21")).
-            batchSize(64).cursor()
+          lazy val cursor =
+            c.find(matchAll("cursorspec21")).batchSize(64).cursor()
 
           // Close connection to make the related cursor erroneous
-          con21.flatMap(_.close()(timeout)).
-            map(_ => {}) must beTypedEqualTo({}).await(1, timeout) and {
-              cursor.foldBulks({}, 128)(
+          con21.flatMap(_.close()(timeout)).map(_ => {}) must beTypedEqualTo({})
+            .await(1, timeout) and {
+            cursor
+              .foldBulks({}, 128)(
                 { (_, _) => Cursor.Cont({}) },
-                Cursor.FailOnError[Unit](onError)).map(_ => -1).recover {
-                  case _ => count
-                } must beTypedEqualTo(1).await(1, timeout)
-            }
+                Cursor.FailOnError[Unit](onError)
+              )
+              .map(_ => -1)
+              .recover { case _ => count } must beTypedEqualTo(1)
+              .await(1, timeout)
+          }
         }
       }
 
       { // .foldWhile
-        def foldWhileSpec(defaultColl: DefaultCollection, timeout: FiniteDuration) = {
+        def foldWhileSpec(
+            defaultColl: DefaultCollection,
+            timeout: FiniteDuration
+          ) = {
           "if fails while processing with existing documents" in {
             @volatile var count = 0
             val onError: (Unit, Throwable) => Unit = { (_, _) =>
@@ -129,12 +149,14 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             val cursor = c.find(matchAll("cursorspec25")).cursor()
             // default batch size 101
 
-            cursor.foldWhileM({}, 128)(
-              { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #25")) },
-              Cursor.FailOnError[Unit](onError)).
-              map(_ => -1).recover {
-                case _ => count
-              } must beTypedEqualTo(1).await(1, timeout)
+            cursor
+              .foldWhileM({}, 128)(
+                { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #25")) },
+                Cursor.FailOnError[Unit](onError)
+              )
+              .map(_ => -1)
+              .recover { case _ => count } must beTypedEqualTo(1)
+              .await(1, timeout)
           }
 
           "if fails with initial value" in {
@@ -146,11 +168,14 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             val c = defaultColl
             val cursor = c.find(matchAll("cursorspec26")).cursor()
 
-            cursor.foldWhile[Unit](sys.error("Foo #26"), 128)(
-              (_, _) => Cursor.Cont({}), Cursor.FailOnError[Unit](onError)).
-              map(_ => -1).recover {
-                case _ => count
-              } must beTypedEqualTo(0).await(1, timeout)
+            cursor
+              .foldWhile[Unit](sys.error("Foo #26"), 128)(
+                (_, _) => Cursor.Cont({}),
+                Cursor.FailOnError[Unit](onError)
+              )
+              .map(_ => -1)
+              .recover { case _ => count } must beTypedEqualTo(0)
+              .await(1, timeout)
           }
 
           "if fails to send request" in {
@@ -160,23 +185,29 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
               count = count + 1
             }
             val con27 = driver.connect(
-              List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
+              List(primaryHost),
+              DefaultOptions.copy(nbChannelsPerNode = 1)
+            )
 
-            val db27 = Await.result(
-              con27.flatMap(_.database("dbspec27")), timeout)
+            val db27 =
+              Await.result(con27.flatMap(_.database("dbspec27")), timeout)
 
             lazy val c = db27(collName)
             val cursor = c.find(matchAll("cursorspec27")).cursor()
 
             // Close connection to make the related cursor erroneous
-            con27.flatMap(_.close()(timeout)).
-              map(_ => {}) must beTypedEqualTo({}).await(1, timeout) and {
-                cursor.foldWhile({}, 128)(
+            con27
+              .flatMap(_.close()(timeout))
+              .map(_ => {}) must beTypedEqualTo({}).await(1, timeout) and {
+              cursor
+                .foldWhile({}, 128)(
                   (_, _) => Cursor.Cont({}),
-                  Cursor.FailOnError[Unit](onError)).map(_ => -1).recover {
-                    case _ => count
-                  } must beTypedEqualTo(1).await(1, timeout)
-              }
+                  Cursor.FailOnError[Unit](onError)
+                )
+                .map(_ => -1)
+                .recover { case _ => count } must beTypedEqualTo(1)
+                .await(1, timeout)
+            }
           }
         }
 
@@ -190,28 +221,31 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
       }
 
       "Driver instance must be closed" in {
-        cursorDrv.close(timeout) must not(throwA[Exception]).
-          eventually(1, timeout)
+        cursorDrv
+          .close(timeout) must not(throwA[Exception]).eventually(1, timeout)
       }
     }
 
     "continue on error" >> {
       lazy val cursorDrv = Common.newAsyncDriver()
       lazy val cursorCon = Await.result(
-        cursorDrv.connect(List(primaryHost), DefaultOptions), timeout)
+        cursorDrv.connect(List(primaryHost), DefaultOptions),
+        timeout
+      )
 
       lazy val slowCursorCon = Await.result(
-        cursorDrv.connect(List(slowPrimary), SlowOptions), slowTimeout)
+        cursorDrv.connect(List(slowPrimary), SlowOptions),
+        slowTimeout
+      )
 
       val (cursorDb, slowCursorDb) =
-        Common.databases(Common.commonDb, cursorCon, slowCursorCon,
-          retries = 1)
+        Common.databases(Common.commonDb, cursorCon, slowCursorCon, retries = 1)
 
       @inline def defaultColl = cursorDb(collName)
 
       "when folding bulks" >> {
-        lazy val delayedTimeout = FiniteDuration(
-          (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
+        lazy val delayedTimeout =
+          FiniteDuration((timeout.toMillis * 1.25D).toLong, MILLISECONDS)
 
         "if fails while processing with existing documents" in {
           @volatile var count = 0
@@ -220,14 +254,17 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             debug(s"continueOnError: foldBulks (#1): $count")
             count = count + 1
           }
-          val cursor = defaultColl.find(matchAll("cursorspec37")).
-            batchSize(64).cursor()
+          val cursor =
+            defaultColl.find(matchAll("cursorspec37")).batchSize(64).cursor()
 
-          cursor.foldBulks({}, 128)(
-            { (_, _) => sys.error("Foo #37"): Cursor.State[Unit] },
-            Cursor.ContOnError[Unit](onError)).map(_ => count).
-            aka("folding") must beTypedEqualTo(2 /* maxDocs / batchSize */ ).
-            await(2, delayedTimeout)
+          cursor
+            .foldBulks({}, 128)(
+              { (_, _) => sys.error("Foo #37"): Cursor.State[Unit] },
+              Cursor.ContOnError[Unit](onError)
+            )
+            .map(_ => count)
+            .aka("folding") must beTypedEqualTo(2 /* maxDocs / batchSize */ )
+            .await(2, delayedTimeout)
         }
 
         "if fails while processing w/o documents" in {
@@ -239,11 +276,14 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
           val c = cursorDb(s"emptycoll_${System identityHashCode onError}")
           val cursor = c.find(matchAll("cursorspec38")).batchSize(64).cursor()
 
-          cursor.foldBulksM({}, 64)(
-            { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #38")) },
-            Cursor.ContOnError[Unit](onError)).map(_ => count).
-            aka("folding") must beTypedEqualTo(1 /* 64 / batchSize */ ).
-            await(2, delayedTimeout)
+          cursor
+            .foldBulksM({}, 64)(
+              { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #38")) },
+              Cursor.ContOnError[Unit](onError)
+            )
+            .map(_ => count)
+            .aka("folding") must beTypedEqualTo(1 /* 64 / batchSize */ )
+            .await(2, delayedTimeout)
 
         }
 
@@ -256,10 +296,14 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
           val c = cursorDb(System.identityHashCode(onError).toString)
           val cursor = c.find(matchAll("cursorspec39")).batchSize(64).cursor()
 
-          cursor.foldBulks[Unit](sys.error("Foo #39"), 128)(
-            (_, _) => Cursor.Cont({}), Cursor.ContOnError[Unit](onError)).
-            map(_ => -1).recover({ case _ => count }) must beTypedEqualTo(0).
-            await(2, delayedTimeout)
+          cursor
+            .foldBulks[Unit](sys.error("Foo #39"), 128)(
+              (_, _) => Cursor.Cont({}),
+              Cursor.ContOnError[Unit](onError)
+            )
+            .map(_ => -1)
+            .recover({ case _ => count }) must beTypedEqualTo(0)
+            .await(2, delayedTimeout)
         }
 
         "if fails to send request" in {
@@ -269,29 +313,36 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             count = count + 1
           }
           val con40 = driver.connect(
-            List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
+            List(primaryHost),
+            DefaultOptions.copy(nbChannelsPerNode = 1)
+          )
 
-          lazy val db40 = Await.result(
-            con40.flatMap(_.database("dbspec40")), timeout)
+          lazy val db40 =
+            Await.result(con40.flatMap(_.database("dbspec40")), timeout)
 
           lazy val c = db40(collName)
           val cursor = c.find(matchAll("cursorspec40")).batchSize(64).cursor()
 
           // Close connection to make the related cursor erroneous
-          con40.flatMap(_.close()(timeout)).
-            map(_ => {}) must beTypedEqualTo({}).await(1, timeout) and {
-              cursor.foldBulks({}, 128)(
+          con40.flatMap(_.close()(timeout)).map(_ => {}) must beTypedEqualTo({})
+            .await(1, timeout) and {
+            cursor
+              .foldBulks({}, 128)(
                 { (_, _) => Cursor.Cont({}) },
-                Cursor.ContOnError[Unit](onError)).
-                map(_ => count) must beTypedEqualTo(1).await(2, delayedTimeout)
-            }
+                Cursor.ContOnError[Unit](onError)
+              )
+              .map(_ => count) must beTypedEqualTo(1).await(2, delayedTimeout)
+          }
         }
       }
 
       { // .foldWhile
-        def foldWhileSpec(defaultColl: DefaultCollection, timeout: FiniteDuration) = {
-          def delayedTimeout = FiniteDuration(
-            (timeout.toMillis * 1.25D).toLong, MILLISECONDS)
+        def foldWhileSpec(
+            defaultColl: DefaultCollection,
+            timeout: FiniteDuration
+          ) = {
+          def delayedTimeout =
+            FiniteDuration((timeout.toMillis * 1.25D).toLong, MILLISECONDS)
 
           "if fails while processing with existing documents" in {
             @volatile var count = 0
@@ -301,10 +352,13 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             }
             val cursor = defaultColl.find(matchAll("cursorspec44")).cursor()
 
-            cursor.foldWhileM({}, 128)(
-              { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #44")) },
-              Cursor.ContOnError[Unit](onError)).map(_ => count).
-              aka("folding") must beTypedEqualTo(128).await(2, delayedTimeout)
+            cursor
+              .foldWhileM({}, 128)(
+                { (_, _) => Future[Cursor.State[Unit]](sys.error("Foo #44")) },
+                Cursor.ContOnError[Unit](onError)
+              )
+              .map(_ => count)
+              .aka("folding") must beTypedEqualTo(128).await(2, delayedTimeout)
 
           }
 
@@ -317,10 +371,14 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
             val c = defaultColl
             val cursor = c.find(matchAll("cursorspec45")).cursor()
 
-            cursor.foldWhile[Unit](sys.error("Foo #45"), 128)(
-              (_, _) => Cursor.Cont({}), Cursor.ContOnError[Unit](onError)).
-              map(_ => -1).recover { case _ => count } must beTypedEqualTo(0).
-              await(2, delayedTimeout)
+            cursor
+              .foldWhile[Unit](sys.error("Foo #45"), 128)(
+                (_, _) => Cursor.Cont({}),
+                Cursor.ContOnError[Unit](onError)
+              )
+              .map(_ => -1)
+              .recover { case _ => count } must beTypedEqualTo(0)
+              .await(2, delayedTimeout)
           }
 
           "if fails to send request" in {
@@ -330,23 +388,29 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
               count = count + 1
             }
             val con46 = driver.connect(
-              List(primaryHost), DefaultOptions.copy(nbChannelsPerNode = 1))
+              List(primaryHost),
+              DefaultOptions.copy(nbChannelsPerNode = 1)
+            )
 
-            lazy val db46 = Await.result(
-              con46.flatMap(_.database("dbspec46")), timeout)
+            lazy val db46 =
+              Await.result(con46.flatMap(_.database("dbspec46")), timeout)
 
             lazy val c = db46(collName)
             val cursor = c.find(matchAll("cursorspec46")).cursor()
 
             // Close connection to make the related cursor erroneous
-            con46.flatMap(_.close()(timeout)).
-              map(_ => {}) must beTypedEqualTo({}).await(1, timeout) and {
-                cursor.foldWhileM({}, 64)(
+            con46
+              .flatMap(_.close()(timeout))
+              .map(_ => {}) must beTypedEqualTo({}).await(1, timeout) and {
+              cursor
+                .foldWhileM({}, 64)(
                   (_, _) => Future.successful(Cursor.Cont({})),
-                  Cursor.ContOnError[Unit](onError)).map(_ => count).
-                  aka("folding") must beTypedEqualTo(1).await(1, timeout)
+                  Cursor.ContOnError[Unit](onError)
+                )
+                .map(_ => count)
+                .aka("folding") must beTypedEqualTo(1).await(1, timeout)
 
-              }
+            }
           }
         }
 
@@ -416,7 +480,7 @@ final class CursorSpec(implicit val ee: ExecutionEnv)
 }
 
 sealed trait CursorSpecEnv { spec: CursorSpec =>
-  //import Common._
+  // import Common._
 
   // Aliases so sub-spec can reuse the same
   @inline def driver = Common.driver

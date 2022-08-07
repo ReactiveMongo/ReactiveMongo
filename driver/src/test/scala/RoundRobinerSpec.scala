@@ -68,23 +68,26 @@ final class RoundRobinerSpec extends org.specs2.mutable.Specification {
 
         val revOrdering = implicitly[math.Ordering[String]].reverse
 
-        r.pickWithFilterAndPriority(
-          _ startsWith "b", 2) must beSome("bar") and {
-            r.pickWithFilterAndPriority(_.size > 3, 2) must beSome("ipsum")
-          } and {
-            // loop again (skip 'foo' and 'bar')
-            r.pickWithFilterAndPriority(_.size > 3, 2) must beSome("ipsum")
-          } and {
-            r.pickWithFilterAndPriority(_.size > 3, 2)(
-              revOrdering) must beSome("lorem")
-          } and {
-            r.pickWithFilterAndPriority(_.size == 3, 2) must beSome("bar")
-          } and {
-            r.pickWithFilterAndPriority(_.size == 3, 2) must beSome("bar")
-          } and {
-            r.pickWithFilterAndPriority(_.size == 3, 2)(
-              revOrdering) must beSome("foo")
-          }
+        r.pickWithFilterAndPriority(_ startsWith "b", 2) must beSome(
+          "bar"
+        ) and {
+          r.pickWithFilterAndPriority(_.size > 3, 2) must beSome("ipsum")
+        } and {
+          // loop again (skip 'foo' and 'bar')
+          r.pickWithFilterAndPriority(_.size > 3, 2) must beSome("ipsum")
+        } and {
+          r.pickWithFilterAndPriority(_.size > 3, 2)(revOrdering) must beSome(
+            "lorem"
+          )
+        } and {
+          r.pickWithFilterAndPriority(_.size == 3, 2) must beSome("bar")
+        } and {
+          r.pickWithFilterAndPriority(_.size == 3, 2) must beSome("bar")
+        } and {
+          r.pickWithFilterAndPriority(_.size == 3, 2)(revOrdering) must beSome(
+            "foo"
+          )
+        }
       }
     }
   }

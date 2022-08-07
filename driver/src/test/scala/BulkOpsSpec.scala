@@ -9,7 +9,7 @@ import reactivemongo.api.collections.BulkOps._
 import org.specs2.concurrent.ExecutionEnv
 
 final class BulkOpsSpec(implicit ee: ExecutionEnv)
-  extends org.specs2.mutable.Specification {
+    extends org.specs2.mutable.Specification {
 
   "Bulk operations".title
 
@@ -21,15 +21,18 @@ final class BulkOpsSpec(implicit ee: ExecutionEnv)
   def producer1 = bulks[BSONDocument](
     documents = Seq.empty,
     maxBsonSize = bsonSize1,
-    maxBulkSize = 2)(_.byteSize)
+    maxBulkSize = 2
+  )(_.byteSize)
 
   val bsonSize2 = BSONArray(doc2, doc2).byteSize - BSONArray.empty.byteSize
 
   val producer2Docs = Seq(doc1, doc1, doc2, doc1, doc2)
+
   def producer2 = bulks[BSONDocument](
     documents = producer2Docs,
     maxBsonSize = bsonSize2,
-    maxBulkSize = 2)(_.byteSize)
+    maxBulkSize = 2
+  )(_.byteSize)
 
   implicit val docOrdering: math.Ordering[BSONDocument] =
     math.Ordering.by[BSONDocument, Int](_.hashCode)
@@ -40,9 +43,10 @@ final class BulkOpsSpec(implicit ee: ExecutionEnv)
   "Preparation" should {
     "produce 1 single empty stage" in {
       producer1 must beLike[BulkProducer[BSONDocument]] {
-        case prod1 => prod1() must beRight.like {
-          case BulkStage(bulk, None) => bulk must beEmpty
-        }
+        case prod1 =>
+          prod1() must beRight.like {
+            case BulkStage(bulk, None) => bulk must beEmpty
+          }
       }
     }
 
@@ -50,34 +54,38 @@ final class BulkOpsSpec(implicit ee: ExecutionEnv)
       bulks[BSONDocument](
         documents = Seq(doc1, doc1, doc2, doc1),
         maxBsonSize = bsonSize1,
-        maxBulkSize = 2)(_.byteSize).
-        aka("bulk producer") must beLike[BulkProducer[BSONDocument]] {
-          case prod1 => prod1() must beRight.like {
+        maxBulkSize = 2
+      )(_.byteSize)
+        .aka("bulk producer") must beLike[BulkProducer[BSONDocument]] {
+        case prod1 =>
+          prod1() must beRight.like {
             case BulkStage(bulk1, Some(prod2)) =>
               bulk1.toList must_== List(doc1, doc1) and {
                 prod2() must beLeft(
-                  s"size of document #2 exceed the maxBsonSize: ${doc2.byteSize} + 3 > ${bsonSize1}")
+                  s"size of document #2 exceed the maxBsonSize: ${doc2.byteSize} + 3 > ${bsonSize1}"
+                )
               }
           }
-        }
+      }
     }
 
     s"produce 5 bulks [#1, #1, #2, #1, #2]" in {
       producer2 must beLike[BulkProducer[BSONDocument]] {
-        case prod1 => prod1() must beRight.like {
-          case BulkStage(bulk1, Some(prod2)) =>
-            bulk1.toList must_== List(doc1, doc1) and {
-              prod2() must beRight.like {
-                case BulkStage(bulk2, Some(prod3)) =>
-                  bulk2.toList must_== List(doc2, doc1) and {
-                    prod3() must beRight.like {
-                      case BulkStage(bulk3, None) =>
-                        bulk3.toList must_== List(doc2)
+        case prod1 =>
+          prod1() must beRight.like {
+            case BulkStage(bulk1, Some(prod2)) =>
+              bulk1.toList must_== List(doc1, doc1) and {
+                prod2() must beRight.like {
+                  case BulkStage(bulk2, Some(prod3)) =>
+                    bulk2.toList must_== List(doc2, doc1) and {
+                      prod3() must beRight.like {
+                        case BulkStage(bulk3, None) =>
+                          bulk3.toList must_== List(doc2)
+                      }
                     }
-                  }
+                }
               }
-            }
-        }
+          }
       }
     }
 
@@ -85,9 +93,12 @@ final class BulkOpsSpec(implicit ee: ExecutionEnv)
       bulks[BSONDocument](
         documents = producer2Docs,
         maxBsonSize = doc1.byteSize,
-        maxBulkSize = 2)(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
+        maxBulkSize = 2
+      )(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
         case prod1 =>
-          prod1() must beLeft(s"size of document #0 exceed the maxBsonSize: ${doc1.byteSize} + 3 > ${doc1.byteSize}")
+          prod1() must beLeft(
+            s"size of document #0 exceed the maxBsonSize: ${doc1.byteSize} + 3 > ${doc1.byteSize}"
+          )
       }
     }
 
@@ -98,13 +109,14 @@ final class BulkOpsSpec(implicit ee: ExecutionEnv)
       bulks[BSONDocument](
         documents = Seq.fill(11)(doc1),
         maxBsonSize = (doc1.byteSize + 1 + 2 /*docElementByteOverhead*/ ) * 11,
-        maxBulkSize = 11)(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
-          case prod1 =>
-            prod1() must beRight.like {
-              case BulkStage(ExpectedFirstBulk, Some(prod2)) =>
-                prod2() must beRight(BulkStage(ExpectedSecondBulk, None))
-            }
-        }
+        maxBulkSize = 11
+      )(_.byteSize) must beLike[BulkProducer[BSONDocument]] {
+        case prod1 =>
+          prod1() must beRight.like {
+            case BulkStage(ExpectedFirstBulk, Some(prod2)) =>
+              prod2() must beRight(BulkStage(ExpectedSecondBulk, None))
+          }
+      }
     }
 
   }
@@ -112,16 +124,17 @@ final class BulkOpsSpec(implicit ee: ExecutionEnv)
   "Application" should {
     "be successfully ordered" >> {
       val app = bulkApply[BSONDocument, Iterable[BSONDocument]](
-        _: BulkProducer[BSONDocument])(Future.successful(_), None)(
-          _: ExecutionContext)
+        _: BulkProducer[BSONDocument]
+      )(Future.successful(_), None)(_: ExecutionContext)
 
       "for producer1" in {
         app(producer1, ee.ec) must beEqualTo(Nil).await
       }
 
       "for producer2" in {
-        app(producer2, ee.ec) must beEqualTo(Seq(
-          Seq(doc1, doc1), Seq(doc2, doc1), Seq(doc2))).await
+        app(producer2, ee.ec) must beEqualTo(
+          Seq(Seq(doc1, doc1), Seq(doc2, doc1), Seq(doc2))
+        ).await
       }
     }
 
@@ -132,16 +145,17 @@ final class BulkOpsSpec(implicit ee: ExecutionEnv)
 
     "be successfully unordered" >> {
       val app = bulkApply[BSONDocument, Iterable[BSONDocument]](
-        _: BulkProducer[BSONDocument])(Future.successful(_), recoverWithEmpty)(
-          _: ExecutionContext)
+        _: BulkProducer[BSONDocument]
+      )(Future.successful(_), recoverWithEmpty)(_: ExecutionContext)
 
       "for producer1" in {
         app(producer1, ee.ec) must beEqualTo(Nil).await
       }
 
       "for producer2" in {
-        app(producer2, ee.ec).map(
-          _.flatten.sorted) must beEqualTo(producer2Docs.sorted).await
+        app(producer2, ee.ec).map(_.flatten.sorted) must beEqualTo(
+          producer2Docs.sorted
+        ).await
       }
     }
 
@@ -162,23 +176,25 @@ final class BulkOpsSpec(implicit ee: ExecutionEnv)
 
     "be failed on the first failure for producer2" in eventually(2, 1.seconds) {
       val app = bulkApply[BSONDocument, Iterable[BSONDocument]](
-        _: BulkProducer[BSONDocument])(foo, None)(_: ExecutionContext)
+        _: BulkProducer[BSONDocument]
+      )(foo, None)(_: ExecutionContext)
 
       app(producer2, ee.ec) must throwA[Exception]("Foo").await
     }
 
     "be successfully unordered even with failures" >> {
       val app = bulkApply[BSONDocument, Iterable[BSONDocument]](
-        _: BulkProducer[BSONDocument])(foo, recoverWithEmpty)(
-          _: ExecutionContext)
+        _: BulkProducer[BSONDocument]
+      )(foo, recoverWithEmpty)(_: ExecutionContext)
 
       "for producer1" in {
         app(producer1, ee.ec) must beEqualTo(Nil).await
       }
 
       "for producer2" in {
-        app(producer2, ee.ec).map(
-          _.flatten.size) must beLessThan(producer2Docs.size).await
+        app(producer2, ee.ec).map(_.flatten.size) must beLessThan(
+          producer2Docs.size
+        ).await
       }
     }
   }

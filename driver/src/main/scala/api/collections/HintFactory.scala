@@ -2,7 +2,8 @@ package reactivemongo.api.collections
 
 import reactivemongo.api.{ PackSupport, SerializationPack }
 
-private[reactivemongo] trait HintFactory[P <: SerializationPack] { collection: PackSupport[P] =>
+private[reactivemongo] trait HintFactory[P <: SerializationPack] {
+  collection: PackSupport[P] =>
 
   /**
    * Returns a hint for the given index `name`.
@@ -25,8 +26,10 @@ private[reactivemongo] trait HintFactory[P <: SerializationPack] { collection: P
   sealed trait Hint
 
   private[api] case class HintString(
-    indexName: String) extends Hint
+      indexName: String)
+      extends Hint
 
   private[api] case class HintDocument(
-    indexSpec: pack.Document) extends Hint
+      indexSpec: pack.Document)
+      extends Hint
 }

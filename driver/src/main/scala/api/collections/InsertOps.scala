@@ -24,9 +24,11 @@ import reactivemongo.api.commands.{
  * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
  */
 trait InsertOps[P <: SerializationPack]
-  extends InsertCommand[P] with CommandCodecsWithPack[P]
-  with MultiBulkWriteResultFactory[P] with UpsertedFactory[P]
-  with LastErrorFactory[P] { collection: GenericCollection[P] =>
+    extends InsertCommand[P]
+    with CommandCodecsWithPack[P]
+    with MultiBulkWriteResultFactory[P]
+    with UpsertedFactory[P]
+    with LastErrorFactory[P] { collection: GenericCollection[P] =>
 
   /**
    * @param ordered $orderedParam
@@ -34,9 +36,10 @@ trait InsertOps[P <: SerializationPack]
    * @param bypassDocumentValidation $bypassDocumentValidationParam
    */
   private[reactivemongo] final def prepareInsert(
-    ordered: Boolean,
-    writeConcern: WriteConcern,
-    bypassDocumentValidation: Boolean): InsertBuilder = {
+      ordered: Boolean,
+      writeConcern: WriteConcern,
+      bypassDocumentValidation: Boolean
+    ): InsertBuilder = {
     if (ordered) {
       new OrderedInsert(writeConcern, bypassDocumentValidation)
     } else {
@@ -56,7 +59,13 @@ trait InsertOps[P <: SerializationPack]
       val emptyCmd = new ResolvedCollectionCommand(
         collection.name,
         new Insert(
-          emptyDoc, Seq.empty[pack.Document], ordered, writeConcern, false))
+          emptyDoc,
+          Seq.empty[pack.Document],
+          ordered,
+          writeConcern,
+          false
+        )
+      )
 
       val doc = pack.serialize(emptyCmd, insertWriter(None))
 
@@ -90,8 +99,13 @@ trait InsertOps[P <: SerializationPack]
      * }
      * }}}
      */
-    final def one[T](document: T)(implicit ec: ExecutionContext, writer: pack.Writer[T]): Future[WriteResult] = {
-      //TODO: val contextSTE = new Throwable().getStackTrace().drop(3)
+    final def one[T](
+        document: T
+      )(implicit
+        ec: ExecutionContext,
+        writer: pack.Writer[T]
+      ): Future[WriteResult] = {
+      // TODO: val contextSTE = new Throwable().getStackTrace().drop(3)
 
       Future(pack.serialize(document, writer)).flatMap { single =>
         execute(Seq(single))
@@ -119,26 +133,38 @@ trait InsertOps[P <: SerializationPack]
      * }
      * }}}
      */
-    final def many[T](documents: Iterable[T])(implicit ec: ExecutionContext, writer: pack.Writer[T]): Future[MultiBulkWriteResult] = {
+    final def many[T](
+        documents: Iterable[T]
+      )(implicit
+        ec: ExecutionContext,
+        writer: pack.Writer[T]
+      ): Future[MultiBulkWriteResult] = {
       val bulkSz = metadata.maxBulkSize
       val maxSz = maxBsonSize
 
       for {
         docs <- serialize(documents)
         res <- {
-          val bulkProducer = BulkOps.bulks(
-            docs, maxSz, bulkSz) { pack.bsonSize(_) }
+          val bulkProducer = BulkOps.bulks(docs, maxSz, bulkSz) {
+            pack.bsonSize(_)
+          }
 
-          BulkOps.bulkApply[pack.Document, WriteResult](bulkProducer)({ bulk =>
-            execute(bulk.toSeq)
-          }, bulkRecover)
+          BulkOps.bulkApply[pack.Document, WriteResult](bulkProducer)(
+            { bulk => execute(bulk.toSeq) },
+            bulkRecover
+          )
         }
       } yield MultiBulkWriteResult(res)
     }
 
     // ---
 
-    private def serialize[T](input: Iterable[T])(implicit ec: ExecutionContext, writer: pack.Writer[T]): Future[Iterable[pack.Document]] =
+    private def serialize[T](
+        input: Iterable[T]
+      )(implicit
+        ec: ExecutionContext,
+        writer: pack.Writer[T]
+      ): Future[Iterable[pack.Document]] =
       Future.sequence(input.map { v =>
         Try(pack.serialize(v, writer)) match {
           case Success(v) => Future.successful(v)
@@ -146,20 +172,30 @@ trait InsertOps[P <: SerializationPack]
         }
       })
 
-    private final def execute(documents: Seq[pack.Document])(implicit ec: ExecutionContext): Future[WriteResult] = documents.headOption match {
+    private final def execute(
+        documents: Seq[pack.Document]
+      )(implicit
+        ec: ExecutionContext
+      ): Future[WriteResult] = documents.headOption match {
       case Some(head) => {
         val cmd = new Insert(
-          head, documents.drop(1), ordered, writeConcern,
-          bypassDocumentValidation)
+          head,
+          documents.drop(1),
+          ordered,
+          writeConcern,
+          bypassDocumentValidation
+        )
 
         runCommand(cmd, writePreference).flatMap { wr =>
           val flattened = wr.flatten
 
           if (!flattened.ok) {
             // was ordered, with one doc => fail if has an error
-            Future.failed(lastError(flattened).
-              getOrElse[Exception](new GenericDriverException(
-                s"fails to insert: $documents")))
+            Future.failed(
+              lastError(flattened).getOrElse[Exception](
+                new GenericDriverException(s"fails to insert: $documents")
+              )
+            )
 
           } else Future.successful(wr)
         }
@@ -174,8 +210,9 @@ trait InsertOps[P <: SerializationPack]
   private val orderedRecover = Option.empty[Exception => Future[WriteResult]]
 
   private final class OrderedInsert(
-    val writeConcern: WriteConcern,
-    val bypassDocumentValidation: Boolean) extends InsertBuilder {
+      val writeConcern: WriteConcern,
+      val bypassDocumentValidation: Boolean)
+      extends InsertBuilder {
 
     val ordered = true
     val bulkRecover = orderedRecover
@@ -186,26 +223,31 @@ trait InsertOps[P <: SerializationPack]
       case lastError: WriteResult =>
         Future.successful(lastError)
 
-      case cause => Future.successful(new LastError(
-        ok = false,
-        errmsg = Option(cause.getMessage),
-        code = Option.empty,
-        lastOp = Some(2002), // InsertOp
-        n = 0,
-        singleShard = Option.empty[String],
-        updatedExisting = false,
-        upserted = Option.empty,
-        wnote = Option.empty[WriteConcern.W],
-        wtimeout = false,
-        waited = Option.empty[Int],
-        wtime = Option.empty[Int],
-        writeErrors = Seq.empty,
-        writeConcernError = Option.empty))
+      case cause =>
+        Future.successful(
+          new LastError(
+            ok = false,
+            errmsg = Option(cause.getMessage),
+            code = Option.empty,
+            lastOp = Some(2002), // InsertOp
+            n = 0,
+            singleShard = Option.empty[String],
+            updatedExisting = false,
+            upserted = Option.empty,
+            wnote = Option.empty[WriteConcern.W],
+            wtimeout = false,
+            waited = Option.empty[Int],
+            wtime = Option.empty[Int],
+            writeErrors = Seq.empty,
+            writeConcernError = Option.empty
+          )
+        )
     }
 
   private final class UnorderedInsert(
-    val writeConcern: WriteConcern,
-    val bypassDocumentValidation: Boolean) extends InsertBuilder {
+      val writeConcern: WriteConcern,
+      val bypassDocumentValidation: Boolean)
+      extends InsertBuilder {
 
     val ordered = false
     val bulkRecover = unorderedRecover

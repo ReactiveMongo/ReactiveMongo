@@ -13,9 +13,10 @@ private[commands] trait SliceAggregation[P <: SerializationPack] {
    * @param n any valud expression that resolves to an integer
    */
   final class Slice private (
-    array: pack.Value,
-    position: Option[pack.Value],
-    n: Option[pack.Value]) extends PipelineOperator {
+      array: pack.Value,
+      position: Option[pack.Value],
+      n: Option[pack.Value])
+      extends PipelineOperator {
 
     import builder.{ document, elementProducer => element }
 
@@ -25,8 +26,7 @@ private[commands] trait SliceAggregation[P <: SerializationPack] {
       position.foreach { els += _ }
       n.foreach { els += _ }
 
-      document(Seq(
-        element(f"$$slice", builder.array(array +: els.result()))))
+      document(Seq(element(f"$$slice", builder.array(array +: els.result()))))
     }
 
     private lazy val tupled = Tuple3(array, position, n)
@@ -63,16 +63,19 @@ private[commands] trait SliceAggregation[P <: SerializationPack] {
    * }}}
    */
   object Slice {
+
     /** Create a \$slice stage without the `position` argument. */
     def apply(
-      array: pack.Value,
-      n: pack.Value): Slice =
+        array: pack.Value,
+        n: pack.Value
+      ): Slice =
       new Slice(array, Option.empty[pack.Value], Some(n))
 
     /** Create a \$slice stage with `position` and `n` arguments. */
     def apply(
-      array: pack.Value,
-      position: pack.Value,
-      n: pack.Value): Slice = new Slice(array, Some(position), Some(n))
+        array: pack.Value,
+        position: pack.Value,
+        n: pack.Value
+      ): Slice = new Slice(array, Some(position), Some(n))
   }
 }

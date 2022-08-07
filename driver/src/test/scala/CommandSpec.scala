@@ -18,7 +18,7 @@ import org.specs2.concurrent.ExecutionEnv
 import reactivemongo.api.tests.{ commands, decoder }
 
 final class CommandSpec(implicit ee: ExecutionEnv)
-  extends org.specs2.mutable.Specification {
+    extends org.specs2.mutable.Specification {
 
   "Commands".title
 
@@ -36,10 +36,11 @@ final class CommandSpec(implicit ee: ExecutionEnv)
           val reIndexDoc = BSONDocument("reIndex" -> coll)
 
           db(coll).create() must beTypedEqualTo({}).awaitFor(t) and {
-            db.runCommand(reIndexDoc, db.failoverStrategy).
-              one[BSONDocument](ReadPreference.primary) must beLike[BSONDocument] {
-                case doc => decoder.double(doc, "ok") must beSome(1)
-              }.awaitFor(t)
+            db.runCommand(reIndexDoc, db.failoverStrategy)
+              .one[BSONDocument](ReadPreference.primary) must beLike[
+              BSONDocument
+            ] { case doc => decoder.double(doc, "ok") must beSome(1) }
+              .awaitFor(t)
           }
         }
 
@@ -49,8 +50,10 @@ final class CommandSpec(implicit ee: ExecutionEnv)
 
         "with the slow connection" in eventually(2, timeout) {
           reindexSpec(
-            slowDb, s"commandspec${System identityHashCode slowDb}",
-            slowTimeout)
+            slowDb,
+            s"commandspec${System identityHashCode slowDb}",
+            slowTimeout
+          )
 
         }
       }
@@ -60,8 +63,8 @@ final class CommandSpec(implicit ee: ExecutionEnv)
   "Admin" should {
     "execute replSetGetStatus" in {
       if (replSetOn) {
-        replSetGetStatusTest.map(_.members.size) must beTypedEqualTo(1).
-          awaitFor(timeout)
+        replSetGetStatusTest.map(_.members.size) must beTypedEqualTo(1)
+          .awaitFor(timeout)
       } else {
         replSetGetStatusTest must throwA[DatabaseException].awaitFor(timeout)
       }
@@ -73,17 +76,21 @@ final class CommandSpec(implicit ee: ExecutionEnv)
       // MongoDB 3
       if (!replSetOn) {
         "fail outside replicaSet (MongoDB 3+)" in {
-          connection.database("admin").flatMap(_.runCommand(
-            ReplSetMaintenance(true),
-            Common.failoverStrategy)) must throwA[DatabaseException].like {
+          connection
+            .database("admin")
+            .flatMap(
+              _.runCommand(ReplSetMaintenance(true), Common.failoverStrategy)
+            ) must throwA[DatabaseException].like {
             case CommandException.Code(code) => code aka "error code" must_== 76
           }.awaitFor(timeout)
         }
       } else {
         "fail with replicaSet (MongoDB 3+)" in {
-          connection.database("admin").flatMap(_.runCommand(
-            ReplSetMaintenance(true),
-            Common.failoverStrategy)) must throwA[DatabaseException].like {
+          connection
+            .database("admin")
+            .flatMap(
+              _.runCommand(ReplSetMaintenance(true), Common.failoverStrategy)
+            ) must throwA[DatabaseException].like {
             case CommandException.Code(code) => code aka "error code" must_== 95
           }.awaitFor(timeout)
         }
@@ -92,13 +99,16 @@ final class CommandSpec(implicit ee: ExecutionEnv)
 
     "response to ping with ok/1.0" in {
       "with the default connection" in {
-        connection.database("admin").
-          flatMap(_.ping()) must beTrue.awaitFor(timeout)
+        connection.database("admin").flatMap(_.ping()) must beTrue.awaitFor(
+          timeout
+        )
       }
 
       "with the slow connection" in {
-        slowConnection.database("admin").
-          flatMap(_.ping()) must beTrue.await(1, timeout)
+        slowConnection.database("admin").flatMap(_.ping()) must beTrue.await(
+          1,
+          timeout
+        )
       }
     }
   }
@@ -108,7 +118,8 @@ final class CommandSpec(implicit ee: ExecutionEnv)
   private def replSetGetStatusTest = {
     import commands.{ replSetStatusReader, replSetGetStatusWriter }
 
-    connection.database("admin").flatMap(
-      _.runCommand(ReplSetGetStatus, Common.failoverStrategy))
+    connection
+      .database("admin")
+      .flatMap(_.runCommand(ReplSetGetStatus, Common.failoverStrategy))
   }
 }

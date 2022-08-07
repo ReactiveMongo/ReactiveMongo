@@ -24,9 +24,12 @@ import reactivemongo.api.commands.{
  * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
  * @define maxBulkSizeParam the maximum number of document(s) per bulk
  */
-trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
-  with UpdateWriteResultFactory[P] with MultiBulkWriteResultFactory[P]
-  with UpsertedFactory[P] with LastErrorFactory[P] {
+trait UpdateOps[P <: SerializationPack]
+    extends UpdateCommand[P]
+    with UpdateWriteResultFactory[P]
+    with MultiBulkWriteResultFactory[P]
+    with UpsertedFactory[P]
+    with LastErrorFactory[P] {
   collection: GenericCollection[P] =>
 
   protected lazy val maxWireVersion =
@@ -39,10 +42,11 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
    * @param maxBulkSize $maxBulkSize
    */
   private[reactivemongo] final def prepareUpdate(
-    ordered: Boolean,
-    writeConcern: WriteConcern,
-    bypassDocumentValidation: Boolean,
-    maxBulkSize: Int): UpdateBuilder = {
+      ordered: Boolean,
+      writeConcern: WriteConcern,
+      bypassDocumentValidation: Boolean,
+      maxBulkSize: Int
+    ): UpdateBuilder = {
     if (ordered) {
       new OrderedUpdate(writeConcern, bypassDocumentValidation, maxBulkSize)
     } else {
@@ -52,6 +56,7 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
 
   /** Builder for update operations. */
   sealed trait UpdateBuilder {
+
     /** $orderedParam */
     def ordered: Boolean
 
@@ -82,17 +87,56 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
      *   coll.update.one(q, u, upsert = true)
      * }}}
      */
-    final def one[Q, U](q: Q, u: U, upsert: Boolean = false, multi: Boolean = false)(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi, None, Seq.empty).flatMap { upd => execute(upd) }
+    final def one[Q, U](
+        q: Q,
+        u: U,
+        upsert: Boolean = false,
+        multi: Boolean = false
+      )(implicit
+        ec: ExecutionContext,
+        qw: pack.Writer[Q],
+        uw: pack.Writer[U]
+      ): Future[UpdateWriteResult] =
+      element[Q, U](q, u, upsert, multi, None, Seq.empty).flatMap { upd =>
+        execute(upd)
+      }
 
     /**
      * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateElement]]).
      */
-    final def one[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation])(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi, collation, Seq.empty).flatMap { upd => execute(upd) }
+    final def one[Q, U](
+        q: Q,
+        u: U,
+        upsert: Boolean,
+        multi: Boolean,
+        collation: Option[Collation]
+      )(implicit
+        ec: ExecutionContext,
+        qw: pack.Writer[Q],
+        uw: pack.Writer[U]
+      ): Future[UpdateWriteResult] =
+      element[Q, U](q, u, upsert, multi, collation, Seq.empty).flatMap { upd =>
+        execute(upd)
+      }
 
     /**
      * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateElement]]).
      */
-    final def one[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit ec: ExecutionContext, qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateWriteResult] = element[Q, U](q, u, upsert, multi, collation, arrayFilters).flatMap { upd => execute(upd) }
+    final def one[Q, U](
+        q: Q,
+        u: U,
+        upsert: Boolean,
+        multi: Boolean,
+        collation: Option[Collation],
+        arrayFilters: Seq[pack.Document]
+      )(implicit
+        ec: ExecutionContext,
+        qw: pack.Writer[Q],
+        uw: pack.Writer[U]
+      ): Future[UpdateWriteResult] =
+      element[Q, U](q, u, upsert, multi, collation, arrayFilters).flatMap {
+        upd => execute(upd)
+      }
 
     /**
      * Performs a [[https://docs.mongodb.com/manual/reference/method/db.collection.updateOne/ single update]] (see [[UpdateElement]]) with a [[https://docs.mongodb.com/manual/reference/command/update/#update-with-an-aggregation-pipeline aggregation pipeline]].
@@ -100,7 +144,20 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
      * @since MongoDB 4.2
      */
     @com.github.ghik.silencer.silent(".*Experimental.*")
-    final def one[Q](q: Q, u: AggregationFramework.Pipeline, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[UpdateWriteResult] = element[Q](q, u, upsert, multi, collation, arrayFilters).flatMap { upd => execute(upd) }
+    final def one[Q](
+        q: Q,
+        u: AggregationFramework.Pipeline,
+        upsert: Boolean,
+        multi: Boolean,
+        collation: Option[Collation],
+        arrayFilters: Seq[pack.Document]
+      )(implicit
+        ec: ExecutionContext,
+        qw: pack.Writer[Q]
+      ): Future[UpdateWriteResult] =
+      element[Q](q, u, upsert, multi, collation, arrayFilters).flatMap { upd =>
+        execute(upd)
+      }
 
     /**
      * '''EXPERIMENTAL:'''
@@ -109,7 +166,18 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
      * @since MongoDB 4.2
      */
     @deprecated("Experimental", "1.0.5-SNAPSHOT")
-    final def one[Q](q: Q, u: AggregationFramework.Pipeline, upsert: Boolean, multi: Boolean)(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[UpdateWriteResult] = element[Q](q, u, upsert, multi, None, Seq.empty).flatMap { upd => execute(upd) }
+    final def one[Q](
+        q: Q,
+        u: AggregationFramework.Pipeline,
+        upsert: Boolean,
+        multi: Boolean
+      )(implicit
+        ec: ExecutionContext,
+        qw: pack.Writer[Q]
+      ): Future[UpdateWriteResult] =
+      element[Q](q, u, upsert, multi, None, Seq.empty).flatMap { upd =>
+        execute(upd)
+      }
 
     /**
      * '''EXPERIMENTAL:'''
@@ -118,7 +186,17 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
      * @since MongoDB 4.2
      */
     @deprecated("Experimental", "1.0.5-SNAPSHOT")
-    final def one[Q](q: Q, u: AggregationFramework.Pipeline, upsert: Boolean)(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[UpdateWriteResult] = element[Q](q, u, upsert, false, None, Seq.empty).flatMap { upd => execute(upd) }
+    final def one[Q](
+        q: Q,
+        u: AggregationFramework.Pipeline,
+        upsert: Boolean
+      )(implicit
+        ec: ExecutionContext,
+        qw: pack.Writer[Q]
+      ): Future[UpdateWriteResult] =
+      element[Q](q, u, upsert, false, None, Seq.empty).flatMap { upd =>
+        execute(upd)
+      }
 
     /**
      * '''EXPERIMENTAL:'''
@@ -127,21 +205,69 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
      * @since MongoDB 4.2
      */
     @deprecated("Experimental", "1.0.5-SNAPSHOT")
-    final def one[Q](q: Q, u: AggregationFramework.Pipeline)(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[UpdateWriteResult] = element[Q](q, u, false, false, None, Seq.empty).flatMap { upd => execute(upd) }
+    final def one[Q](
+        q: Q,
+        u: AggregationFramework.Pipeline
+      )(implicit
+        ec: ExecutionContext,
+        qw: pack.Writer[Q]
+      ): Future[UpdateWriteResult] =
+      element[Q](q, u, false, false, None, Seq.empty).flatMap { upd =>
+        execute(upd)
+      }
 
     @deprecated("Experimental", "1.0.5")
-    final def one(update: UpdateElement)(implicit ec: ExecutionContext): Future[UpdateWriteResult] = execute(update)
+    final def one(
+        update: UpdateElement
+      )(implicit
+        ec: ExecutionContext
+      ): Future[UpdateWriteResult] = execute(update)
 
     /** Prepares an [[UpdateElement]] */
-    final def element[Q, U](q: Q, u: U, upsert: Boolean = false, multi: Boolean = false)(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] = element(q, u, upsert, multi, None, Seq.empty)
+    final def element[Q, U](
+        q: Q,
+        u: U,
+        upsert: Boolean = false,
+        multi: Boolean = false
+      )(implicit
+        qw: pack.Writer[Q],
+        uw: pack.Writer[U]
+      ): Future[UpdateElement] = element(q, u, upsert, multi, None, Seq.empty)
 
     /** Prepares an [[UpdateElement]] */
-    final def element[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation])(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] = element(q, u, upsert, multi, collation, Seq.empty)
+    final def element[Q, U](
+        q: Q,
+        u: U,
+        upsert: Boolean,
+        multi: Boolean,
+        collation: Option[Collation]
+      )(implicit
+        qw: pack.Writer[Q],
+        uw: pack.Writer[U]
+      ): Future[UpdateElement] =
+      element(q, u, upsert, multi, collation, Seq.empty)
 
     /** Prepares an [[UpdateElement]] */
-    final def element[Q, U](q: Q, u: U, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit qw: pack.Writer[Q], uw: pack.Writer[U]): Future[UpdateElement] = {
+    final def element[Q, U](
+        q: Q,
+        u: U,
+        upsert: Boolean,
+        multi: Boolean,
+        collation: Option[Collation],
+        arrayFilters: Seq[pack.Document]
+      )(implicit
+        qw: pack.Writer[Q],
+        uw: pack.Writer[U]
+      ): Future[UpdateElement] = {
       (Try(pack.serialize(q, qw)).map { query =>
-        new UpdateElement(query, Left(pack.serialize(u, uw)), upsert, multi, collation, arrayFilters)
+        new UpdateElement(
+          query,
+          Left(pack.serialize(u, uw)),
+          upsert,
+          multi,
+          collation,
+          arrayFilters
+        )
       }) match {
         case Success(element) => Future.successful(element)
         case Failure(cause)   => Future.failed[UpdateElement](cause)
@@ -155,7 +281,16 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
      * @since MongoDB 4.2
      */
     @deprecated("Experimental", "1.0.5-SNAPSHOT")
-    final def element[Q](q: Q, u: AggregationFramework.Pipeline, upsert: Boolean, multi: Boolean, collation: Option[Collation])(implicit qw: pack.Writer[Q]): Future[UpdateElement] = element(q, u, upsert, multi, collation, Seq.empty)
+    final def element[Q](
+        q: Q,
+        u: AggregationFramework.Pipeline,
+        upsert: Boolean,
+        multi: Boolean,
+        collation: Option[Collation]
+      )(implicit
+        qw: pack.Writer[Q]
+      ): Future[UpdateElement] =
+      element(q, u, upsert, multi, collation, Seq.empty)
 
     /**
      * '''EXPERIMENTAL:'''
@@ -164,9 +299,25 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
      * @since MongoDB 4.2
      */
     @deprecated("Experimental", "1.0.5-SNAPSHOT")
-    final def element[Q](q: Q, u: AggregationFramework.Pipeline, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document])(implicit qw: pack.Writer[Q]): Future[UpdateElement] = {
+    final def element[Q](
+        q: Q,
+        u: AggregationFramework.Pipeline,
+        upsert: Boolean,
+        multi: Boolean,
+        collation: Option[Collation],
+        arrayFilters: Seq[pack.Document]
+      )(implicit
+        qw: pack.Writer[Q]
+      ): Future[UpdateElement] = {
       (Try(pack.serialize(q, qw)).map { query =>
-        new UpdateElement(query, Right(u.map(_.makePipe)), upsert, multi, collation, arrayFilters)
+        new UpdateElement(
+          query,
+          Right(u.map(_.makePipe)),
+          upsert,
+          multi,
+          collation,
+          arrayFilters
+        )
       }) match {
         case Success(element) => Future.successful(element)
         case Failure(cause)   => Future.failed[UpdateElement](cause)
@@ -206,20 +357,30 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
      * }
      * }}}
      */
-    final def many(firstUpdate: UpdateElement, updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
-      val bulkProducer = BulkOps.bulks(
-        Seq(firstUpdate) ++ updates, maxBsonSize, maxBulkSize) { up =>
-          val v: pack.Value = up.u match {
-            case Left(doc) => doc
-            case Right(pipeline) =>
-              pack.newBuilder.array(pipeline)
-          }
+    final def many(
+        firstUpdate: UpdateElement,
+        updates: Iterable[UpdateElement]
+      )(implicit
+        ec: ExecutionContext
+      ): Future[MultiBulkWriteResult] = {
+      val bulkProducer =
+        BulkOps.bulks(Seq(firstUpdate) ++ updates, maxBsonSize, maxBulkSize) {
+          up =>
+            val v: pack.Value = up.u match {
+              case Left(doc) => doc
+              case Right(pipeline) =>
+                pack.newBuilder.array(pipeline)
+            }
 
-          elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(v)
+            elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(v)
         }
 
-      BulkOps.bulkApply[UpdateElement, UpdateWriteResult](
-        bulkProducer)(execute(_), bulkRecover).map(MultiBulkWriteResult(_))
+      BulkOps
+        .bulkApply[UpdateElement, UpdateWriteResult](bulkProducer)(
+          execute(_),
+          bulkRecover
+        )
+        .map(MultiBulkWriteResult(_))
     }
 
     /**
@@ -248,25 +409,34 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
      * }
      * }}}
      */
-    final def many(updates: Iterable[UpdateElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
+    final def many(
+        updates: Iterable[UpdateElement]
+      )(implicit
+        ec: ExecutionContext
+      ): Future[MultiBulkWriteResult] = {
       if (updates.isEmpty) {
         Future.failed[MultiBulkWriteResult](
-          new GenericDriverException("No update to be performed"))
+          new GenericDriverException("No update to be performed")
+        )
 
       } else {
-        val bulkProducer = BulkOps.bulks(
-          updates, maxBsonSize, maxBulkSize) { up =>
-          val v: pack.Value = up.u match {
-            case Left(doc) => doc
-            case Right(pipeline) =>
-              pack.newBuilder.array(pipeline)
-          }
+        val bulkProducer = BulkOps.bulks(updates, maxBsonSize, maxBulkSize) {
+          up =>
+            val v: pack.Value = up.u match {
+              case Left(doc) => doc
+              case Right(pipeline) =>
+                pack.newBuilder.array(pipeline)
+            }
 
-          elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(v)
+            elementEnvelopeSize + pack.bsonSize(up.q) + pack.bsonSize(v)
         }
 
-        BulkOps.bulkApply[UpdateElement, UpdateWriteResult](
-          bulkProducer)(execute(_), bulkRecover).map(MultiBulkWriteResult(_))
+        BulkOps
+          .bulkApply[UpdateElement, UpdateWriteResult](bulkProducer)(
+            execute(_),
+            bulkRecover
+          )
+          .map(MultiBulkWriteResult(_))
       }
     }
 
@@ -283,13 +453,14 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
         upsert = false,
         multi = false,
         collation = None,
-        arrayFilters = Seq.empty)
+        arrayFilters = Seq.empty
+      )
 
       // Command envelope to compute accurate BSON size limit
       val emptyCmd = new ResolvedCollectionCommand(
         collection.name,
-        new Update(
-          emptyElm, Seq.empty, ordered, writeConcern, false))
+        new Update(emptyElm, Seq.empty, ordered, writeConcern, false)
+      )
 
       val doc = pack.serialize(emptyCmd, updateWriter(None))
 
@@ -304,8 +475,11 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
       import builder.{ elementProducer => elmt }
 
       val elements = Seq.newBuilder[pack.ElementProducer] ++= Seq(
-        elmt("q", emptyDoc), elmt("u", emptyDoc),
-        elmt("upsert", sfalse), elmt("multi", sfalse))
+        elmt("q", emptyDoc),
+        elmt("u", emptyDoc),
+        elmt("upsert", sfalse),
+        elmt("multi", sfalse)
+      )
 
       if (metadata.maxWireVersion >= MongoWireVersion.V34) {
         elements += elmt("collation", emptyDoc)
@@ -319,9 +493,10 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
     }
 
     @inline private final def execute(
-      bulk: Iterable[UpdateElement])(
-      implicit
-      ec: ExecutionContext): Future[UpdateWriteResult] =
+        bulk: Iterable[UpdateElement]
+      )(implicit
+        ec: ExecutionContext
+      ): Future[UpdateWriteResult] =
       bulk.headOption match {
         case Some(first) =>
           execute(first, bulk.drop(1).toSeq)
@@ -331,22 +506,30 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
       }
 
     private final def execute(
-      firstUpdate: UpdateElement,
-      updates: Seq[UpdateElement] = Seq.empty)(
-      implicit
-      ec: ExecutionContext): Future[UpdateWriteResult] = {
+        firstUpdate: UpdateElement,
+        updates: Seq[UpdateElement] = Seq.empty
+      )(implicit
+        ec: ExecutionContext
+      ): Future[UpdateWriteResult] = {
 
       val cmd = new Update(
-        firstUpdate, updates, ordered, writeConcern, bypassDocumentValidation)
+        firstUpdate,
+        updates,
+        ordered,
+        writeConcern,
+        bypassDocumentValidation
+      )
 
       runCommand(cmd, writePreference).flatMap { wr =>
         val flattened = wr.flatten
 
         if (!flattened.ok) {
           // was ordered, with one doc => fail if has an error
-          Future.failed(lastError(flattened).
-            getOrElse[Exception](new GenericDriverException(
-              s"fails to update: $updates")))
+          Future.failed(
+            lastError(flattened).getOrElse[Exception](
+              new GenericDriverException(s"fails to update: $updates")
+            )
+          )
 
         } else Future.successful(wr)
       }
@@ -359,9 +542,10 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
     Option.empty[Exception => Future[UpdateWriteResult]]
 
   private final class OrderedUpdate(
-    val writeConcern: WriteConcern,
-    val bypassDocumentValidation: Boolean,
-    val maxBulkSize: Int) extends UpdateBuilder {
+      val writeConcern: WriteConcern,
+      val bypassDocumentValidation: Boolean,
+      val maxBulkSize: Int)
+      extends UpdateBuilder {
 
     val ordered = true
     val bulkRecover = orderedRecover
@@ -373,32 +557,39 @@ trait UpdateOps[P <: SerializationPack] extends UpdateCommand[P]
   private val unorderedRecover: Option[Exception => Future[UpdateWriteResult]] =
     Some[Exception => Future[UpdateWriteResult]] {
       case lastError: WriteResult =>
-        Future.successful(new UpdateWriteResult(
-          ok = false,
-          n = lastError.n,
-          nModified = 0,
-          upserted = Seq.empty,
-          writeErrors = lastError.writeErrors,
-          writeConcernError = lastError.writeConcernError,
-          code = lastError.code,
-          errmsg = Some(lastError.getMessage)))
+        Future.successful(
+          new UpdateWriteResult(
+            ok = false,
+            n = lastError.n,
+            nModified = 0,
+            upserted = Seq.empty,
+            writeErrors = lastError.writeErrors,
+            writeConcernError = lastError.writeConcernError,
+            code = lastError.code,
+            errmsg = Some(lastError.getMessage)
+          )
+        )
 
       case cause =>
-        Future.successful(new UpdateWriteResult(
-          ok = false,
-          n = 0,
-          nModified = 0,
-          upserted = Seq.empty,
-          writeErrors = Seq.empty,
-          writeConcernError = Option.empty,
-          code = Option.empty,
-          errmsg = Option(cause.getMessage)))
+        Future.successful(
+          new UpdateWriteResult(
+            ok = false,
+            n = 0,
+            nModified = 0,
+            upserted = Seq.empty,
+            writeErrors = Seq.empty,
+            writeConcernError = Option.empty,
+            code = Option.empty,
+            errmsg = Option(cause.getMessage)
+          )
+        )
     }
 
   private final class UnorderedUpdate(
-    val writeConcern: WriteConcern,
-    val bypassDocumentValidation: Boolean,
-    val maxBulkSize: Int) extends UpdateBuilder {
+      val writeConcern: WriteConcern,
+      val bypassDocumentValidation: Boolean,
+      val maxBulkSize: Int)
+      extends UpdateBuilder {
 
     val ordered = false
     val bulkRecover = unorderedRecover

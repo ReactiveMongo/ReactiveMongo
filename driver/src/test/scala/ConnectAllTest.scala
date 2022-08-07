@@ -42,12 +42,13 @@ trait ConnectAllTest { _self: NodeSetSpec =>
       connectAll(sys, _)
     }
 
-    withNodeSet("connect all the nodes with synchronization") { sys =>
-      { ns =>
-        ns.synchronized {
-          connectAll(sys, ns)
+    withNodeSet("connect all the nodes with synchronization") {
+      sys =>
+        { ns =>
+          ns.synchronized {
+            connectAll(sys, ns)
+          }
         }
-      }
     }
 
     { // Make sure closed channels are properly handled
@@ -57,41 +58,44 @@ trait ConnectAllTest { _self: NodeSetSpec =>
       lazy val ChanId2 = DefaultChannelId.newInstance()
 
       def connections(): Future[Vector[Connection]] = {
-        Future.sequence(Seq(ChanId1, ChanId2).map { chanId =>
-          NettyEmbedder.simpleChannel(chanId, false).map { chan =>
-            val channel: EmbeddedChannel = {
-              if (chanId != ChanId2) {
-                chan
-              } else {
-                new EmbeddedChannel(chanId, false, false) {
-                  override def connect(addr: SocketAddress): ChannelFuture = {
-                    val p = new DefaultChannelPromise(chan)
+        Future
+          .sequence(Seq(ChanId1, ChanId2).map { chanId =>
+            NettyEmbedder.simpleChannel(chanId, false).map { chan =>
+              val channel: EmbeddedChannel = {
+                if (chanId != ChanId2) {
+                  chan
+                } else {
+                  new EmbeddedChannel(chanId, false, false) {
+                    override def connect(addr: SocketAddress): ChannelFuture = {
+                      val p = new DefaultChannelPromise(chan)
 
-                    // See MongoDBSystem#cch3
-                    p.setFailure(new ClosedChannelException())
+                      // See MongoDBSystem#cch3
+                      p.setFailure(new ClosedChannelException())
 
-                    p
+                      p
+                    }
+
+                    // See MongoDBSystem#cch4
+                    override def isOpen(): Boolean = false
                   }
-
-                  // See MongoDBSystem#cch4
-                  override def isOpen(): Boolean = false
                 }
               }
-            }
 
-            new Connection(
-              channel, ConnectionStatus.Disconnected,
-              authenticated = Set.empty,
-              authenticating = None,
-              signaling = false)
-          }
-        }).map(_.toVector)
+              new Connection(
+                channel,
+                ConnectionStatus.Disconnected,
+                authenticated = Set.empty,
+                authenticating = None,
+                signaling = false
+              )
+            }
+          })
+          .map(_.toVector)
       }
 
       "connect all with closed channel" in {
-        def opts = MongoConnectionOptions.default.copy(
-          nbChannelsPerNode = 1,
-          heartbeatFrequencyMS = 500)
+        def opts = MongoConnectionOptions.default
+          .copy(nbChannelsPerNode = 1, heartbeatFrequencyMS = 500)
 
         withConAndSys(md, options = opts, _nodes = Seq.empty) { (_, ref) =>
           import ref.{ underlyingActor => sys }
@@ -108,9 +112,15 @@ trait ConnectAllTest { _self: NodeSetSpec =>
               ProtocolMetadata.Default,
               PingInfo(),
               false,
-              System.nanoTime())
+              System.nanoTime()
+            )
             ns = new NodeSet(
-              Some("foo"), None, Vector(node), Set.empty, ListSet.empty)
+              Some("foo"),
+              None,
+              Vector(node),
+              Set.empty,
+              ListSet.empty
+            )
             _ = reactivemongo.api.tests.updateNodeSet(sys, "_test")(_ => ns)
             _ = connectAll(sys, ns)
           } yield reactivemongo.api.tests.nodeSet(sys))
@@ -121,18 +131,20 @@ trait ConnectAllTest { _self: NodeSetSpec =>
           def check(i: Int): Boolean = {
             import ConnectionStatus.{ Connected, Connecting }
 
-            val cs = reactivemongo.api.tests.
-              nodeSet(sys).nodes.flatMap(_.connections).map { con =>
-                con.status -> con.channel.id
-              }.toSeq
+            val cs = reactivemongo.api.tests
+              .nodeSet(sys)
+              .nodes
+              .flatMap(_.connections)
+              .map { con => con.status -> con.channel.id }
+              .toSeq
 
             cs match {
               case Seq(
-                Tuple2(Connected, ChanId1),
-                Tuple2(Connecting | Connected, chanId)) if (
-                chanId != ChanId2) =>
+                    Tuple2(Connected, ChanId1),
+                    Tuple2(Connecting | Connected, chanId)
+                  ) if (chanId != ChanId2) =>
                 // See #cch5: ChanId2 has been replaced
-                //println("_ok")
+                // println("_ok")
                 true
 
               case _ if (i < 5) => {
@@ -148,10 +160,12 @@ trait ConnectAllTest { _self: NodeSetSpec =>
           conns.map {
             _.map(c => c.status -> c.channel.id).toSeq -> check(0)
           }
-        } must beTypedEqualTo(Seq[(ConnectionStatus, ChannelId)](
-          Tuple2(ConnectionStatus.Disconnected, ChanId1),
-          Tuple2(ConnectionStatus.Connecting, ChanId2)) -> true).
-          awaitFor(slowTimeout)
+        } must beTypedEqualTo(
+          Seq[(ConnectionStatus, ChannelId)](
+            Tuple2(ConnectionStatus.Disconnected, ChanId1),
+            Tuple2(ConnectionStatus.Connecting, ChanId2)
+          ) -> true
+        ).awaitFor(slowTimeout)
       }
     }
   }
@@ -164,34 +178,40 @@ trait ConnectAllTest { _self: NodeSetSpec =>
     val ChanId3 = DefaultChannelId.newInstance()
     val ChanId4 = DefaultChannelId.newInstance()
 
-    val node1 = Tuple4(ChanId1, s"$testhost:27017",
-      true, ConnectionStatus.Connected)
+    val node1 =
+      Tuple4(ChanId1, s"$testhost:27017", true, ConnectionStatus.Connected)
 
-    val node2 = Tuple4(ChanId2, s"$testhost:27018",
-      true, ConnectionStatus.Disconnected)
+    val node2 =
+      Tuple4(ChanId2, s"$testhost:27018", true, ConnectionStatus.Disconnected)
 
-    val node3 = Tuple4(ChanId3, s"$testhost:27019",
-      false, ConnectionStatus.Connecting)
+    val node3 =
+      Tuple4(ChanId3, s"$testhost:27019", false, ConnectionStatus.Connecting)
 
-    val node4 = Tuple4(ChanId4, s"$testhost:27020",
-      false, ConnectionStatus.Disconnected)
+    val node4 =
+      Tuple4(ChanId4, s"$testhost:27020", false, ConnectionStatus.Disconnected)
 
     Vector(node1, node2, node3, node4)
   }
 
-  private def withNodeSet(specTitle: String)(conAll: StandardDBSystem => NodeSet => NodeSet) = specTitle in {
+  private def withNodeSet(
+      specTitle: String
+    )(conAll: StandardDBSystem => NodeSet => NodeSet
+    ) = specTitle in {
     withConAndSys(md, _nodes = Seq.empty) { (_, ref) =>
       def node(
-        chanId: ChannelId,
-        host: String,
-        chanConnected: Boolean,
-        status: ConnectionStatus): Future[Node] = {
+          chanId: ChannelId,
+          host: String,
+          chanConnected: Boolean,
+          status: ConnectionStatus
+        ): Future[Node] = {
         NettyEmbedder.simpleChannel(chanId, chanConnected).map { chan =>
           val con = new Connection(
-            chan, status,
+            chan,
+            status,
             authenticated = Set.empty,
             authenticating = None,
-            signaling = false)
+            signaling = false
+          )
 
           new Node(
             host,
@@ -203,7 +223,8 @@ trait ConnectAllTest { _self: NodeSetSpec =>
             ProtocolMetadata.Default,
             PingInfo(),
             false,
-            System.nanoTime())
+            System.nanoTime()
+          )
         }
       }
 
@@ -220,23 +241,30 @@ trait ConnectAllTest { _self: NodeSetSpec =>
         Future(conAll(ref.underlyingActor)(nodes))
       }
 
-      Future.sequence((0 to 10).map(_ => concurCon)).map {
-        _.flatMap(_.nodes.flatMap { node =>
-          node.connections.map { node.name -> _.status }
-        }).toSet
-      }.andThen {
-        case _ => nsNodes.foreach {
-          _.foreach {
-            _.connected.foreach(_.channel.close())
-          }
+      Future
+        .sequence((0 to 10).map(_ => concurCon))
+        .map {
+          _.flatMap(_.nodes.flatMap { node =>
+            node.connections.map { node.name -> _.status }
+          }).toSet
         }
-      }
-    } must contain(exactly[(String, ConnectionStatus)](
-      s"$testhost:27017" -> ConnectionStatus.Connected, // already Connected
-      // Disconnected to Connected for :27018 as chan is active/connected
-      s"$testhost:27018" -> ConnectionStatus.Connected,
-      s"$testhost:27019" -> ConnectionStatus.Connecting, // already Connecting
-      // connecting `node4` (transition from Disconnected to Connected)
-      s"$testhost:27020" -> ConnectionStatus.Connected)).await(0, timeout)
+        .andThen {
+          case _ =>
+            nsNodes.foreach {
+              _.foreach {
+                _.connected.foreach(_.channel.close())
+              }
+            }
+        }
+    } must contain(
+      exactly[(String, ConnectionStatus)](
+        s"$testhost:27017" -> ConnectionStatus.Connected, // already Connected
+        // Disconnected to Connected for :27018 as chan is active/connected
+        s"$testhost:27018" -> ConnectionStatus.Connected,
+        s"$testhost:27019" -> ConnectionStatus.Connecting, // already Connecting
+        // connecting `node4` (transition from Disconnected to Connected)
+        s"$testhost:27020" -> ConnectionStatus.Connected
+      )
+    ).await(0, timeout)
   }
 }

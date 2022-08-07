@@ -25,13 +25,13 @@ import reactivemongo.core.errors.GenericDriverException
  * @param srvPrefix the SRV prefix (default: `_mongodb._tcp`)
  */
 private[util] final class DefaultSRVResolver(
-  resolve: SRVRecordResolver)(
-  implicit
-  ec: ExecutionContext) extends (String => Future[List[SRV]]) {
+    resolve: SRVRecordResolver
+  )(implicit
+    ec: ExecutionContext)
+    extends (String => Future[List[SRV]]) {
 
   def apply(name: String): Future[List[SRV]] = {
-    val baseName = Name.fromString(
-      name.dropWhile(_ != '.').drop(1), Name.root)
+    val baseName = Name.fromString(name.dropWhile(_ != '.').drop(1), Name.root)
 
     @annotation.tailrec
     def go(records: Array[Record], names: List[SRV]): Future[List[SRV]] = {
@@ -42,8 +42,11 @@ private[util] final class DefaultSRVResolver(
 
           if (nme.isAbsolute) {
             if (!nme.subdomain(baseName)) {
-              Future.failed[List[SRV]](new GenericDriverException(
-                s"$nme is not subdomain of $baseName"))
+              Future.failed[List[SRV]](
+                new GenericDriverException(
+                  s"$nme is not subdomain of $baseName"
+                )
+              )
 
             } else {
               go(records.tail, (nme.toString(true) -> rec.getPort) :: names)
@@ -51,13 +54,17 @@ private[util] final class DefaultSRVResolver(
           } else {
             go(
               records.tail,
-              (Name.concatenate(
-                nme, baseName).toString(true) -> rec.getPort) :: names)
+              (Name
+                .concatenate(nme, baseName)
+                .toString(true) -> rec.getPort) :: names
+            )
           }
         }
 
-        case Some(rec) => Future.failed[List[SRV]](
-          new GenericDriverException(s"Unexpected record: $rec"))
+        case Some(rec) =>
+          Future.failed[List[SRV]](
+            new GenericDriverException(s"Unexpected record: $rec")
+          )
 
         case _ => Future.successful(names.reverse)
       }

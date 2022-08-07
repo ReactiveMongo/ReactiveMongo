@@ -46,8 +46,8 @@ import reactivemongo.api.commands.CommandCodecs
 
 /** Query build factory */
 @SuppressWarnings(Array("VariableShadowing"))
-trait QueryBuilderFactory[P <: SerializationPack]
-  extends HintFactory[P] { self: PackSupport[P] =>
+trait QueryBuilderFactory[P <: SerializationPack] extends HintFactory[P] {
+  self: PackSupport[P] =>
 
   import GenericQueryBuilder.logger
 
@@ -55,7 +55,6 @@ trait QueryBuilderFactory[P <: SerializationPack]
    * A builder that helps to make a fine-tuned query to MongoDB.
    *
    * When the query is ready, you can call `cursor` to get a [[Cursor]], or `one` if you want to retrieve just one document.
-   *
    *
    * @param skip the number of documents to skip.
    * @param batchSize the upper limit on the number of documents to retrieve per batch (0 for unspecified)
@@ -100,29 +99,29 @@ trait QueryBuilderFactory[P <: SerializationPack]
    * @define projectionFunction Sets the [[https://docs.mongodb.com/manual/reference/method/db.collection.find/index.html#projection projection specification]] to determine which fields to include in the returned documents
    */
   final class QueryBuilder private[reactivemongo] (
-    collection: Collection,
-    failoverStrategy: FailoverStrategy = FailoverStrategy.default,
-    val skip: Int = 0,
-    val batchSize: Int = 0,
-    val cursorOptions: CursorOptions = CursorOptions.empty,
-    val readConcern: ReadConcern = ReadConcern.default,
-    readPreference: ReadPreference = ReadPreference.primary,
-    filter: Option[pack.Document] = None,
-    val projection: Option[pack.Document] = None,
-    val sort: Option[pack.Document] = None,
-    val max: Option[pack.Document] = None,
-    val min: Option[pack.Document] = None,
-    val hint: Option[Hint] = None,
-    val explain: Boolean = false,
-    val snapshot: Boolean = false,
-    val comment: Option[String] = None,
-    val maxTimeMs: Option[Long] = None,
-    val maxAwaitTimeMs: Option[Long] = None,
-    val singleBatch: Boolean = false,
-    val maxScan: Option[Double] = None,
-    val returnKey: Boolean = false,
-    val showRecordId: Boolean = false,
-    val collation: Option[Collation] = None) {
+      collection: Collection,
+      failoverStrategy: FailoverStrategy = FailoverStrategy.default,
+      val skip: Int = 0,
+      val batchSize: Int = 0,
+      val cursorOptions: CursorOptions = CursorOptions.empty,
+      val readConcern: ReadConcern = ReadConcern.default,
+      readPreference: ReadPreference = ReadPreference.primary,
+      filter: Option[pack.Document] = None,
+      val projection: Option[pack.Document] = None,
+      val sort: Option[pack.Document] = None,
+      val max: Option[pack.Document] = None,
+      val min: Option[pack.Document] = None,
+      val hint: Option[Hint] = None,
+      val explain: Boolean = false,
+      val snapshot: Boolean = false,
+      val comment: Option[String] = None,
+      val maxTimeMs: Option[Long] = None,
+      val maxAwaitTimeMs: Option[Long] = None,
+      val singleBatch: Boolean = false,
+      val maxScan: Option[Double] = None,
+      val returnKey: Boolean = false,
+      val showRecordId: Boolean = false,
+      val collation: Option[Collation] = None) {
 
     @inline private def version: MongoWireVersion =
       collection.db.connectionState.metadata.maxWireVersion
@@ -136,9 +135,11 @@ trait QueryBuilderFactory[P <: SerializationPack]
     /**
      * $filterFunction.
      */
-    private[api] def filter[T](selector: T)(
-      implicit
-      w: pack.Writer[T]): QueryBuilder =
+    private[api] def filter[T](
+        selector: T
+      )(implicit
+        w: pack.Writer[T]
+      ): QueryBuilder =
       copy(filter = Option(selector).map(pack.serialize[T](_, w)))
 
     /**
@@ -192,9 +193,11 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *
      * @tparam Pjn The type of the projection. An implicit `Writer[Pjn]` typeclass for handling it has to be in the scope.
      */
-    def projection[Pjn](p: Pjn)(
-      implicit
-      writer: pack.Writer[Pjn]): QueryBuilder =
+    def projection[Pjn](
+        p: Pjn
+      )(implicit
+        writer: pack.Writer[Pjn]
+      ): QueryBuilder =
       copy(projection = Some(pack.serialize(p, writer)))
 
     /**
@@ -376,7 +379,6 @@ trait QueryBuilderFactory[P <: SerializationPack]
      * Sets the `collation` document.
      * @since MongoDB 3.4
      *
-     *
      * {{{
      * import reactivemongo.api.Collation
      * import reactivemongo.api.bson.BSONDocument
@@ -532,7 +534,12 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *
      * @tparam T $resultTParam
      */
-    def cursor[T](readPreference: ReadPreference = readPreference)(implicit reader: pack.Reader[T], cp: CursorProducer[T]): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference))
+    def cursor[T](
+        readPreference: ReadPreference = readPreference
+      )(implicit
+        reader: pack.Reader[T],
+        cp: CursorProducer[T]
+      ): cp.ProducedCursor = cp.produce(defaultCursor[T](readPreference))
 
     /**
      * $oneFunction (using the default [[reactivemongo.api.ReadPreference]]).
@@ -558,7 +565,11 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *
      * @tparam T $resultTParam
      */
-    def one[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = one(this.readPreference)
+    def one[T](
+        implicit
+        reader: pack.Reader[T],
+        ec: ExecutionContext
+      ): Future[Option[T]] = one(this.readPreference)
 
     /**
      * $oneFunction.
@@ -581,7 +592,13 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *
      * @tparam T $resultTParam
      */
-    def one[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[Option[T]] = copy(batchSize = 1).defaultCursor(readPreference)(reader).headOption
+    def one[T](
+        readPreference: ReadPreference
+      )(implicit
+        reader: pack.Reader[T],
+        ec: ExecutionContext
+      ): Future[Option[T]] =
+      copy(batchSize = 1).defaultCursor(readPreference)(reader).headOption
 
     /**
      * $requireOneFunction
@@ -602,7 +619,11 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *
      * @tparam T $resultTParam
      */
-    def requireOne[T](implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = requireOne(readPreference)
+    def requireOne[T](
+        implicit
+        reader: pack.Reader[T],
+        ec: ExecutionContext
+      ): Future[T] = requireOne(readPreference)
 
     /**
      * $requireOneFunction.
@@ -631,38 +652,66 @@ trait QueryBuilderFactory[P <: SerializationPack]
      *
      * @tparam T $resultTParam
      */
-    def requireOne[T](readPreference: ReadPreference)(implicit reader: pack.Reader[T], ec: ExecutionContext): Future[T] = copy(batchSize = 1).defaultCursor(readPreference)(reader).head
+    def requireOne[T](
+        readPreference: ReadPreference
+      )(implicit
+        reader: pack.Reader[T],
+        ec: ExecutionContext
+      ): Future[T] =
+      copy(batchSize = 1).defaultCursor(readPreference)(reader).head
 
     // ---
 
     @SuppressWarnings(Array("MaxParameters"))
     private[reactivemongo] def copy(
-      failoverStrategy: FailoverStrategy = failoverStrategy,
-      skip: Int = this.skip,
-      batchSize: Int = this.batchSize,
-      cursorOptions: CursorOptions = this.cursorOptions,
-      readConcern: ReadConcern = this.readConcern,
-      readPreference: ReadPreference = this.readPreference,
-      filter: Option[pack.Document] = this.filter,
-      projection: Option[pack.Document] = this.projection,
-      sort: Option[pack.Document] = this.sort,
-      max: Option[pack.Document] = this.max,
-      min: Option[pack.Document] = this.min,
-      hint: Option[Hint] = this.hint,
-      explain: Boolean = this.explain,
-      snapshot: Boolean = this.snapshot,
-      comment: Option[String] = this.comment,
-      maxTimeMs: Option[Long] = this.maxTimeMs,
-      maxAwaitTimeMs: Option[Long] = this.maxAwaitTimeMs,
-      singleBatch: Boolean = this.singleBatch,
-      maxScan: Option[Double] = this.maxScan,
-      returnKey: Boolean = this.returnKey,
-      showRecordId: Boolean = this.showRecordId,
-      collation: Option[Collation] = this.collation): QueryBuilder =
-      new QueryBuilder(this.collection, failoverStrategy, skip, batchSize,
-        cursorOptions, readConcern, readPreference, filter, projection, sort,
-        max, min, hint, explain, snapshot, comment, maxTimeMs, maxAwaitTimeMs,
-        singleBatch, maxScan, returnKey, showRecordId, collation)
+        failoverStrategy: FailoverStrategy = failoverStrategy,
+        skip: Int = this.skip,
+        batchSize: Int = this.batchSize,
+        cursorOptions: CursorOptions = this.cursorOptions,
+        readConcern: ReadConcern = this.readConcern,
+        readPreference: ReadPreference = this.readPreference,
+        filter: Option[pack.Document] = this.filter,
+        projection: Option[pack.Document] = this.projection,
+        sort: Option[pack.Document] = this.sort,
+        max: Option[pack.Document] = this.max,
+        min: Option[pack.Document] = this.min,
+        hint: Option[Hint] = this.hint,
+        explain: Boolean = this.explain,
+        snapshot: Boolean = this.snapshot,
+        comment: Option[String] = this.comment,
+        maxTimeMs: Option[Long] = this.maxTimeMs,
+        maxAwaitTimeMs: Option[Long] = this.maxAwaitTimeMs,
+        singleBatch: Boolean = this.singleBatch,
+        maxScan: Option[Double] = this.maxScan,
+        returnKey: Boolean = this.returnKey,
+        showRecordId: Boolean = this.showRecordId,
+        collation: Option[Collation] = this.collation
+      ): QueryBuilder =
+      new QueryBuilder(
+        this.collection,
+        failoverStrategy,
+        skip,
+        batchSize,
+        cursorOptions,
+        readConcern,
+        readPreference,
+        filter,
+        projection,
+        sort,
+        max,
+        min,
+        hint,
+        explain,
+        snapshot,
+        comment,
+        maxTimeMs,
+        maxAwaitTimeMs,
+        singleBatch,
+        maxScan,
+        returnKey,
+        showRecordId,
+        collation
+      )
 
     // ---
 
@@ -677,10 +726,11 @@ trait QueryBuilderFactory[P <: SerializationPack]
       string
     }
 
-    private lazy val writeReadPref = QueryCodecs.writeReadPref[pack.type](builder)
+    private lazy val writeReadPref =
+      QueryCodecs.writeReadPref[pack.type](builder)
 
-    private val mergeLt32: Function2[ReadPreference, Int, pack.Document] =
-      { (readPreference: ReadPreference, _: Int) =>
+    private val mergeLt32: Function2[ReadPreference, Int, pack.Document] = {
+      (readPreference: ReadPreference, _: Int) =>
         val elements = Seq.newBuilder[pack.ElementProducer]
 
         // Primary and SecondaryPreferred are encoded as the slaveOk flag;
@@ -688,7 +738,8 @@ trait QueryBuilderFactory[P <: SerializationPack]
 
         elements += element(
           f"$$query",
-          filter.getOrElse(builder.document(Seq.empty)))
+          filter.getOrElse(builder.document(Seq.empty))
+        )
 
         sort.foreach {
           elements += element(f"$$orderby", _)
@@ -702,13 +753,9 @@ trait QueryBuilderFactory[P <: SerializationPack]
             elements += element(f"$$hint", doc)
         }
 
-        maxTimeMs.foreach { l =>
-          elements += element(f"$$maxTimeMS", long(l))
-        }
+        maxTimeMs.foreach { l => elements += element(f"$$maxTimeMS", long(l)) }
 
-        comment.foreach { c =>
-          elements += element(f"$$comment", string(c))
-        }
+        comment.foreach { c => elements += element(f"$$comment", string(c)) }
 
         if (explain) {
           elements += element(f"$$explain", boolean(true))
@@ -725,11 +772,11 @@ trait QueryBuilderFactory[P <: SerializationPack]
         logger.trace(s"command: ${pack pretty merged}")
 
         merged
-      }
+    }
 
     private val merge32: Function2[ReadPreference, Int, pack.Document] = {
-      val writeCollation = Collation.serializeWith[pack.type](
-        pack, _: Collation)(builder)
+      val writeCollation =
+        Collation.serializeWith[pack.type](pack, _: Collation)(builder)
 
       { (readPreference, maxDocs) =>
         import QueryFlags.{
@@ -775,7 +822,8 @@ trait QueryBuilderFactory[P <: SerializationPack]
           element("allowPartialResults", boolean(partial)),
           element("singleBatch", boolean(singleBatch)),
           element("returnKey", boolean(returnKey)),
-          element("showRecordId", boolean(showRecordId)))
+          element("showRecordId", boolean(showRecordId))
+        )
 
         if (version.compareTo(MongoWireVersion.V34) < 0) {
           elements += element("snapshot", boolean(snapshot))
@@ -806,50 +854,44 @@ trait QueryBuilderFactory[P <: SerializationPack]
 
         }
 
-        batchSizeN.foreach { i =>
-          elements += element("batchSize", int(i))
-        }
+        batchSizeN.foreach { i => elements += element("batchSize", int(i)) }
 
-        limit.foreach { i =>
-          elements += element("limit", int(i))
-        }
+        limit.foreach { i => elements += element("limit", int(i)) }
 
-        comment.foreach { c =>
-          elements += element("comment", string(c))
-        }
+        comment.foreach { c => elements += element("comment", string(c)) }
 
-        maxTimeMs.foreach { l =>
-          elements += element("maxTimeMS", long(l))
-        }
+        maxTimeMs.foreach { l => elements += element("maxTimeMS", long(l)) }
 
-        max.foreach { doc =>
-          elements += element("max", doc)
-        }
+        max.foreach { doc => elements += element("max", doc) }
 
-        min.foreach { doc =>
-          elements += element("min", doc)
-        }
+        min.foreach { doc => elements += element("min", doc) }
 
         collation.foreach { c =>
           elements += element("collation", writeCollation(c))
         }
 
-        val session = collection.db.session.filter(
-          _ => (version.compareTo(MongoWireVersion.V36) >= 0))
+        val session = collection.db.session.filter(_ =>
+          (version.compareTo(MongoWireVersion.V36) >= 0)
+        )
 
-        elements ++= CommandCodecs.writeSessionReadConcern(
-          builder)(session)(readConcern)
+        elements ++= CommandCodecs.writeSessionReadConcern(builder)(session)(
+          readConcern
+        )
 
-        val readPref = element(f"$$readPreference", writeReadPref(readPreference))
+        val readPref =
+          element(f"$$readPreference", writeReadPref(readPreference))
 
         val merged = if (!explain) {
           elements += readPref
 
           document(elements.result())
         } else {
-          document(Seq[pack.ElementProducer](
-            element("explain", document(elements.result())),
-            readPref))
+          document(
+            Seq[pack.ElementProducer](
+              element("explain", document(elements.result())),
+              readPref
+            )
+          )
         }
 
         logger.trace(s"command: ${pack pretty merged}")
@@ -858,12 +900,14 @@ trait QueryBuilderFactory[P <: SerializationPack]
       }
     }
 
-    private[reactivemongo] lazy val merge: Function2[ReadPreference, Int, pack.Document] = if (version.compareTo(MongoWireVersion.V32) < 0) mergeLt32 else merge32
+    private[reactivemongo] lazy val merge: Function2[ReadPreference, Int, pack.Document] =
+      if (version.compareTo(MongoWireVersion.V32) < 0) mergeLt32 else merge32
 
     private def defaultCursor[T](
-      readPreference: ReadPreference)(
-      implicit
-      reader: pack.Reader[T]): Cursor.WithOps[T] = {
+        readPreference: ReadPreference
+      )(implicit
+        reader: pack.Reader[T]
+      ): Cursor.WithOps[T] = {
 
       if (version.compareTo(MongoWireVersion.V60) < 0) {
         val (name, body) = {
@@ -871,7 +915,8 @@ trait QueryBuilderFactory[P <: SerializationPack]
             collection.fullCollectionName -> { (_: Int) =>
               val buffer = pack.writeToBuffer(
                 WritableBuffer.empty,
-                merge(readPreference, Int.MaxValue))
+                merge(readPreference, Int.MaxValue)
+              )
 
               projection.fold(buffer) { pack.writeToBuffer(buffer, _) }.buffer
             }
@@ -881,7 +926,8 @@ trait QueryBuilderFactory[P <: SerializationPack]
                 // if MongoDB 3.2+, projection is managed in merge
                 def prepared = pack.writeToBuffer(
                   WritableBuffer.empty,
-                  merge(readPreference, maxDocs))
+                  merge(readPreference, maxDocs)
+                )
 
                 prepared.buffer
             }
@@ -895,9 +941,16 @@ trait QueryBuilderFactory[P <: SerializationPack]
 
         val op = Query(flags, name, skip, batchSize)
 
-        DefaultCursor.query(pack, op, body, readPreference,
-          collection.db, failoverStrategy,
-          collection.fullCollectionName, maxAwaitTimeMs)(reader)
+        DefaultCursor.query(
+          pack,
+          op,
+          body,
+          readPreference,
+          collection.db,
+          failoverStrategy,
+          collection.fullCollectionName,
+          maxAwaitTimeMs
+        )(reader)
 
       } else {
         val body: Int => ByteBuf = { (maxDocs: Int) =>
@@ -908,9 +961,8 @@ trait QueryBuilderFactory[P <: SerializationPack]
           val doc = merge(readPreference, maxDocs)
 
           val section: pack.Document = builder.document(
-            Seq(
-              elmt(doc),
-              elmt(f"$$db", builder.string(collection.db.name))))
+            Seq(elmt(doc), elmt(f"$$db", builder.string(collection.db.name)))
+          )
 
           val buffer = WritableBuffer.empty
 
@@ -921,16 +973,25 @@ trait QueryBuilderFactory[P <: SerializationPack]
         }
 
         val op = Message(
-          flags = 0 /* TODO: OpMsg flags */ ,
-          checksum = None /* TODO: OpMsg checksum */ ,
-          requiresPrimary = !readPreference.slaveOk)
+          flags = 0 /* TODO: OpMsg flags */,
+          checksum = None /* TODO: OpMsg checksum */,
+          requiresPrimary = !readPreference.slaveOk
+        )
 
-        val tailable = (cursorOptions.
-          flags & QueryFlags.TailableCursor) == QueryFlags.TailableCursor
+        val tailable =
+          (cursorOptions.flags & QueryFlags.TailableCursor) == QueryFlags.TailableCursor
 
-        DefaultCursor.query(pack, op, body, readPreference,
-          collection.db, failoverStrategy,
-          collection.fullCollectionName, maxAwaitTimeMs, tailable)(reader)
+        DefaultCursor.query(
+          pack,
+          op,
+          body,
+          readPreference,
+          collection.db,
+          failoverStrategy,
+          collection.fullCollectionName,
+          maxAwaitTimeMs,
+          tailable
+        )(reader)
 
       }
     }

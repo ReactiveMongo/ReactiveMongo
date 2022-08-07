@@ -30,8 +30,8 @@ trait AggregationOps[P <: SerializationPack] {
 
   /** The [[https://docs.mongodb.com/manual/core/aggregation-pipeline/ aggregation framework]] for this collection */
   object AggregationFramework
-    extends AggFramework[collection.pack.type]
-    with PackSupport[collection.pack.type] {
+      extends AggFramework[collection.pack.type]
+      with PackSupport[collection.pack.type] {
 
     val pack: collection.pack.type = collection.pack
   }
@@ -48,30 +48,34 @@ trait AggregationOps[P <: SerializationPack] {
 
   /** Aggregator context */
   final class AggregatorContext[T] private[reactivemongo] (
-    val pipeline: List[PipelineOperator],
-    val explain: Boolean,
-    val allowDiskUse: Boolean,
-    val bypassDocumentValidation: Boolean,
-    val readConcern: ReadConcern,
-    val writeConcern: WriteConcern,
-    val readPreference: ReadPreference,
-    val batchSize: Option[Int],
-    val cursorOptions: CursorOptions,
-    val maxTime: Option[FiniteDuration],
-    val reader: pack.Reader[T],
-    val hint: Option[Hint],
-    val comment: Option[String],
-    val collation: Option[Collation]) {
+      val pipeline: List[PipelineOperator],
+      val explain: Boolean,
+      val allowDiskUse: Boolean,
+      val bypassDocumentValidation: Boolean,
+      val readConcern: ReadConcern,
+      val writeConcern: WriteConcern,
+      val readPreference: ReadPreference,
+      val batchSize: Option[Int],
+      val cursorOptions: CursorOptions,
+      val maxTime: Option[FiniteDuration],
+      val reader: pack.Reader[T],
+      val hint: Option[Hint],
+      val comment: Option[String],
+      val collation: Option[Collation]) {
 
     def prepared[AC[U] <: Cursor.WithOps[U]](
-      implicit
-      cp: CursorProducer.Aux[T, AC]): Aggregator[T, AC] =
+        implicit
+        cp: CursorProducer.Aux[T, AC]
+      ): Aggregator[T, AC] =
       new Aggregator[T, AC](this, cp)
   }
 
-  private[api] final class Aggregator[T, AC[_] <: Cursor[_]] private[reactivemongo] (
-    val context: AggregatorContext[T],
-    val cp: CursorProducer.Aux[T, AC]) {
+  private[api] final class Aggregator[
+      T,
+      AC[_] <: Cursor[_]
+    ] private[reactivemongo] (
+      val context: AggregatorContext[T],
+      val cp: CursorProducer.Aux[T, AC]) {
 
     private def ver = db.connectionState.metadata.maxWireVersion
 
@@ -81,15 +85,26 @@ trait AggregationOps[P <: SerializationPack] {
       implicit def aggReader: pack.Reader[T] = context.reader
 
       val cmd = new Aggregate[T](
-        context.pipeline, context.explain,
-        context.allowDiskUse, batchSz, ver,
+        context.pipeline,
+        context.explain,
+        context.allowDiskUse,
+        batchSz,
+        ver,
         context.bypassDocumentValidation,
-        context.readConcern, context.writeConcern,
-        context.hint, context.comment, context.collation)
+        context.readConcern,
+        context.writeConcern,
+        context.hint,
+        context.comment,
+        context.collation
+      )
 
       val cursor = runner.cursor[T, Aggregate[T]](
-        collection, cmd, context.cursorOptions,
-        context.readPreference, context.maxTime.map(_.toMillis))
+        collection,
+        cmd,
+        context.cursorOptions,
+        context.readPreference,
+        context.maxTime.map(_.toMillis)
+      )
 
       cp.produce(cursor)
     }
@@ -104,19 +119,20 @@ trait AggregationOps[P <: SerializationPack] {
    * @param readConcern the read concern (since MongoDB 3.2)
    */
   private[api] final class Aggregate[T](
-    val pipeline: Seq[PipelineOperator],
-    val explain: Boolean = false,
-    val allowDiskUse: Boolean,
-    val batchSize: Int,
-    val wireVersion: MongoWireVersion,
-    val bypassDocumentValidation: Boolean,
-    val readConcern: ReadConcern,
-    val writeConcern: WriteConcern,
-    val hint: Option[Hint],
-    val comment: Option[String],
-    val collation: Option[Collation]) extends CollectionCommand
-    with CommandWithPack[pack.type]
-    with CommandWithResult[T] {
+      val pipeline: Seq[PipelineOperator],
+      val explain: Boolean = false,
+      val allowDiskUse: Boolean,
+      val batchSize: Int,
+      val wireVersion: MongoWireVersion,
+      val bypassDocumentValidation: Boolean,
+      val readConcern: ReadConcern,
+      val writeConcern: WriteConcern,
+      val hint: Option[Hint],
+      val comment: Option[String],
+      val collation: Option[Collation])
+      extends CollectionCommand
+      with CommandWithPack[pack.type]
+      with CommandWithResult[T] {
     val commandKind = CommandKind.Aggregate
   }
 
@@ -124,8 +140,9 @@ trait AggregationOps[P <: SerializationPack] {
 
   private final def commandWriter[T]: pack.Writer[AggregateCmd[T]] = {
     val builder = pack.newBuilder
-    val session = collection.db.session.filter(
-      _ => (version.compareTo(MongoWireVersion.V36) >= 0))
+    val session = collection.db.session.filter(_ =>
+      (version.compareTo(MongoWireVersion.V36) >= 0)
+    )
 
     val writeWriteConcern = CommandCodecs.writeWriteConcern(builder)
     val writeCollation = Collation.serializeWith(pack, _: Collation)(builder)
@@ -151,12 +168,17 @@ trait AggregationOps[P <: SerializationPack] {
         element("pipeline", pipeline),
         element("explain", boolean(cmd.explain)),
         element("allowDiskUse", boolean(cmd.allowDiskUse)),
-        element("cursor", document(Seq(
-          element("batchSize", builder.int(cmd.batchSize))))))
+        element(
+          "cursor",
+          document(Seq(element("batchSize", builder.int(cmd.batchSize))))
+        )
+      )
 
       if (cmd.wireVersion >= MongoWireVersion.V32) {
-        elements += element("bypassDocumentValidation", boolean(
-          cmd.bypassDocumentValidation))
+        elements += element(
+          "bypassDocumentValidation",
+          boolean(cmd.bypassDocumentValidation)
+        )
 
         elements ++= writeReadConcern(cmd.readConcern)
       }

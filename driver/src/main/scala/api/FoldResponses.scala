@@ -12,12 +12,15 @@ import akka.actor.ActorSystem
 import reactivemongo.core.protocol.Response
 
 private[api] final class FoldResponses[T](
-  failoverStrategy: FailoverStrategy,
-  nextResponse: (ExecutionContext, Response) => Future[Option[Response]],
-  killCursors: (Long, String) => Unit,
-  maxDocs: Int,
-  suc: (T, Response) => Future[Cursor.State[T]],
-  err: Cursor.ErrorHandler[T])(implicit actorSys: ActorSystem, ec: ExecutionContext) { self =>
+    failoverStrategy: FailoverStrategy,
+    nextResponse: (ExecutionContext, Response) => Future[Option[Response]],
+    killCursors: (Long, String) => Unit,
+    maxDocs: Int,
+    suc: (T, Response) => Future[Cursor.State[T]],
+    err: Cursor.ErrorHandler[T]
+  )(implicit
+    actorSys: ActorSystem,
+    ec: ExecutionContext) { self =>
   import Cursor.{ Cont, Done, Fail, State, logger }
   import CursorOps.UnrecoverableException
 
@@ -41,12 +44,13 @@ private[api] final class FoldResponses[T](
       logger.warn(s"unexpected fold message: $s")
   }
 
-  @inline private def kill(cursorID: Long): Unit = try {
-    killCursors(cursorID, "FoldResponses")
-  } catch {
-    case NonFatal(cause) =>
-      logger.warn(s"Fails to kill cursor: $cursorID", cause)
-  }
+  @inline private def kill(cursorID: Long): Unit =
+    try {
+      killCursors(cursorID, "FoldResponses")
+    } catch {
+      case NonFatal(cause) =>
+        logger.warn(s"Fails to kill cursor: $cursorID", cause)
+    }
 
   @inline private def ok(r: Response, v: T): Unit = {
     kill(r.reply.cursorID) // Releases cursor before ending
@@ -63,12 +67,13 @@ private[api] final class FoldResponses[T](
   @inline private def handleResponse(last: Response, cur: T, c: Int): Unit = {
     logger.trace(s"Process response: $last")
 
-    val handled: Future[State[T]] = try {
-      suc(cur, last)
-    } catch {
-      case NonFatal(unsafe) /* see makeIterator */ =>
-        Future.failed[State[T]](unsafe)
-    }
+    val handled: Future[State[T]] =
+      try {
+        suc(cur, last)
+      } catch {
+        case NonFatal(unsafe) /* see makeIterator */ =>
+          Future.failed[State[T]](unsafe)
+      }
 
     def nc = c + last.reply.numberReturned
 
@@ -84,23 +89,25 @@ private[api] final class FoldResponses[T](
       case UnrecoverableException(e) =>
         ko(last, e) // already marked recoverable
 
-      case _ => err(cur, error) match {
-        case Done(d) => ok(last, d)
+      case _ =>
+        err(cur, error) match {
+          case Done(d) => ok(last, d)
 
-        case Fail(f) => ko(last, f)
+          case Fail(f) => ko(last, f)
 
-        case next @ Cont(v) =>
-          self ! ProcNext(last, v /*cur*/ , next, c)
+          case next @ Cont(v) =>
+            self ! ProcNext(last, v /*cur*/, next, c)
 
-        case _ =>
-          ko(last, error)
-      }
+          case _ =>
+            ko(last, error)
+        }
     }
 
   @inline private def fetch(
-    c: Int,
-    fec: ExecutionContext,
-    fr: Response): Future[Option[Response]] = {
+      c: Int,
+      fec: ExecutionContext,
+      fr: Response
+    ): Future[Option[Response]] = {
     // Enforce maxDocs check as r.reply.startingFrom (checked in hasNext),
     // will always be set to 0 by the server for tailable cursor/capped coll
     if (c < maxDocs) {
@@ -111,24 +118,40 @@ private[api] final class FoldResponses[T](
     }
   }
 
-  @inline private def procNext(last: Response, cur: T, next: State[T], c: Int): Unit = next match {
+  @inline private def procNext(
+      last: Response,
+      cur: T,
+      next: State[T],
+      c: Int
+    ): Unit = next match {
     case Done(d) => ok(last, d)
 
     case Fail(f) => self ! OnError(last, cur, f, c)
 
-    case Cont(v) => fetch(c, ec, last).onComplete({
-      case Success(Some(r)) => self ! ProcResponses(
-        () => Future.successful(r), v, c, r.reply.cursorID)
+    case Cont(v) =>
+      fetch(c, ec, last).onComplete({
+        case Success(Some(r)) =>
+          self ! ProcResponses(
+            () => Future.successful(r),
+            v,
+            c,
+            r.reply.cursorID
+          )
 
-      case Success(_) => ok(last, v)
-      case Failure(e) => ko(last, e)
-    })(ec)
+        case Success(_) => ok(last, v)
+        case Failure(e) => ko(last, e)
+      })(ec)
 
     case s =>
       logger.warn(s"Unexpected cursor state: $s")
   }
 
-  @inline private def procResponses(last: Future[Response], cur: T, c: Int, lastID: Long): Unit = last.onComplete({
+  @inline private def procResponses(
+      last: Future[Response],
+      cur: T,
+      c: Int,
+      lastID: Long
+    ): Unit = last.onComplete({
     case Success(r) => self ! HandleResponse(r, cur, c)
 
     case Failure(error) => {
@@ -181,10 +204,11 @@ private[api] final class FoldResponses[T](
    * @param lastID the last ID for the cursor (or `-1` if unknown)
    */
   private[api] case class ProcResponses(
-    requester: () => Future[Response],
-    cur: T,
-    c: Int,
-    lastID: Long) extends Msg
+      requester: () => Future[Response],
+      cur: T,
+      c: Int,
+      lastID: Long)
+      extends Msg
 
   /**
    * @param last $lastParam
@@ -200,8 +224,11 @@ private[api] final class FoldResponses[T](
    * @param c $cParam
    */
   private case class ProcNext(
-    last: Response,
-    cur: T, next: State[T], c: Int) extends Msg
+      last: Response,
+      cur: T,
+      next: State[T],
+      c: Int)
+      extends Msg
 
   /**
    * @param last $lastParam
@@ -210,7 +237,11 @@ private[api] final class FoldResponses[T](
    * @param c $cParam
    */
   private case class OnError(
-    last: Response, cur: T, error: Throwable, c: Int) extends Msg
+      last: Response,
+      cur: T,
+      error: Throwable,
+      c: Int)
+      extends Msg
 
   // ---
 
@@ -241,6 +272,7 @@ private[api] final class FoldResponses[T](
   }
 
   private sealed trait LowPriorityDelay { _self: Delay.type =>
+
     private val unsafe = new Delay {
       type Message = Nothing
       val value = Duration.Zero
@@ -254,20 +286,30 @@ private[api] final class FoldResponses[T](
 }
 
 private[api] object FoldResponses {
+
   def apply[T](
-    failoverStrategy: FailoverStrategy,
-    z: => T,
-    makeRequest: ExecutionContext => Future[Response],
-    nextResponse: (ExecutionContext, Response) => Future[Option[Response]],
-    killCursors: (Long, String) => Unit,
-    suc: (T, Response) => Future[Cursor.State[T]],
-    err: Cursor.ErrorHandler[T],
-    maxDocs: Int)(implicit actorSys: ActorSystem, ec: ExecutionContext): Future[T] = {
+      failoverStrategy: FailoverStrategy,
+      z: => T,
+      makeRequest: ExecutionContext => Future[Response],
+      nextResponse: (ExecutionContext, Response) => Future[Option[Response]],
+      killCursors: (Long, String) => Unit,
+      suc: (T, Response) => Future[Cursor.State[T]],
+      err: Cursor.ErrorHandler[T],
+      maxDocs: Int
+    )(implicit
+      actorSys: ActorSystem,
+      ec: ExecutionContext
+    ): Future[T] = {
     Future(z)(ec).flatMap({ v =>
       val max = if (maxDocs > 0) maxDocs else Int.MaxValue
       val f = new FoldResponses[T](
-        failoverStrategy, nextResponse, killCursors, max, suc, err)(
-        actorSys, ec)
+        failoverStrategy,
+        nextResponse,
+        killCursors,
+        max,
+        suc,
+        err
+      )(actorSys, ec)
 
       f ! f.ProcResponses(() => makeRequest(ec), v, 0, -1L)
 

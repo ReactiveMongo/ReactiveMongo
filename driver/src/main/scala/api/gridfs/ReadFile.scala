@@ -18,16 +18,27 @@ import reactivemongo.api.SerializationPack
  * @param metadata the document holding all the metadata that are not standard
  */
 final class ReadFile[+Id, Metadata] private[api] (
-  val id: Id,
-  val filename: Option[String],
-  val uploadDate: Option[Long],
-  val contentType: Option[String],
-  val length: Long,
-  val chunkSize: Int,
-  val md5: Option[String],
-  val metadata: Metadata) extends FileMetadata[Id, Metadata] with ComputedMetadata {
+    val id: Id,
+    val filename: Option[String],
+    val uploadDate: Option[Long],
+    val contentType: Option[String],
+    val length: Long,
+    val chunkSize: Int,
+    val md5: Option[String],
+    val metadata: Metadata)
+    extends FileMetadata[Id, Metadata]
+    with ComputedMetadata {
 
-  private[api] def tupled = Tuple8((id: Any), contentType, filename, uploadDate, chunkSize, length, md5, metadata)
+  private[api] def tupled = Tuple8(
+    (id: Any),
+    contentType,
+    filename,
+    uploadDate,
+    chunkSize,
+    length,
+    md5,
+    metadata
+  )
 
   @SuppressWarnings(Array("ComparingUnrelatedTypes"))
   override def equals(that: Any): Boolean = that match {
@@ -44,8 +55,14 @@ final class ReadFile[+Id, Metadata] private[api] (
 }
 
 object ReadFile {
+
   /** A default `BSONReader` for `ReadFile`. */
-  private[api] def reader[P <: SerializationPack, Id](pack: P)(implicit idValue: Id <:< pack.Value, idTag: scala.reflect.ClassTag[Id]): pack.Reader[ReadFile[Id, pack.Document]] = {
+  private[api] def reader[P <: SerializationPack, Id](
+      pack: P
+    )(implicit
+      idValue: Id <:< pack.Value,
+      idTag: scala.reflect.ClassTag[Id]
+    ): pack.Reader[ReadFile[Id, pack.Document]] = {
     val decoder = pack.newDecoder
     val builder = pack.newBuilder
     val emptyMetadata = builder.document(Seq.empty[pack.ElementProducer])
@@ -61,8 +78,7 @@ object ReadFile {
         ud = decoder.long(doc, "uploadDate")
         m5 = decoder.string(doc, "md5")
         mt = decoder.child(doc, "metadata").getOrElse(emptyMetadata)
-      } yield new ReadFile[Id, pack.Document](
-        id, fn, ud, ct, lh, cz, m5, mt))
+      } yield new ReadFile[Id, pack.Document](id, fn, ud, ct, lh, cz, m5, mt))
 
     }
   }

@@ -7,7 +7,7 @@ import reactivemongo.api.{ FailoverStrategy, MongoConnection }
 import reactivemongo.api.tests._
 
 final class FailoverSpec(implicit ee: ExecutionEnv)
-  extends org.specs2.mutable.Specification {
+    extends org.specs2.mutable.Specification {
 
   "Failover".title
 
@@ -30,15 +30,16 @@ final class FailoverSpec(implicit ee: ExecutionEnv)
 
   private def spec(con: MongoConnection, timeout: FiniteDuration) = {
     "be successful" in {
-      _failover2(con, strategy)(() => Future.successful({})).
-        future must beTypedEqualTo({}).await(1, timeout)
+      _failover2(con, strategy)(() =>
+        Future.successful({})
+      ).future must beTypedEqualTo({}).await(1, timeout)
     }
 
     "fail" >> {
       "with an failed result" in {
         _failover2(con, strategy)(() =>
-          Future.failed(new Exception("Foo"))).
-          future must throwA[Exception]("Foo").await(1, timeout)
+          Future.failed(new Exception("Foo"))
+        ).future must throwA[Exception]("Foo").await(1, timeout)
       }
 
       "with an erroneous response" in {
@@ -48,17 +49,23 @@ final class FailoverSpec(implicit ee: ExecutionEnv)
           delayFactor = { i =>
             c = i
             1D
-          })
-
-        _failover2(con, s)(() => Future.successful(
-          fakeResponseError(reactivemongo.api.bson.BSONDocument(
-            "ok" -> 0D,
-            "errmsg" -> "not master",
-            "code" -> 10107,
-            "codeName" -> "NotMaster")))).
-          future must throwA[Exception]("not master").awaitFor(timeout) and {
-            c must_=== 10
           }
+        )
+
+        _failover2(con, s)(() =>
+          Future.successful(
+            fakeResponseError(
+              reactivemongo.api.bson.BSONDocument(
+                "ok" -> 0D,
+                "errmsg" -> "not master",
+                "code" -> 10107,
+                "codeName" -> "NotMaster"
+              )
+            )
+          )
+        ).future must throwA[Exception]("not master").awaitFor(timeout) and {
+          c must_=== 10
+        }
       }
     }
 

@@ -2,6 +2,7 @@ package reactivemongo.api.gridfs
 
 /** File metadata */
 private[api] trait FileMetadata[+Id, Document] {
+
   /** The id of this file. */
   def id: Id
 
@@ -20,6 +21,7 @@ private[api] trait FileMetadata[+Id, Document] {
 
 /** Computed file metadata */
 private[api] trait ComputedMetadata { _self: FileMetadata[_, _] =>
+
   /** The length of the file. */
   def length: Long
 

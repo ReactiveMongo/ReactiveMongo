@@ -3,8 +3,8 @@ package reactivemongo.api.commands
 import reactivemongo.api.SerializationPack
 
 private[reactivemongo] final class Capped(
-  val size: Long,
-  val max: Option[Int] = None) {
+    val size: Long,
+    val max: Option[Int] = None) {
 
   override def equals(that: Any): Boolean = that match {
     case other: Capped =>
@@ -20,14 +20,18 @@ private[reactivemongo] final class Capped(
 }
 
 private[reactivemongo] object Capped {
+
   @SuppressWarnings(Array("UnusedMethodParameter"))
-  private[api] def writeTo[P <: SerializationPack](pack: P)(builder: SerializationPack.Builder[pack.type], append: pack.ElementProducer => Any)(capped: Capped): Unit = {
+  private[api] def writeTo[P <: SerializationPack](
+      pack: P
+    )(builder: SerializationPack.Builder[pack.type],
+      append: pack.ElementProducer => Any
+    )(capped: Capped
+    ): Unit = {
     import builder.{ elementProducer => element }
 
     append(element("size", builder.long(capped.size)))
 
-    capped.max.foreach { max =>
-      append(element("max", builder.int(max)))
-    }
+    capped.max.foreach { max => append(element("max", builder.int(max))) }
   }
 }

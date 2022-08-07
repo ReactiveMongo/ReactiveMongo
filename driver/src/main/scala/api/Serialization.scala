@@ -2,9 +2,7 @@ package reactivemongo.api
 
 import reactivemongo.api.commands.{ CommandCodecs, WriteResult }
 
-import reactivemongo.api.bson.collection.{
-  BSONSerializationPack => SerPack
-}
+import reactivemongo.api.bson.collection.{ BSONSerializationPack => SerPack }
 
 private[reactivemongo] object Serialization {
   type Pack = SerPack.type
@@ -21,5 +19,6 @@ private[reactivemongo] object Serialization {
 
   lazy implicit val writeResultReader: SerPack.Reader[WriteResult] =
     CommandCodecs.writeResultReader[WriteResult, this.Pack](
-      internalSerializationPack)
+      internalSerializationPack
+    )
 }

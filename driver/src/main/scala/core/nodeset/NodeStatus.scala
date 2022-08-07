@@ -9,6 +9,7 @@ sealed trait QueryableNodeStatus { _self: NodeStatus =>
 sealed trait CanonicalNodeStatus { _self: NodeStatus => }
 
 object NodeStatus {
+
   object Uninitialized extends NodeStatus {
     override def toString = "Uninitialized"
   }
@@ -23,14 +24,18 @@ object NodeStatus {
   }
 
   /** Can vote. The primary is the only member to accept write operations. */
-  object Primary extends NodeStatus
-    with QueryableNodeStatus with CanonicalNodeStatus {
+  object Primary
+      extends NodeStatus
+      with QueryableNodeStatus
+      with CanonicalNodeStatus {
     override def toString = "Primary"
   }
 
   /** Can vote. The secondary replicates the data store. */
-  object Secondary extends NodeStatus
-    with QueryableNodeStatus with CanonicalNodeStatus {
+  object Secondary
+      extends NodeStatus
+      with QueryableNodeStatus
+      with CanonicalNodeStatus {
     override def toString = "Secondary"
   }
 

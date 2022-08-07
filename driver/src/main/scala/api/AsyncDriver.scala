@@ -48,8 +48,8 @@ import reactivemongo.core.nodeset.Authenticate
  * @define uriStrictParam the strict URI, that will be parsed by [[reactivemongo.api.MongoConnection.fromString]]
  */
 final class AsyncDriver(
-  protected val config: Option[Config] = None,
-  protected val classLoader: Option[ClassLoader] = None) {
+    protected val config: Option[Config] = None,
+    protected val classLoader: Option[ClassLoader] = None) {
 
   import scala.collection.mutable.{ Map => MutableMap }
   import AsyncDriver.logger
@@ -115,8 +115,9 @@ final class AsyncDriver(
    * }}}
    */
   def connect(
-    nodes: Seq[String],
-    options: MongoConnectionOptions): Future[MongoConnection] =
+      nodes: Seq[String],
+      options: MongoConnectionOptions
+    ): Future[MongoConnection] =
     askConnection(nodes, options, Option.empty)
 
   /**
@@ -139,9 +140,10 @@ final class AsyncDriver(
    * }}}
    */
   def connect(
-    nodes: Seq[String],
-    options: MongoConnectionOptions,
-    name: String): Future[MongoConnection] = askConnection(nodes, options, Some(name))
+      nodes: Seq[String],
+      options: MongoConnectionOptions,
+      name: String
+    ): Future[MongoConnection] = askConnection(nodes, options, Some(name))
 
   /**
    * Creates a new MongoConnection from URI.
@@ -176,7 +178,10 @@ final class AsyncDriver(
    * val con: Future[MongoConnection] = driver.connect("mongodb://user123:passwd123@host1:27018,host2:27019,host3:27020/somedb?foo=bar&authenticationMechanism=scram-sha1", name = Some("ConnectionName"))
    * }}}
    */
-  def connect(uriStrict: String, name: Option[String]): Future[MongoConnection] = {
+  def connect(
+      uriStrict: String,
+      name: Option[String]
+    ): Future[MongoConnection] = {
     implicit def ec: ExecutionContext =
       reactivemongo.util.sameThreadExecutionContext
 
@@ -201,7 +206,10 @@ final class AsyncDriver(
    *   driver.connect(uri, name = Some("ConnectionName"))
    * }}}
    */
-  def connect[T](parsedURI: MongoConnection.URI[T], name: Option[String]): Future[MongoConnection] = connect(parsedURI, name, true)
+  def connect[T](
+      parsedURI: MongoConnection.URI[T],
+      name: Option[String]
+    ): Future[MongoConnection] = connect(parsedURI, name, true)
 
   /**
    * Creates a new MongoConnection from URI.
@@ -221,16 +229,22 @@ final class AsyncDriver(
    * }}}
    */
   def connect[T](
-    parsedURI: MongoConnection.URI[T],
-    name: Option[String],
-    strictMode: Boolean): Future[MongoConnection] = {
+      parsedURI: MongoConnection.URI[T],
+      name: Option[String],
+      strictMode: Boolean
+    ): Future[MongoConnection] = {
     if (strictMode && parsedURI.ignoredOptions.nonEmpty) {
-      Future.failed(new IllegalArgumentException(s"The connection URI contains unsupported options: ${parsedURI.ignoredOptions.mkString(", ")}"))
+      Future.failed(
+        new IllegalArgumentException(
+          s"The connection URI contains unsupported options: ${parsedURI.ignoredOptions.mkString(", ")}"
+        )
+      )
     } else {
       askConnection(
         parsedURI.hosts.map(h => h._1 + ':' + h._2).toSeq,
         parsedURI.options.copy(credentials = parsedURI.options.credentials),
-        name)
+        name
+      )
     }
   }
 
@@ -268,7 +282,11 @@ final class AsyncDriver(
    *   }
    * }}}
    */
-  def close(timeout: FiniteDuration = FiniteDuration(2, SECONDS))(implicit ec: ExecutionContext): Future[Unit] = {
+  def close(
+      timeout: FiniteDuration = FiniteDuration(2, SECONDS)
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Unit] = {
     logger.info(s"[$supervisorName] Closing instance of ReactiveMongo driver")
 
     val callerSTE = Thread.currentThread.getStackTrace.drop(3).take(3)
@@ -295,7 +313,10 @@ final class AsyncDriver(
         case err =>
           err.setStackTrace(callerSTE)
 
-          logger.warn(s"[$supervisorName] Fails to close connections within timeout. Continuing closing of ReactiveMongo driver anyway.", err)
+          logger.warn(
+            s"[$supervisorName] Fails to close connections within timeout. Continuing closing of ReactiveMongo driver anyway.",
+            err
+          )
       }.flatMap { _ =>
         // ... and then shut down the ActorSystem as it is exiting.
         systemClose(Some(timeout))
@@ -314,8 +335,7 @@ final class AsyncDriver(
         }
       }
 
-      case Success(AsyncSystemControl(close)) =>
-        { _ => close() }
+      case Success(AsyncSystemControl(close)) => { _ => close() }
 
       case Failure(cause) => { _ => Future.failed[Unit](cause) }
     }
@@ -339,16 +359,18 @@ final class AsyncDriver(
    * @param name $connectionNameParam
    */
   protected def askConnection(
-    nodes: Seq[String],
-    options: MongoConnectionOptions,
-    name: Option[String]): Future[MongoConnection] = {
+      nodes: Seq[String],
+      options: MongoConnectionOptions,
+      name: Option[String]
+    ): Future[MongoConnection] = {
 
     if (nodes.isEmpty) {
       Future.failed[MongoConnection](
-        new reactivemongo.core.errors.ConnectionException("No node specified"))
+        new reactivemongo.core.errors.ConnectionException("No node specified")
+      )
     } else {
-      val nm = name.getOrElse(
-        s"Connection-${connectionCounter.incrementAndGet()}")
+      val nm =
+        name.getOrElse(s"Connection-${connectionCounter.incrementAndGet()}")
 
       val authentications = options.credentials.map {
         case (db, c) => Authenticate(db, c.user, c.password)
@@ -360,14 +382,26 @@ final class AsyncDriver(
       }
 
       lazy val dbsystem: MongoDBSystem = opts.authenticationMechanism match {
-        case X509Authentication => new StandardDBSystemWithX509(
-          supervisorName, nm, nodes, authentications, opts)
+        case X509Authentication =>
+          new StandardDBSystemWithX509(
+            supervisorName,
+            nm,
+            nodes,
+            authentications,
+            opts
+          )
 
-        case ScramSha256Authentication => new StandardDBSystemWithScramSha256(
-          supervisorName, nm, nodes, authentications, opts)
+        case ScramSha256Authentication =>
+          new StandardDBSystemWithScramSha256(
+            supervisorName,
+            nm,
+            nodes,
+            authentications,
+            opts
+          )
 
-        case _ => new StandardDBSystem(
-          supervisorName, nm, nodes, authentications, opts)
+        case _ =>
+          new StandardDBSystem(supervisorName, nm, nodes, authentications, opts)
       }
 
       val mongosystem = system.actorOf(Props(dbsystem), nm)
@@ -378,8 +412,8 @@ final class AsyncDriver(
         Timeout(10000L, MILLISECONDS) // 10s
       }
 
-      def connection = (supervisorActor ? AddConnection(
-        nm, nodes, opts, mongosystem))(timeout)
+      def connection =
+        (supervisorActor ? AddConnection(nm, nodes, opts, mongosystem))(timeout)
 
       logger.info(s"[$supervisorName] Creating connection: $nm")
 
@@ -395,18 +429,19 @@ final class AsyncDriver(
   // ---
 
   private case class AddConnection(
-    name: String,
-    nodes: Seq[String],
-    options: MongoConnectionOptions,
-    mongosystem: ActorRef)
+      name: String,
+      nodes: Seq[String],
+      options: MongoConnectionOptions,
+      mongosystem: ActorRef)
 
   // For testing only
   @SuppressWarnings(Array("MethodReturningAny"))
   private[api] def addConnectionMsg(
-    name: String,
-    nodes: Seq[String],
-    options: MongoConnectionOptions,
-    mongosystem: ActorRef): Any =
+      name: String,
+      nodes: Seq[String],
+      options: MongoConnectionOptions,
+      mongosystem: ActorRef
+    ): Any =
     AddConnection(name, nodes, options, mongosystem)
 
   private final class SupervisorActor(driver: AsyncDriver) extends Actor {
@@ -415,11 +450,12 @@ final class AsyncDriver(
     val receive: Receive = {
       case AddConnection(name, _, opts, sys) => {
         logger.debug(
-          s"[$supervisorName] Add connection to the supervisor: $name")
+          s"[$supervisorName] Add connection to the supervisor: $name"
+        )
 
-        val connection = new MongoConnection(
-          supervisorName, name, driver.system, sys, opts)
-        //connection.nodes = nodes
+        val connection =
+          new MongoConnection(supervisorName, name, driver.system, sys, opts)
+        // connection.nodes = nodes
 
         driver.connectionMonitors.put(connection.monitor, connection)
 
@@ -432,7 +468,8 @@ final class AsyncDriver(
         import term.actor
 
         logger.debug(
-          s"[$supervisorName] Connection is terminated: ${actor.path}")
+          s"[$supervisorName] Connection is terminated: ${actor.path}"
+        )
 
         driver.connectionMonitors.remove(actor)
         ()
@@ -468,7 +505,8 @@ final class AsyncDriver(
           import term.actor
 
           driver.connectionMonitors.remove(actor).foreach { con =>
-            logger.debug(s"[$supervisorName] Connection is terminated: ${con.name}")
+            logger
+              .debug(s"[$supervisorName] Connection is terminated: ${con.name}")
 
             if (isEmpty) {
               context.stop(self)
@@ -499,6 +537,7 @@ final class AsyncDriver(
 
 /** The driver factory */
 object AsyncDriver {
+
   /** Creates a new [[AsyncDriver]] with a new ActorSystem. */
   def apply(): AsyncDriver = new AsyncDriver()
 

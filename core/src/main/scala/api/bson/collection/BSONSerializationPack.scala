@@ -42,8 +42,9 @@ object BSONSerializationPack extends SerializationPack { self =>
     }
 
   def deserialize[A](
-    document: Document,
-    reader: Reader[A]): A = reader.readTry(document) match {
+      document: Document,
+      reader: Reader[A]
+    ): A = reader.readTry(document) match {
     case Success(a) => a
 
     case Failure(cause) =>
@@ -51,25 +52,28 @@ object BSONSerializationPack extends SerializationPack { self =>
   }
 
   private[reactivemongo] def writeToBuffer(
-    buffer: WritableBuffer,
-    document: Document): WritableBuffer =
+      buffer: WritableBuffer,
+      document: Document
+    ): WritableBuffer =
     DefaultBufferHandler.writeDocument(document, buffer)
 
   private[reactivemongo] def readFromBuffer(buffer: ReadableBuffer): Document =
     DefaultBufferHandler.readDocument(buffer)
 
-  override def readAndDeserialize[A](response: Response, reader: Reader[A]): A = response match {
-    case s @ Response.Successful(_, _, docs, _) => s.first match {
-      case Some(preloaded) => // optimization
-        deserialize[A](preloaded, reader)
+  override def readAndDeserialize[A](response: Response, reader: Reader[A]): A =
+    response match {
+      case s @ Response.Successful(_, _, docs, _) =>
+        s.first match {
+          case Some(preloaded) => // optimization
+            deserialize[A](preloaded, reader)
+
+          case _ =>
+            readAndDeserialize(ReadableBuffer(docs), reader)
+        }
 
       case _ =>
-        readAndDeserialize(ReadableBuffer(docs), reader)
+        readAndDeserialize(ReadableBuffer(response.documents), reader)
     }
-
-    case _ =>
-      readAndDeserialize(ReadableBuffer(response.documents), reader)
-  }
 
   def writer[A](f: A => Document): Writer[A] = BSONDocumentWriter[A](f)
 
@@ -77,21 +81,30 @@ object BSONSerializationPack extends SerializationPack { self =>
 
   def widenReader[T](r: NarrowValueReader[T]): WidenValueReader[T] = r
 
-  private[reactivemongo] def readValue[A](value: Value, reader: WidenValueReader[A]): Try[A] = reader.readTry(value)
+  private[reactivemongo] def readValue[A](
+      value: Value,
+      reader: WidenValueReader[A]
+    ): Try[A] = reader.readTry(value)
 
   private[reactivemongo] def reader[A](f: Document => A): Reader[A] =
     BSONDocumentReader(f)
 
-  private[reactivemongo] def afterReader[A, B](r: Reader[A])(f: A => B): Reader[B] = r.afterRead(f)
+  private[reactivemongo] def afterReader[A, B](
+      r: Reader[A]
+    )(f: A => B
+    ): Reader[B] = r.afterRead(f)
 
   override private[reactivemongo] def bsonSize(value: Value): Int =
     value.byteSize
 
-  private[reactivemongo] val narrowIdentityReader: NarrowValueReader[BSONValue] = BSONReader[BSONValue](identity)
+  private[reactivemongo] val narrowIdentityReader: NarrowValueReader[BSONValue] =
+    BSONReader[BSONValue](identity)
 
-  override private[reactivemongo] val newBuilder: SerializationPack.Builder[BSONSerializationPack.type] = Builder
+  override private[reactivemongo] val newBuilder: SerializationPack.Builder[BSONSerializationPack.type] =
+    Builder
 
-  override private[reactivemongo] val newDecoder: SerializationPack.Decoder[BSONSerializationPack.type] = Decoder
+  override private[reactivemongo] val newDecoder: SerializationPack.Decoder[BSONSerializationPack.type] =
+    Decoder
 
   override private[reactivemongo] def pretty(doc: BSONDocument): String =
     BSONDocument.pretty(doc)
@@ -100,7 +113,7 @@ object BSONSerializationPack extends SerializationPack { self =>
 
   /** A builder for serialization simple values (useful for the commands) */
   private object Builder
-    extends SerializationPack.Builder[BSONSerializationPack.type] {
+      extends SerializationPack.Builder[BSONSerializationPack.type] {
     protected[reactivemongo] val pack = self
 
     def document(elements: Seq[ElementProducer]): Document =
@@ -139,7 +152,7 @@ object BSONSerializationPack extends SerializationPack { self =>
   }
 
   private object Decoder
-    extends SerializationPack.Decoder[BSONSerializationPack.type] {
+      extends SerializationPack.Decoder[BSONSerializationPack.type] {
     protected[reactivemongo] val pack = self
 
     def asDocument(value: BSONValue): Option[BSONDocument] = value match {
@@ -151,9 +164,7 @@ object BSONSerializationPack extends SerializationPack { self =>
       document.elements.map(_.name).toSet
 
     def binary(document: BSONDocument, name: String): Option[Array[Byte]] =
-      document.get(name).collect {
-        case bin: BSONBinary => bin.byteArray
-      }
+      document.get(name).collect { case bin: BSONBinary => bin.byteArray }
 
     def get(document: BSONDocument, name: String): Option[BSONValue] =
       document.get(name)
@@ -168,8 +179,9 @@ object BSONSerializationPack extends SerializationPack { self =>
       document.getAsOpt[BSONDocument](name)
 
     def children(document: BSONDocument, name: String): List[BSONDocument] = {
-      document.getAsOpt[List[BSONDocument]](name).
-        getOrElse(List.empty[BSONDocument])
+      document
+        .getAsOpt[List[BSONDocument]](name)
+        .getOrElse(List.empty[BSONDocument])
     }
 
     def double(document: BSONDocument, name: String): Option[Double] =

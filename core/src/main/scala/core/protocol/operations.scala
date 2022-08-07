@@ -30,6 +30,7 @@ import reactivemongo.core.protocol.buffer.{
 
 /** A Mongo Wire Protocol operation */
 private[reactivemongo] sealed trait Op {
+
   /** The operation code */
   val code: Int
 }
@@ -40,7 +41,8 @@ private[reactivemongo] sealed trait Op {
  * Actually, all operations excepted Reply are requests.
  */
 private[reactivemongo] sealed trait RequestOp
-  extends Op with ChannelBufferWritable {
+    extends Op
+    with ChannelBufferWritable {
 
   /** States if this request expects a response. */
   val expectsResponse: Boolean = false
@@ -51,6 +53,7 @@ private[reactivemongo] sealed trait RequestOp
 
 /** A request that needs to know the full collection name. */
 private[reactivemongo] sealed trait CollectionAwareRequestOp extends RequestOp {
+
   /** The full collection name (''<dbname.collectionname>'') */
   val fullCollectionName: String
 
@@ -60,7 +63,8 @@ private[reactivemongo] sealed trait CollectionAwareRequestOp extends RequestOp {
 }
 
 /** A request that will perform a write on the database */
-private[reactivemongo] sealed trait WriteRequestOp extends CollectionAwareRequestOp
+private[reactivemongo] sealed trait WriteRequestOp
+    extends CollectionAwareRequestOp
 
 /**
  * Reply operation.
@@ -71,10 +75,11 @@ private[reactivemongo] sealed trait WriteRequestOp extends CollectionAwareReques
  * @param numberReturned The number of documents that are present in this reply.
  */
 private[reactivemongo] case class Reply(
-  flags: Int,
-  val cursorID: Long,
-  val startingFrom: Int,
-  val numberReturned: Int) extends Op {
+    flags: Int,
+    val cursorID: Long,
+    val startingFrom: Int,
+    val numberReturned: Int)
+    extends Op {
   val code = Reply.code
 
   /** States whether the cursor given in the request was found */
@@ -91,10 +96,15 @@ private[reactivemongo] case class Reply(
   /** States if this reply is in error */
   lazy val inError = cursorNotFound || queryFailure
 
-  lazy val stringify = toString + " [" + str(cursorNotFound, "CursorNotFound;") + str(queryFailure, "QueryFailure;") + str(awaitCapable, "AwaitCapable") + "]"
+  lazy val stringify =
+    toString + " [" + str(cursorNotFound, "CursorNotFound;") + str(
+      queryFailure,
+      "QueryFailure;"
+    ) + str(awaitCapable, "AwaitCapable") + "]"
 }
 
 private[reactivemongo] object Reply extends ChannelBufferReadable[Reply] {
+
   /** OP_REPLY = 1 */
   val code = 1
 
@@ -103,7 +113,8 @@ private[reactivemongo] object Reply extends ChannelBufferReadable[Reply] {
     buffer.readIntLE,
     buffer.readLongLE,
     buffer.readIntLE,
-    buffer.readIntLE)
+    buffer.readIntLE
+  )
 
 }
 
@@ -113,8 +124,9 @@ private[reactivemongo] object Reply extends ChannelBufferReadable[Reply] {
  * @param flags Operation flags.
  */
 private[reactivemongo] case class Update(
-  fullCollectionName: String,
-  flags: Int) extends WriteRequestOp {
+    fullCollectionName: String,
+    flags: Int)
+    extends WriteRequestOp {
   val code = 2001
   val writeTo = writeTupleToBuffer3((0, fullCollectionName, flags)) _
   val size = 4 /* int32 = ZERO */ + 4 + fullCollectionName.length + 1
@@ -122,6 +134,7 @@ private[reactivemongo] case class Update(
 }
 
 private[reactivemongo] object UpdateFlags {
+
   /** If set, the database will insert the supplied object into the collection if no matching document is found. */
   val Upsert = 0x01
 
@@ -135,8 +148,9 @@ private[reactivemongo] object UpdateFlags {
  * @param flags Operation flags.
  */
 private[reactivemongo] case class Insert(
-  flags: Int,
-  fullCollectionName: String) extends WriteRequestOp {
+    flags: Int,
+    fullCollectionName: String)
+    extends WriteRequestOp {
   val code = 2002
   val writeTo = writeTupleToBuffer2((flags, fullCollectionName)) _
   val size = 4 + fullCollectionName.length + 1
@@ -152,16 +166,18 @@ private[reactivemongo] case class Insert(
  * @param numberToReturn The number of documents to return in the response. 0 means the server will choose.
  */
 private[reactivemongo] case class Query(
-  flags: Int,
-  fullCollectionName: String,
-  numberToSkip: Int,
-  numberToReturn: Int) extends CollectionAwareRequestOp {
+    flags: Int,
+    fullCollectionName: String,
+    numberToSkip: Int,
+    numberToReturn: Int)
+    extends CollectionAwareRequestOp {
   override val expectsResponse = true
   val code = 2004
   val size = 4 + fullCollectionName.length + 1 + 4 + 4
 
   val writeTo: ByteBuf => Unit = writeTupleToBuffer4(
-    (flags, fullCollectionName, numberToSkip, numberToReturn)) _
+    (flags, fullCollectionName, numberToSkip, numberToReturn)
+  ) _
 }
 
 /**
@@ -170,9 +186,10 @@ private[reactivemongo] case class Query(
  * @param flags the operation flags (`flagBits`)
  */
 private[reactivemongo] case class Message(
-  flags: Int,
-  checksum: Option[Int],
-  override val requiresPrimary: Boolean) extends RequestOp {
+    flags: Int,
+    checksum: Option[Int],
+    override val requiresPrimary: Boolean)
+    extends RequestOp {
   override val expectsResponse = true
   val code = Message.code
   val size = 4
@@ -191,6 +208,7 @@ private[reactivemongo] object Message {
  * Query flags.
  */
 private[reactivemongo] object QueryFlags {
+
   /** Makes the cursor not to close after all the data is consumed. */
   val TailableCursor = 0x02
 
@@ -228,9 +246,10 @@ private[reactivemongo] object QueryFlags {
  * @param cursorId id of the cursor.
  */
 private[reactivemongo] case class GetMore(
-  fullCollectionName: String,
-  numberToReturn: Int,
-  cursorID: Long) extends CollectionAwareRequestOp {
+    fullCollectionName: String,
+    numberToReturn: Int,
+    cursorID: Long)
+    extends CollectionAwareRequestOp {
   override val expectsResponse = true
   val code = 2005
 
@@ -246,8 +265,9 @@ private[reactivemongo] case class GetMore(
  * @param flags operation flags.
  */
 private[reactivemongo] case class Delete(
-  fullCollectionName: String,
-  flags: Int) extends WriteRequestOp {
+    fullCollectionName: String,
+    flags: Int)
+    extends WriteRequestOp {
   val code = 2006
   val writeTo = writeTupleToBuffer3((0, fullCollectionName, flags)) _
   val size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4
@@ -259,7 +279,8 @@ private[reactivemongo] case class Delete(
  *
  * @param cursorIDs ids of the cursors to kill. Should not be empty.
  */
-private[reactivemongo] case class KillCursors(cursorIDs: Set[Long]) extends RequestOp {
+private[reactivemongo] case class KillCursors(cursorIDs: Set[Long])
+    extends RequestOp {
   val code = 2007
 
   val writeTo: ByteBuf => Unit = { (buffer: ByteBuf) =>
@@ -275,11 +296,12 @@ private[reactivemongo] case class KillCursors(cursorIDs: Set[Long]) extends Requ
 }
 
 private[reactivemongo] case class CompressedOp(
-  override val expectsResponse: Boolean,
-  override val requiresPrimary: Boolean,
-  originalOpCode: Int,
-  uncompressedSize: Int,
-  compressorId: Byte) extends RequestOp {
+    override val expectsResponse: Boolean,
+    override val requiresPrimary: Boolean,
+    originalOpCode: Int,
+    uncompressedSize: Int,
+    compressorId: Byte)
+    extends RequestOp {
   val code = CompressedOp.code
 
   val size = 4 + 4 + 1

@@ -12,10 +12,12 @@ import reactivemongo.util.sameThreadExecutionContext
 private[reactivemongo] sealed trait SystemControl
 
 private[reactivemongo] case class TimedSystemControl(
-  close: Option[FiniteDuration] => Try[Unit]) extends SystemControl
+    close: Option[FiniteDuration] => Try[Unit])
+    extends SystemControl
 
 private[reactivemongo] case class AsyncSystemControl(
-  close: () => Future[Unit]) extends SystemControl
+    close: () => Future[Unit])
+    extends SystemControl
 
 private[reactivemongo] object SystemControl {
   import scala.language.reflectiveCalls

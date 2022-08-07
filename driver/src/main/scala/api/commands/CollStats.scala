@@ -3,7 +3,8 @@ package reactivemongo.api.commands
 import reactivemongo.api.{ CollectionStats, SerializationPack }
 
 private[reactivemongo] final class CollStats(val scale: Option[Int] = None)
-  extends CollectionCommand with CommandWithResult[CollectionStats] {
+    extends CollectionCommand
+    with CommandWithResult[CollectionStats] {
 
   val commandKind = CommandKind.CollStats
 
@@ -21,14 +22,19 @@ private[reactivemongo] final class CollStats(val scale: Option[Int] = None)
 }
 
 private[reactivemongo] object CollStats {
-  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[CollStats]] = {
+
+  private[api] def writer[P <: SerializationPack](
+      pack: P
+    ): pack.Writer[ResolvedCollectionCommand[CollStats]] = {
     val builder = pack.newBuilder
 
     pack.writer[ResolvedCollectionCommand[CollStats]] { cmd =>
       val elms = Seq.newBuilder[pack.ElementProducer]
 
       elms += builder.elementProducer(
-        "collStats", builder.string(cmd.collection))
+        "collStats",
+        builder.string(cmd.collection)
+      )
 
       cmd.command.scale.foreach { scale =>
         elms += builder.elementProducer("scale", builder.int(scale))
@@ -64,8 +70,23 @@ private[reactivemongo] object CollStats {
         mx = decoder.long(doc, "max")
         ms = decoder.double(doc, "maxSize")
       } yield new CollectionStats(
-        ns, count, sz, avg, ss, ne, ni, le, pf, sf,
-        uf, ti, is, cp, mx, ms))
+        ns,
+        count,
+        sz,
+        avg,
+        ss,
+        ne,
+        ni,
+        le,
+        pf,
+        sf,
+        uf,
+        ti,
+        is,
+        cp,
+        mx,
+        ms
+      ))
     }
   }
 }

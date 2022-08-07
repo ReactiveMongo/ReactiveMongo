@@ -19,6 +19,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
 
   /** Factory to declare custom call to a group function. */
   object GroupFunction {
+
     /**
      * Creates a call to specified group function with given argument.
      *
@@ -40,14 +41,14 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @param field $fieldParam
    */
   final class AvgField private (val field: String) extends GroupFunction {
+
     protected[reactivemongo] val makeFunction =
       pipe(f"$$avg", builder.string("$" + field))
 
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.field == null && other.field == null) || (
-          this.field != null && this.field == other.field)
+        (this.field == null && other.field == null) || (this.field != null && this.field == other.field)
 
       case _ =>
         false
@@ -74,8 +75,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression == other.expression)
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -99,13 +99,13 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    */
   final class FirstField private (val field: String) extends GroupFunction {
 
-    protected[reactivemongo] val makeFunction = pipe(f"$$first", builder.string("$" + field))
+    protected[reactivemongo] val makeFunction =
+      pipe(f"$$first", builder.string("$" + field))
 
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.field == null && other.field == null) || (
-          this.field != null && this.field == other.field)
+        (this.field == null && other.field == null) || (this.field != null && this.field == other.field)
 
       case _ =>
         false
@@ -132,8 +132,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression == other.expression)
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -156,14 +155,14 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @param field $fieldParam
    */
   final class LastField private (val field: String) extends GroupFunction {
+
     protected[reactivemongo] val makeFunction =
       pipe(f"$$last", builder.string("$" + field))
 
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.field == null && other.field == null) || (
-          this.field != null && this.field == other.field)
+        (this.field == null && other.field == null) || (this.field != null && this.field == other.field)
 
       case _ =>
         false
@@ -190,8 +189,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression == other.expression)
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -214,14 +212,14 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @param field $fieldParam
    */
   final class MaxField private (val field: String) extends GroupFunction {
+
     protected[reactivemongo] val makeFunction =
       pipe(f"$$max", builder.string("$" + field))
 
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.field == null && other.field == null) || (
-          this.field != null && this.field == other.field)
+        (this.field == null && other.field == null) || (this.field != null && this.field == other.field)
 
       case _ =>
         false
@@ -235,6 +233,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object MaxField {
+
     def apply(field: String): MaxField =
       new MaxField(field)
   }
@@ -251,8 +250,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression == other.expression)
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -275,7 +273,8 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @param mergeExpr the `\$mergeObjects` expression
    */
   final class MergeObjects private (
-    val expression: pack.Value) extends GroupFunction {
+      val expression: pack.Value)
+      extends GroupFunction {
 
     protected[reactivemongo] val makeFunction =
       pipe(f"$$mergeObjects", expression)
@@ -283,8 +282,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression == other.expression)
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -298,6 +296,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   object MergeObjects {
+
     def apply(expression: pack.Value): MergeObjects =
       new MergeObjects(expression)
   }
@@ -308,15 +307,15 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @param field $fieldParam
    */
   final class MinField private (val field: String) extends GroupFunction {
+
     protected[reactivemongo] val makeFunction =
       pipe(f"$$min", builder.string("$" + field))
 
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.field == null && other.field == null) || (
-          this.field != null && this.field.
-          ==(other.field))
+        (this.field == null && other.field == null) || (this.field != null && this.field
+          .==(other.field))
 
       case _ =>
         false
@@ -344,8 +343,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression == other.expression)
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -368,15 +366,15 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @param field $fieldParam
    */
   final class PushField private (val field: String) extends GroupFunction {
+
     protected[reactivemongo] val makeFunction =
       pipe(f"$$push", builder.string("$" + field))
 
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.field == null && other.field == null) || (
-          this.field != null && this.field.
-          ==(other.field))
+        (this.field == null && other.field == null) || (this.field != null && this.field
+          .==(other.field))
 
       case _ =>
         false
@@ -405,8 +403,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression == other.expression)
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -430,14 +427,14 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    */
   final class AddFieldToSet private (val field: String) extends GroupFunction {
 
-    protected[reactivemongo] val makeFunction = pipe(f"$$addToSet", builder.string("$" + field))
+    protected[reactivemongo] val makeFunction =
+      pipe(f"$$addToSet", builder.string("$" + field))
 
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.field == null && other.field == null) || (
-          this.field != null && this.field.
-          ==(other.field))
+        (this.field == null && other.field == null) || (this.field != null && this.field
+          .==(other.field))
 
       case _ =>
         false
@@ -460,15 +457,15 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @param addToSetExpr the `\$addToSet` expression
    */
   final class AddToSet private (
-    val expression: pack.Value) extends GroupFunction {
+      val expression: pack.Value)
+      extends GroupFunction {
 
     protected[reactivemongo] val makeFunction = pipe(f"$$addToSet", expression)
 
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression == other.expression)
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -491,14 +488,14 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @since MongoDB 3.2
    */
   final class StdDevPop private (
-    val expression: pack.Value) extends GroupFunction {
+      val expression: pack.Value)
+      extends GroupFunction {
     protected[reactivemongo] val makeFunction = pipe(f"$$stdDevPop", expression)
 
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression == other.expression)
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -522,7 +519,8 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @param field $fieldParam
    */
   final class StdDevPopField private (
-    val field: String) extends GroupFunction {
+      val field: String)
+      extends GroupFunction {
 
     protected[reactivemongo] val makeFunction =
       pipe(f"$$stdDevPop", builder.string("$" + field))
@@ -530,9 +528,8 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.field == null && other.field == null) || (
-          this.field != null && this.field.
-          ==(other.field))
+        (this.field == null && other.field == null) || (this.field != null && this.field
+          .==(other.field))
 
       case _ =>
         false
@@ -555,7 +552,8 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @since MongoDB 3.2
    */
   final class StdDevSamp private (
-    val expression: pack.Value) extends GroupFunction {
+      val expression: pack.Value)
+      extends GroupFunction {
 
     protected[reactivemongo] val makeFunction =
       pipe(f"$$stdDevSamp", expression)
@@ -563,8 +561,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression == other.expression)
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -588,7 +585,8 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @param field $fieldParam
    */
   final class StdDevSampField private (
-    val field: String) extends GroupFunction {
+      val field: String)
+      extends GroupFunction {
 
     protected[reactivemongo] val makeFunction =
       pipe(f"$$stdDevSamp", builder.string("$" + field))
@@ -596,9 +594,8 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.field == null && other.field == null) || (
-          this.field != null && this.field.
-          ==(other.field))
+        (this.field == null && other.field == null) || (this.field != null && this.field
+          .==(other.field))
 
       case _ =>
         false
@@ -621,15 +618,15 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @param field $fieldParam
    */
   final class SumField private (val field: String) extends GroupFunction {
+
     protected[reactivemongo] val makeFunction =
       pipe(f"$$sum", builder.string("$" + field))
 
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.field == null && other.field == null) || (
-          this.field != null && this.field.
-          ==(other.field))
+        (this.field == null && other.field == null) || (this.field != null && this.field
+          .==(other.field))
 
       case _ =>
         false
@@ -652,14 +649,14 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
    * @param sumExpr the `\$sum` expression
    */
   final class Sum private (val expression: pack.Value) extends GroupFunction {
+
     protected[reactivemongo] val makeFunction: pack.Document =
       pipe(f"$$sum", expression)
 
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (
-          this.expression != null && this.expression == other.expression)
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -682,6 +679,7 @@ private[commands] trait GroupAggregation[P <: SerializationPack] {
   }
 
   final class SumValue(val value: Int) extends GroupFunction {
+
     protected[reactivemongo] val makeFunction =
       pipe(f"$$sum", builder.int(value))
 

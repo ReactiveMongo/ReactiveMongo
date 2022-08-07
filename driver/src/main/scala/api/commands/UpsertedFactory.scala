@@ -7,8 +7,8 @@ trait UpsertedFactory[P <: SerializationPack] {
 
   /** An upserted element */
   final class Upserted private (
-    _index: Int,
-    __id: pack.Value) {
+      _index: Int,
+      __id: pack.Value) {
 
     /** The index of the upserted element */
     @inline def index: Int = _index
@@ -33,13 +33,16 @@ trait UpsertedFactory[P <: SerializationPack] {
   }
 
   object Upserted {
+
     private[reactivemongo] def apply(index: Int, _id: pack.Value): Upserted =
       new Upserted(index, _id)
 
     def unapply(upserted: Upserted): Option[(Int, Any)] =
       Option(upserted).map { u => u.index -> u._id }
 
-    private[api] def readUpserted(decoder: SerializationPack.Decoder[pack.type]): pack.Document => Option[Upserted] = { document =>
+    private[api] def readUpserted(
+        decoder: SerializationPack.Decoder[pack.type]
+      ): pack.Document => Option[Upserted] = { document =>
       (for {
         index <- decoder.int(document, "index")
         id <- decoder.get(document, "_id")

@@ -72,53 +72,83 @@ final class SessionSpec extends org.specs2.mutable.Specification {
 
     "start transaction" >> {
       "if none is already started (when not distributed)" in {
-        session1.startTransaction(WriteConcern.Default, None).
-          aka("started tx") must beSuccessfulTry[(SessionTransaction, Boolean)].like {
-            case (SessionTransaction(1L, Some(wc), None, false, None), true) =>
-              wc must_=== WriteConcern.Default
+        session1
+          .startTransaction(WriteConcern.Default, None)
+          .aka("started tx") must beSuccessfulTry[
+          (SessionTransaction, Boolean)
+        ].like {
+          case (SessionTransaction(1L, Some(wc), None, false, None), true) =>
+            wc must_=== WriteConcern.Default
 
-          }
+        }
       }
 
       "when distributed" >> {
         "with failure without pinned node" in {
-          session2.startTransaction(WriteConcern.Default, None).
-            aka("started tx") must beFailedTry[(SessionTransaction, Boolean)].
-            withThrowable[GenericDriverException](
-              ".*Cannot start a distributed transaction without a pinned node.*")
+          session2
+            .startTransaction(WriteConcern.Default, None)
+            .aka("started tx") must beFailedTry[(SessionTransaction, Boolean)]
+            .withThrowable[GenericDriverException](
+              ".*Cannot start a distributed transaction without a pinned node.*"
+            )
         }
 
         "successfully with a pinned node if none already started" in {
-          session2.startTransaction(WriteConcern.Default, Some("pinnedNode")).
-            aka("started tx") must beSuccessfulTry[(SessionTransaction, Boolean)].like {
-              case (SessionTransaction(
-                1L, Some(wc), Some("pinnedNode"), false, None), true) =>
-                wc must_=== WriteConcern.Default
+          session2
+            .startTransaction(WriteConcern.Default, Some("pinnedNode"))
+            .aka("started tx") must beSuccessfulTry[
+            (SessionTransaction, Boolean)
+          ].like {
+            case (
+                  SessionTransaction(
+                    1L,
+                    Some(wc),
+                    Some("pinnedNode"),
+                    false,
+                    None
+                  ),
+                  true
+                ) =>
+              wc must_=== WriteConcern.Default
 
-            }
+          }
         }
       }
     }
 
     "not start transaction if already started" >> {
       "when not distributed" in {
-        session1.startTransaction(WriteConcern.Default, None).
-          aka("start tx") must beSuccessfulTry[(SessionTransaction, Boolean)].
-          like {
-            case (SessionTransaction(
-              1L, Some(_), None, false, None),
-              startedNewTx) => startedNewTx must beFalse
-          }
+        session1
+          .startTransaction(WriteConcern.Default, None)
+          .aka("start tx") must beSuccessfulTry[
+          (SessionTransaction, Boolean)
+        ].like {
+          case (
+                SessionTransaction(1L, Some(_), None, false, None),
+                startedNewTx
+              ) =>
+            startedNewTx must beFalse
+        }
       }
 
       "when distributed" in {
-        session2.startTransaction(WriteConcern.Default, Some("pinnedNode")).
-          aka("start tx") must beSuccessfulTry[(SessionTransaction, Boolean)].
-          like {
-            case (SessionTransaction(
-              1L, Some(_), Some("pinnedNode"), false, None), startedNewTx) =>
-              startedNewTx must beFalse
-          }
+        session2
+          .startTransaction(WriteConcern.Default, Some("pinnedNode"))
+          .aka("start tx") must beSuccessfulTry[
+          (SessionTransaction, Boolean)
+        ].like {
+          case (
+                SessionTransaction(
+                  1L,
+                  Some(_),
+                  Some("pinnedNode"),
+                  false,
+                  None
+                ),
+                startedNewTx
+              ) =>
+            startedNewTx must beFalse
+        }
       }
     }
 
@@ -147,22 +177,30 @@ final class SessionSpec extends org.specs2.mutable.Specification {
 
     "start a second transaction" >> {
       "with pinned node ignored when not distributed" in {
-        session1.startTransaction(WriteConcern.Default, Some("node")).
-          aka("started tx") must beSuccessfulTry[(SessionTransaction, Boolean)].like {
-            case (SessionTransaction(2L, Some(wc), None, false, None), true) =>
-              wc must_=== WriteConcern.Default
+        session1
+          .startTransaction(WriteConcern.Default, Some("node"))
+          .aka("started tx") must beSuccessfulTry[
+          (SessionTransaction, Boolean)
+        ].like {
+          case (SessionTransaction(2L, Some(wc), None, false, None), true) =>
+            wc must_=== WriteConcern.Default
 
-          }
+        }
       }
 
       "when distributed" in {
-        session2.startTransaction(WriteConcern.Default, Some("node2")).
-          aka("started tx") must beSuccessfulTry[(SessionTransaction, Boolean)].like {
-            case (SessionTransaction(
-              2L, Some(wc), Some("node2"), false, None), true) =>
-              wc must_=== WriteConcern.Default
+        session2
+          .startTransaction(WriteConcern.Default, Some("node2"))
+          .aka("started tx") must beSuccessfulTry[
+          (SessionTransaction, Boolean)
+        ].like {
+          case (
+                SessionTransaction(2L, Some(wc), Some("node2"), false, None),
+                true
+              ) =>
+            wc must_=== WriteConcern.Default
 
-          }
+        }
       }
     }
   }
