@@ -19,11 +19,21 @@ import scala.collection.immutable.{ ListSet, Map, Set }
 import scala.concurrent.ExecutionContext
 
 private[reactivemongo] trait UtilCompat {
-  @inline private[reactivemongo] def toListSet[A, B](in: Iterable[A])(f: A => B): ListSet[B] = in.view.map(f).to(ListSet)
 
-  @inline private[reactivemongo] def toMap[T, K, V](in: Iterable[T])(f: T => (K, V)): Map[K, V] = in.view.map(f).to(Map)
+  @inline private[reactivemongo] def toListSet[A, B](
+      in: Iterable[A]
+    )(f: A => B
+    ): ListSet[B] = in.view.map(f).to(ListSet)
 
-  @inline private[reactivemongo] def toFlatMap[T, K, V](in: Iterable[T])(f: T => Iterable[(K, V)]): Map[K, V] = in.view.flatMap(f).to(Map)
+  @inline private[reactivemongo] def toMap[T, K, V](
+      in: Iterable[T]
+    )(f: T => (K, V)
+    ): Map[K, V] = in.view.map(f).to(Map)
+
+  @inline private[reactivemongo] def toFlatMap[T, K, V](
+      in: Iterable[T]
+    )(f: T => Iterable[(K, V)]
+    ): Map[K, V] = in.view.flatMap(f).to(Map)
 
   @inline private[reactivemongo] def toStream[T](in: Iterator[T]) =
     in.to(LazyList)
@@ -31,12 +41,17 @@ private[reactivemongo] trait UtilCompat {
   @inline private[reactivemongo] def toStream[T](in: IterableOnce[T]) =
     in.iterator.to(LazyList)
 
-  @inline private[reactivemongo] def lazyZip[A, B](a: Set[A], b: Set[B]) = a.lazyZip(b)
+  @inline private[reactivemongo] def lazyZip[A, B](a: Set[A], b: Set[B]) =
+    a.lazyZip(b)
 
-  @inline private[reactivemongo] def lazyZip[A, B](a: Iterable[A], b: Iterable[B]) = a.lazyZip(b)
+  @inline private[reactivemongo] def lazyZip[A, B](
+      a: Iterable[A],
+      b: Iterable[B]
+    ) = a.lazyZip(b)
 
   private[reactivemongo] type ArrayOps[T] = scala.collection.ArrayOps[T]
 
-  @inline private[reactivemongo] def sameThreadExecutionContext: ExecutionContext = ExecutionContext.parasitic
+  @inline private[reactivemongo] def sameThreadExecutionContext: ExecutionContext =
+    ExecutionContext.parasitic
 
 }

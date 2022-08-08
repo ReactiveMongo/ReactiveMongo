@@ -9,6 +9,7 @@ import org.xerial.snappy.{ Snappy => Z }
 import reactivemongo.io.netty.buffer.ByteBuf
 
 private[reactivemongo] final class Snappy {
+
   def decode(in: ByteBuf, out: ByteBuf): Try[Int] = Try {
     val outNioBuffer: ByteBuffer =
       out.internalNioBuffer(out.writerIndex, out.writableBytes)

@@ -10,18 +10,21 @@ import reactivemongo.api.{
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/insert/ insert]] command.
  */
-private[reactivemongo] trait InsertCommand[P <: SerializationPack] { self: PackSupport[P] =>
+private[reactivemongo] trait InsertCommand[P <: SerializationPack] {
+  self: PackSupport[P] =>
 
   /**
    * @param head the first mandatory document
    * @param tail maybe other documents
    */
   private[reactivemongo] final class Insert(
-    val head: pack.Document,
-    val tail: Seq[pack.Document],
-    val ordered: Boolean,
-    val writeConcern: WriteConcern,
-    val bypassDocumentValidation: Boolean) extends CollectionCommand with CommandWithResult[InsertResult] {
+      val head: pack.Document,
+      val tail: Seq[pack.Document],
+      val ordered: Boolean,
+      val writeConcern: WriteConcern,
+      val bypassDocumentValidation: Boolean)
+      extends CollectionCommand
+      with CommandWithResult[InsertResult] {
 
     val commandKind = CommandKind.Insert
 
@@ -40,20 +43,28 @@ private[reactivemongo] trait InsertCommand[P <: SerializationPack] { self: PackS
     @inline override lazy val toString: String = {
       val docs = (head +: tail).map(pack.pretty)
 
-      s"""Insert(${docs.mkString("[", ", ", "]")}, ${ordered.toString}, ${writeConcern.toString}, ${bypassDocumentValidation.toString})"""
+      s"""Insert(${docs.mkString(
+          "[",
+          ", ",
+          "]"
+        )}, ${ordered.toString}, ${writeConcern.toString}, ${bypassDocumentValidation.toString})"""
     }
   }
 
-  private[reactivemongo] type InsertResult = DefaultWriteResult // for simplified imports
+  private[reactivemongo] type InsertResult =
+    DefaultWriteResult // for simplified imports
 
-  private[reactivemongo] final type InsertCmd = ResolvedCollectionCommand[Insert]
+  private[reactivemongo] final type InsertCmd =
+    ResolvedCollectionCommand[Insert]
 
   private[reactivemongo] def session(): Option[Session]
 
-  implicit private[reactivemongo] final lazy val insertWriter: pack.Writer[InsertCmd] = insertWriter(self.session())
+  implicit private[reactivemongo] final lazy val insertWriter: pack.Writer[InsertCmd] =
+    insertWriter(self.session())
 
   private[reactivemongo] final def insertWriter(
-    session: Option[Session]): pack.Writer[InsertCmd] = {
+      session: Option[Session]
+    ): pack.Writer[InsertCmd] = {
 
     val builder = pack.newBuilder
     val writeWriteConcern = CommandCodecs.writeWriteConcern(pack)
@@ -74,18 +85,20 @@ private[reactivemongo] trait InsertCommand[P <: SerializationPack] { self: PackS
         element("documents", documents),
         element(
           "bypassDocumentValidation",
-          builder.boolean(command.bypassDocumentValidation)))
+          builder.boolean(command.bypassDocumentValidation)
+        )
+      )
 
-      session.foreach { s =>
-        elements ++= writeSession(s)
-      }
+      session.foreach { s => elements ++= writeSession(s) }
 
       if (!session.exists(_.transaction.isSuccess)) {
         // writeConcern is not allowed within a multi-statement transaction
         // code=72
 
         elements += element(
-          "writeConcern", writeWriteConcern(command.writeConcern))
+          "writeConcern",
+          writeWriteConcern(command.writeConcern)
+        )
       }
 
       builder.document(elements.result())

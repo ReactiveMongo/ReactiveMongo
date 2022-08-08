@@ -1,16 +1,18 @@
 package reactivemongo.core.protocol
 
 case class ProtocolMetadata(
-  minWireVersion: MongoWireVersion,
-  maxWireVersion: MongoWireVersion,
-  maxMessageSizeBytes: Int,
-  maxBsonSize: Int,
-  maxBulkSize: Int) {
+    minWireVersion: MongoWireVersion,
+    maxWireVersion: MongoWireVersion,
+    maxMessageSizeBytes: Int,
+    maxBsonSize: Int,
+    maxBulkSize: Int) {
+
   override lazy val toString =
     s"ProtocolMetadata($minWireVersion, $maxWireVersion)"
 }
 
 object ProtocolMetadata {
+
   /**
    * maxBulkSize = 1000
    */
@@ -19,5 +21,6 @@ object ProtocolMetadata {
     maxWireVersion = MongoWireVersion.V30,
     maxMessageSizeBytes = 48000000,
     maxBsonSize = 16 * 1024 * 1024,
-    maxBulkSize = 1000)
+    maxBulkSize = 1000
+  )
 }

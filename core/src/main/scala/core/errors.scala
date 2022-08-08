@@ -24,6 +24,7 @@ import scala.util.control.NoStackTrace
 
 /** An error that can come from a MongoDB node or not. */
 sealed trait ReactiveMongoException extends Exception {
+
   /** explanation message */
   def message: String
 
@@ -32,19 +33,21 @@ sealed trait ReactiveMongoException extends Exception {
 
 /** An error thrown by a MongoDB node. */
 trait DatabaseException extends ReactiveMongoException {
+
   /** Representation of the original document of this error */
   private[reactivemongo] def originalDocument: Option[String]
 
   /** error code */
   def code: Option[Int]
 
-  override def getMessage: String = s"DatabaseException['$message'" + code.fold("")(c => s" (code = $c)") + "]"
+  override def getMessage: String =
+    s"DatabaseException['$message'" + code.fold("")(c => s" (code = $c)") + "]"
 
   /** Tells if this error is due to a write on a secondary node. */
   private[reactivemongo] final def isNotAPrimaryError: Boolean =
     code.fold(false) {
       case 10054 | 10056 | 10058 | 10107 | 13435 | 13436 => true
-      case _ => false
+      case _                                             => false
     }
 
   /** Tells if this error is related to authentication issues. */
@@ -71,15 +74,20 @@ trait DatabaseException extends ReactiveMongoException {
 private[reactivemongo] object DatabaseException {
   def apply(cause: Throwable): DatabaseException = new DefaultException(cause)
 
-  def apply[P <: SerializationPack](pack: P)(doc: pack.Document): DatabaseException = new DatabaseException with NoStackTrace {
+  def apply[P <: SerializationPack](
+      pack: P
+    )(doc: pack.Document
+    ): DatabaseException = new DatabaseException with NoStackTrace {
     private lazy val decoder = pack.newDecoder
 
     lazy val originalDocument = Option(doc).map(pack.pretty(_))
 
-    lazy val message = decoder.string(doc, f"$$err").orElse {
-      decoder.string(doc, "errmsg")
-    }.getOrElse(
-      s"message is not present, unknown error: ${pack pretty doc}")
+    lazy val message = decoder
+      .string(doc, f"$$err")
+      .orElse {
+        decoder.string(doc, "errmsg")
+      }
+      .getOrElse(s"message is not present, unknown error: ${pack pretty doc}")
 
     lazy val code = decoder.int(doc, "code")
   }
@@ -87,7 +95,9 @@ private[reactivemongo] object DatabaseException {
   // ---
 
   private final class DefaultException(
-    val cause: Throwable) extends DatabaseException with NoStackTrace {
+      val cause: Throwable)
+      extends DatabaseException
+      with NoStackTrace {
 
     val originalDocument = Option.empty[Nothing]
     val code = Option.empty[Int]
@@ -104,13 +114,15 @@ private[reactivemongo] trait DriverException extends ReactiveMongoException {
 /** A generic driver error. */
 @SuppressWarnings(Array("NullAssignment"))
 private[reactivemongo] final class GenericDriverException(
-  val message: String,
-  override val cause: Throwable = null) extends DriverException with NoStackTrace {
+    val message: String,
+    override val cause: Throwable = null)
+    extends DriverException
+    with NoStackTrace {
 
   override def equals(that: Any): Boolean = that match {
     case other: GenericDriverException =>
-      (this.message == null && other.message == null) || (
-        this.message != null && this.message.equals(other.message))
+      (this.message == null && other.message == null) || (this.message != null && this.message
+        .equals(other.message))
 
     case _ =>
       false
@@ -123,12 +135,13 @@ private[reactivemongo] final class GenericDriverException(
 }
 
 private[reactivemongo] final class ConnectionException(
-  val message: String) extends DriverException {
+    val message: String)
+    extends DriverException {
 
   override def equals(that: Any): Boolean = that match {
     case other: ConnectionException =>
-      (this.message == null && other.message == null) || (
-        this.message != null && this.message.equals(other.message))
+      (this.message == null && other.message == null) || (this.message != null && this.message
+        .equals(other.message))
 
     case _ =>
       false
@@ -142,8 +155,9 @@ private[reactivemongo] final class ConnectionException(
 
 /** A generic error thrown by a MongoDB node. */
 private[reactivemongo] final class GenericDatabaseException(
-  val message: String,
-  val code: Option[Int]) extends DatabaseException {
+    val message: String,
+    val code: Option[Int])
+    extends DatabaseException {
 
   val originalDocument = None
 
@@ -160,6 +174,7 @@ private[reactivemongo] final class GenericDatabaseException(
 
 /** A generic command error. */
 private[reactivemongo] trait CommandException extends DatabaseException {
+
   /** error code */
   val code: Option[Int]
 
@@ -168,16 +183,20 @@ private[reactivemongo] trait CommandException extends DatabaseException {
 }
 
 private[reactivemongo] object CommandException {
+
   @inline def apply(
-    message: String,
-    originalDocument: Option[BSONDocument] = None,
-    code: Option[Int] = None): CommandException =
+      message: String,
+      originalDocument: Option[BSONDocument] = None,
+      code: Option[Int] = None
+    ): CommandException =
     CommandException(BSONSerializationPack)(message, originalDocument, code)
 
-  def apply[P <: SerializationPack](pack: P)(
-    _message: String,
-    _originalDocument: Option[pack.Document],
-    _code: Option[Int]): CommandException =
+  def apply[P <: SerializationPack](
+      pack: P
+    )(_message: String,
+      _originalDocument: Option[pack.Document],
+      _code: Option[Int]
+    ): CommandException =
     new CommandException {
       lazy val originalDocument = _originalDocument.map(pack.pretty)
       val code = _code

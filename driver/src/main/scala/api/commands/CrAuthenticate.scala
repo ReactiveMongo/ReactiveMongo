@@ -8,14 +8,15 @@ import reactivemongo.api.SerializationPack
  * Gets a nonce for authentication token.
  */
 private[reactivemongo] object GetCrNonce
-  extends Command with CommandWithResult[CrNonce] {
+    extends Command
+    with CommandWithResult[CrNonce] {
 
   val commandKind = CommandKind.GetNonce
 
   def writer[P <: SerializationPack](pack: P): pack.Writer[GetCrNonce.type] = {
     val builder = pack.newBuilder
-    val cmd = builder.document(Seq(
-      builder.elementProducer("getnonce", builder.int(1))))
+    val cmd =
+      builder.document(Seq(builder.elementProducer("getnonce", builder.int(1))))
 
     pack.writer[GetCrNonce.type](_ => cmd)
   }
@@ -23,9 +24,10 @@ private[reactivemongo] object GetCrNonce
   def reader[P <: SerializationPack](pack: P): pack.Reader[CrNonce] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandExceptionsReaderOpt[pack.type, CrNonce](pack) {
-      decoder.string(_, "nonce").map { new CrNonce(_) }
-    }
+    CommandCodecs
+      .dealingWithGenericCommandExceptionsReaderOpt[pack.type, CrNonce](pack) {
+        decoder.string(_, "nonce").map { new CrNonce(_) }
+      }
   }
 }
 
@@ -39,9 +41,11 @@ private[reactivemongo] final class CrNonce(val value: String) extends AnyVal
  * @param nonce the previous nonce given by the server
  */
 private[reactivemongo] case class CrAuthenticate(
-  user: String,
-  password: String,
-  nonce: String) extends Command with CommandWithResult[AuthenticationResult] {
+    user: String,
+    password: String,
+    nonce: String)
+    extends Command
+    with CommandWithResult[AuthenticationResult] {
   import reactivemongo.util._
 
   val commandKind = CommandKind.Authenticate
@@ -55,21 +59,27 @@ private[reactivemongo] case class CrAuthenticate(
 
 /** Authentication command's response deserializer. */
 private[reactivemongo] object CrAuthenticate {
+
   def writer[P <: SerializationPack](pack: P): pack.Writer[CrAuthenticate] = {
     val builder = pack.newBuilder
 
     import builder.{ elementProducer => elem, string }
 
     pack.writer[CrAuthenticate] { auth =>
-      builder.document(Seq(
-        elem("authenticate", builder.int(1)),
-        elem("user", string(auth.user)),
-        elem("nonce", string(auth.nonce)),
-        elem("key", string(auth.key))))
+      builder.document(
+        Seq(
+          elem("authenticate", builder.int(1)),
+          elem("user", string(auth.user)),
+          elem("nonce", string(auth.nonce)),
+          elem("key", string(auth.key))
+        )
+      )
     }
   }
 
-  def reader[P <: SerializationPack](pack: P): pack.Reader[AuthenticationResult] = {
+  def reader[P <: SerializationPack](
+      pack: P
+    ): pack.Reader[AuthenticationResult] = {
     val decoder = pack.newDecoder
 
     import decoder.string
@@ -78,14 +88,20 @@ private[reactivemongo] object CrAuthenticate {
       string(doc, "errmsg") match {
         case Some(error) =>
           Some(
-            FailedAuthentication(pack)(error, decoder.int(doc, "code"),
-              Some(doc)))
+            FailedAuthentication(pack)(
+              error,
+              decoder.int(doc, "code"),
+              Some(doc)
+            )
+          )
 
-        case _ => (for {
-          dbn <- string(doc, "dbname")
-          usr <- string(doc, "user")
-          ro = decoder.booleanLike(doc, "readOnly").getOrElse(false)
-        } yield VerboseSuccessfulAuthentication(dbn, usr, ro))
+        case _ => (
+          for {
+            dbn <- string(doc, "dbname")
+            usr <- string(doc, "user")
+            ro = decoder.booleanLike(doc, "readOnly").getOrElse(false)
+          } yield VerboseSuccessfulAuthentication(dbn, usr, ro)
+        )
       }
     }
   }

@@ -1,6 +1,7 @@
 package reactivemongo.core.protocol
 
 sealed trait MongoWireVersion extends Ordered[MongoWireVersion] {
+
   /** The numeric representation */
   def value: Int
 
@@ -21,7 +22,11 @@ sealed trait MongoWireVersion extends Ordered[MongoWireVersion] {
 }
 
 object MongoWireVersion {
-  @deprecated("MongoDB 3.0 EOL reached by Feb 2018: https://www.mongodb.com/support-policy", "0.16.0")
+
+  @deprecated(
+    "MongoDB 3.0 EOL reached by Feb 2018: https://www.mongodb.com/support-policy",
+    "0.16.0"
+  )
   object V30 extends MongoWireVersion {
     val value = 3
     override val toString = "3.0"

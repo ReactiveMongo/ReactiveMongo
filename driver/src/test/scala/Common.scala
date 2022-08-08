@@ -29,8 +29,10 @@ object Common extends CommonAuth {
 
   val nettyNativeArch = sys.props.get("test.nettyNativeArch")
 
-  val failoverRetries = sys.props.get("test.failoverRetries").
-    flatMap(r => scala.util.Try(r.toInt).toOption).getOrElse(7)
+  val failoverRetries = sys.props
+    .get("test.failoverRetries")
+    .flatMap(r => scala.util.Try(r.toInt).toOption)
+    .getOrElse(7)
 
   val failoverStrategy = FailoverStrategy(retries = failoverRetries)
 
@@ -71,17 +73,22 @@ object Common extends CommonAuth {
     }
 
   val DefaultOptions = {
-    val a = MongoConnectionOptions.default.copy(
-      failoverStrategy = failoverStrategy,
-      heartbeatFrequencyMS = (timeout.toMillis / 2).toInt,
-      credentials = DefaultCredentials.map("" -> _).toMap,
-      keyStore = sys.props.get("test.keyStore").map { uri =>
-        MongoConnectionOptions.KeyStore(
-          resource = new java.net.URI(uri), // file://..
-          storeType = "PKCS12",
-          password = sys.props.get("test.keyStorePassword").map(_.toCharArray),
-          trust = true)
-      }).withCompressors(ListSet.empty[Compressor] ++ compressor.toSeq)
+    val a = MongoConnectionOptions.default
+      .copy(
+        failoverStrategy = failoverStrategy,
+        heartbeatFrequencyMS = (timeout.toMillis / 2).toInt,
+        credentials = DefaultCredentials.map("" -> _).toMap,
+        keyStore = sys.props.get("test.keyStore").map { uri =>
+          MongoConnectionOptions.KeyStore(
+            resource = new java.net.URI(uri), // file://..
+            storeType = "PKCS12",
+            password =
+              sys.props.get("test.keyStorePassword").map(_.toCharArray),
+            trust = true
+          )
+        }
+      )
+      .withCompressors(ListSet.empty[Compressor] ++ compressor.toSeq)
 
     val b = {
       if (sys.props.get("test.enableSSL") contains "true") {
@@ -89,9 +96,7 @@ object Common extends CommonAuth {
       } else a
     }
 
-    authMode.fold(b) { mode =>
-      b.copy(authenticationMechanism = mode)
-    }
+    authMode.fold(b) { mode => b.copy(authenticationMechanism = mode) }
   }
 
   lazy val connection =
@@ -107,8 +112,8 @@ object Common extends CommonAuth {
     failoverStrategy.copy(retries = retries)
   }
 
-  val slowPrimary = sys.props.getOrElse(
-    "test.slowPrimaryHost", "localhost:27019")
+  val slowPrimary =
+    sys.props.getOrElse("test.slowPrimaryHost", "localhost:27019")
 
   val slowTimeout: FiniteDuration = {
     val maxTimeout = estTimeout(slowFailover)
@@ -119,14 +124,15 @@ object Common extends CommonAuth {
 
   val SlowOptions = DefaultOptions.copy(
     failoverStrategy = slowFailover,
-    heartbeatFrequencyMS = (slowTimeout.toMillis / 2).toInt)
+    heartbeatFrequencyMS = (slowTimeout.toMillis / 2).toInt
+  )
 
   val slowProxy: NettyProxy = {
     import java.net.InetSocketAddress
     import ExecutionContext.Implicits.global
 
-    val delay = sys.props.get("test.slowProxyDelay").
-      fold(500L /* ms */ )(_.toLong)
+    val delay =
+      sys.props.get("test.slowProxyDelay").fold(500L /* ms */ )(_.toLong)
 
     import NettyProxy.InetAddress
 
@@ -144,10 +150,11 @@ object Common extends CommonAuth {
     Await.result(driver.connect(List(slowPrimary), SlowOptions), slowTimeout)
 
   def databases(
-    name: String,
-    con: MongoConnection,
-    slowCon: MongoConnection,
-    retries: Int = 0): (DB, DB) = {
+      name: String,
+      con: MongoConnection,
+      slowCon: MongoConnection,
+      retries: Int = 0
+    ): (DB, DB) = {
     import ExecutionContext.Implicits.global
 
     val _db = for {
@@ -156,10 +163,13 @@ object Common extends CommonAuth {
     } yield d
 
     try {
-      Await.result(_db, timeout) -> Await.result((for {
-        _ <- slowProxy.start()
-        resolved <- slowCon.database(name, slowFailover)
-      } yield resolved), timeout + slowTimeout)
+      Await.result(_db, timeout) -> Await.result(
+        (for {
+          _ <- slowProxy.start()
+          resolved <- slowCon.database(name, slowFailover)
+        } yield resolved),
+        timeout + slowTimeout
+      )
     } catch {
       case _: java.util.concurrent.TimeoutException if (retries > 0) =>
         databases(name, con, slowCon, retries - 1)
@@ -170,16 +180,19 @@ object Common extends CommonAuth {
 
   @annotation.tailrec
   def tryUntil[T](retries: List[Int])(f: => T, test: T => Boolean): Boolean =
-    if (test(f)) true else retries match {
-      case delay :: next => {
-        Thread.sleep(delay.toLong)
-        tryUntil(next)(f, test)
+    if (test(f)) true
+    else
+      retries match {
+        case delay :: next => {
+          Thread.sleep(delay.toLong)
+          tryUntil(next)(f, test)
+        }
+
+        case _ => false
       }
 
-      case _ => false
-    }
-
   private val asyncDriverReg = Seq.newBuilder[AsyncDriver]
+
   def newAsyncDriver(): AsyncDriver = asyncDriverReg.synchronized {
     val drv = AsyncDriver()
 

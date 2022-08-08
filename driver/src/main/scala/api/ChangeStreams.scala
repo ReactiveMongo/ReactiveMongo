@@ -33,6 +33,7 @@ object ChangeStreams {
    * Defines the lookup strategy of a change stream.
    */
   sealed abstract class FullDocumentStrategy(val name: String) {
+
     final override def equals(that: Any): Boolean = that match {
       case other: FullDocumentStrategy => this.name == other.name
       case _                           => false

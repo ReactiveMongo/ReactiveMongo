@@ -17,9 +17,9 @@ import scala.concurrent.duration.FiniteDuration
  * }}}
  */
 final class FailoverStrategy private[api] (
-  _initialDelay: FiniteDuration,
-  _retries: Int,
-  _delayFactor: Int => Double) {
+    _initialDelay: FiniteDuration,
+    _retries: Int,
+    _delayFactor: Int => Double) {
 
   /** The initial delay between the first failed attempt and the next one */
   @inline def initialDelay: FiniteDuration = _initialDelay
@@ -39,9 +39,10 @@ final class FailoverStrategy private[api] (
 
   @SuppressWarnings(Array("VariableShadowing"))
   def copy(
-    initialDelay: FiniteDuration = _initialDelay,
-    retries: Int = _retries,
-    delayFactor: Int => Double = _delayFactor): FailoverStrategy =
+      initialDelay: FiniteDuration = _initialDelay,
+      retries: Int = _retries,
+      delayFactor: Int => Double = _delayFactor
+    ): FailoverStrategy =
     new FailoverStrategy(initialDelay, retries, delayFactor)
 
   override lazy val toString = delayFactor match {
@@ -54,6 +55,7 @@ final class FailoverStrategy private[api] (
 
 /** [[FailoverStrategy]] utilities */
 object FailoverStrategy {
+
   /** The default strategy */
   val default = FailoverStrategy()
 
@@ -65,7 +67,7 @@ object FailoverStrategy {
 
   /** A factor function using simple multiplication. */
   final class FactorFun private[api] (val multiplier: Double)
-    extends (Int => Double) {
+      extends (Int => Double) {
 
     /**
      * Returns the factor by which the initial delay must be multiplied,
@@ -100,8 +102,9 @@ object FailoverStrategy {
   // 'def' instead of 'val' as used in defaults of the case class
 
   def apply(
-    initialDelay: FiniteDuration = FiniteDuration(100, "ms"),
-    retries: Int = 10,
-    delayFactor: Int => Double = defaultFactor): FailoverStrategy =
+      initialDelay: FiniteDuration = FiniteDuration(100, "ms"),
+      retries: Int = 10,
+      delayFactor: Int => Double = defaultFactor
+    ): FailoverStrategy =
     new FailoverStrategy(initialDelay, retries, delayFactor)
 }

@@ -19,7 +19,8 @@ final class CompressionSpec extends org.specs2.mutable.Specification {
     spec(
       name = "Zstandard",
       encode = zstd.encode(_: ByteBuf, _: ByteBuf),
-      decode = zstd.decode(_: ByteBuf, _: ByteBuf))
+      decode = zstd.decode(_: ByteBuf, _: ByteBuf)
+    )
   }
 
   { // Zlib
@@ -28,7 +29,8 @@ final class CompressionSpec extends org.specs2.mutable.Specification {
     spec(
       name = "Zlib (default)",
       encode = defaultZlib.encode(_: ByteBuf, _: ByteBuf),
-      decode = defaultZlib.decode(_: ByteBuf, _: ByteBuf))
+      decode = defaultZlib.decode(_: ByteBuf, _: ByteBuf)
+    )
 
     // Best speed
     val bestSpeedZlib = Zlib(1)
@@ -36,7 +38,8 @@ final class CompressionSpec extends org.specs2.mutable.Specification {
     spec(
       name = "Zlib (best speed)",
       encode = bestSpeedZlib.encode(_: ByteBuf, _: ByteBuf),
-      decode = bestSpeedZlib.decode(_: ByteBuf, _: ByteBuf))
+      decode = bestSpeedZlib.decode(_: ByteBuf, _: ByteBuf)
+    )
 
     // Best compression
     val bestCompressionZlib = Zlib(9)
@@ -44,7 +47,8 @@ final class CompressionSpec extends org.specs2.mutable.Specification {
     spec(
       name = "Zlib (best compression)",
       encode = bestCompressionZlib.encode(_: ByteBuf, _: ByteBuf),
-      decode = bestCompressionZlib.decode(_: ByteBuf, _: ByteBuf))
+      decode = bestCompressionZlib.decode(_: ByteBuf, _: ByteBuf)
+    )
   }
 
   { // Snappy
@@ -53,15 +57,17 @@ final class CompressionSpec extends org.specs2.mutable.Specification {
     spec(
       name = "Snappy",
       encode = snappy.encode(_: ByteBuf, _: ByteBuf),
-      decode = snappy.decode(_: ByteBuf, _: ByteBuf))
+      decode = snappy.decode(_: ByteBuf, _: ByteBuf)
+    )
   }
 
   // ---
 
   private def spec(
-    name: String,
-    encode: Function2[ByteBuf, ByteBuf, Try[Unit]],
-    decode: Function2[ByteBuf, ByteBuf, Try[Int]]) = {
+      name: String,
+      encode: Function2[ByteBuf, ByteBuf, Try[Unit]],
+      decode: Function2[ByteBuf, ByteBuf, Try[Int]]
+    ) = {
     def roundtrip(data: => Array[Byte]) = {
       val input: Array[Byte] = data
       val sz = input.size

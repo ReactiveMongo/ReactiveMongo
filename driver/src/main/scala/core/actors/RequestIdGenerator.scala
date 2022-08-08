@@ -31,6 +31,7 @@ private[actors] class RequestIdGenerator(val lower: Int, val upper: Int) {
 }
 
 private[reactivemongo] object RequestIdGenerator {
+
   def unapply(g: RequestIdGenerator): Option[(Int, Int)] =
     Some(g.lower -> g.upper)
 

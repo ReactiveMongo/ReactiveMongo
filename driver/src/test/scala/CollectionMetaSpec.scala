@@ -61,20 +61,25 @@ trait CollectionMetaSpec { collSpec: CollectionSpec =>
   def cappedSpec(c: BSONCollection, timeout: FiniteDuration) =
     "be capped" >> {
       "after conversion" in {
-        c.convertToCapped(cappedMaxSize, None) must beEqualTo({}).
-          await(1, timeout)
+        c.convertToCapped(cappedMaxSize, None) must beEqualTo({})
+          .await(1, timeout)
       }
 
       "with statistics (MongoDB >= 3.0)" in {
         c.stats() must beLike[CollectionStats] {
-          case stats => stats.capped must beTrue and (
-            stats.maxSize must beSome(cappedMaxSize))
+          case stats =>
+            stats.capped must beTrue and (stats.maxSize must beSome(
+              cappedMaxSize
+            ))
         }.await(1, timeout)
       }
     }
 
   def successfulRename(
-    _db: DB, c: MongoConnection, timeout: FiniteDuration) =
+      _db: DB,
+      c: MongoConnection,
+      timeout: FiniteDuration
+    ) =
     "successfully" in {
       val coll = _db.collection(s"foo_${System identityHashCode timeout}")
 
@@ -82,16 +87,20 @@ trait CollectionMetaSpec { collSpec: CollectionSpec =>
         adminDb <- c.database("admin")
         _ <- coll.create()
         _ <- adminDb.renameCollection(
-          _db.name, coll.name, s"renamed${System identityHashCode coll}")
+          _db.name,
+          coll.name,
+          s"renamed${System identityHashCode coll}"
+        )
 
       } yield ()) must beTypedEqualTo({}).await(0, timeout)
     }
 
   def failedRename(
-    _db: DB,
-    c: MongoConnection,
-    colName: String,
-    timeout: FiniteDuration) = "with failure" in {
+      _db: DB,
+      c: MongoConnection,
+      colName: String,
+      timeout: FiniteDuration
+    ) = "with failure" in {
     (for {
       adminDb <- c.database("admin")
       _ <- adminDb.renameCollection(_db.name, colName, "renamed")
@@ -122,8 +131,8 @@ trait CollectionMetaSpec { collSpec: CollectionSpec =>
 
     "be dropped successfully if exist" in {
       col.drop(false) aka "legacy drop" must beTrue.await(1, timeout) and {
-        col.create().flatMap(_ => col.drop(false)).
-          aka("dropped") must beTrue.await(1, timeout)
+        col.create().flatMap(_ => col.drop(false)).aka("dropped") must beTrue
+          .await(1, timeout)
       }
     }
 

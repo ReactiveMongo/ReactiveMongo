@@ -21,24 +21,27 @@ private[api] trait CountOp[P <: SerializationPack] {
   implicit private lazy val countReader: pack.Reader[Long] = resultReader
 
   protected[api] def countDocuments(
-    query: Option[pack.Document],
-    limit: Option[Int],
-    skip: Int,
-    hint: Option[Hint],
-    readConcern: ReadConcern,
-    readPreference: ReadPreference)(
-    implicit
-    ec: ExecutionContext): Future[Long] = runCommand(
+      query: Option[pack.Document],
+      limit: Option[Int],
+      skip: Int,
+      hint: Option[Hint],
+      readConcern: ReadConcern,
+      readPreference: ReadPreference
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Long] = runCommand(
     new CountCommand(query, limit, skip, hint, readConcern),
-    readPreference)
+    readPreference
+  )
 
   private final class CountCommand(
-    val query: Option[pack.Document],
-    val limit: Option[Int],
-    val skip: Int,
-    val hint: Option[Hint],
-    val readConcern: ReadConcern)
-    extends CollectionCommand with CommandWithResult[Long] {
+      val query: Option[pack.Document],
+      val limit: Option[Int],
+      val skip: Int,
+      val hint: Option[Hint],
+      val readConcern: ReadConcern)
+      extends CollectionCommand
+      with CommandWithResult[Long] {
     val commandKind = CommandKind.Count
   }
 
@@ -46,19 +49,15 @@ private[api] trait CountOp[P <: SerializationPack] {
 
   private def commandWriter: pack.Writer[CountCmd] = {
     val builder = pack.newBuilder
-    val session = collection.db.session.filter(
-      _ => (version.compareTo(MongoWireVersion.V36) >= 0))
+    val session = collection.db.session.filter(_ =>
+      (version.compareTo(MongoWireVersion.V36) >= 0)
+    )
 
     val writeReadConcern =
       CommandCodecs.writeSessionReadConcern(builder)(session)
 
     pack.writer[CountCmd] { count =>
-      import builder.{
-        document,
-        elementProducer => element,
-        int,
-        string
-      }
+      import builder.{ document, elementProducer => element, int, string }
 
       val elements = Seq.newBuilder[pack.ElementProducer]
 

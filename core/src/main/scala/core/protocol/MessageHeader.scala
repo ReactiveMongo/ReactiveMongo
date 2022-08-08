@@ -18,13 +18,15 @@ import reactivemongo.core.protocol.buffer.{
  * @param opCode operation code of this message.
  */
 private[reactivemongo] class MessageHeader(
-  val messageLength: Int,
-  val requestID: Int,
-  val responseTo: Int,
-  val opCode: Int) extends ChannelBufferWritable {
+    val messageLength: Int,
+    val requestID: Int,
+    val responseTo: Int,
+    val opCode: Int)
+    extends ChannelBufferWritable {
 
   val writeTo: ByteBuf => Unit = writeTupleToBuffer4(
-    (messageLength, requestID, responseTo, opCode)) _
+    (messageLength, requestID, responseTo, opCode)
+  ) _
 
   override val size = MessageHeader.size
 
@@ -32,11 +34,12 @@ private[reactivemongo] class MessageHeader(
     Tuple4(messageLength, requestID, responseTo, opCode)
 
   private[core] def copy(
-    messageLength: Int = this.messageLength,
-    requestID: Int = this.requestID,
-    responseTo: Int = this.responseTo,
-    opCode: Int = this.opCode): MessageHeader = new MessageHeader(
-    messageLength, requestID, responseTo, opCode)
+      messageLength: Int = this.messageLength,
+      requestID: Int = this.requestID,
+      responseTo: Int = this.responseTo,
+      opCode: Int = this.opCode
+    ): MessageHeader =
+    new MessageHeader(messageLength, requestID, responseTo, opCode)
 
   override def equals(that: Any): Boolean = that match {
     case other: MessageHeader =>
@@ -54,7 +57,7 @@ private[reactivemongo] class MessageHeader(
 
 /** Header deserializer from a [[http://netty.io/4.1/api/io/netty/buffer/ByteBuf.html ByteBuf]]. */
 private[reactivemongo] object MessageHeader
-  extends ChannelBufferReadable[MessageHeader] {
+    extends ChannelBufferReadable[MessageHeader] {
 
   override def readFrom(buffer: ByteBuf): MessageHeader = {
     val messageLength = buffer.readIntLE

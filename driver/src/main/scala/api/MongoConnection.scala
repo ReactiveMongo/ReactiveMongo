@@ -49,9 +49,9 @@ import reactivemongo.api.commands.SuccessfulAuthentication
 import reactivemongo.util, util.{ LazyLogger, SRVRecordResolver, TXTResolver }
 
 private[api] case class ConnectionState(
-  metadata: ProtocolMetadata,
-  setName: Option[String],
-  isMongos: Boolean)
+    metadata: ProtocolMetadata,
+    setName: Option[String],
+    isMongos: Boolean)
 
 /**
  * A pool of MongoDB connections, obtained from a [[reactivemongo.api.AsyncDriver]].
@@ -79,11 +79,11 @@ private[api] case class ConnectionState(
  * @define failoverStrategy the failover strategy for sending requests
  */
 final class MongoConnection private[reactivemongo] (
-  private[api] val supervisor: String,
-  private[reactivemongo] val name: String,
-  private[api] val actorSystem: ActorSystem,
-  private[api] val mongosystem: ActorRef,
-  private[api] val options: MongoConnectionOptions) {
+    private[api] val supervisor: String,
+    private[reactivemongo] val name: String,
+    private[api] val actorSystem: ActorSystem,
+    private[api] val mongosystem: ActorRef,
+    private[api] val options: MongoConnectionOptions) {
   import Exceptions._
 
   /**
@@ -104,7 +104,12 @@ final class MongoConnection private[reactivemongo] (
    * }}}
    */
   @SuppressWarnings(Array("VariableShadowing"))
-  def database(name: String, failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit ec: ExecutionContext): Future[DB] =
+  def database(
+      name: String,
+      failoverStrategy: FailoverStrategy = options.failoverStrategy
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] =
     waitIsAvailable(failoverStrategy, stackTrace()).map { state =>
       new DB(name, this, state, failoverStrategy, None)
     }
@@ -133,15 +138,18 @@ final class MongoConnection private[reactivemongo] (
    */
   @SuppressWarnings(Array("VariableShadowing"))
   def authenticate(
-    db: String,
-    user: String,
-    password: String,
-    failoverStrategy: FailoverStrategy = options.failoverStrategy)(implicit ec: ExecutionContext): Future[SuccessfulAuthentication] = waitIsAvailable(
-    failoverStrategy, stackTrace()).flatMap { _ =>
-    val req = new AuthRequest(Authenticate(db, user, Option(password)))
-    mongosystem ! req
-    req.future
-  }
+      db: String,
+      user: String,
+      password: String,
+      failoverStrategy: FailoverStrategy = options.failoverStrategy
+    )(implicit
+      ec: ExecutionContext
+    ): Future[SuccessfulAuthentication] =
+    waitIsAvailable(failoverStrategy, stackTrace()).flatMap { _ =>
+      val req = new AuthRequest(Authenticate(db, user, Option(password)))
+      mongosystem ! req
+      req.future
+    }
 
   /**
    * Closes this connection (closes all the channels and ends the actors).
@@ -165,7 +173,8 @@ final class MongoConnection private[reactivemongo] (
     } else {
       whenActive {
         ask(monitor, Close("MongoConnection.askClose", timeout))(
-          Timeout(timeout))
+          Timeout(timeout)
+        )
       }
     }
   }
@@ -175,7 +184,8 @@ final class MongoConnection private[reactivemongo] (
 
   // --- Internals ---
 
-  override def toString: String = s"MongoConnection { ${MongoConnectionOptions.toStrings(options).mkString(", ")} }"
+  override def toString: String =
+    s"MongoConnection { ${MongoConnectionOptions.toStrings(options).mkString(", ")} }"
 
   private[api] var history = () => InternalState.empty
 
@@ -187,18 +197,19 @@ final class MongoConnection private[reactivemongo] (
 
   /** Returns a future that will be successful when node set is available. */
   private[api] def waitIsAvailable(
-    failoverStrategy: FailoverStrategy,
-    contextSTE: Array[StackTraceElement])(
-    implicit
-    ec: ExecutionContext): Future[ConnectionState] = {
+      failoverStrategy: FailoverStrategy,
+      contextSTE: Array[StackTraceElement]
+    )(implicit
+      ec: ExecutionContext
+    ): Future[ConnectionState] = {
 
     debug("Waiting is available...")
 
     val timeoutFactor = 1.25D
-    val timeout: FiniteDuration = (1 to failoverStrategy.retries).
-      foldLeft(failoverStrategy.initialDelay) { (d, i) =>
-        d + (failoverStrategy.initialDelay * (
-          (timeoutFactor * failoverStrategy.delayFactor(i)).toLong))
+    val timeout: FiniteDuration = (1 to failoverStrategy.retries)
+      .foldLeft(failoverStrategy.initialDelay) { (d, i) =>
+        d + (failoverStrategy.initialDelay * ((timeoutFactor * failoverStrategy
+          .delayFactor(i)).toLong))
       }
 
     probe(timeout).recoverWith {
@@ -217,7 +228,8 @@ final class MongoConnection private[reactivemongo] (
   }
 
   private[api] def sendExpectingResponse(
-    expectingResponse: ExpectingResponse): Future[Response] = whenActive {
+      expectingResponse: ExpectingResponse
+    ): Future[Response] = whenActive {
     mongosystem ! expectingResponse
     expectingResponse.future
   }
@@ -237,7 +249,9 @@ final class MongoConnection private[reactivemongo] (
   }
 
   private case class IsPrimaryAvailable(result: Promise[ConnectionState]) {
-    override val toString = s"IsPrimaryAvailable#${System identityHashCode this}?"
+
+    override val toString =
+      s"IsPrimaryAvailable#${System identityHashCode this}?"
   }
 
   /* For testing purpose */
@@ -269,28 +283,30 @@ final class MongoConnection private[reactivemongo] (
         }
       }
 
-      Future.firstCompletedOf(Seq(
-        p.future.recoverWith {
-          case cause: Exception =>
-            warn(s"Fails to probe the connection monitor: $check", cause)
+      Future.firstCompletedOf(
+        Seq(
+          p.future.recoverWith {
+            case cause: Exception =>
+              warn(s"Fails to probe the connection monitor: $check", cause)
 
-            unavailResult
-        },
-        after(timeout, actorSystem.scheduler)({
-          if (p.future.isCompleted) {
-            p.future // discard timeout as probing has completed
-          } else {
-            warn(s"Timeout after $timeout while probing the connection monitor: $check")
-            unavailResult
-          }
-        })))
+              unavailResult
+          },
+          after(timeout, actorSystem.scheduler)({
+            if (p.future.isCompleted) {
+              p.future // discard timeout as probing has completed
+            } else {
+              warn(s"Timeout after $timeout while probing the connection monitor: $check")
+              unavailResult
+            }
+          })
+        )
+      )
     }
 
   private var monitorInited: Boolean = false
 
   private[api] lazy val monitor = {
-    val ref = actorSystem.actorOf(
-      Props(new MonitorActor), s"Monitor-$name")
+    val ref = actorSystem.actorOf(Props(new MonitorActor), s"Monitor-$name")
 
     monitorInited = true
 
@@ -318,7 +334,10 @@ final class MongoConnection private[reactivemongo] (
         _metadata = Some(available.metadata)
 
         val state = ConnectionState(
-          available.metadata, available.setName, available.isMongos)
+          available.metadata,
+          available.setName,
+          available.isMongos
+        )
 
         if (!primaryAvailable.trySuccess(state)) {
           primaryAvailable = Promise.successful(state)
@@ -343,7 +362,10 @@ final class MongoConnection private[reactivemongo] (
         _metadata = Some(available.metadata)
 
         val state = ConnectionState(
-          available.metadata, available.setName, available.isMongos)
+          available.metadata,
+          available.setName,
+          available.isMongos
+        )
 
         if (!setAvailable.trySuccess(state)) {
           setAvailable = Promise.successful(state)
@@ -382,10 +404,12 @@ final class MongoConnection private[reactivemongo] (
 
         killed = true
         primaryAvailable = Promise.failed[ConnectionState](
-          new Exception(s"[$lnm] Closing connection..."))
+          new Exception(s"[$lnm] Closing connection...")
+        )
 
         setAvailable = Promise.failed[ConnectionState](
-          new Exception(s"[$lnm] Closing connection..."))
+          new Exception(s"[$lnm] Closing connection...")
+        )
 
         mongosystem ! Close("MonitorActor#Close", close.timeout)
         waitingForClose += sender()
@@ -411,7 +435,7 @@ final class MongoConnection private[reactivemongo] (
 
   private val lnm = s"$supervisor/$name" // log name
 
-  //@inline private def _println(msg: => String) = println(s"[$lnm] $msg")
+  // @inline private def _println(msg: => String) = println(s"[$lnm] $msg")
 
   @inline private def debug(msg: => String) = logger.debug(s"[$lnm] $msg")
 
@@ -433,8 +457,10 @@ object MongoConnection {
   private[api] val logger = LazyLogger("reactivemongo.api.MongoConnection")
 
   final class URIParsingException private[api] (
-    message: String,
-    cause: Throwable) extends Exception(message, cause) with NoStackTrace {
+      message: String,
+      cause: Throwable)
+      extends Exception(message, cause)
+      with NoStackTrace {
 
     @com.github.ghik.silencer.silent
     @SuppressWarnings(Array("NullParameter"))
@@ -450,10 +476,10 @@ object MongoConnection {
    * @param authenticate the authenticate information (see [[MongoConnectionOptions.authenticationMechanism]])
    */
   final class URI[T] private[api] (
-    val hosts: ListSet[(String, Int)],
-    val options: MongoConnectionOptions,
-    val ignoredOptions: List[String],
-    val db: T) {
+      val hosts: ListSet[(String, Int)],
+      val options: MongoConnectionOptions,
+      val ignoredOptions: List[String],
+      val db: T) {
 
     @SuppressWarnings(Array("ComparingUnrelatedTypes"))
     override def equals(that: Any): Boolean = that match {
@@ -494,7 +520,15 @@ object MongoConnection {
    *
    * @param uri $uriParam
    */
-  @inline def fromString(uri: String)(implicit ec: ExecutionContext): Future[ParsedURI] = parse[Option[String]](uri, reactivemongo.util.dnsResolve(), reactivemongo.util.txtRecords())
+  @inline def fromString(
+      uri: String
+    )(implicit
+      ec: ExecutionContext
+    ): Future[ParsedURI] = parse[Option[String]](
+    uri,
+    reactivemongo.util.dnsResolve(),
+    reactivemongo.util.txtRecords()
+  )
 
   /**
    * $parseFromStringBrief, with a required DB name.
@@ -510,19 +544,30 @@ object MongoConnection {
    *
    * @param uri $uriParam
    */
-  @inline def fromStringWithDB(uri: String)(implicit ec: ExecutionContext): Future[ParsedURIWithDB] = parse[String](uri, reactivemongo.util.dnsResolve(), reactivemongo.util.txtRecords())
+  @inline def fromStringWithDB(
+      uri: String
+    )(implicit
+      ec: ExecutionContext
+    ): Future[ParsedURIWithDB] = parse[String](
+    uri,
+    reactivemongo.util.dnsResolve(),
+    reactivemongo.util.txtRecords()
+  )
 
   // ---
 
   private[reactivemongo] sealed trait URIBuilder[T] {
+
     def apply(
-      hosts: ListSet[(String, Int)],
-      options: MongoConnectionOptions,
-      ignoredOptions: List[String],
-      db: Option[String]): Future[URI[T]]
+        hosts: ListSet[(String, Int)],
+        options: MongoConnectionOptions,
+        ignoredOptions: List[String],
+        db: Option[String]
+      ): Future[URI[T]]
   }
 
   private[reactivemongo] object URIBuilder {
+
     implicit def default: URIBuilder[Option[String]] =
       new FunctionalBuilder[Option[String]]({
         (hosts, options, ignoredOptions, db) =>
@@ -536,40 +581,52 @@ object MongoConnection {
 
         case _ =>
           Future.failed[URI[String]](
-            new IllegalArgumentException("Missing database name"))
+            new IllegalArgumentException("Missing database name")
+          )
 
       })
 
     // ---
 
     private final class FunctionalBuilder[T](
-      f: Function4[ListSet[(String, Int)], MongoConnectionOptions, List[String], Option[String], Future[URI[T]]]) extends URIBuilder[T] {
+        f: Function4[ListSet[(String, Int)], MongoConnectionOptions, List[
+          String
+        ], Option[String], Future[URI[T]]])
+        extends URIBuilder[T] {
+
       @inline def apply(
-        hosts: ListSet[(String, Int)],
-        options: MongoConnectionOptions,
-        ignoredOptions: List[String],
-        db: Option[String]): Future[URI[T]] =
+          hosts: ListSet[(String, Int)],
+          options: MongoConnectionOptions,
+          ignoredOptions: List[String],
+          db: Option[String]
+        ): Future[URI[T]] =
         f(hosts, options, ignoredOptions, db)
     }
   }
 
   private[reactivemongo] def parse[T](
-    uri: String,
-    srvRecResolver: SRVRecordResolver,
-    txtResolver: TXTResolver)(
-    implicit
-    ec: ExecutionContext, uriBuilder: URIBuilder[T]): Future[URI[T]] = {
+      uri: String,
+      srvRecResolver: SRVRecordResolver,
+      txtResolver: TXTResolver
+    )(implicit
+      ec: ExecutionContext,
+      uriBuilder: URIBuilder[T]
+    ): Future[URI[T]] = {
 
     val seedList = uri.startsWith("mongodb+srv://")
 
     val createUri = {
-      (hosts: ListSet[(String, Int)],
-      options: MongoConnectionOptions,
-      ignoredOptions: List[String],
-      db: Option[String]) =>
+      (
+          hosts: ListSet[(String, Int)],
+          options: MongoConnectionOptions,
+          ignoredOptions: List[String],
+          db: Option[String]
+      ) =>
         uriBuilder(hosts, options, ignoredOptions, db).recoverWith {
-          case cause: IllegalArgumentException => Future.failed[URI[T]](
-            new URIParsingException(s"${cause.getMessage}: $uri"))
+          case cause: IllegalArgumentException =>
+            Future.failed[URI[T]](
+              new URIParsingException(s"${cause.getMessage}: $uri")
+            )
         }
     }
 
@@ -588,28 +645,34 @@ object MongoConnection {
 
       (unsupportedKeys, options) <- {
         val empty = MongoConnectionOptions.default
-        val initial = if (!seedList) empty else {
-          empty.copy(sslEnabled = true)
-        }
+        val initial =
+          if (!seedList) empty
+          else {
+            empty.copy(sslEnabled = true)
+          }
 
         def txtOptions: Future[Map[String, String]] = {
           if (!seedList) {
             Future.successful(Map.empty[String, String])
           } else {
-            val serviceName = setSpec. // strip credentials before '@',
-              drop(credentialEnd + 1).takeWhile(_ != '/') // and DB after '/'
+            val serviceName = setSpec
+              . // strip credentials before '@',
+              drop(credentialEnd + 1)
+              .takeWhile(_ != '/') // and DB after '/'
 
             for {
               records <- Await.ready(
                 txtResolver(serviceName),
-                reactivemongo.util.dnsTimeout)
+                reactivemongo.util.dnsTimeout
+              )
               res <- records.foldLeft(
-                Future.successful(Map.empty[String, String])) { (o, r) =>
-                  for {
-                    prev <- o
-                    cur <- parseOptions(r)
-                  } yield prev ++ cur
-                }
+                Future.successful(Map.empty[String, String])
+              ) { (o, r) =>
+                for {
+                  prev <- o
+                  cur <- parseOptions(r)
+                } yield prev ++ cur
+              }
             } yield res
           }
         }
@@ -621,10 +684,16 @@ object MongoConnection {
           os <- parseOptions(optionStr)
           opts = makeOptions(txt ++ os, initial)
           res <- {
-            if (opts._2.maxIdleTimeMS != 0 &&
-              opts._2.maxIdleTimeMS < opts._2.heartbeatFrequencyMS) {
+            if (
+              opts._2.maxIdleTimeMS != 0 &&
+              opts._2.maxIdleTimeMS < opts._2.heartbeatFrequencyMS
+            ) {
 
-              Future.failed[(List[String], MongoConnectionOptions)](new URIParsingException(s"Invalid URI options: maxIdleTimeMS(${opts._2.maxIdleTimeMS}) < heartbeatFrequencyMS(${opts._2.heartbeatFrequencyMS})"))
+              Future.failed[(List[String], MongoConnectionOptions)](
+                new URIParsingException(
+                  s"Invalid URI options: maxIdleTimeMS(${opts._2.maxIdleTimeMS}) < heartbeatFrequencyMS(${opts._2.heartbeatFrequencyMS})"
+                )
+              )
             } else {
               Future.successful(opts)
             }
@@ -635,22 +704,31 @@ object MongoConnection {
       parsedUri <- {
         if (credentialEnd == -1) {
           parseHostsAndDB(seedList, setSpec, srvRecResolver).flatMap {
-            case (db, hosts) => options.authenticationMechanism match {
-              case X509Authentication => db match {
-                case Some(dbName) => {
-                  val optsWithX509 = options.copy(credentials = Map(
-                    dbName -> MongoConnectionOptions.Credential("", None)))
+            case (db, hosts) =>
+              options.authenticationMechanism match {
+                case X509Authentication =>
+                  db match {
+                    case Some(dbName) => {
+                      val optsWithX509 = options.copy(credentials =
+                        Map(
+                          dbName -> MongoConnectionOptions.Credential("", None)
+                        )
+                      )
 
-                  createUri(hosts, optsWithX509, unsupportedKeys, db)
-                }
+                      createUri(hosts, optsWithX509, unsupportedKeys, db)
+                    }
+
+                    case _ =>
+                      Future.failed[URI[T]](
+                        new URIParsingException(
+                          s"Could not parse URI '$uri': authentication information found but no database name in URI"
+                        )
+                      )
+                  }
 
                 case _ =>
-                  Future.failed[URI[T]](new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI"))
+                  createUri(hosts, options, unsupportedKeys, db)
               }
-
-              case _ =>
-                createUri(hosts, options, unsupportedKeys, db)
-            }
           }
         } else {
           val WithAuth = """([^:]+)(|:[^@]*)@(.+)""".r
@@ -660,37 +738,59 @@ object MongoConnection {
               val pass = p.stripPrefix(":")
 
               parseHostsAndDB(
-                seedList, hostsPortsAndDB, srvRecResolver).flatMap {
+                seedList,
+                hostsPortsAndDB,
+                srvRecResolver
+              ).flatMap {
                 case (Some(database), hosts) => {
-                  if (options.authenticationMechanism == X509Authentication && pass.nonEmpty) {
-                    Future.failed[URI[T]](new URIParsingException("You should not provide a password when authenticating with X509 authentication"))
+                  if (
+                    options.authenticationMechanism == X509Authentication && pass.nonEmpty
+                  ) {
+                    Future.failed[URI[T]](
+                      new URIParsingException(
+                        "You should not provide a password when authenticating with X509 authentication"
+                      )
+                    )
                   } else {
                     val password = {
-                      if (options.authenticationMechanism != X509Authentication) {
+                      if (
+                        options.authenticationMechanism != X509Authentication
+                      ) {
                         Option(pass)
                       } else Option.empty[String]
                     }
 
-                    val authDb = options.
-                      authenticationDatabase.getOrElse(database)
+                    val authDb =
+                      options.authenticationDatabase.getOrElse(database)
 
                     val optsWithCred = options.copy(
-                      credentials = options.credentials + (
-                        authDb -> MongoConnectionOptions.Credential(
-                          user, password)))
+                      credentials =
+                        options.credentials + (authDb -> MongoConnectionOptions
+                          .Credential(user, password))
+                    )
 
                     createUri(
-                      hosts, optsWithCred, unsupportedKeys, Some(database))
+                      hosts,
+                      optsWithCred,
+                      unsupportedKeys,
+                      Some(database)
+                    )
                   }
                 }
 
                 case _ =>
-                  Future.failed[URI[T]](new URIParsingException(s"Could not parse URI '$uri': authentication information found but no database name in URI"))
+                  Future.failed[URI[T]](
+                    new URIParsingException(
+                      s"Could not parse URI '$uri': authentication information found but no database name in URI"
+                    )
+                  )
               }
             }
 
-            case _ => Future.failed[URI[T]](
-              new URIParsingException(s"Could not parse URI '$uri'"))
+            case _ =>
+              Future.failed[URI[T]](
+                new URIParsingException(s"Could not parse URI '$uri'")
+              )
           }
         }
       }
@@ -698,13 +798,19 @@ object MongoConnection {
   }
 
   private def parseHosts(
-    seedList: Boolean,
-    hosts: String,
-    srvRecResolver: SRVRecordResolver)(implicit ec: ExecutionContext): Future[ListSet[(String, Int)]] = {
+      seedList: Boolean,
+      hosts: String,
+      srvRecResolver: SRVRecordResolver
+    )(implicit
+      ec: ExecutionContext
+    ): Future[ListSet[(String, Int)]] = {
     if (seedList) {
-      Await.ready(
-        reactivemongo.util.srvRecords(hosts)(srvRecResolver),
-        reactivemongo.util.dnsTimeout).map {
+      Await
+        .ready(
+          reactivemongo.util.srvRecords(hosts)(srvRecResolver),
+          reactivemongo.util.dnsTimeout
+        )
+        .map {
           ListSet.empty ++ _
         }
     } else {
@@ -713,42 +819,54 @@ object MongoConnection {
       @annotation.tailrec
       def parse(input: Iterable[String]): Future[ListSet[(String, Int)]] =
         input.headOption match {
-          case Some(h) => h.span(_ != ':') match {
-            case ("", _) => Future.failed(
-              new URIParsingException(s"No valid host in the URI: '$h'"))
+          case Some(h) =>
+            h.span(_ != ':') match {
+              case ("", _) =>
+                Future.failed(
+                  new URIParsingException(s"No valid host in the URI: '$h'")
+                )
 
-            case (host, "") => {
-              buf += host -> DefaultPort
-              parse(input.drop(1))
-            }
-
-            case (host, port) => {
-              val res: Either[Throwable, (String, Int)] = try {
-                val p = port.drop(1).toInt
-
-                if (p <= 0 || p >= 65536) {
-                  Left(new URIParsingException(s"Could not parse host '$h' from URI: invalid port '$port'"))
-                } else {
-                  Right(host -> p)
-                }
-              } catch {
-                case _: NumberFormatException =>
-                  Left(new URIParsingException(s"Could not parse host '$h' from URI: invalid port '$port'"))
-
-                case NonFatal(cause) => Left(cause)
+              case (host, "") => {
+                buf += host -> DefaultPort
+                parse(input.drop(1))
               }
 
-              res match {
-                case Left(cause) =>
-                  Future.failed(cause)
+              case (host, port) => {
+                val res: Either[Throwable, (String, Int)] =
+                  try {
+                    val p = port.drop(1).toInt
 
-                case Right(node) => {
-                  buf += node
-                  parse(input.drop(1))
+                    if (p <= 0 || p >= 65536) {
+                      Left(
+                        new URIParsingException(
+                          s"Could not parse host '$h' from URI: invalid port '$port'"
+                        )
+                      )
+                    } else {
+                      Right(host -> p)
+                    }
+                  } catch {
+                    case _: NumberFormatException =>
+                      Left(
+                        new URIParsingException(
+                          s"Could not parse host '$h' from URI: invalid port '$port'"
+                        )
+                      )
+
+                    case NonFatal(cause) => Left(cause)
+                  }
+
+                res match {
+                  case Left(cause) =>
+                    Future.failed(cause)
+
+                  case Right(node) => {
+                    buf += node
+                    parse(input.drop(1))
+                  }
                 }
               }
             }
-          }
 
           case _ =>
             Future.successful(buf.result())
@@ -759,11 +877,12 @@ object MongoConnection {
   }
 
   private def parseHostsAndDB(
-    seedList: Boolean,
-    input: String,
-    srvRecResolver: SRVRecordResolver)(
-    implicit
-    ec: ExecutionContext): Future[(Option[String], ListSet[(String, Int)])] =
+      seedList: Boolean,
+      input: String,
+      srvRecResolver: SRVRecordResolver
+    )(implicit
+      ec: ExecutionContext
+    ): Future[(Option[String], ListSet[(String, Int)])] =
     input.span(_ != '/') match {
       case (hosts, "") =>
         parseHosts(seedList, hosts, srvRecResolver).map(None -> _)
@@ -783,16 +902,20 @@ object MongoConnection {
       @annotation.tailrec
       def parse(input: Iterable[String]): Future[Map[String, String]] =
         input.headOption match {
-          case Some(option) => option.span(_ != '=') match {
-            case (_, "") => Future.failed[Map[String, String]](
-              new URIParsingException(
-                s"Could not parse invalid options '$options'"))
+          case Some(option) =>
+            option.span(_ != '=') match {
+              case (_, "") =>
+                Future.failed[Map[String, String]](
+                  new URIParsingException(
+                    s"Could not parse invalid options '$options'"
+                  )
+                )
 
-            case (key, v) => {
-              buf.put(key, v.drop(1))
-              parse(input.drop(1))
+              case (key, v) => {
+                buf.put(key, v.drop(1))
+                parse(input.drop(1))
+              }
             }
-          }
 
           case _ =>
             Future.successful(buf.toMap)
@@ -834,11 +957,12 @@ object MongoConnection {
   }
 
   private case class ParseState(
-    options: MongoConnectionOptions,
-    rejected: Map[String, String] = Map.empty[String, String]) {
+      options: MongoConnectionOptions,
+      rejected: Map[String, String] = Map.empty[String, String]) {
 
     def updateOption(
-      f: MongoConnectionOptions => MongoConnectionOptions): ParseState =
+        f: MongoConnectionOptions => MongoConnectionOptions
+      ): ParseState =
       copy(options = f(this.options))
 
     def reject(setting: (String, String)): ParseState =
@@ -846,17 +970,24 @@ object MongoConnection {
   }
 
   private def makeOptions(
-    opts: Map[String, String],
-    initial: MongoConnectionOptions): (List[String], MongoConnectionOptions) = {
+      opts: Map[String, String],
+      initial: MongoConnectionOptions
+    ): (List[String], MongoConnectionOptions) = {
 
-    @inline def make(name: String, input: String, state: ParseState)(f: => ParseState): ParseState = try {
-      f
-    } catch {
-      case NonFatal(cause) =>
-        logger.debug(s"Invalid option '$name': $input", cause)
+    @inline def make(
+        name: String,
+        input: String,
+        state: ParseState
+      )(f: => ParseState
+      ): ParseState =
+      try {
+        f
+      } catch {
+        case NonFatal(cause) =>
+          logger.debug(s"Invalid option '$name': $input", cause)
 
-        state.reject(name -> input)
-    }
+          state.reject(name -> input)
+      }
 
     def deprecated(expected: String, actual: String): Unit =
       if (actual != expected) {
@@ -874,12 +1005,14 @@ object MongoConnection {
         state.updateOption(_.copy(authenticationMechanism = X509Authentication))
 
       case (state, ("authenticationMechanism", "scram-sha256")) =>
-        state.updateOption(_.copy(
-          authenticationMechanism = ScramSha256Authentication))
+        state.updateOption(
+          _.copy(authenticationMechanism = ScramSha256Authentication)
+        )
 
       case (state, ("authenticationMechanism", _)) =>
-        state.updateOption(_.copy(
-          authenticationMechanism = ScramSha1Authentication))
+        state.updateOption(
+          _.copy(authenticationMechanism = ScramSha1Authentication)
+        )
 
       case (state, (n @ ("authenticationDatabase" | "authSource"), v)) => {
         deprecated(n, "authenticationDatabase")
@@ -900,9 +1033,9 @@ object MongoConnection {
         state.updateOption(_.copy(sslAllowsInvalidCert = v.toBoolean))
 
       case (state, ("compressors", Compressors(compressors, invalid))) =>
-        invalid.foldLeft(state) { (st, c) =>
-          st.reject("compressors" -> c)
-        }.updateOption(_.withCompressors(compressors))
+        invalid
+          .foldLeft(state) { (st, c) => st.reject("compressors" -> c) }
+          .updateOption(_.withCompressors(compressors))
 
       case (state, ("rm.tcpNoDelay", v)) =>
         state.updateOption(_.copy(tcpNoDelay = v.toBoolean))
@@ -914,14 +1047,15 @@ object MongoConnection {
         state.updateOption(_.copy(nbChannelsPerNode = v.toInt))
 
       case (state, ("rm.maxInFlightRequestsPerChannel", UnsignedInt(max))) =>
-        state.updateOption(_.copy(
-          maxInFlightRequestsPerChannel = Some(max.toInt)))
+        state.updateOption(
+          _.copy(maxInFlightRequestsPerChannel = Some(max.toInt))
+        )
 
       case (state, ("rm.minIdleChannelsPerNode", UnsignedInt(min))) =>
         state.updateOption(_.copy(minIdleChannelsPerNode = min.toInt))
 
-      case (state, ("rm.maxNonQueryableHeartbeats", UnsignedInt(max))) if (
-        max != "0") =>
+      case (state, ("rm.maxNonQueryableHeartbeats", UnsignedInt(max)))
+          if (max != "0") =>
         state.updateOption(_.withMaxNonQueryableHeartbeats(max.toInt))
 
       case (state, ("writeConcern", "unacknowledged")) =>
@@ -940,15 +1074,17 @@ object MongoConnection {
         state.updateOption(_.copy(readPreference = ReadPreference.primary))
 
       case (state, ("readPreference", "primaryPreferred")) =>
-        state.updateOption(_.copy(
-          readPreference = ReadPreference.primaryPreferred))
+        state.updateOption(
+          _.copy(readPreference = ReadPreference.primaryPreferred)
+        )
 
       case (state, ("readPreference", "secondary")) =>
         state.updateOption(_.copy(readPreference = ReadPreference.secondary))
 
       case (state, ("readPreference", "secondaryPreferred")) =>
-        state.updateOption(_.copy(
-          readPreference = ReadPreference.secondaryPreferred))
+        state.updateOption(
+          _.copy(readPreference = ReadPreference.secondaryPreferred)
+        )
 
       case (state, ("readPreference", "nearest")) =>
         state.updateOption(_.copy(readPreference = ReadPreference.nearest))
@@ -970,7 +1106,8 @@ object MongoConnection {
             case Some(dur) => dur
             case _ =>
               throw new URIParsingException(
-                s"Invalid duration 'rm.failover': $opt")
+                s"Invalid duration 'rm.failover': $opt"
+              )
           }
 
           val delay = FiniteDuration(time, unit)
@@ -982,16 +1119,19 @@ object MongoConnection {
         }
 
       case (state, ("retryWrites", "true")) => {
-        logger.info("Connection option 'rm.failover' should be preferred to 'retryWrites'")
+        logger.info(
+          "Connection option 'rm.failover' should be preferred to 'retryWrites'"
+        )
 
         state
       }
 
       case (state, ("retryWrites", _)) => {
-        logger.info("Connection option 'rm.failover' should be preferred to 'retryWrites'")
+        logger.info(
+          "Connection option 'rm.failover' should be preferred to 'retryWrites'"
+        )
 
-        state.updateOption(_.copy(
-          failoverStrategy = FailoverStrategy.strict))
+        state.updateOption(_.copy(failoverStrategy = FailoverStrategy.strict))
       }
 
       case (state, ("heartbeatFrequencyMS", UnsignedInt(ms))) =>
@@ -1000,21 +1140,25 @@ object MongoConnection {
 
           if (millis < 500) {
             throw new URIParsingException(
-              "'heartbeatFrequencyMS' must be >= 500 milliseconds")
+              "'heartbeatFrequencyMS' must be >= 500 milliseconds"
+            )
           }
 
           state.updateOption(_.copy(heartbeatFrequencyMS = millis))
         }
 
-      case (state, ("appName", nme)) => Option(nme).map(_.trim).filter(v => {
-        v.nonEmpty && v.getBytes("UTF-8").size < 128
-      }) match {
-        case Some(appName) =>
-          state.updateOption(_.copy(appName = Some(appName)))
+      case (state, ("appName", nme)) =>
+        Option(nme)
+          .map(_.trim)
+          .filter(v => {
+            v.nonEmpty && v.getBytes("UTF-8").size < 128
+          }) match {
+          case Some(appName) =>
+            state.updateOption(_.copy(appName = Some(appName)))
 
-        case _ =>
-          state.reject("appName" -> nme)
-      }
+          case _ =>
+            state.reject("appName" -> nme)
+        }
 
       case (state, kv) => state.reject(kv)
     }
@@ -1052,15 +1196,21 @@ object MongoConnection {
         resource = new java.net.URI(uri),
         password = rejected.get("keyStorePassword").map(_.toCharArray),
         storeType = rejected.getOrElse("keyStoreType", "PKCS12"),
-        trust = true)
+        trust = true
+      )
 
-      parsed2.updateOption(_.copy(keyStore = Some(keyStore))).copy(
-        rejected = rejected - "keyStore" - "keyStorePassword" - "keyStoreType")
+      parsed2
+        .updateOption(_.copy(keyStore = Some(keyStore)))
+        .copy(
+          rejected = rejected - "keyStore" - "keyStorePassword" - "keyStoreType"
+        )
     }
 
     // Overriding options
-    def updateWriteConcern(st: ParseState)(
-      f: WriteConcern => WriteConcern): ParseState = st.updateOption { opts =>
+    def updateWriteConcern(
+        st: ParseState
+      )(f: WriteConcern => WriteConcern
+      ): ParseState = st.updateOption { opts =>
       opts.copy(writeConcern = f(opts.writeConcern))
     }
 
@@ -1074,8 +1224,9 @@ object MongoConnection {
       case (state, (o @ ("writeConcernW" | "w"), UnsignedInt(str))) => {
         deprecated(o, "w")
 
-        updateWriteConcern(state)(_.copy(
-          w = WriteConcern.WaitForAcknowledgments(str.toInt)))
+        updateWriteConcern(state)(
+          _.copy(w = WriteConcern.WaitForAcknowledgments(str.toInt))
+        )
       }
 
       case (state, (o @ ("writeConcernW" | "w"), tag)) => {
@@ -1090,7 +1241,10 @@ object MongoConnection {
         updateWriteConcern(state)(_.copy(j = journaled.toBoolean))
       }
 
-      case (state, (o @ ("wtimeoutMS" | "writeConcernTimeout"), UnsignedInt(ms))) => {
+      case (
+            state,
+            (o @ ("wtimeoutMS" | "writeConcernTimeout"), UnsignedInt(ms))
+          ) => {
         deprecated(o, "journal")
 
         updateWriteConcern(state)(_.copy(wtimeout = Some(ms.toInt)))

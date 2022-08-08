@@ -15,8 +15,9 @@ final class Driver(core: Project) {
   import Dependencies._
   import XmlUtil._
 
-  lazy val module = Project("ReactiveMongo", file("driver")).
-    settings(Seq(
+  lazy val module = Project("ReactiveMongo", file("driver"))
+    .settings(
+      Seq(
         description := "ReactiveMongo is a Scala driver that provides fully non-blocking and asynchronous I/O operations ",
         scalacOptions ++= {
           if (scalaBinaryVersion.value == "3") {
@@ -42,8 +43,10 @@ final class Driver(core: Project) {
               scalaBinVer = scalaBinaryVersion.value,
               ver = version.value,
               major = Common.majorVersion.value,
-              dir = dir),
-            generateTrace(dir))
+              dir = dir
+            ),
+            generateTrace(dir)
+          )
         }.taskValue,
         driverCleanup := {
           val classDir = (Compile / classDirectory).value
@@ -53,7 +56,8 @@ final class Driver(core: Project) {
           }
 
           val classFile = "StaticListenerBinder.class"
-          val listenerClass = classDir / "external" / "reactivemongo" / classFile
+          val listenerClass =
+            classDir / "external" / "reactivemongo" / classFile
 
           streams.value.log(s"Cleanup $listenerClass ...")
 
@@ -71,7 +75,7 @@ final class Driver(core: Project) {
           "dnsjava" % "dnsjava" % "3.5.1",
           commonsCodec,
           specs.value,
-          "ch.qos.logback" % "logback-classic" % "1.2.11" % Test,
+          "ch.qos.logback" % "logback-classic" % "1.2.11" % Test
         ) ++ logApi,
         mimaBinaryIssueFilters ++= {
           import com.typesafe.tools.mima.core._
@@ -98,7 +102,7 @@ final class Driver(core: Project) {
           val log = streams.value.log
           val objectClass = f"tests.Common$$"
 
-          Tests.Cleanup {cl: ClassLoader =>
+          Tests.Cleanup { cl: ClassLoader =>
             import scala.language.reflectiveCalls
 
             val c = cl.loadClass(objectClass)
@@ -111,31 +115,50 @@ final class Driver(core: Project) {
           }
         },
         Compile / packageBin / mappings ~= driverFilter,
-        //mappings in (Compile, packageDoc) ~= driverFilter,
+        // mappings in (Compile, packageDoc) ~= driverFilter,
         Compile / packageSrc / mappings ~= driverFilter,
-        apiMappings ++= Documentation.mappings("com.typesafe.akka", "http://doc.akka.io/api/akka/%s/")("akka-actor").value ++ Documentation.mappings("com.typesafe.play", "http://playframework.com/documentation/%s/api/scala/index.html", _.replaceAll("[\\d]$", "x"))("play-iteratees").value,
-    )).configure { p =>
+        apiMappings ++= Documentation
+          .mappings("com.typesafe.akka", "http://doc.akka.io/api/akka/%s/")(
+            "akka-actor"
+          )
+          .value ++ Documentation
+          .mappings(
+            "com.typesafe.play",
+            "http://playframework.com/documentation/%s/api/scala/index.html",
+            _.replaceAll("[\\d]$", "x")
+          )("play-iteratees")
+          .value
+      )
+    )
+    .configure { p =>
       sys.props.get("test.nettyNativeArch") match {
-        case Some("osx") => p.settings(Seq(
-          libraryDependencies += shadedNative("osx-x86-64").value % Test
-        ))
+        case Some("osx") =>
+          p.settings(
+            Seq(
+              libraryDependencies += shadedNative("osx-x86-64").value % Test
+            )
+          )
 
-        case Some(_/* linux */) => p.settings(Seq(
-          libraryDependencies += shadedNative("linux-x86-64").value % Test
-        ))
+        case Some(_ /* linux */ ) =>
+          p.settings(
+            Seq(
+              libraryDependencies += shadedNative("linux-x86-64").value % Test
+            )
+          )
 
         case _ => p
       }
-    }.dependsOn(core)
+    }
+    .dependsOn(core)
 
   // ---
 
   private def generateVersion(
-    scalaBinVer: String,
-    ver: String,
-    major: String,
-    dir: File
-  ): File = {
+      scalaBinVer: String,
+      ver: String,
+      major: String,
+      dir: File
+    ): File = {
     val outdir = dir / "reactivemongo" / "api"
     val f = outdir / "Version.scala"
 
@@ -197,9 +220,11 @@ private[reactivemongo] object Trace {
       organization.value % "reactivemongo-shaded-native" % s
     } else {
       val variant = if (arch == "osx-x86-64") "kqueue" else "epoll"
-      val classifier = if (arch == "osx-x86-64") "osx-x86_64" else "linux-x86_64"
+      val classifier =
+        if (arch == "osx-x86-64") "osx-x86_64" else "linux-x86_64"
 
-      ("io.netty" % s"netty-transport-native-${variant}" % Dependencies.nettyVer).classifier(classifier)
+      ("io.netty" % s"netty-transport-native-${variant}" % Dependencies.nettyVer)
+        .classifier(classifier)
     }
   }
 

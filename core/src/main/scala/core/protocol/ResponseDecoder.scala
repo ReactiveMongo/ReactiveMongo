@@ -15,17 +15,23 @@ import reactivemongo.api.bson.collection.BSONSerializationPack
 import reactivemongo.core.errors.DatabaseException
 
 private[reactivemongo] class ResponseDecoder
-  extends reactivemongo.io.netty.handler.codec.MessageToMessageDecoder[ByteBuf] {
+    extends reactivemongo.io.netty.handler.codec.MessageToMessageDecoder[
+      ByteBuf
+    ] {
 
   override def decode(
-    context: ChannelHandlerContext,
-    frame: ByteBuf, // see ResponseFrameDecoder
-    out: JList[Object]): Unit = {
+      context: ChannelHandlerContext,
+      frame: ByteBuf, // see ResponseFrameDecoder
+      out: JList[Object]
+    ): Unit = {
 
-    out.add(decodeResponse(
-      context = context,
-      channelId = Option(context).map(_.channel.id),
-      frame = frame))
+    out.add(
+      decodeResponse(
+        context = context,
+        channelId = Option(context).map(_.channel.id),
+        frame = frame
+      )
+    )
 
     ()
   }
@@ -35,36 +41,40 @@ private[reactivemongo] class ResponseDecoder
       h.opCode == CompressedOp.code
 
   private[reactivemongo] def decodeResponse(
-    context: ChannelHandlerContext,
-    channelId: Option[ChannelId],
-    frame: ByteBuf): Response = {
+      context: ChannelHandlerContext,
+      channelId: Option[ChannelId],
+      frame: ByteBuf
+    ): Response = {
 
     val readableBytes = frame.readableBytes
 
     if (readableBytes < MessageHeader.size) {
-      //frame.readBytes(readableBytes) // discard
+      // frame.readBytes(readableBytes) // discard
       frame.discardReadBytes()
 
       throw new IllegalStateException(
-        s"Invalid message size: $readableBytes < ${MessageHeader.size}")
+        s"Invalid message size: $readableBytes < ${MessageHeader.size}"
+      )
     }
 
     // ---
 
-    val header: MessageHeader = try {
-      MessageHeader(frame)
-    } catch {
-      case NonFatal(cause) =>
-        frame.discardReadBytes()
+    val header: MessageHeader =
+      try {
+        MessageHeader(frame)
+      } catch {
+        case NonFatal(cause) =>
+          frame.discardReadBytes()
 
-        throw new IllegalStateException("Invalid message header", cause)
-    }
+          throw new IllegalStateException("Invalid message header", cause)
+      }
 
     if (header.messageLength > readableBytes) {
       frame.discardReadBytes()
 
       throw new IllegalStateException(
-        s"Invalid message length: ${header.messageLength} < ${readableBytes}")
+        s"Invalid message length: ${header.messageLength} < ${readableBytes}"
+      )
 
     } else if (!accepts(header)) {
       frame.discardReadBytes()
@@ -82,10 +92,11 @@ private[reactivemongo] class ResponseDecoder
   }
 
   private[reactivemongo] def decompress(
-    channelId: Option[ChannelId],
-    frame: ByteBuf,
-    header: MessageHeader,
-    allocDirect: Int => ByteBuf): Response = {
+      channelId: Option[ChannelId],
+      frame: ByteBuf,
+      header: MessageHeader,
+      allocDirect: Int => ByteBuf
+    ): Response = {
     val originalOpCode = frame.readIntLE
     val uncompressedSize = frame.readIntLE
     val compressorId: Short = frame.readUnsignedByte
@@ -99,13 +110,13 @@ private[reactivemongo] class ResponseDecoder
         buffer.Snappy.DefaultCompressor.decode(_: ByteBuf, _: ByteBuf)
       } else {
         throw new IllegalStateException(
-          s"Unexpected compressor ID: ${compressorId}")
+          s"Unexpected compressor ID: ${compressorId}"
+        )
       }
     }
 
-    val newHeader = header.copy(
-      messageLength = uncompressedSize,
-      opCode = originalOpCode)
+    val newHeader =
+      header.copy(messageLength = uncompressedSize, opCode = originalOpCode)
 
     val buf = allocDirect(uncompressedSize)
 
@@ -131,9 +142,10 @@ private[reactivemongo] class ResponseDecoder
   }
 
   private def decodeMessage(
-    channelId: Option[ChannelId],
-    frame: ByteBuf,
-    header: MessageHeader): Response = {
+      channelId: Option[ChannelId],
+      frame: ByteBuf,
+      header: MessageHeader
+    ): Response = {
 
     val flags = frame.readIntLE()
 
@@ -146,11 +158,8 @@ private[reactivemongo] class ResponseDecoder
       throw new UnsupportedOperationException("Unsupported OpMessage section")
     }
 
-    val reply = Reply(
-      flags = 0,
-      cursorID = 0L,
-      startingFrom = 0,
-      numberReturned = 1)
+    val reply =
+      Reply(flags = 0, cursorID = 0L, startingFrom = 0, numberReturned = 1)
 
     decodeReply(channelId, frame, header, reply)
 
@@ -158,16 +167,18 @@ private[reactivemongo] class ResponseDecoder
   }
 
   @inline private def decodeReply(
-    channelId: Option[ChannelId],
-    frame: ByteBuf,
-    header: MessageHeader): Response =
+      channelId: Option[ChannelId],
+      frame: ByteBuf,
+      header: MessageHeader
+    ): Response =
     decodeReply(channelId, frame, header, Reply(frame))
 
   private def decodeReply(
-    channelId: Option[ChannelId],
-    frame: ByteBuf,
-    header: MessageHeader,
-    reply: Reply): Response = {
+      channelId: Option[ChannelId],
+      frame: ByteBuf,
+      header: MessageHeader,
+      reply: Reply
+    ): Response = {
     val chanId = channelId.orNull
     def info = new ResponseInfo(chanId)
 
@@ -191,7 +202,11 @@ private[reactivemongo] class ResponseDecoder
             }
 
             Response.CommandError(
-              header, r, info, DatabaseException(BSONSerializationPack)(doc))
+              header,
+              r,
+              info,
+              DatabaseException(BSONSerializationPack)(doc)
+            )
           }
 
           doc.getAsOpt[BSONDocument]("cursor") match {
@@ -200,8 +215,9 @@ private[reactivemongo] class ResponseDecoder
                 id <- cursor.long("id")
                 ns <- cursor.string("ns")
 
-                batch <- cursor.getAsOpt[Seq[BSONDocument]]("firstBatch").
-                  orElse(cursor.getAsOpt[Seq[BSONDocument]]("nextBatch"))
+                batch <- cursor
+                  .getAsOpt[Seq[BSONDocument]]("firstBatch")
+                  .orElse(cursor.getAsOpt[Seq[BSONDocument]]("nextBatch"))
               } yield {
                 val r = reply.copy(cursorID = id, numberReturned = batch.size)
 
@@ -245,6 +261,7 @@ private[reactivemongo] class ResponseDecoder
 }
 
 private[reactivemongo] object ResponseDecoder {
+
   @inline def first(buf: ByteBuf) = Try[BSONDocument] {
     val sz = buf.getIntLE(buf.readerIndex)
     val bytes = Array.ofDim[Byte](sz)
@@ -255,7 +272,7 @@ private[reactivemongo] object ResponseDecoder {
 
     val docBuf = reactivemongo.api.bson.buffer.ReadableBuffer(bytes)
 
-    reactivemongo.api.bson.collection.
-      BSONSerializationPack.readFromBuffer(docBuf)
+    reactivemongo.api.bson.collection.BSONSerializationPack
+      .readFromBuffer(docBuf)
   }
 }

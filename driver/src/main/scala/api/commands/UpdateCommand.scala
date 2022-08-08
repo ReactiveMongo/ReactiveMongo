@@ -14,19 +14,28 @@ import reactivemongo.api.{
  * Implements the [[https://docs.mongodb.com/manual/reference/command/update/ update]] command.
  */
 private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
-  self: PackSupport[P] with UpdateWriteResultFactory[P] with UpsertedFactory[P] =>
+  self: PackSupport[P]
+    with UpdateWriteResultFactory[P]
+    with UpsertedFactory[P] =>
 
   private[reactivemongo] final class Update(
-    val firstUpdate: UpdateElement,
-    val updates: Seq[UpdateElement],
-    val ordered: Boolean,
-    val writeConcern: WriteConcern,
-    val bypassDocumentValidation: Boolean) extends CollectionCommand with CommandWithResult[UpdateWriteResult] {
+      val firstUpdate: UpdateElement,
+      val updates: Seq[UpdateElement],
+      val ordered: Boolean,
+      val writeConcern: WriteConcern,
+      val bypassDocumentValidation: Boolean)
+      extends CollectionCommand
+      with CommandWithResult[UpdateWriteResult] {
 
     val commandKind = CommandKind.Update
 
     private[commands] lazy val tupled = Tuple5(
-      firstUpdate, updates, ordered, writeConcern, bypassDocumentValidation)
+      firstUpdate,
+      updates,
+      ordered,
+      writeConcern,
+      bypassDocumentValidation
+    )
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type => other.tupled == this.tupled
@@ -36,7 +45,8 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
     @inline override def hashCode: Int = tupled.hashCode
   }
 
-  final protected[reactivemongo] type UpdateCmd = ResolvedCollectionCommand[Update]
+  final protected[reactivemongo] type UpdateCmd =
+    ResolvedCollectionCommand[Update]
 
   /**
    * @param q the query that matches the documents to update
@@ -47,15 +57,22 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
    * @param arrayFilters an array of filter documents that determines which array elements to modify for an update operation on an array field
    */
   final class UpdateElement(
-    val q: pack.Document,
-    private[api] val u: Either[pack.Document, Seq[pack.Document]],
-    val upsert: Boolean,
-    val multi: Boolean,
-    val collation: Option[Collation],
-    val arrayFilters: Seq[pack.Document]) {
+      val q: pack.Document,
+      private[api] val u: Either[pack.Document, Seq[pack.Document]],
+      val upsert: Boolean,
+      val multi: Boolean,
+      val collation: Option[Collation],
+      val arrayFilters: Seq[pack.Document]) {
 
     @deprecated("Use the main constructor", "1.0.5")
-    def this(q: pack.Document, u: pack.Document, upsert: Boolean, multi: Boolean, collation: Option[Collation], arrayFilters: Seq[pack.Document]) = this(q, Left(u), upsert, multi, collation, arrayFilters)
+    def this(
+        q: pack.Document,
+        u: pack.Document,
+        upsert: Boolean,
+        multi: Boolean,
+        collation: Option[Collation],
+        arrayFilters: Seq[pack.Document]
+      ) = this(q, Left(u), upsert, multi, collation, arrayFilters)
 
     private val data = (q, u, upsert, multi, collation, arrayFilters)
 
@@ -70,12 +87,13 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
   }
 
   final protected[reactivemongo] def writeElement(
-    builder: SerializationPack.Builder[pack.type]): UpdateElement => pack.Document = {
+      builder: SerializationPack.Builder[pack.type]
+    ): UpdateElement => pack.Document = {
     import builder.{ boolean, document, elementProducer }
 
     def base(element: UpdateElement) = {
-      val els = Seq.newBuilder[pack.ElementProducer] += elementProducer(
-        "q", element.q)
+      val els =
+        Seq.newBuilder[pack.ElementProducer] += elementProducer("q", element.q)
 
       element.u match {
         case Left(op) =>
@@ -87,7 +105,8 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
 
       els ++= Seq(
         elementProducer("upsert", boolean(element.upsert)),
-        elementProducer("multi", boolean(element.multi)))
+        elementProducer("multi", boolean(element.multi))
+      )
     }
 
     if (maxWireVersion < MongoWireVersion.V34) { elmt1 =>
@@ -98,7 +117,8 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
       elmt2.collation.foreach { c =>
         elements += elementProducer(
           "collation",
-          Collation.serializeWith(pack, c)(builder))
+          Collation.serializeWith(pack, c)(builder)
+        )
       }
 
       document(elements.result())
@@ -108,12 +128,15 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
       elmt3.collation.foreach { c =>
         elements += elementProducer(
           "collation",
-          Collation.serializeWith(pack, c)(builder))
+          Collation.serializeWith(pack, c)(builder)
+        )
       }
 
       if (elmt3.arrayFilters.nonEmpty) {
         elements += elementProducer(
-          "arrayFilters", builder.array(elmt3.arrayFilters))
+          "arrayFilters",
+          builder.array(elmt3.arrayFilters)
+        )
       }
 
       document(elements.result())
@@ -124,9 +147,12 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
 
   protected def maxWireVersion: MongoWireVersion
 
-  implicit final private[reactivemongo] lazy val updateWriter: pack.Writer[UpdateCmd] = updateWriter(self.session())
+  implicit final private[reactivemongo] lazy val updateWriter: pack.Writer[UpdateCmd] =
+    updateWriter(self.session())
 
-  final private[reactivemongo] def updateWriter(session: Option[Session]): pack.Writer[UpdateCmd] = {
+  final private[reactivemongo] def updateWriter(
+      session: Option[Session]
+    ): pack.Writer[UpdateCmd] = {
     val builder = pack.newBuilder
     val writeSession = CommandCodecs.writeSession(builder)
     val writeElement = this.writeElement(builder)
@@ -143,20 +169,25 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
       elements ++= Seq[pack.ElementProducer](
         element("update", builder.string(update.collection)),
         element("ordered", ordered),
-        element("updates", builder.array(
-          writeElement(command.firstUpdate) +:
-            command.updates.map(writeElement))))
+        element(
+          "updates",
+          builder.array(
+            writeElement(command.firstUpdate) +:
+              command.updates.map(writeElement)
+          )
+        )
+      )
 
-      session.foreach { s =>
-        elements ++= writeSession(s)
-      }
+      session.foreach { s => elements ++= writeSession(s) }
 
       if (!session.exists(_.transaction.isSuccess)) {
         // writeConcern is not allowed within a multi-statement transaction
         // code=72
 
         elements += element(
-          "writeConcern", writeWriteConcern(command.writeConcern))
+          "writeConcern",
+          writeWriteConcern(command.writeConcern)
+        )
       }
 
       builder.document(elements.result())
@@ -169,27 +200,31 @@ private[reactivemongo] trait UpdateCommand[P <: SerializationPack] {
     val readWriteConcernError = CommandCodecs.readWriteConcernError(decoder)
     val readUpserted = Upserted.readUpserted(decoder)
 
-    CommandCodecs.dealingWithGenericCommandExceptionsReader[pack.type, UpdateWriteResult](pack) { doc =>
-      val werrors = decoder.children(doc, "writeErrors").flatMap { e =>
-        readWriteError(e).toSeq
+    CommandCodecs
+      .dealingWithGenericCommandExceptionsReader[pack.type, UpdateWriteResult](
+        pack
+      ) { doc =>
+        val werrors = decoder.children(doc, "writeErrors").flatMap { e =>
+          readWriteError(e).toSeq
+        }
+
+        val wcError =
+          decoder.child(doc, "writeConcernError").flatMap(readWriteConcernError)
+
+        val upserted = decoder
+          .array(doc, "upserted")
+          .map(_.flatMap { v => decoder.asDocument(v).flatMap(readUpserted) })
+
+        new UpdateWriteResult(
+          ok = decoder.booleanLike(doc, "ok").getOrElse(true),
+          n = decoder.int(doc, "n").getOrElse(0),
+          nModified = decoder.int(doc, "nModified").getOrElse(0),
+          upserted = upserted.getOrElse(Seq.empty[self.Upserted]),
+          writeErrors = werrors,
+          writeConcernError = wcError,
+          code = decoder.int(doc, "code"),
+          errmsg = decoder.string(doc, "errmsg")
+        )
       }
-
-      val wcError = decoder.child(doc, "writeConcernError").
-        flatMap(readWriteConcernError)
-
-      val upserted = decoder.array(doc, "upserted").map(_.flatMap { v =>
-        decoder.asDocument(v).flatMap(readUpserted)
-      })
-
-      new UpdateWriteResult(
-        ok = decoder.booleanLike(doc, "ok").getOrElse(true),
-        n = decoder.int(doc, "n").getOrElse(0),
-        nModified = decoder.int(doc, "nModified").getOrElse(0),
-        upserted = upserted.getOrElse(Seq.empty[self.Upserted]),
-        writeErrors = werrors,
-        writeConcernError = wcError,
-        code = decoder.int(doc, "code"),
-        errmsg = decoder.string(doc, "errmsg"))
-    }
   }
 }

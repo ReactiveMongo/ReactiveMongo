@@ -11,20 +11,23 @@ import reactivemongo.api.{
 /**
  * Implements the [[https://docs.mongodb.com/manual/reference/command/delete/ delete]] command.
  */
-private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackSupport[P] =>
+private[reactivemongo] trait DeleteCommand[P <: SerializationPack] {
+  self: PackSupport[P] =>
 
   private[reactivemongo] final class Delete(
-    val deletes: Seq[DeleteElement],
-    val ordered: Boolean,
-    val writeConcern: WriteConcern) extends CollectionCommand with CommandWithResult[DeleteResult] {
+      val deletes: Seq[DeleteElement],
+      val ordered: Boolean,
+      val writeConcern: WriteConcern)
+      extends CollectionCommand
+      with CommandWithResult[DeleteResult] {
     val commandKind = CommandKind.Delete
   }
 
   /** Delete command element */
   final class DeleteElement private[reactivemongo] (
-    _q: pack.Document,
-    _limit: Int,
-    _collation: Option[Collation]) {
+      _q: pack.Document,
+      _limit: Int,
+      _collation: Option[Collation]) {
 
     /** The query that matches documents to delete */
     @inline def q: pack.Document = _q
@@ -53,7 +56,8 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackS
   /** Result for a delete command */
   final type DeleteResult = DefaultWriteResult
 
-  protected[reactivemongo] final type DeleteCmd = ResolvedCollectionCommand[Delete]
+  protected[reactivemongo] final type DeleteCmd =
+    ResolvedCollectionCommand[Delete]
 
   private[reactivemongo] def session(): Option[Session]
 
@@ -61,7 +65,8 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackS
     deleteWriter(self.session())
 
   protected final def deleteWriter(
-    session: Option[Session]): pack.Writer[DeleteCmd] = {
+      session: Option[Session]
+    ): pack.Writer[DeleteCmd] = {
     val builder = pack.newBuilder
 
     import builder.{ elementProducer => element }
@@ -74,24 +79,29 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackS
 
       elements ++= Seq(
         element("delete", builder.string(delete.collection)),
-        element("ordered", builder.boolean(delete.command.ordered)))
+        element("ordered", builder.boolean(delete.command.ordered))
+      )
 
       if (!session.exists(_.transaction.isSuccess)) {
         // writeConcern is not allowed within a multi-statement transaction
         // code=72
 
         elements += element(
-          "writeConcern", writeWriteConcern(delete.command.writeConcern))
+          "writeConcern",
+          writeWriteConcern(delete.command.writeConcern)
+        )
       }
 
-      session.foreach { s =>
-        elements ++= writeSession(s)
-      }
+      session.foreach { s => elements ++= writeSession(s) }
 
       delete.command.deletes.headOption.foreach { first =>
-        elements += element("deletes", builder.array(
-          writeElement(builder, first) +:
-            delete.command.deletes.tail.map(writeElement(builder, _))))
+        elements += element(
+          "deletes",
+          builder.array(
+            writeElement(builder, first) +:
+              delete.command.deletes.tail.map(writeElement(builder, _))
+          )
+        )
       }
 
       builder.document(elements.result())
@@ -99,21 +109,21 @@ private[reactivemongo] trait DeleteCommand[P <: SerializationPack] { self: PackS
   }
 
   private[api] def writeElement(
-    builder: SerializationPack.Builder[pack.type],
-    e: DeleteElement): pack.Document = {
+      builder: SerializationPack.Builder[pack.type],
+      e: DeleteElement
+    ): pack.Document = {
 
     import builder.{ elementProducer => element }
 
     val elements = Seq.newBuilder[pack.ElementProducer]
 
-    elements ++= Seq(
-      element("q", e.q),
-      element("limit", builder.int(e.limit)))
+    elements ++= Seq(element("q", e.q), element("limit", builder.int(e.limit)))
 
     e.collation.foreach { c =>
       elements += element(
         "collation",
-        Collation.serializeWith(pack, c)(builder))
+        Collation.serializeWith(pack, c)(builder)
+      )
     }
 
     builder.document(elements.result())

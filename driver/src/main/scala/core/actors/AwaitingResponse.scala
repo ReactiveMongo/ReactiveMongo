@@ -7,13 +7,13 @@ import reactivemongo.io.netty.channel.ChannelId
 import reactivemongo.core.protocol.{ Request, Response }
 
 private[actors] final class AwaitingResponse(
-  val request: Request,
-  val channelID: ChannelId,
-  val promise: Promise[Response],
-  val isGetLastError: Boolean,
-  val pinnedNode: Option[String],
-  val retry: Int = 0,
-  val writeConcern: Option[Request] = None) {
+    val request: Request,
+    val channelID: ChannelId,
+    val promise: Promise[Response],
+    val isGetLastError: Boolean,
+    val pinnedNode: Option[String],
+    val retry: Int = 0,
+    val writeConcern: Option[Request] = None) {
 
   @inline def requestID: Int = request.requestID
 
@@ -23,23 +23,28 @@ private[actors] final class AwaitingResponse(
    */
   def retriable(max: Int): Option[ChannelId => AwaitingResponse] =
     if (!promise.isCompleted && retry >= max) None
-    else Some({ (id: ChannelId) =>
-      copy(
-        channelID = id,
-        retry = this.retry + 1)
-    })
+    else
+      Some({ (id: ChannelId) => copy(channelID = id, retry = this.retry + 1) })
 
   @SuppressWarnings(Array("VariableShadowing"))
   private def copy(
-    channelID: ChannelId,
-    retry: Int,
-    request: Request = this.request,
-    promise: Promise[Response] = this.promise,
-    isGetLastError: Boolean = this.isGetLastError,
-    pinnedNode: Option[String] = this.pinnedNode,
-    writeConcern: Option[Request] = this.writeConcern): AwaitingResponse =
-    new AwaitingResponse(request, channelID, promise,
-      isGetLastError, pinnedNode, retry, writeConcern)
+      channelID: ChannelId,
+      retry: Int,
+      request: Request = this.request,
+      promise: Promise[Response] = this.promise,
+      isGetLastError: Boolean = this.isGetLastError,
+      pinnedNode: Option[String] = this.pinnedNode,
+      writeConcern: Option[Request] = this.writeConcern
+    ): AwaitingResponse =
+    new AwaitingResponse(
+      request,
+      channelID,
+      promise,
+      isGetLastError,
+      pinnedNode,
+      retry,
+      writeConcern
+    )
 
   override def equals(that: Any): Boolean = that match {
     case other: AwaitingResponse =>
@@ -52,13 +57,23 @@ private[actors] final class AwaitingResponse(
   override lazy val hashCode: Int = tupled.hashCode
 
   private lazy val tupled = Tuple7(
-    request, channelID, promise, isGetLastError,
-    pinnedNode, retry, writeConcern)
+    request,
+    channelID,
+    promise,
+    isGetLastError,
+    pinnedNode,
+    retry,
+    writeConcern
+  )
 
   override def toString: String =
     s"AwaitingResponse[request=${request}, channelID=${channelID}]"
 }
 
 private[actors] object AwaitingResponse {
-  def unapply(req: AwaitingResponse): Option[(Request, ChannelId, Promise[Response], Boolean)] = Some(Tuple4(req.request, req.channelID, req.promise, req.isGetLastError))
+
+  def unapply(
+      req: AwaitingResponse
+    ): Option[(Request, ChannelId, Promise[Response], Boolean)] =
+    Some(Tuple4(req.request, req.channelID, req.promise, req.isGetLastError))
 }

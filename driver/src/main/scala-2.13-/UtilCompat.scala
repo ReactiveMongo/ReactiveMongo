@@ -25,28 +25,44 @@ private[reactivemongo] trait UtilCompat {
   /** Compatibility type alias */
   type TraversableOnce[T] = scala.collection.TraversableOnce[T]
 
-  @inline private[reactivemongo] def toListSet[A, B](in: Iterable[A])(f: A => B): ListSet[B] = in.map(f)(breakOut)
+  @inline private[reactivemongo] def toListSet[A, B](
+      in: Iterable[A]
+    )(f: A => B
+    ): ListSet[B] = in.map(f)(breakOut)
 
-  @inline private[reactivemongo] def toMap[T, K, V](in: Iterable[T])(f: T => (K, V)): Map[K, V] = in.map(f)(breakOut)
+  @inline private[reactivemongo] def toMap[T, K, V](
+      in: Iterable[T]
+    )(f: T => (K, V)
+    ): Map[K, V] = in.map(f)(breakOut)
 
-  @inline private[reactivemongo] def toFlatMap[T, K, V](in: Iterable[T])(f: T => Iterable[(K, V)]): Map[K, V] = in.flatMap(f)(breakOut)
+  @inline private[reactivemongo] def toFlatMap[T, K, V](
+      in: Iterable[T]
+    )(f: T => Iterable[(K, V)]
+    ): Map[K, V] = in.flatMap(f)(breakOut)
 
   @inline private[reactivemongo] def toStream[T](in: TraversableOnce[T]) =
     in.toStream
 
-  @inline private[reactivemongo] def lazyZip[A, B](a: Set[A], b: Set[B]) = (a -> b).zipped
+  @inline private[reactivemongo] def lazyZip[A, B](a: Set[A], b: Set[B]) =
+    (a -> b).zipped
 
-  @inline private[reactivemongo] def lazyZip[A, B](a: Iterable[A], b: Iterable[B]) = (a -> b).zipped
+  @inline private[reactivemongo] def lazyZip[A, B](
+      a: Iterable[A],
+      b: Iterable[B]
+    ) = (a -> b).zipped
 
   private[reactivemongo] type ArrayOps[T] = scala.collection.mutable.ArrayOps[T]
 
-  private[reactivemongo] lazy val sameThreadExecutionContext: ExecutionContext = SameThreadExecutionContext
+  private[reactivemongo] lazy val sameThreadExecutionContext: ExecutionContext =
+    SameThreadExecutionContext
 
   private object SameThreadExecutionContext extends ExecutionContext {
     def execute(command: Runnable): Unit = command.run()
 
     def reportFailure(t: Throwable): Unit =
       throw new IllegalStateException(
-        "exception in sameThreadExecutionContext", t)
+        "exception in sameThreadExecutionContext",
+        t
+      )
   }
 }

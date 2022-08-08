@@ -52,13 +52,19 @@ private[api] trait CursorCompatAPI[T] { _: Cursor[T] =>
    * }}}
    */
   def collect[M[_]](
-    maxDocs: Int = Int.MaxValue,
-    err: ErrorHandler[M[T]] = Cursor.FailOnError[M[T]]())(
-    implicit
-    cbf: CanBuildFrom[M[_], T, M[T]],
-    ec: ExecutionContext): Future[M[T]]
+      maxDocs: Int = Int.MaxValue,
+      err: ErrorHandler[M[T]] = Cursor.FailOnError[M[T]]()
+    )(implicit
+      cbf: CanBuildFrom[M[_], T, M[T]],
+      ec: ExecutionContext
+    ): Future[M[T]]
 
   /** '''EXPERIMENTAL:''' The cursor state, if already resolved. */
-  def peek[M[_]](maxDocs: Int)(implicit cbf: CanBuildFrom[M[_], T, M[T]], ec: ExecutionContext): Future[Cursor.Result[M[T]]]
+  def peek[M[_]](
+      maxDocs: Int
+    )(implicit
+      cbf: CanBuildFrom[M[_], T, M[T]],
+      ec: ExecutionContext
+    ): Future[Cursor.Result[M[T]]]
 
 }

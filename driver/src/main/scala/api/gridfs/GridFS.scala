@@ -73,10 +73,15 @@ import reactivemongo.api.gridfs.{ FileToSave => SF, ReadFile => RF }
  * @define fileReader fileReader a file reader automatically resolved if `Id` is a valid value
  */
 sealed trait GridFS[P <: SerializationPack]
-  extends GridFSCompat with PackSupport[P]
-  with InsertCommand[P] with DeleteCommand[P] with UpdateCommand[P]
-  with UpdateWriteResultFactory[P] with UpsertedFactory[P]
-  with CommandCodecsWithPack[P] with QueryBuilderFactory[P] { self =>
+    extends GridFSCompat
+    with PackSupport[P]
+    with InsertCommand[P]
+    with DeleteCommand[P]
+    with UpdateCommand[P]
+    with UpdateWriteResultFactory[P]
+    with UpsertedFactory[P]
+    with CommandCodecsWithPack[P]
+    with QueryBuilderFactory[P] { self =>
 
   /* The database where this store is located. */
   protected def db: DB with DBMetaCommands
@@ -108,13 +113,15 @@ sealed trait GridFS[P <: SerializationPack]
     collection = fileColl,
     failoverStrategy = db.failoverStrategy,
     readConcern = db.connection.options.readConcern,
-    readPreference = db.defaultReadPreference)
+    readPreference = db.defaultReadPreference
+  )
 
   private lazy val chunkQueryBuilder = new QueryBuilder(
     collection = chunkColl,
     failoverStrategy = db.failoverStrategy,
     readConcern = db.connection.options.readConcern,
-    readPreference = db.defaultReadPreference)
+    readPreference = db.defaultReadPreference
+  )
 
   private lazy val runner = Command.run[pack.type](pack, db.failoverStrategy)
 
@@ -137,9 +144,11 @@ sealed trait GridFS[P <: SerializationPack]
   }
 
   private[api] object FileReader {
+
     implicit def default[Id <: pack.Value](
-      implicit
-      idTag: ClassTag[Id]): FileReader[Id] = {
+        implicit
+        idTag: ClassTag[Id]
+      ): FileReader[Id] = {
       val underlying = RF.reader[P, Id](pack)
 
       new FileReader[Id] {
@@ -170,17 +179,24 @@ sealed trait GridFS[P <: SerializationPack]
    *     BSONDocument("filename" -> n)).headOption
    * }}}
    */
-  def find[S, Id <: pack.Value](selector: S)(implicit w: pack.Writer[S], r: FileReader[Id], cp: CursorProducer[ReadFile[Id]]): cp.ProducedCursor = try {
-    val q = pack.serialize(selector, w)
-    val query = fileQueryBuilder.filter(q)
+  def find[S, Id <: pack.Value](
+      selector: S
+    )(implicit
+      w: pack.Writer[S],
+      r: FileReader[Id],
+      cp: CursorProducer[ReadFile[Id]]
+    ): cp.ProducedCursor =
+    try {
+      val q = pack.serialize(selector, w)
+      val query = fileQueryBuilder.filter(q)
 
-    import r.reader
+      import r.reader
 
-    query.cursor[ReadFile[Id]](defaultReadPreference)
-  } catch {
-    case NonFatal(cause) =>
-      FailingCursor(db.connection, cause)
-  }
+      query.cursor[ReadFile[Id]](defaultReadPreference)
+    } catch {
+      case NonFatal(cause) =>
+        FailingCursor(db.connection, cause)
+    }
 
   /**
    * $findDescription.
@@ -200,7 +216,11 @@ sealed trait GridFS[P <: SerializationPack]
    *   gfs.find(BSONDocument("filename" -> n)).headOption
    * }}}
    */
-  def find(selector: pack.Document)(implicit cp: CursorProducer[ReadFile[pack.Value]]): cp.ProducedCursor = {
+  def find(
+      selector: pack.Document
+    )(implicit
+      cp: CursorProducer[ReadFile[pack.Value]]
+    ): cp.ProducedCursor = {
     implicit def w: pack.Writer[pack.Document] = pack.IdentityWriter
     implicit def r: FileReader[pack.Value] = FileReader.default(pack.IsValue)
 
@@ -214,8 +234,11 @@ sealed trait GridFS[P <: SerializationPack]
    * @param file $readFileParam
    */
   def chunks(
-    file: ReadFile[pack.Value],
-    readPreference: ReadPreference = defaultReadPreference)(implicit cp: CursorProducer[Array[Byte]]): cp.ProducedCursor = {
+      file: ReadFile[pack.Value],
+      readPreference: ReadPreference = defaultReadPreference
+    )(implicit
+      cp: CursorProducer[Array[Byte]]
+    ): cp.ProducedCursor = {
     val selectorOpts = chunkSelector(file)
     val sortOpts = document(Seq(elem("n", builder.int(1))))
     implicit def reader: pack.Reader[Array[Byte]] = chunkReader
@@ -230,7 +253,13 @@ sealed trait GridFS[P <: SerializationPack]
    *
    * @param file $readFileParam
    */
-  def readToOutputStream[Id <: pack.Value](file: ReadFile[Id], out: OutputStream, readPreference: ReadPreference = defaultReadPreference)(implicit ec: ExecutionContext): Future[Unit] = {
+  def readToOutputStream[Id <: pack.Value](
+      file: ReadFile[Id],
+      out: OutputStream,
+      readPreference: ReadPreference = defaultReadPreference
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Unit] = {
     val selectorOpts = chunkSelector(file)
     val sortOpts = document(Seq(elem("n", builder.int(1))))
     val query = chunkQueryBuilder.filter(selectorOpts).sort(sortOpts)
@@ -245,7 +274,8 @@ sealed trait GridFS[P <: SerializationPack]
           Cursor.Cont(out write array)
 
         case _ => {
-          val errmsg = s"not a chunk! failed assertion: data field is missing: ${pack pretty doc}"
+          val errmsg =
+            s"not a chunk! failed assertion: data field is missing: ${pack pretty doc}"
 
           logger.error(errmsg)
           Cursor.Fail(new GenericDriverException(errmsg))
@@ -256,44 +286,60 @@ sealed trait GridFS[P <: SerializationPack]
   }
 
   /** Writes the data provided by the given InputStream to the given file. */
-  def writeFromInputStream[Id <: pack.Value](file: FileToSave[Id], input: InputStream, chunkSize: Int = 262144)(implicit ec: ExecutionContext): Future[ReadFile[Id]] = {
+  def writeFromInputStream[Id <: pack.Value](
+      file: FileToSave[Id],
+      input: InputStream,
+      chunkSize: Int = 262144
+    )(implicit
+      ec: ExecutionContext
+    ): Future[ReadFile[Id]] = {
     type M = MessageDigest
 
     lazy val digestInit = MessageDigest.getInstance("MD5")
 
-    def digestUpdate(md: MessageDigest, chunk: Array[Byte]) = { md.update(chunk); md }
+    def digestUpdate(md: MessageDigest, chunk: Array[Byte]) = {
+      md.update(chunk); md
+    }
 
     def digestFinalize(md: MessageDigest) = Future(md.digest()).map(Some(_))
 
     case class Chunk(
-      previous: Array[Byte],
-      n: Int,
-      md: M,
-      length: Int) {
+        previous: Array[Byte],
+        n: Int,
+        md: M,
+        length: Int) {
       def feed(chunk: Array[Byte]): Future[Chunk] = {
         val wholeChunk = self.concat(previous, chunk)
 
         val normalizedChunkNumber = wholeChunk.length / chunkSize
 
-        logger.debug(s"wholeChunk size is ${wholeChunk.length} => ${normalizedChunkNumber}")
+        logger.debug(
+          s"wholeChunk size is ${wholeChunk.length} => ${normalizedChunkNumber}"
+        )
 
         val zipped =
           for (i <- 0 until normalizedChunkNumber)
             yield Arrays.copyOfRange(
-            wholeChunk, i * chunkSize, (i + 1) * chunkSize) -> i
+              wholeChunk,
+              i * chunkSize,
+              (i + 1) * chunkSize
+            ) -> i
 
         val left = Arrays.copyOfRange(
-          wholeChunk, normalizedChunkNumber * chunkSize, wholeChunk.length)
+          wholeChunk,
+          normalizedChunkNumber * chunkSize,
+          wholeChunk.length
+        )
 
-        Future.traverse(zipped) { ci =>
-          writeChunk(n + ci._2, ci._1)
-        }.map { _ =>
-          logger.debug("all futures for the last given chunk are redeemed.")
-          Chunk(
-            if (left.isEmpty) Array.empty else left,
-            n + normalizedChunkNumber,
-            digestUpdate(md, chunk),
-            length + chunk.length)
+        Future.traverse(zipped) { ci => writeChunk(n + ci._2, ci._1) }.map {
+          _ =>
+            logger.debug("all futures for the last given chunk are redeemed.")
+            Chunk(
+              if (left.isEmpty) Array.empty else left,
+              n + normalizedChunkNumber,
+              digestUpdate(md, chunk),
+              length + chunk.length
+            )
         }
       }
 
@@ -336,7 +382,12 @@ sealed trait GridFS[P <: SerializationPack]
    * @param id the id of the file to be updated
    * @param metadata the file new metadata
    */
-  def update[Id <: pack.Value](id: Id, metadata: pack.Document)(implicit ec: ExecutionContext): Future[WriteResult] = {
+  def update[Id <: pack.Value](
+      id: Id,
+      metadata: pack.Document
+    )(implicit
+      ec: ExecutionContext
+    ): Future[WriteResult] = {
     val updateFileCmd = new Update(
       firstUpdate = new UpdateElement(
         q = document(Seq(elem("_id", id))),
@@ -344,11 +395,13 @@ sealed trait GridFS[P <: SerializationPack]
         upsert = false,
         multi = false,
         collation = None,
-        arrayFilters = Seq.empty),
+        arrayFilters = Seq.empty
+      ),
       updates = Seq.empty,
       ordered = false,
       writeConcern = defaultWriteConcern,
-      bypassDocumentValidation = false)
+      bypassDocumentValidation = false
+    )
 
     runner(fileColl, updateFileCmd, defaultReadPreference)
   }
@@ -360,18 +413,22 @@ sealed trait GridFS[P <: SerializationPack]
    *
    * @param id the file id to remove from this store
    */
-  def remove[Id <: pack.Value](id: Id)(implicit ec: ExecutionContext): Future[WriteResult] = {
+  def remove[Id <: pack.Value](
+      id: Id
+    )(implicit
+      ec: ExecutionContext
+    ): Future[WriteResult] = {
     val deleteChunkCmd = new Delete(
-      Seq(new DeleteElement(
-        _q = document(Seq(elem("files_id", id))), 0, None)),
+      Seq(new DeleteElement(_q = document(Seq(elem("files_id", id))), 0, None)),
       ordered = false,
-      writeConcern = defaultWriteConcern)
+      writeConcern = defaultWriteConcern
+    )
 
     val deleteFileCmd = new Delete(
-      Seq(new DeleteElement(
-        _q = document(Seq(elem("_id", id))), 1, None)),
+      Seq(new DeleteElement(_q = document(Seq(elem("_id", id))), 1, None)),
       ordered = false,
-      writeConcern = defaultWriteConcern)
+      writeConcern = defaultWriteConcern
+    )
 
     for {
       _ <- runner(chunkColl, deleteChunkCmd, defaultReadPreference)
@@ -395,52 +452,62 @@ sealed trait GridFS[P <: SerializationPack]
 
     for {
       _ <- create(chunkColl)
-      c <- indexMngr.onCollection(chunkColl.name).ensure(Index(pack)(
-        key = List("files_id" -> Ascending, "n" -> Ascending),
-        name = None,
-        unique = true,
-        background = false,
-        sparse = false,
-        expireAfterSeconds = None,
-        storageEngine = None,
-        weights = None,
-        defaultLanguage = None,
-        languageOverride = None,
-        textIndexVersion = None,
-        sphereIndexVersion = None,
-        bits = None,
-        min = None,
-        max = None,
-        bucketSize = None,
-        collation = None,
-        wildcardProjection = None,
-        version = None, // let MongoDB decide
-        partialFilter = None,
-        options = builder.document(Seq.empty)))
+      c <- indexMngr
+        .onCollection(chunkColl.name)
+        .ensure(
+          Index(pack)(
+            key = List("files_id" -> Ascending, "n" -> Ascending),
+            name = None,
+            unique = true,
+            background = false,
+            sparse = false,
+            expireAfterSeconds = None,
+            storageEngine = None,
+            weights = None,
+            defaultLanguage = None,
+            languageOverride = None,
+            textIndexVersion = None,
+            sphereIndexVersion = None,
+            bits = None,
+            min = None,
+            max = None,
+            bucketSize = None,
+            collation = None,
+            wildcardProjection = None,
+            version = None, // let MongoDB decide
+            partialFilter = None,
+            options = builder.document(Seq.empty)
+          )
+        )
 
       _ <- create(fileColl)
-      f <- indexMngr.onCollection(fileColl.name).ensure(Index(pack)(
-        key = List("filename" -> Ascending, "uploadDate" -> Ascending),
-        name = None,
-        unique = false,
-        background = false,
-        sparse = false,
-        expireAfterSeconds = None,
-        storageEngine = None,
-        weights = None,
-        defaultLanguage = None,
-        languageOverride = None,
-        textIndexVersion = None,
-        sphereIndexVersion = None,
-        bits = None,
-        min = None,
-        max = None,
-        bucketSize = None,
-        collation = None,
-        wildcardProjection = None,
-        version = None, // let MongoDB decide
-        partialFilter = None,
-        options = builder.document(Seq.empty)))
+      f <- indexMngr
+        .onCollection(fileColl.name)
+        .ensure(
+          Index(pack)(
+            key = List("filename" -> Ascending, "uploadDate" -> Ascending),
+            name = None,
+            unique = false,
+            background = false,
+            sparse = false,
+            expireAfterSeconds = None,
+            storageEngine = None,
+            weights = None,
+            defaultLanguage = None,
+            languageOverride = None,
+            textIndexVersion = None,
+            sphereIndexVersion = None,
+            bits = None,
+            min = None,
+            max = None,
+            bucketSize = None,
+            collation = None,
+            wildcardProjection = None,
+            version = None, // let MongoDB decide
+            partialFilter = None,
+            options = builder.document(Seq.empty)
+          )
+        )
     } yield (c && f)
   }
 
@@ -452,9 +519,7 @@ sealed trait GridFS[P <: SerializationPack]
   def exists(implicit ec: ExecutionContext): Future[Boolean] = (for {
     _ <- stats(chunkColl).filter { c => c.size > 0 || c.nindexes > 0 }
     _ <- stats(fileColl).filter { f => f.size > 0 || f.nindexes > 0 }
-  } yield true).recover {
-    case _ => false
-  }
+  } yield true).recover { case _ => false }
 
   // Dependent factories
 
@@ -463,61 +528,75 @@ sealed trait GridFS[P <: SerializationPack]
    * The unique ID is automatically generated.
    */
   def fileToSave(
-    filename: Option[String] = None,
-    contentType: Option[String] = None,
-    uploadDate: Option[Long] = None,
-    metadata: pack.Document = document(Seq.empty)): FileToSave[pack.Value] =
+      filename: Option[String] = None,
+      contentType: Option[String] = None,
+      uploadDate: Option[Long] = None,
+      metadata: pack.Document = document(Seq.empty)
+    ): FileToSave[pack.Value] =
     new FileToSave[pack.Value](
       filename = filename,
       contentType = contentType,
       uploadDate = uploadDate,
       metadata = metadata,
-      id = builder.generateObjectId())
+      id = builder.generateObjectId()
+    )
 
   /** Prepare the information to save a file. */
   def fileToSave[Id <: pack.Value](
-    filename: Option[String],
-    contentType: Option[String],
-    uploadDate: Option[Long],
-    metadata: pack.Document,
-    id: Id): FileToSave[Id] =
+      filename: Option[String],
+      contentType: Option[String],
+      uploadDate: Option[Long],
+      metadata: pack.Document,
+      id: Id
+    ): FileToSave[Id] =
     new FileToSave[Id](
       filename = filename,
       contentType = contentType,
       uploadDate = uploadDate,
       metadata = metadata,
-      id = id)
+      id = id
+    )
 
   // ---
 
   private[reactivemongo] def writeChunk(
-    id: pack.Value,
-    n: Int,
-    bytes: Array[Byte])(implicit ec: ExecutionContext): Future[WriteResult] = {
+      id: pack.Value,
+      n: Int,
+      bytes: Array[Byte]
+    )(implicit
+      ec: ExecutionContext
+    ): Future[WriteResult] = {
     logger.debug(s"Writing chunk #$n @ file $id")
 
-    val chunkDoc = document(Seq(
-      elem("files_id", id),
-      elem("n", builder.int(n)),
-      elem("data", builder.binary(bytes))))
+    val chunkDoc = document(
+      Seq(
+        elem("files_id", id),
+        elem("n", builder.int(n)),
+        elem("data", builder.binary(bytes))
+      )
+    )
 
     val insertChunkCmd = new Insert(
       head = chunkDoc,
       tail = Seq.empty[pack.Document],
       ordered = false,
       writeConcern = defaultWriteConcern,
-      bypassDocumentValidation = false)
+      bypassDocumentValidation = false
+    )
 
     runner(chunkColl, insertChunkCmd, defaultReadPreference)
   }
 
   private[reactivemongo] def finalizeFile[Id <: pack.Value](
-    file: FileToSave[Id],
-    previous: Array[Byte],
-    n: Int,
-    chunkSize: Int,
-    length: Long,
-    md5Hex: Option[String])(implicit ec: ExecutionContext): Future[ReadFile[Id]] = {
+      file: FileToSave[Id],
+      previous: Array[Byte],
+      n: Int,
+      chunkSize: Int,
+      length: Long,
+      md5Hex: Option[String]
+    )(implicit
+      ec: ExecutionContext
+    ): Future[ReadFile[Id]] = {
 
     logger.debug(s"Writing last chunk #$n @ file ${file.id}")
 
@@ -529,7 +608,8 @@ sealed trait GridFS[P <: SerializationPack]
       elem("chunkSize", builder.int(chunkSize)),
       elem("length", builder.long(length)),
       elem("uploadDate", builder.dateTime(uploadDate)),
-      elem("metadata", file.metadata))
+      elem("metadata", file.metadata)
+    )
 
     file.filename.foreach { fn =>
       fileProps += elem("filename", builder.string(fn))
@@ -539,9 +619,7 @@ sealed trait GridFS[P <: SerializationPack]
       fileProps += elem("contentType", builder.string(ct))
     }
 
-    md5Hex.foreach { hex =>
-      fileProps += elem("md5", builder.string(hex))
-    }
+    md5Hex.foreach { hex => fileProps += elem("md5", builder.string(hex)) }
 
     writeChunk(file.id, n, previous).flatMap { _ =>
       val fileDoc = document(fileProps.result())
@@ -551,7 +629,8 @@ sealed trait GridFS[P <: SerializationPack]
         tail = Seq.empty[pack.Document],
         ordered = false,
         writeConcern = defaultWriteConcern,
-        bypassDocumentValidation = false)
+        bypassDocumentValidation = false
+      )
 
       @SuppressWarnings(Array("VariableShadowing"))
       @inline def run =
@@ -564,7 +643,8 @@ sealed trait GridFS[P <: SerializationPack]
             chunkSize = chunkSize,
             length = length,
             metadata = file.metadata,
-            md5 = md5Hex)
+            md5 = md5Hex
+          )
         }
 
       run
@@ -572,21 +652,35 @@ sealed trait GridFS[P <: SerializationPack]
   }
 
   @inline private def chunkSelector[Id <: pack.Value](
-    file: ReadFile[Id]): pack.Document =
-    document(Seq(
-      elem("files_id", file.id),
-      elem("n", document(Seq(
-        elem(f"$$gte", builder.int(0)),
-        elem(f"$$lte", builder.long(
-          file.length / file.chunkSize + (
-            if (file.length % file.chunkSize > 0) 1 else 0))))))))
+      file: ReadFile[Id]
+    ): pack.Document =
+    document(
+      Seq(
+        elem("files_id", file.id),
+        elem(
+          "n",
+          document(
+            Seq(
+              elem(f"$$gte", builder.int(0)),
+              elem(
+                f"$$lte",
+                builder.long(
+                  file.length / file.chunkSize + (if (
+                                                    file.length % file.chunkSize > 0
+                                                  ) 1
+                                                  else 0)
+                )
+              )
+            )
+          )
+        )
+      )
+    )
 
   private lazy val chunkReader: pack.Reader[Array[Byte]] = {
     val dec = pack.newDecoder
 
-    pack.readerOpt[Array[Byte]] { doc =>
-      dec.binary(doc, "data")
-    }
+    pack.readerOpt[Array[Byte]] { doc => dec.binary(doc, "data") }
   }
 
   @inline private[reactivemongo] def defaultReadPreference =
@@ -601,21 +695,22 @@ sealed trait GridFS[P <: SerializationPack]
   private implicit lazy val unitReader: pack.Reader[Unit] =
     CommandCodecs.unitReader[pack.type](pack)
 
-  private implicit lazy val createWriter: pack.Writer[ResolvedCollectionCommand[Create]] = CreateCollection.writer[pack.type](pack)
+  private implicit lazy val createWriter: pack.Writer[ResolvedCollectionCommand[Create]] =
+    CreateCollection.writer[pack.type](pack)
 
   private def create(coll: Collection)(implicit ec: ExecutionContext) =
     runner(coll, createCollCmd, defaultReadPreference).recover {
       case CommandException.Code(48 /* already exists */ ) => ()
 
-      case CommandException.Message(
-        "collection already exists") => ()
+      case CommandException.Message("collection already exists") => ()
     }
 
   // Coll stats
 
   private lazy val collStatsCmd = new CollStats()
 
-  private implicit lazy val collStatsWriter: pack.Writer[ResolvedCollectionCommand[CollStats]] = CollStats.writer[pack.type](pack)
+  private implicit lazy val collStatsWriter: pack.Writer[ResolvedCollectionCommand[CollStats]] =
+    CollStats.writer[pack.type](pack)
 
   private implicit lazy val collStatsReader: pack.Reader[CollectionStats] =
     CollStats.reader[pack.type](pack)
@@ -625,15 +720,18 @@ sealed trait GridFS[P <: SerializationPack]
 
   // ---
 
-  override def toString: String = s"GridFS(db = ${db.name}, files = ${fileColl.name}, chunks = ${chunkColl.name})"
+  override def toString: String =
+    s"GridFS(db = ${db.name}, files = ${fileColl.name}, chunks = ${chunkColl.name})"
 }
 
 object GridFS {
+
   @SuppressWarnings(Array("VariableShadowing"))
   private[api] def apply[P <: SerializationPack](
-    _pack: P,
-    db: DB with DBMetaCommands,
-    prefix: String): GridFS[P] = {
+      _pack: P,
+      db: DB with DBMetaCommands,
+      prefix: String
+    ): GridFS[P] = {
     @SuppressWarnings(Array("MethodNames")) def _prefix = prefix
     @SuppressWarnings(Array("MethodNames")) def _db = db
 

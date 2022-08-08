@@ -20,25 +20,42 @@ package reactivemongo.api
  * @param maxSize The maximum size in bytes (or in bytes / scale, if any) of this collection, if capped.
  */
 final class CollectionStats private[api] (
-  val ns: String,
-  val count: Int,
-  val size: Double,
-  val averageObjectSize: Option[Double],
-  val storageSize: Double,
-  val numExtents: Option[Int],
-  val nindexes: Int,
-  val lastExtentSize: Option[Int],
-  val paddingFactor: Option[Double],
-  val systemFlags: Option[Int],
-  val userFlags: Option[Int],
-  val totalIndexSize: Int,
-  val sizePerIndex: List[(String, Int)],
-  val capped: Boolean,
-  val max: Option[Long],
-  val maxSize: Option[Double]) {
+    val ns: String,
+    val count: Int,
+    val size: Double,
+    val averageObjectSize: Option[Double],
+    val storageSize: Double,
+    val numExtents: Option[Int],
+    val nindexes: Int,
+    val lastExtentSize: Option[Int],
+    val paddingFactor: Option[Double],
+    val systemFlags: Option[Int],
+    val userFlags: Option[Int],
+    val totalIndexSize: Int,
+    val sizePerIndex: List[(String, Int)],
+    val capped: Boolean,
+    val max: Option[Long],
+    val maxSize: Option[Double]) {
   @inline def indexSizes: Array[(String, Int)] = sizePerIndex.toArray
 
-  private lazy val tupled = Tuple16(ns, count, size, averageObjectSize, storageSize, numExtents, nindexes, lastExtentSize, paddingFactor, systemFlags, userFlags, totalIndexSize, sizePerIndex, capped, max, maxSize)
+  private lazy val tupled = Tuple16(
+    ns,
+    count,
+    size,
+    averageObjectSize,
+    storageSize,
+    numExtents,
+    nindexes,
+    lastExtentSize,
+    paddingFactor,
+    systemFlags,
+    userFlags,
+    totalIndexSize,
+    sizePerIndex,
+    capped,
+    max,
+    maxSize
+  )
 
   override def hashCode: Int = tupled.hashCode
 
@@ -50,5 +67,7 @@ final class CollectionStats private[api] (
       false
   }
 
-  override def toString = s"""CollStatsResult($ns, capped = $capped, count = $count, size = $size, avgObjSize = $averageObjectSize, storageSize = $storageSize, numExtents = $numExtents, nindexes = $nindexes, lastExtentSize = $lastExtentSize, paddingFactor = $paddingFactor, systemFlags = $systemFlags, userFlags = $userFlags, sizePerIndex = ${sizePerIndex.mkString("[ ", ", ", " ]")}, max = $max)"""
+  override def toString =
+    s"""CollStatsResult($ns, capped = $capped, count = $count, size = $size, avgObjSize = $averageObjectSize, storageSize = $storageSize, numExtents = $numExtents, nindexes = $nindexes, lastExtentSize = $lastExtentSize, paddingFactor = $paddingFactor, systemFlags = $systemFlags, userFlags = $userFlags, sizePerIndex = ${sizePerIndex
+        .mkString("[ ", ", ", " ]")}, max = $max)"""
 }

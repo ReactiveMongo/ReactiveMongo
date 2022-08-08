@@ -1,6 +1,7 @@
 package reactivemongo.api
 
 sealed trait Compressor {
+
   /** The compressor [[https://github.com/mongodb/specifications/blob/master/source/compression/OP_COMPRESSED.rst#mongodb-handshake-amendment name]] (e.g `snappy`) */
   def name: String
 
@@ -11,6 +12,7 @@ sealed trait Compressor {
 }
 
 object Compressor {
+
   /**
    * The content of the message is uncompressed.
    * This is realistically only used for testing.
@@ -32,7 +34,8 @@ object Compressor {
    * @param compressionLevel Zlib compression [[https://github.com/mongodb/specifications/blob/master/source/compression/OP_COMPRESSED.rst#zlibcompressionlevel level]] (from -1 - 9)
    */
   sealed class Zlib private[api] (
-    val compressionLevel: Int) extends Compressor {
+      val compressionLevel: Int)
+      extends Compressor {
 
     val name = Zlib.name
     val id = Zlib.id

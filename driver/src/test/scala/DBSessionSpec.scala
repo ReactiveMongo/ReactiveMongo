@@ -6,8 +6,8 @@ trait DBSessionSpec { specs: DatabaseSpec =>
   import tests.Common
   import Common._
 
-  @inline private def _db = Common.connection.database(
-    s"dbsession-${System identityHashCode this}")
+  @inline private def _db =
+    Common.connection.database(s"dbsession-${System identityHashCode this}")
 
   def sessionSpecs = "manage session" >> {
     section("gt_mongo32")
@@ -71,76 +71,88 @@ trait DBSessionSpec { specs: DatabaseSpec =>
               database
             }
           } must beSome[DB].await(0, timeout)
-        } and (
-          database must beSome[DB].which { db =>
-            lazy val coll = db.collection(colName)
+        } and (database must beSome[DB].which { db =>
+          lazy val coll = db.collection(colName)
 
-            def find() = coll.find(
+          def find() = coll
+            .find(
               selector = BSONDocument.empty,
-              projection = Option.empty[BSONDocument]).one[BSONDocument]
+              projection = Option.empty[BSONDocument]
+            )
+            .one[BSONDocument]
 
-            apiTests.session(db).flatMap(
-              _.transaction.toOption.map(_.txnNumber)) must beSome(1L) and {
-                (for {
-                  n <- find().map(_.size)
+          apiTests
+            .session(db)
+            .flatMap(_.transaction.toOption.map(_.txnNumber)) must beSome(
+            1L
+          ) and {
+            (for {
+              n <- find().map(_.size)
 
-                  // See recover(code=251) in endTransaction
-                  s <- db.abortTransaction().map(apiTests.session)
+              // See recover(code=251) in endTransaction
+              s <- db.abortTransaction().map(apiTests.session)
 
-                  // NoOp abort
-                  _ <- db.abortTransaction()
-                  _ <- db.abortTransaction(failIfNotStarted = false)
-                  _ <- db.abortTransaction(failIfNotStarted = true).failed
-                } yield s.map(n -> _.transaction.toOption.map(_.txnNumber))).
-                  aka("session after tx") must beSome(0 -> Option.empty[Long]).
-                  awaitFor(timeout)
+              // NoOp abort
+              _ <- db.abortTransaction()
+              _ <- db.abortTransaction(failIfNotStarted = false)
+              _ <- db.abortTransaction(failIfNotStarted = true).failed
+            } yield s.map(n -> _.transaction.toOption.map(_.txnNumber))).aka(
+              "session after tx"
+            ) must beSome(0 -> Option.empty[Long]).awaitFor(timeout)
 
-              } and {
-                // Start a new transaction with the same session
-                db.startTransaction(None, failIfAlreadyStarted = false).
-                  map(apiTests.session).map {
-                    _.flatMap(_.transaction.toOption).map(_.txnNumber)
-                  } must beSome(2L).await(1, timeout)
-              } and {
-                // Insert a doc in the transaction,
-                // and check the count before & after
+          } and {
+            // Start a new transaction with the same session
+            db.startTransaction(None, failIfAlreadyStarted = false)
+              .map(apiTests.session)
+              .map {
+                _.flatMap(_.transaction.toOption).map(_.txnNumber)
+              } must beSome(2L).await(1, timeout)
+          } and {
+            // Insert a doc in the transaction,
+            // and check the count before & after
 
-                val inserted = BSONDocument("_id" -> 1)
+            val inserted = BSONDocument("_id" -> 1)
 
-                (for {
-                  n1 <- find().map(_.size) // before insert
-                  _ <- coll.insert.one(inserted)
+            (for {
+              n1 <- find().map(_.size) // before insert
+              _ <- coll.insert.one(inserted)
 
-                  n2 <- coll.find(
-                    selector = inserted,
-                    projection = Option.empty[BSONDocument]).
-                    one[BSONDocument].map(_.size)
+              n2 <- coll
+                .find(
+                  selector = inserted,
+                  projection = Option.empty[BSONDocument]
+                )
+                .one[BSONDocument]
+                .map(_.size)
 
-                } yield n1 -> n2) must beTypedEqualTo(0 -> 1).awaitFor(timeout)
-              } and {
-                // 0 document found outside the transaction
-                _db.flatMap {
-                  _.collection(colName).find(
-                    selector = BSONDocument.empty,
-                    projection = Option.empty[BSONDocument]).
-                    one[BSONDocument].map(_.size)
-                } must beTypedEqualTo(0).awaitFor(timeout)
-              } and {
-                // 0 document found in session after transaction is aborted
+            } yield n1 -> n2) must beTypedEqualTo(0 -> 1).awaitFor(timeout)
+          } and {
+            // 0 document found outside the transaction
+            _db.flatMap {
+              _.collection(colName)
+                .find(
+                  selector = BSONDocument.empty,
+                  projection = Option.empty[BSONDocument]
+                )
+                .one[BSONDocument]
+                .map(_.size)
+            } must beTypedEqualTo(0).awaitFor(timeout)
+          } and {
+            // 0 document found in session after transaction is aborted
 
-                db.abortTransaction().map { aborted =>
-                  val session = apiTests.session(aborted)
+            db.abortTransaction().map { aborted =>
+              val session = apiTests.session(aborted)
 
-                  session.map { s =>
-                    s.lsid.toString -> s.transaction.toOption.map(_.txnNumber)
-                  }
-                } must beSome[(String, Option[Long])].like {
-                  case (_ /*lsid*/ , None /*transaction*/ ) =>
-                    find().map(_.size) must beTypedEqualTo(0).awaitFor(timeout)
-
-                }.awaitFor(timeout)
+              session.map { s =>
+                s.lsid.toString -> s.transaction.toOption.map(_.txnNumber)
               }
-          })
+            } must beSome[(String, Option[Long])].like {
+              case (_ /*lsid*/, None /*transaction*/ ) =>
+                find().map(_.size) must beTypedEqualTo(0).awaitFor(timeout)
+
+            }.awaitFor(timeout)
+          }
+        })
       }
 
       "cannot abort transaction after session is killed" in {
@@ -155,8 +167,9 @@ trait DBSessionSpec { specs: DatabaseSpec =>
 
           c = sdb.collection(colName)
           _ <- c.insert.one(BSONDocument("foo" -> 1))
-          _ <- c.insert.many(Seq(
-            BSONDocument("foo" -> 2), BSONDocument("bar" -> 3)))
+          _ <- c.insert.many(
+            Seq(BSONDocument("foo" -> 2), BSONDocument("bar" -> 3))
+          )
 
           kdb <- tdb.killSession()
           _ <- kdb.abortTransaction(failIfNotStarted = true).failed
@@ -180,60 +193,73 @@ trait DBSessionSpec { specs: DatabaseSpec =>
         _db.flatMap(_.startSession()).flatMap { sdb =>
           for {
             _ <- sdb.collection(colName).create()
-            tdb <- sdb.startTransaction(Some(WriteConcern.Default.copy(
-              w = WriteConcern.Majority)))
+            tdb <- sdb.startTransaction(
+              Some(WriteConcern.Default.copy(w = WriteConcern.Majority))
+            )
           } yield {
             database = Some(tdb)
             database
           }
-        } must beSome[DB].awaitFor(timeout) and (
-          database must beSome[DB].which { db =>
-            lazy val coll = db.collection(colName)
+        } must beSome[DB]
+          .awaitFor(timeout) and (database must beSome[DB].which { db =>
+          lazy val coll = db.collection(colName)
 
-            def find() = coll.find(
+          def find() = coll
+            .find(
               selector = BSONDocument.empty,
-              projection = Option.empty[BSONDocument]).cursor[BSONDocument]()
+              projection = Option.empty[BSONDocument]
+            )
+            .cursor[BSONDocument]()
 
-            find().headOption must beNone.awaitFor(timeout) and {
-              coll.insert.
-                many(Seq(BSONDocument("_id" -> 1))).
-                //one(BSONDocument("_id" -> 1)).
-                map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
-            } and {
-              // 1 document found in transaction after insert
-              find().collect[List]().
-                map(_.size) must beTypedEqualTo(1).awaitFor(timeout)
+          find().headOption must beNone.awaitFor(timeout) and {
+            coll.insert
+              .many(Seq(BSONDocument("_id" -> 1)))
+              .
+              // one(BSONDocument("_id" -> 1)).
+              map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
+          } and {
+            // 1 document found in transaction after insert
+            find().collect[List]().map(_.size) must beTypedEqualTo(1).awaitFor(
+              timeout
+            )
 
-            } and {
-              // 0 document found outside transaction
-              _db.flatMap {
-                _.collection(colName).find(
+          } and {
+            // 0 document found outside transaction
+            _db.flatMap {
+              _.collection(colName)
+                .find(
                   selector = BSONDocument("_id" -> 1),
-                  projection = Option.empty[BSONDocument]).
-                  one[BSONDocument].map(_.size)
-              } must beTypedEqualTo(0).awaitFor(timeout)
-            } and {
-              coll.insert.many(Seq(
-                BSONDocument("_id" -> 2), BSONDocument("_id" -> 3))).
-                map(_.n) must beTypedEqualTo(2).awaitFor(timeout)
-            } and {
-              find().collect[List]().
-                map(_.size) must beTypedEqualTo(3).awaitFor(timeout)
-            } and {
-              db.commitTransaction().
-                aka("commited") must beAnInstanceOf[DB].awaitFor(timeout)
+                  projection = Option.empty[BSONDocument]
+                )
+                .one[BSONDocument]
+                .map(_.size)
+            } must beTypedEqualTo(0).awaitFor(timeout)
+          } and {
+            coll.insert
+              .many(Seq(BSONDocument("_id" -> 2), BSONDocument("_id" -> 3)))
+              .map(_.n) must beTypedEqualTo(2).awaitFor(timeout)
+          } and {
+            find().collect[List]().map(_.size) must beTypedEqualTo(3).awaitFor(
+              timeout
+            )
+          } and {
+            db.commitTransaction().aka("commited") must beAnInstanceOf[DB]
+              .awaitFor(timeout)
 
-            } and {
-              // 1 document found outside transaction after commit
+          } and {
+            // 1 document found outside transaction after commit
 
-              _db.flatMap {
-                _.collection(colName).find(
+            _db.flatMap {
+              _.collection(colName)
+                .find(
                   selector = BSONDocument("_id" -> 1),
-                  projection = Option.empty[BSONDocument]).
-                  one[BSONDocument].map(_.size)
-              } must beTypedEqualTo(1).awaitFor(timeout)
-            }
-          })
+                  projection = Option.empty[BSONDocument]
+                )
+                .one[BSONDocument]
+                .map(_.size)
+            } must beTypedEqualTo(1).awaitFor(timeout)
+          }
+        })
       }
 
       section("ge_mongo4")

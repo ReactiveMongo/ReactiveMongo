@@ -12,7 +12,8 @@ import reactivemongo.api.indexes.Index
  * @param db the database name
  */
 private[reactivemongo] class ListIndexes(val db: String)
-  extends CollectionCommand with CommandWithResult[List[Index]] {
+    extends CollectionCommand
+    with CommandWithResult[List[Index]] {
 
   val commandKind = CommandKind.ListIndexes
 
@@ -30,39 +31,63 @@ private[reactivemongo] class ListIndexes(val db: String)
 }
 
 private[reactivemongo] object ListIndexes {
-  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[Command[P]]] = {
+
+  private[api] def writer[P <: SerializationPack](
+      pack: P
+    ): pack.Writer[ResolvedCollectionCommand[Command[P]]] = {
     val builder = pack.newBuilder
 
     pack.writer[ResolvedCollectionCommand[Command[P]]] { list =>
-      builder.document(Seq(builder.elementProducer(
-        "listIndexes", builder.string(list.collection))))
+      builder.document(
+        Seq(
+          builder
+            .elementProducer("listIndexes", builder.string(list.collection))
+        )
+      )
     }
   }
 
-  private[api] def reader[P <: SerializationPack](pack: P)(implicit r: pack.Reader[Index.Aux[P]]): pack.Reader[List[Index.Aux[P]]] = {
+  private[api] def reader[P <: SerializationPack](
+      pack: P
+    )(implicit
+      r: pack.Reader[Index.Aux[P]]
+    ): pack.Reader[List[Index.Aux[P]]] = {
     val decoder = pack.newDecoder
 
     @annotation.tailrec
-    def readBatch(batch: List[pack.Document], indexes: List[Index.Aux[P]]): List[Index.Aux[P]] = batch match {
+    def readBatch(
+        batch: List[pack.Document],
+        indexes: List[Index.Aux[P]]
+      ): List[Index.Aux[P]] = batch match {
       case d :: ds =>
         readBatch(ds, pack.deserialize(d, r) :: indexes)
 
       case _ => indexes
     }
 
-    CommandCodecs.dealingWithGenericCommandExceptionsReaderOpt[P, List[Index.Aux[P]]](pack) { doc =>
-      decoder.child(doc, "cursor").map {
-        decoder.children(_, "firstBatch")
-      }.map[List[Index.Aux[P]]](readBatch(_, Nil)).orElse(
-        throw new GenericDriverException(
-          "the cursor and firstBatch must be defined"))
-    }
+    CommandCodecs
+      .dealingWithGenericCommandExceptionsReaderOpt[P, List[Index.Aux[P]]](
+        pack
+      ) { doc =>
+        decoder
+          .child(doc, "cursor")
+          .map {
+            decoder.children(_, "firstBatch")
+          }
+          .map[List[Index.Aux[P]]](readBatch(_, Nil))
+          .orElse(
+            throw new GenericDriverException(
+              "the cursor and firstBatch must be defined"
+            )
+          )
+      }
   }
 
   // ---
 
   private[api] final class Command[P <: SerializationPack](val db: String)
-    extends CollectionCommand with CommandWithResult[List[Index.Aux[P]]] {
+      extends CollectionCommand
+      with CommandWithResult[List[Index.Aux[P]]] {
 
     val commandKind = CommandKind.ListIndexes
 

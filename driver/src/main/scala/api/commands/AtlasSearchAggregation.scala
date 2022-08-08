@@ -14,7 +14,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
    * '''EXPERIMENTAL:''' See [[AtlasSearch$]]
    */
   final class AtlasSearch private[api] (
-    val operator: AtlasSearch.Operator) extends PipelineOperator {
+      val operator: AtlasSearch.Operator)
+      extends PipelineOperator {
 
     def makePipe: pack.Document =
       pipe(f"$$search", pipe(operator.name, operator.document))
@@ -23,8 +24,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.operator == null && other.operator == null) || (
-          this.operator != null && this.operator == other.operator)
+        (this.operator == null && other.operator == null) || (this.operator != null && this.operator == other.operator)
 
       case _ =>
         false
@@ -38,9 +38,9 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
    * One or at least one string with optional alternate analyzer specified in multi field
    */
   final class SearchString private[api] (
-    val head: String,
-    val next: Seq[String],
-    val multi: Option[String]) {
+      val head: String,
+      val next: Seq[String],
+      val multi: Option[String]) {
 
     lazy val values: Seq[String] = head +: next
 
@@ -51,15 +51,27 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         case (Some(_), None) =>
           array(string(head) +: next.map(string))
 
-        case (Some(_), Some(alterAnalyzer)) => array(
-          builder.document(Seq(
-            elm("value", string(head)),
-            elm("multi", string(alterAnalyzer)))) +: next.map(string))
+        case (Some(_), Some(alterAnalyzer)) =>
+          array(
+            builder.document(
+              Seq(
+                elm("value", string(head)),
+                elm("multi", string(alterAnalyzer))
+              )
+            ) +: next.map(string)
+          )
 
-        case (None, Some(alterAnalyzer)) => array(Seq(
-          builder.document(Seq(
-            elm("value", string(head)),
-            elm("multi", string(alterAnalyzer))))))
+        case (None, Some(alterAnalyzer)) =>
+          array(
+            Seq(
+              builder.document(
+                Seq(
+                  elm("value", string(head)),
+                  elm("multi", string(alterAnalyzer))
+                )
+              )
+            )
+          )
 
         case _ =>
           string(head)
@@ -142,15 +154,17 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * }}}
      */
     def apply(
-      single: String,
-      alternateAnalyzer: String,
-      next: Seq[String]): SearchString =
+        single: String,
+        alternateAnalyzer: String,
+        next: Seq[String]
+      ): SearchString =
       new SearchString(single, next, Some(alternateAnalyzer))
 
   }
 
   /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/tutorial/ Atlas Search]] (only on MongoDB Atlas) */
   object AtlasSearch {
+
     /**
      * @param operator the Atlas Search top [[https://docs.atlas.mongodb.com/reference/atlas-search/query-syntax/#fts-operators operator]]
      *
@@ -180,14 +194,15 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
     /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/query-syntax/#fts-operators Operator]] for [[]] */
     object Operator {
+
       /** Creates a search operator with given options. */
       def apply(name: String, options: pack.Document): Operator =
         new DefaultOp(name, options)
 
       private final class DefaultOp(
-        val name: String,
-        val document: pack.Document) extends Operator {
-      }
+          val name: String,
+          val document: pack.Document)
+          extends Operator {}
     }
 
     /** '''EXPERIMENTAL:''' Score option for term operator */
@@ -199,11 +214,19 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
     /** '''EXPERIMENTAL:''' Multiplies the result score by the given number. */
     final class BoostScore private[api] (
-      val value: Double) extends Score {
+        val value: Double)
+        extends Score {
 
-      def document = builder.document(Seq(builder.elementProducer(
-        "boost", builder.document(Seq(builder.elementProducer(
-          "value", builder.double(value)))))))
+      def document = builder.document(
+        Seq(
+          builder.elementProducer(
+            "boost",
+            builder.document(
+              Seq(builder.elementProducer("value", builder.double(value)))
+            )
+          )
+        )
+      )
 
       @inline override def hashCode: Int = value.toInt
 
@@ -221,11 +244,19 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
     /** '''EXPERIMENTAL:''' Replaces the result score with the given number */
     final class ConstantScore private[api] (
-      val value: Double) extends Score {
+        val value: Double)
+        extends Score {
 
-      def document = builder.document(Seq(builder.elementProducer(
-        "constant", builder.document(Seq(builder.elementProducer(
-          "value", builder.double(value)))))))
+      def document = builder.document(
+        Seq(
+          builder.elementProducer(
+            "constant",
+            builder.document(
+              Seq(builder.elementProducer("value", builder.double(value)))
+            )
+          )
+        )
+      )
 
       @inline override def hashCode: Int = value.toInt
 
@@ -242,6 +273,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
     }
 
     object Score {
+
       /**
        * '''EXPERIMENTAL:''' Multiplies the result score by the given number.
        *
@@ -278,12 +310,16 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * @param path $pathParam
      * @param score $scoreParam
      */
-    @deprecated("https://docs.atlas.mongodb.com/reference/atlas-search/term/", "")
+    @deprecated(
+      "https://docs.atlas.mongodb.com/reference/atlas-search/term/",
+      ""
+    )
     final class Term private[api] (
-      val query: SearchString,
-      val path: SearchString,
-      val modifier: Option[Term.Modifier],
-      val score: Option[Score]) extends Operator {
+        val query: SearchString,
+        val path: SearchString,
+        val modifier: Option[Term.Modifier],
+        val score: Option[Score])
+        extends Operator {
 
       val name = "term"
 
@@ -292,7 +328,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
         val opts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
           elm("query", query.value),
-          elm("path", path.value))
+          elm("path", path.value)
+        )
 
         modifier.foreach {
           case Term.Wildcard =>
@@ -305,20 +342,23 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
             opts += elm("prefix", boolean(true))
 
           case fuzzy: Term.Fuzzy =>
-            opts += elm("fuzzy", builder.document(Seq(
-              elm("maxEdits", builder.int(fuzzy.maxEdits)),
-              elm("prefixLength", builder.int(fuzzy.prefixLength)))))
+            opts += elm(
+              "fuzzy",
+              builder.document(
+                Seq(
+                  elm("maxEdits", builder.int(fuzzy.maxEdits)),
+                  elm("prefixLength", builder.int(fuzzy.prefixLength))
+                )
+              )
+            )
         }
 
-        score.foreach { sc =>
-          opts += elm("score", sc.document)
-        }
+        score.foreach { sc => opts += elm("score", sc.document) }
 
         builder.document(opts.result())
       }
 
-      private lazy val tupled = Tuple4(
-        query, path, modifier, score)
+      private lazy val tupled = Tuple4(query, path, modifier, score)
 
       @inline override def hashCode: Int = tupled.hashCode
 
@@ -335,6 +375,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
     /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/term/#term-ref Term]] operator for [[]]. */
     object Term {
+
       /**
        * @param query $queryParam
        * @param path $pathParam
@@ -342,10 +383,11 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * @param score $scoreParam
        */
       def apply(
-        query: SearchString,
-        path: SearchString,
-        modifier: Option[Modifier] = None,
-        score: Option[Score] = None): Term =
+          query: SearchString,
+          path: SearchString,
+          modifier: Option[Modifier] = None,
+          score: Option[Score] = None
+        ): Term =
         new Term(query, path, modifier, score)
 
       // ---
@@ -364,8 +406,9 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
       /** '''EXPERIMENTAL:''' Fuzzy search options */
       final class Fuzzy private[api] (
-        val maxEdits: Int,
-        val prefixLength: Int) extends Modifier {
+          val maxEdits: Int,
+          val prefixLength: Int)
+          extends Modifier {
         private lazy val tupled = maxEdits -> prefixLength
 
         override def hashCode = tupled.hashCode
@@ -384,13 +427,15 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
       /** '''EXPERIMENTAL:''' Fuzzy search options */
       object Fuzzy {
+
         /**
          * @param maxEdits the maximum number of single-character edits required to match the specified search term
          * @param prefixLength the number of characters at the beginning of the result that must exactly match the search term
          */
         def apply(
-          maxEdits: Int = 2,
-          prefixLength: Int = 0): Fuzzy = new Fuzzy(maxEdits, prefixLength)
+            maxEdits: Int = 2,
+            prefixLength: Int = 0
+          ): Fuzzy = new Fuzzy(maxEdits, prefixLength)
       }
     }
 
@@ -404,10 +449,11 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * @param score $scoreParam
      */
     final class Text private[api] (
-      val query: SearchString,
-      val path: SearchString,
-      val fuzzy: Option[Text.Fuzzy],
-      val score: Option[Score]) extends Operator {
+        val query: SearchString,
+        val path: SearchString,
+        val fuzzy: Option[Text.Fuzzy],
+        val score: Option[Score])
+        extends Operator {
 
       val name = "text"
 
@@ -416,18 +462,23 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
         val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
           elm("query", query.value),
-          elm("path", path.value))
+          elm("path", path.value)
+        )
 
         fuzzy.foreach { mod =>
-          elms += elm("fuzzy", builder.document(Seq(
-            elm("maxEdits", builder.int(mod.maxEdits)),
-            elm("prefixLength", builder.int(mod.prefixLength)),
-            elm("maxExpansions", builder.int(mod.maxExpansions)))))
+          elms += elm(
+            "fuzzy",
+            builder.document(
+              Seq(
+                elm("maxEdits", builder.int(mod.maxEdits)),
+                elm("prefixLength", builder.int(mod.prefixLength)),
+                elm("maxExpansions", builder.int(mod.maxExpansions))
+              )
+            )
+          )
         }
 
-        score.foreach { sc =>
-          elms += elm("score", sc.document)
-        }
+        score.foreach { sc => elms += elm("score", sc.document) }
 
         builder.document(elms.result())
       }
@@ -449,6 +500,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
     /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/text/#text-ref Text]] operator for Atlas Search */
     object Text {
+
       /**
        * @param query $queryParam
        * @param path $pathParam
@@ -467,19 +519,20 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * }}}
        */
       def apply(
-        query: SearchString,
-        path: SearchString,
-        fuzzy: Option[Text.Fuzzy] = None,
-        score: Option[Score] = None): Text =
+          query: SearchString,
+          path: SearchString,
+          fuzzy: Option[Text.Fuzzy] = None,
+          score: Option[Score] = None
+        ): Text =
         new Text(query, path, fuzzy, score)
 
       // ---
 
       /** '''EXPERIMENTAL:''' Fuzzy search options */
       final class Fuzzy private[api] (
-        val maxEdits: Int,
-        val prefixLength: Int,
-        val maxExpansions: Int) {
+          val maxEdits: Int,
+          val prefixLength: Int,
+          val maxExpansions: Int) {
         private lazy val tupled = Tuple3(maxEdits, prefixLength, maxExpansions)
 
         override def hashCode = tupled.hashCode
@@ -508,15 +561,17 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * }}}
        */
       object Fuzzy {
+
         /**
          * @param maxEdits the maximum number of single-character edits required to match the specified search term
          * @param prefixLength the number of characters at the beginning of the result that must exactly match the search term
          * @param maxExpansions the maximum number of variations to generate and search for
          */
         def apply(
-          maxEdits: Int = 2,
-          prefixLength: Int = 0,
-          maxExpansions: Int = 50): Fuzzy = new Fuzzy(maxEdits, prefixLength, maxExpansions)
+            maxEdits: Int = 2,
+            prefixLength: Int = 0,
+            maxExpansions: Int = 50
+          ): Fuzzy = new Fuzzy(maxEdits, prefixLength, maxExpansions)
       }
     }
 
@@ -528,10 +583,11 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * @param score $scoreParam
      */
     final class Phrase private[api] (
-      val query: SearchString,
-      val path: SearchString,
-      val slop: Int,
-      val score: Option[Score]) extends Operator {
+        val query: SearchString,
+        val path: SearchString,
+        val slop: Int,
+        val score: Option[Score])
+        extends Operator {
 
       val name = "phrase"
 
@@ -541,11 +597,10 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
           elm("query", query.value),
           elm("path", path.value),
-          elm("slop", builder.int(slop)))
+          elm("slop", builder.int(slop))
+        )
 
-        score.foreach { sc =>
-          elms += elm("score", sc.document)
-        }
+        score.foreach { sc => elms += elm("score", sc.document) }
 
         builder.document(elms.result())
       }
@@ -567,6 +622,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
     /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/phrase/#phrase-ref Phrase]] operator for Atlas Search */
     object Phrase {
+
       /**
        * @param query $queryParam
        * @param path $pathParam
@@ -585,18 +641,20 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * }}}
        */
       def apply(
-        query: SearchString,
-        path: SearchString,
-        slop: Int = 0,
-        score: Option[Score] = None): Phrase =
+          query: SearchString,
+          path: SearchString,
+          slop: Int = 0,
+          score: Option[Score] = None
+        ): Phrase =
         new Phrase(query, path, slop, score)
     }
 
     /** '''EXPERIMENTAL:''' See [[Compound$]] */
     final class Compound private[api] (
-      val head: Compound.Clause,
-      val next: Seq[Compound.Clause],
-      val minimumShouldMatch: Option[Int]) extends Operator {
+        val head: Compound.Clause,
+        val next: Seq[Compound.Clause],
+        val minimumShouldMatch: Option[Int])
+        extends Operator {
       val name = "compound"
 
       def document: pack.Document = {
@@ -608,13 +666,13 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         val elms = Seq.newBuilder[pack.ElementProducer]
 
         def clauseElm(c: Compound.Clause): Unit = {
-          import c._1.{ toString => clauseType }, c._2.{
-            _1 => firstOp,
-            _2 => ops
-          }
+          import c._1.{ toString => clauseType },
+          c._2.{ _1 => firstOp, _2 => ops }
 
-          elms += elm(clauseType, builder.array(
-            docOp(firstOp) +: ops.map(docOp)))
+          elms += elm(
+            clauseType,
+            builder.array(docOp(firstOp) +: ops.map(docOp))
+          )
 
           ()
         }
@@ -656,6 +714,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * @define minimumShouldMatchParam the option to specify a minimum number of clauses which must match to return a result
      */
     object Compound {
+
       /**
        * $newBuilderBrief and no `minimumShouldMatch` setting.
        *
@@ -678,9 +737,10 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * }}}
        */
       def newBuilder(
-        clauseType: ClauseType,
-        head: Operator): Builder = new Builder(
-        (clauseType -> (head -> Seq.empty)), Seq.empty, None)
+          clauseType: ClauseType,
+          head: Operator
+        ): Builder =
+        new Builder((clauseType -> (head -> Seq.empty)), Seq.empty, None)
 
       /**
        * $newBuilderBrief and with given `minimumShouldMatch` setting.
@@ -705,10 +765,14 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * }}}
        */
       def newBuilder(
-        clauseType: ClauseType,
-        head: Operator,
-        minimumShouldMatch: Int): Builder = new Builder(
-        (clauseType -> (head -> Seq.empty)), Seq.empty, Some(minimumShouldMatch))
+          clauseType: ClauseType,
+          head: Operator,
+          minimumShouldMatch: Int
+        ): Builder = new Builder(
+        (clauseType -> (head -> Seq.empty)),
+        Seq.empty,
+        Some(minimumShouldMatch)
+      )
 
       /**
        * $newBuilderBrief (with multiple operators)
@@ -738,10 +802,11 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * }}}
        */
       def newBuilder(
-        clauseType: ClauseType,
-        head: Operator,
-        next: Seq[Operator]): Builder = new Builder(
-        (clauseType -> (head -> next)), Seq.empty, None)
+          clauseType: ClauseType,
+          head: Operator,
+          next: Seq[Operator]
+        ): Builder =
+        new Builder((clauseType -> (head -> next)), Seq.empty, None)
 
       /**
        * $newBuilderBrief (with multiple operators)
@@ -773,11 +838,15 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * }}}
        */
       def newBuilder(
-        clauseType: ClauseType,
-        head: Operator,
-        next: Seq[Operator],
-        minimumShouldMatch: Int): Builder = new Builder(
-        (clauseType -> (head -> next)), Seq.empty, Some(minimumShouldMatch))
+          clauseType: ClauseType,
+          head: Operator,
+          next: Seq[Operator],
+          minimumShouldMatch: Int
+        ): Builder = new Builder(
+        (clauseType -> (head -> next)),
+        Seq.empty,
+        Some(minimumShouldMatch)
+      )
 
       /**
        * $newBuilderBrief (with multiple operators)
@@ -806,9 +875,9 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * }}}
        */
       def newBuilder(
-        clauseType: ClauseType,
-        operators: Operators): Builder = new Builder(
-        (clauseType -> operators), Seq.empty, None)
+          clauseType: ClauseType,
+          operators: Operators
+        ): Builder = new Builder((clauseType -> operators), Seq.empty, None)
 
       /**
        * $newBuilderBrief (with multiple operators)
@@ -839,17 +908,21 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * }}}
        */
       def newBuilder(
-        clauseType: ClauseType,
-        operators: Operators,
-        minimumShouldMatch: Int): Builder = new Builder(
-        (clauseType -> operators), Seq.empty, Some(minimumShouldMatch))
+          clauseType: ClauseType,
+          operators: Operators,
+          minimumShouldMatch: Int
+        ): Builder = new Builder(
+        (clauseType -> operators),
+        Seq.empty,
+        Some(minimumShouldMatch)
+      )
 
       /**
        * '''EXPERIMENTAL:''' Type of [[Compound]] clause;
        * Actually either [[must]], [[mustNot]], [[should]] or [[filter]].
        */
       final class ClauseType private[api] (
-        override val toString: String) {
+          override val toString: String) {
 
         @inline override def hashCode: Int = toString.hashCode
 
@@ -878,11 +951,12 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * @define appendWarning Override any clause previously defined for the same type
        */
       final class Builder private[api] (
-        head: Clause,
-        next: Seq[Clause],
-        minimumShouldMatch: Option[Int]) {
-        def result(): Compound = new Compound(
-          head, next.reverse, minimumShouldMatch)
+          head: Clause,
+          next: Seq[Clause],
+          minimumShouldMatch: Option[Int]) {
+
+        def result(): Compound =
+          new Compound(head, next.reverse, minimumShouldMatch)
 
         /**
          * $appendBrief with a single operator. $appendWarning.
@@ -913,9 +987,13 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
          * }}}
          */
         def append(
-          clauseType: ClauseType,
-          op: Operator): Builder = new Builder(
-          head, (clauseType -> (op -> Seq.empty)) +: next, minimumShouldMatch)
+            clauseType: ClauseType,
+            op: Operator
+          ): Builder = new Builder(
+          head,
+          (clauseType -> (op -> Seq.empty)) +: next,
+          minimumShouldMatch
+        )
 
         /**
          * $appendBrief with multiple operators. $appendWarning.
@@ -951,10 +1029,14 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
          * }}}
          */
         def append(
-          clauseType: ClauseType,
-          op: Operator,
-          ops: Seq[Operator]): Builder = new Builder(
-          head, (clauseType -> (op -> ops)) +: next, minimumShouldMatch)
+            clauseType: ClauseType,
+            op: Operator,
+            ops: Seq[Operator]
+          ): Builder = new Builder(
+          head,
+          (clauseType -> (op -> ops)) +: next,
+          minimumShouldMatch
+        )
 
         /**
          * $appendBrief with multiple operators. $appendWarning.
@@ -989,9 +1071,13 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
          * }}}
          */
         def append(
-          clauseType: ClauseType,
-          operators: Operators): Builder = new Builder(
-          head, (clauseType -> operators) +: next, minimumShouldMatch)
+            clauseType: ClauseType,
+            operators: Operators
+          ): Builder = new Builder(
+          head,
+          (clauseType -> operators) +: next,
+          minimumShouldMatch
+        )
 
         /**
          * Updates the `minimumShouldMatch` setting for the compound search.
@@ -1025,13 +1111,13 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * @param path $pathParam
      */
     final class Exists private[api] (
-      val path: SearchString) extends Operator {
+        val path: SearchString)
+        extends Operator {
 
       val name = "exists"
 
       def document: pack.Document =
-        builder.document(Seq(
-          builder.elementProducer("path", path.value)))
+        builder.document(Seq(builder.elementProducer("path", path.value)))
 
       @inline override def hashCode: Int = path.hashCode
 
@@ -1048,6 +1134,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
     /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/exists/#exists-ref Exists]] operator for Atlas Search */
     object Exists {
+
       /**
        * @param path $pathParam
        *
@@ -1072,10 +1159,11 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * @param score $scoreParam
      */
     final class Near private[api] (
-      val origin: Near.Origin,
-      val path: SearchString,
-      val pivot: Option[Double],
-      val score: Option[Score]) extends Operator {
+        val origin: Near.Origin,
+        val path: SearchString,
+        val pivot: Option[Double],
+        val score: Option[Score])
+        extends Operator {
 
       val name = "near"
 
@@ -1084,15 +1172,12 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
         val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
           elm("origin", origin.value),
-          elm("path", path.value))
+          elm("path", path.value)
+        )
 
-        pivot.foreach { pv =>
-          elms += elm("pivot", builder.double(pv))
-        }
+        pivot.foreach { pv => elms += elm("pivot", builder.double(pv)) }
 
-        score.foreach { sc =>
-          elms += elm("score", sc.document)
-        }
+        score.foreach { sc => elms += elm("score", sc.document) }
 
         builder.document(elms.result())
       }
@@ -1114,6 +1199,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
     /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/near/#near-ref Near]] operator for Atlas Search */
     object Near {
+
       /**
        * @param origin $originParam
        * @param path $pathParam
@@ -1131,14 +1217,15 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * }}}
        */
       def apply(
-        origin: Near.Origin,
-        path: SearchString,
-        pivot: Option[Double] = None,
-        score: Option[Score] = None): Near =
+          origin: Near.Origin,
+          path: SearchString,
+          pivot: Option[Double] = None,
+          score: Option[Score] = None
+        ): Near =
         new Near(origin, path, pivot, score)
 
       final class Origin private[api] (
-        private[api] val value: pack.Value)
+          private[api] val value: pack.Value)
 
       /**
        * {{{
@@ -1182,10 +1269,11 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * @param score $scoreParam
      */
     final class Range(
-      val path: SearchString,
-      val start: Range.Start,
-      val end: Range.End,
-      val score: Option[Score]) extends Operator {
+        val path: SearchString,
+        val start: Range.Start,
+        val end: Range.End,
+        val score: Option[Score])
+        extends Operator {
       val name = "range"
 
       def document: pack.Document = {
@@ -1196,11 +1284,10 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         elms ++= Seq(
           elm("path", path.value),
           elm(start.tpe, start.value),
-          elm(end.tpe, end.value))
+          elm(end.tpe, end.value)
+        )
 
-        score.foreach { sc =>
-          elms += elm("score", sc.document)
-        }
+        score.foreach { sc => elms += elm("score", sc.document) }
 
         builder.document(elms.result())
       }
@@ -1220,6 +1307,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
     /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/range/ Range]] operator for Atlas Search */
     object Range {
+
       /**
        * @param path $pathParam
        * @param start the start condition of the range
@@ -1241,10 +1329,11 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * }}}
        */
       def apply(
-        path: SearchString,
-        start: Start,
-        end: End,
-        score: Option[Score] = None): Range =
+          path: SearchString,
+          start: Start,
+          end: End,
+          score: Option[Score] = None
+        ): Range =
         new Range(path, start, end, score)
 
       // ---
@@ -1294,8 +1383,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         new End("lte", w.write(value))
 
       final class Start private[api] (
-        val tpe: String,
-        val value: pack.Value) {
+          val tpe: String,
+          val value: pack.Value) {
         @inline override def hashCode: Int = toString.hashCode
 
         override def equals(that: Any): Boolean = that match {
@@ -1310,8 +1399,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
       }
 
       final class End private[api] (
-        val tpe: String,
-        val value: pack.Value) {
+          val tpe: String,
+          val value: pack.Value) {
         @inline override def hashCode: Int = toString.hashCode
 
         override def equals(that: Any): Boolean = that match {
@@ -1326,6 +1415,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
       }
 
       sealed trait Writer[T] {
+
         /** Returns the serialized representation for the input value `v` */
         def write(v: T): pack.Value
       }
@@ -1343,7 +1433,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
         implicit def longWriter: Writer[Long] = Writer[Long](builder.long)
 
-        implicit def doubleWriter: Writer[Double] = Writer[Double](builder.double)
+        implicit def doubleWriter: Writer[Double] =
+          Writer[Double](builder.double)
 
         implicit def instantWriter: Writer[Instant] =
           Writer[Instant] { i => builder.dateTime(i.toEpochMilli) }
@@ -1351,7 +1442,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         // ---
 
         private final class FunctionalWriter[T](
-          f: T => pack.Value) extends Writer[T] {
+            f: T => pack.Value)
+            extends Writer[T] {
 
           def write(v: T): pack.Value = f(v)
         }
@@ -1366,10 +1458,11 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * @param score $scoreParam
      */
     final class Wildcard private[api] (
-      val query: SearchString,
-      val path: SearchString,
-      val allowAnalyzedField: Boolean,
-      val score: Option[Score]) extends Operator {
+        val query: SearchString,
+        val path: SearchString,
+        val allowAnalyzedField: Boolean,
+        val score: Option[Score])
+        extends Operator {
 
       val name = "wildcard"
 
@@ -1379,11 +1472,10 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
           elm("query", query.value),
           elm("path", path.value),
-          elm("allowAnalyzedField", builder.boolean(allowAnalyzedField)))
+          elm("allowAnalyzedField", builder.boolean(allowAnalyzedField))
+        )
 
-        score.foreach { sc =>
-          elms += elm("score", sc.document)
-        }
+        score.foreach { sc => elms += elm("score", sc.document) }
 
         builder.document(elms.result())
       }
@@ -1405,6 +1497,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
     /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/wildcard/#wildcard-ref Wildcard]] operator for Atlas Search */
     object Wildcard {
+
       /**
        * @param query $queryParam
        * @param path $pathParam
@@ -1412,19 +1505,21 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * @param score $scoreParam
        */
       def apply(
-        query: SearchString,
-        path: SearchString,
-        allowAnalyzedField: Boolean = false,
-        score: Option[Score] = None): Wildcard =
+          query: SearchString,
+          path: SearchString,
+          allowAnalyzedField: Boolean = false,
+          score: Option[Score] = None
+        ): Wildcard =
         new Wildcard(query, path, allowAnalyzedField, score)
     }
 
     /** '''EXPERIMENTAL:''' See [[Regex$]] */
     final class Regex private[api] (
-      val query: SearchString,
-      val path: SearchString,
-      val allowAnalyzedField: Boolean,
-      val score: Option[Score]) extends Operator {
+        val query: SearchString,
+        val path: SearchString,
+        val allowAnalyzedField: Boolean,
+        val score: Option[Score])
+        extends Operator {
 
       val name = "regex"
 
@@ -1434,11 +1529,10 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
           elm("query", query.value),
           elm("path", path.value),
-          elm("allowAnalyzedField", builder.boolean(allowAnalyzedField)))
+          elm("allowAnalyzedField", builder.boolean(allowAnalyzedField))
+        )
 
-        score.foreach { sc =>
-          elms += elm("score", sc.document)
-        }
+        score.foreach { sc => elms += elm("score", sc.document) }
 
         builder.document(elms.result())
       }
@@ -1460,6 +1554,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
     /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/regex/#regex-ref Regex]] operator for Atlas Search */
     object Regex {
+
       /**
        * @param query $queryParam
        * @param path $pathParam
@@ -1478,10 +1573,11 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * }}}
        */
       def apply(
-        query: SearchString,
-        path: SearchString,
-        allowAnalyzedField: Boolean = false,
-        score: Option[Score] = None): Regex =
+          query: SearchString,
+          path: SearchString,
+          allowAnalyzedField: Boolean = false,
+          score: Option[Score] = None
+        ): Regex =
         new Regex(query, path, allowAnalyzedField, score)
     }
 
@@ -1493,9 +1589,10 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      * @param score $scoreParam
      */
     final class QueryString private[api] (
-      val defaultPath: String,
-      val query: String,
-      val score: Option[Score]) extends Operator {
+        val defaultPath: String,
+        val query: String,
+        val score: Option[Score])
+        extends Operator {
 
       val name = "queryString"
 
@@ -1504,11 +1601,10 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
         val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
           elm("defaultPath", string(defaultPath)),
-          elm("query", string(query)))
+          elm("query", string(query))
+        )
 
-        score.foreach { sc =>
-          elms += elm("score", sc.document)
-        }
+        score.foreach { sc => elms += elm("score", sc.document) }
 
         builder.document(elms.result())
       }
@@ -1530,6 +1626,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
     /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/query-syntax/#query-syntax-ref Query string]] operator for Atlas Search. */
     object QueryString {
+
       /**
        * @param defaultPath the indexed field to search by default
        * @param query the [[https://docs.atlas.mongodb.com/reference/atlas-search/queryString/#description query string]]
@@ -1545,9 +1642,10 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * }}}
        */
       def apply(
-        defaultPath: String,
-        query: String,
-        score: Option[Score] = None): QueryString =
+          defaultPath: String,
+          query: String,
+          score: Option[Score] = None
+        ): QueryString =
         new QueryString(defaultPath, query, score)
     }
   }

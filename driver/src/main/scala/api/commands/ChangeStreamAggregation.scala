@@ -21,8 +21,9 @@ trait ChangeStreamAggregation[P <: SerializationPack] {
    * @since MongoDB 3.6
    */
   final class ChangeStream private[api] (
-    offset: Option[ChangeStream.Offset],
-    fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy]) extends PipelineOperator {
+      offset: Option[ChangeStream.Offset],
+      fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy])
+      extends PipelineOperator {
 
     def makePipe: pack.Document = {
       val elms = Seq.newBuilder[pack.ElementProducer]
@@ -33,7 +34,9 @@ trait ChangeStreamAggregation[P <: SerializationPack] {
 
         case startAt: ChangeStream.StartAt =>
           elms += builder.elementProducer(
-            "startAtOperationTime", builder.timestamp(startAt.operationTime))
+            "startAtOperationTime",
+            builder.timestamp(startAt.operationTime)
+          )
 
         case resumeAfter: ChangeStream.ResumeAfter =>
           elms += builder.elementProducer("resumeAfter", resumeAfter.value)
@@ -60,13 +63,16 @@ trait ChangeStreamAggregation[P <: SerializationPack] {
   }
 
   object ChangeStream {
+
     /** Change stream offset */
     sealed trait Offset
 
     /**
      * Indicates that the change stream must [[https://github.com/mongodb/specifications/blob/master/source/change-streams/change-streams.rst#resumeafter resume after]] the given value.
      */
-    final class ResumeAfter private[api] (val value: pack.Value) extends Offset {
+    final class ResumeAfter private[api] (val value: pack.Value)
+        extends Offset {
+
       @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
       @inline override def hashCode: Int =
         if (value == null) -1 else value.hashCode
@@ -74,8 +80,7 @@ trait ChangeStreamAggregation[P <: SerializationPack] {
       @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
       override def equals(that: Any): Boolean = that match {
         case other: this.type =>
-          (this.value == null && other.value == null) || (
-            this.value != null && this.value == other.value)
+          (this.value == null && other.value == null) || (this.value != null && this.value == other.value)
 
         case _ =>
           false
@@ -85,6 +90,7 @@ trait ChangeStreamAggregation[P <: SerializationPack] {
     }
 
     object ResumeAfter {
+
       /**
        * @param value Represents the ID of the last known change event, if any. The stream will resume just after that event.
        */
@@ -93,6 +99,7 @@ trait ChangeStreamAggregation[P <: SerializationPack] {
 
     /** Indicates that the change stream must start after the given value. */
     final class StartAfter private[api] (val value: pack.Value) extends Offset {
+
       @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
       @inline override def hashCode: Int =
         if (value == null) -1 else value.hashCode
@@ -100,8 +107,7 @@ trait ChangeStreamAggregation[P <: SerializationPack] {
       @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
       override def equals(that: Any): Boolean = that match {
         case other: this.type =>
-          (this.value == null && other.value == null) || (
-            this.value != null && this.value == other.value)
+          (this.value == null && other.value == null) || (this.value != null && this.value == other.value)
 
         case _ =>
           false
@@ -134,6 +140,7 @@ trait ChangeStreamAggregation[P <: SerializationPack] {
     }
 
     object StartAt {
+
       /**
        * @param operationTime The operation time before which all change events are known. Must be in the time range of the oplog.
        */
@@ -145,7 +152,8 @@ trait ChangeStreamAggregation[P <: SerializationPack] {
      * @param fullDocumentStrategy If set to UpdateLookup, every update change event will be joined with the ''current'' version of the relevant document.
      */
     def apply(
-      offset: Option[Offset] = None,
-      fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None): ChangeStream = new ChangeStream(offset, fullDocumentStrategy)
+        offset: Option[Offset] = None,
+        fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None
+      ): ChangeStream = new ChangeStream(offset, fullDocumentStrategy)
   }
 }

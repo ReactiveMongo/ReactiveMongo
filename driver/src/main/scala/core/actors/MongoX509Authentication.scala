@@ -23,20 +23,26 @@ private[reactivemongo] trait MongoX509Authentication { system: MongoDBSystem =>
   private lazy val writer = X509Authenticate.writer(pack)
 
   protected final def sendAuthenticate(
-    connection: Connection,
-    nextAuth: Authenticate): Connection = {
+      connection: Connection,
+      nextAuth: Authenticate
+    ): Connection = {
 
     val maker = Command.buildRequestMaker(pack)(
       CommandKind.Authenticate,
       X509Authenticate(Option(nextAuth.user)),
-      writer, ReadPreference.primary, db = f"$$external")
+      writer,
+      ReadPreference.primary,
+      db = f"$$external"
+    )
 
     connection.send(
       maker(RequestIdGenerator.authenticate.next),
-      compression = ListSet.empty)
+      compression = ListSet.empty
+    )
 
-    connection.copy(authenticating = Some(
-      X509Authenticating(nextAuth.db, nextAuth.user)))
+    connection.copy(authenticating =
+      Some(X509Authenticating(nextAuth.db, nextAuth.user))
+    )
   }
 
   private lazy val reader = X509Authenticate.reader(pack)
@@ -49,7 +55,8 @@ private[reactivemongo] trait MongoX509Authentication { system: MongoDBSystem =>
 
       updateNodeSet(s"X509Authentication($chanId)") { ns =>
         handleAuthResponse(ns, resp)(
-          AuthenticationResult.parse(pack, resp)(reader))
+          AuthenticationResult.parse(pack, resp)(reader)
+        )
       }
 
       ()

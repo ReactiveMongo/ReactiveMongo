@@ -26,7 +26,10 @@ import reactivemongo.api.commands.CommandCodecs
 
 import reactivemongo.core.errors.GenericDriverException
 
-trait GenericCollectionProducer[P <: SerializationPack, +C <: GenericCollection[P]] extends CollectionProducer[C] {
+trait GenericCollectionProducer[
+    P <: SerializationPack,
+    +C <: GenericCollection[P]]
+    extends CollectionProducer[C] {
   private[reactivemongo] val pack: P
 }
 
@@ -77,22 +80,32 @@ trait GenericCollectionProducer[P <: SerializationPack, +C <: GenericCollection[
  * @define fetchNewObjectParam the command result must be the new object instead of the old one
  */
 trait GenericCollection[P <: SerializationPack]
-  extends Collection with PackSupport[P] with GenericCollectionWithCommands[P]
-  with CollectionMetaCommands with InsertOps[P] with UpdateOps[P]
-  with DeleteOps[P] with CountOp[P] with DistinctOp[P]
-  with GenericCollectionWithDistinctOps[P]
-  with FindAndModifyOps[P] with ChangeStreamOps[P]
-  with AggregationOps[P] with GenericCollectionMetaCommands[P]
-  with QueryBuilderFactory[P] { self =>
+    extends Collection
+    with PackSupport[P]
+    with GenericCollectionWithCommands[P]
+    with CollectionMetaCommands
+    with InsertOps[P]
+    with UpdateOps[P]
+    with DeleteOps[P]
+    with CountOp[P]
+    with DistinctOp[P]
+    with GenericCollectionWithDistinctOps[P]
+    with FindAndModifyOps[P]
+    with ChangeStreamOps[P]
+    with AggregationOps[P]
+    with GenericCollectionMetaCommands[P]
+    with QueryBuilderFactory[P] { self =>
 
   /** Upper MongoDB version (used for version checks) */
   protected lazy val version = db.connectionState.metadata.maxWireVersion
 
   import AggregationFramework.{ Pipeline => AggregationPipeline }
 
-  private[reactivemongo] implicit def packIdentityReader: pack.Reader[pack.Document] = pack.IdentityReader
+  private[reactivemongo] implicit def packIdentityReader: pack.Reader[pack.Document] =
+    pack.IdentityReader
 
-  private[reactivemongo] implicit def packIdentityWriter: pack.Writer[pack.Document] = pack.IdentityWriter
+  private[reactivemongo] implicit def packIdentityWriter: pack.Writer[pack.Document] =
+    pack.IdentityWriter
 
   implicit protected lazy val unitReader: pack.Reader[Unit] =
     CommandCodecs.unitReader[pack.type](pack)
@@ -102,7 +115,8 @@ trait GenericCollection[P <: SerializationPack]
     collection = this,
     failoverStrategy = this.failoverStrategy,
     readConcern = this.readConcern,
-    readPreference = this.readPreference)
+    readPreference = this.readPreference
+  )
 
   // Required for ops (e.g. InsertOps, ...)
   private[reactivemongo] def session(): Option[Session] = db.session
@@ -125,7 +139,8 @@ trait GenericCollection[P <: SerializationPack]
    * @param pwriter the writer for the projection
    * @return $returnQueryBuilder
    */
-  def find[S](selector: S)(implicit swriter: pack.Writer[S]): QueryBuilder = find(selector, Option.empty[pack.Document])
+  def find[S](selector: S)(implicit swriter: pack.Writer[S]): QueryBuilder =
+    find(selector, Option.empty[pack.Document])
 
   /**
    * $findDescription, with the projection applied.
@@ -140,7 +155,13 @@ trait GenericCollection[P <: SerializationPack]
    * @param pwriter the writer for the projection
    * @return $returnQueryBuilder
    */
-  def find[S, J](selector: S, projection: Option[J])(implicit swriter: pack.Writer[S], pwriter: pack.Writer[J]): QueryBuilder = {
+  def find[S, J](
+      selector: S,
+      projection: Option[J]
+    )(implicit
+      swriter: pack.Writer[S],
+      pwriter: pack.Writer[J]
+    ): QueryBuilder = {
     val queryBuilder = genericQueryBuilder.filter(selector)
 
     projection.fold(queryBuilder) { queryBuilder.projection(_) }
@@ -158,13 +179,16 @@ trait GenericCollection[P <: SerializationPack]
    * @param readPreference $readPrefParam
    */
   def count(
-    selector: Option[pack.Document] = None,
-    limit: Option[Int] = None,
-    skip: Int = 0,
-    hint: Option[Hint] = None,
-    readConcern: ReadConcern = this.readConcern,
-    readPreference: ReadPreference = this.readPreference)(implicit ec: ExecutionContext): Future[Long] = countDocuments(
-    selector, limit, skip, hint, readConcern, readPreference)
+      selector: Option[pack.Document] = None,
+      limit: Option[Int] = None,
+      skip: Int = 0,
+      hint: Option[Hint] = None,
+      readConcern: ReadConcern = this.readConcern,
+      readPreference: ReadPreference = this.readPreference
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Long] =
+    countDocuments(selector, limit, skip, hint, readConcern, readPreference)
 
   /**
    * Returns an unordered builder for insert operations.
@@ -284,8 +308,9 @@ trait GenericCollection[P <: SerializationPack]
    * }}}
    */
   def insert(
-    ordered: Boolean,
-    bypassDocumentValidation: Boolean): InsertBuilder =
+      ordered: Boolean,
+      bypassDocumentValidation: Boolean
+    ): InsertBuilder =
     prepareInsert(ordered, this.writeConcern, bypassDocumentValidation)
 
   /**
@@ -310,9 +335,10 @@ trait GenericCollection[P <: SerializationPack]
    * }}}
    */
   def insert(
-    ordered: Boolean,
-    writeConcern: WriteConcern,
-    bypassDocumentValidation: Boolean): InsertBuilder =
+      ordered: Boolean,
+      writeConcern: WriteConcern,
+      bypassDocumentValidation: Boolean
+    ): InsertBuilder =
     prepareInsert(ordered, writeConcern, bypassDocumentValidation)
 
   /**
@@ -335,8 +361,12 @@ trait GenericCollection[P <: SerializationPack]
    * }}}
    */
   def update: UpdateBuilder =
-    prepareUpdate(false, writeConcern, false,
-      db.connectionState.metadata.maxBulkSize)
+    prepareUpdate(
+      false,
+      writeConcern,
+      false,
+      db.connectionState.metadata.maxBulkSize
+    )
 
   /**
    * Returns an update builder.
@@ -361,8 +391,12 @@ trait GenericCollection[P <: SerializationPack]
    * @param ordered $orderedParam
    */
   def update(ordered: Boolean): UpdateBuilder =
-    prepareUpdate(ordered, writeConcern, false,
-      db.connectionState.metadata.maxBulkSize)
+    prepareUpdate(
+      ordered,
+      writeConcern,
+      false,
+      db.connectionState.metadata.maxBulkSize
+    )
 
   /**
    * Returns an ordered update builder.
@@ -386,8 +420,12 @@ trait GenericCollection[P <: SerializationPack]
    * @param writeConcern $writeConcernParam
    */
   def update(writeConcern: WriteConcern): UpdateBuilder =
-    prepareUpdate(true, writeConcern, false,
-      db.connectionState.metadata.maxBulkSize)
+    prepareUpdate(
+      true,
+      writeConcern,
+      false,
+      db.connectionState.metadata.maxBulkSize
+    )
 
   /**
    * Returns an update builder.
@@ -412,10 +450,15 @@ trait GenericCollection[P <: SerializationPack]
    * @param writeConcern $writeConcernParam
    */
   def update(
-    ordered: Boolean,
-    writeConcern: WriteConcern): UpdateBuilder =
-    prepareUpdate(ordered, writeConcern, false,
-      db.connectionState.metadata.maxBulkSize)
+      ordered: Boolean,
+      writeConcern: WriteConcern
+    ): UpdateBuilder =
+    prepareUpdate(
+      ordered,
+      writeConcern,
+      false,
+      db.connectionState.metadata.maxBulkSize
+    )
 
   /**
    * Returns an update builder.
@@ -442,10 +485,15 @@ trait GenericCollection[P <: SerializationPack]
    * @param bypassDocumentValidation $bypassDocumentValidationParam
    */
   def update(
-    ordered: Boolean,
-    bypassDocumentValidation: Boolean): UpdateBuilder =
-    prepareUpdate(ordered, this.writeConcern, bypassDocumentValidation,
-      db.connectionState.metadata.maxBulkSize)
+      ordered: Boolean,
+      bypassDocumentValidation: Boolean
+    ): UpdateBuilder =
+    prepareUpdate(
+      ordered,
+      this.writeConcern,
+      bypassDocumentValidation,
+      db.connectionState.metadata.maxBulkSize
+    )
 
   /**
    * Returns an update builder.
@@ -474,11 +522,16 @@ trait GenericCollection[P <: SerializationPack]
    * @param bypassDocumentValidation $bypassDocumentValidationParam
    */
   def update(
-    ordered: Boolean,
-    writeConcern: WriteConcern,
-    bypassDocumentValidation: Boolean): UpdateBuilder =
-    prepareUpdate(ordered, writeConcern, bypassDocumentValidation,
-      db.connectionState.metadata.maxBulkSize)
+      ordered: Boolean,
+      writeConcern: WriteConcern,
+      bypassDocumentValidation: Boolean
+    ): UpdateBuilder =
+    prepareUpdate(
+      ordered,
+      writeConcern,
+      bypassDocumentValidation,
+      db.connectionState.metadata.maxBulkSize
+    )
 
   /**
    * Returns an update modifier, to be used with `findAndModify`.
@@ -487,7 +540,17 @@ trait GenericCollection[P <: SerializationPack]
    * @param fetchNewObject $fetchNewObjectParam
    * @param upsert $upsertParam
    */
-  def updateModifier[U](update: U, fetchNewObject: Boolean = false, upsert: Boolean = false)(implicit updateWriter: pack.Writer[U]): FindAndUpdateOp = new FindAndUpdateOp(pack.serialize(update, updateWriter), fetchNewObject, upsert)
+  def updateModifier[U](
+      update: U,
+      fetchNewObject: Boolean = false,
+      upsert: Boolean = false
+    )(implicit
+      updateWriter: pack.Writer[U]
+    ): FindAndUpdateOp = new FindAndUpdateOp(
+    pack.serialize(update, updateWriter),
+    fetchNewObject,
+    upsert
+  )
 
   /**
    * '''EXPERIMENTAL:'''
@@ -497,7 +560,15 @@ trait GenericCollection[P <: SerializationPack]
    * @param fetchNewObject $fetchNewObjectParam
    * @param upsert $upsertParam
    */
-  def aggregationUpdateModifier(update: AggregationPipeline, fetchNewObject: Boolean = false, upsert: Boolean = false): FindAndUpdateWithAggregateOp = new FindAndUpdateWithAggregateOp(update.map(_.makePipe), fetchNewObject, upsert)
+  def aggregationUpdateModifier(
+      update: AggregationPipeline,
+      fetchNewObject: Boolean = false,
+      upsert: Boolean = false
+    ): FindAndUpdateWithAggregateOp = new FindAndUpdateWithAggregateOp(
+    update.map(_.makePipe),
+    fetchNewObject,
+    upsert
+  )
 
   /** Returns a removal modifier, to be used with `findAndModify`. */
   @inline def removeModifier = FindAndRemoveOp
@@ -545,15 +616,19 @@ trait GenericCollection[P <: SerializationPack]
    */
   @SuppressWarnings(Array("MaxParameters"))
   def findAndModify[S](
-    selector: S,
-    modifier: FindAndModifyOp,
-    sort: Option[pack.Document] = None,
-    fields: Option[pack.Document] = None,
-    bypassDocumentValidation: Boolean = false,
-    writeConcern: WriteConcern = this.writeConcern,
-    maxTime: Option[FiniteDuration] = None,
-    collation: Option[Collation] = None,
-    arrayFilters: Seq[pack.Document] = Seq.empty)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[FindAndModifyResult] = {
+      selector: S,
+      modifier: FindAndModifyOp,
+      sort: Option[pack.Document] = None,
+      fields: Option[pack.Document] = None,
+      bypassDocumentValidation: Boolean = false,
+      writeConcern: WriteConcern = this.writeConcern,
+      maxTime: Option[FiniteDuration] = None,
+      collation: Option[Collation] = None,
+      arrayFilters: Seq[pack.Document] = Seq.empty
+    )(implicit
+      swriter: pack.Writer[S],
+      ec: ExecutionContext
+    ): Future[FindAndModifyResult] = {
 
     val op = prepareFindAndModify(
       selector = selector,
@@ -564,7 +639,8 @@ trait GenericCollection[P <: SerializationPack]
       writeConcern = writeConcern,
       maxTime = maxTime,
       collation = collation,
-      arrayFilters = arrayFilters)
+      arrayFilters = arrayFilters
+    )
 
     op()
   }
@@ -605,29 +681,35 @@ trait GenericCollection[P <: SerializationPack]
    */
   @SuppressWarnings(Array("MaxParameters"))
   def findAndUpdate[S, T](
-    selector: S,
-    update: T,
-    fetchNewObject: Boolean = false,
-    upsert: Boolean = false,
-    sort: Option[pack.Document] = None,
-    fields: Option[pack.Document] = None,
-    bypassDocumentValidation: Boolean = false,
-    writeConcern: WriteConcern = this.writeConcern,
-    maxTime: Option[FiniteDuration] = None,
-    collation: Option[Collation] = None,
-    arrayFilters: Seq[pack.Document] = Seq.empty)(
-    implicit
-    swriter: pack.Writer[S],
-    writer: pack.Writer[T],
-    ec: ExecutionContext): Future[FindAndModifyResult] = {
+      selector: S,
+      update: T,
+      fetchNewObject: Boolean = false,
+      upsert: Boolean = false,
+      sort: Option[pack.Document] = None,
+      fields: Option[pack.Document] = None,
+      bypassDocumentValidation: Boolean = false,
+      writeConcern: WriteConcern = this.writeConcern,
+      maxTime: Option[FiniteDuration] = None,
+      collation: Option[Collation] = None,
+      arrayFilters: Seq[pack.Document] = Seq.empty
+    )(implicit
+      swriter: pack.Writer[S],
+      writer: pack.Writer[T],
+      ec: ExecutionContext
+    ): Future[FindAndModifyResult] = {
     val updateOp = updateModifier(update, fetchNewObject, upsert)
 
-    findAndModify(selector, updateOp, sort, fields,
+    findAndModify(
+      selector,
+      updateOp,
+      sort,
+      fields,
       bypassDocumentValidation = bypassDocumentValidation,
       writeConcern = writeConcern,
       maxTime = maxTime,
       collation = collation,
-      arrayFilters = arrayFilters)
+      arrayFilters = arrayFilters
+    )
   }
 
   /**
@@ -673,28 +755,34 @@ trait GenericCollection[P <: SerializationPack]
    * @param arrayFilters $arrayFiltersParam
    */
   def findAndUpdateWithPipeline[S](
-    selector: S,
-    update: AggregationPipeline,
-    fetchNewObject: Boolean = false,
-    upsert: Boolean = false,
-    sort: Option[pack.Document] = None,
-    fields: Option[pack.Document] = None,
-    bypassDocumentValidation: Boolean = false,
-    writeConcern: WriteConcern = this.writeConcern,
-    maxTime: Option[FiniteDuration] = None,
-    collation: Option[Collation] = None,
-    arrayFilters: Seq[pack.Document] = Seq.empty)(
-    implicit
-    swriter: pack.Writer[S],
-    ec: ExecutionContext): Future[FindAndModifyResult] = {
+      selector: S,
+      update: AggregationPipeline,
+      fetchNewObject: Boolean = false,
+      upsert: Boolean = false,
+      sort: Option[pack.Document] = None,
+      fields: Option[pack.Document] = None,
+      bypassDocumentValidation: Boolean = false,
+      writeConcern: WriteConcern = this.writeConcern,
+      maxTime: Option[FiniteDuration] = None,
+      collation: Option[Collation] = None,
+      arrayFilters: Seq[pack.Document] = Seq.empty
+    )(implicit
+      swriter: pack.Writer[S],
+      ec: ExecutionContext
+    ): Future[FindAndModifyResult] = {
     val updateOp = aggregationUpdateModifier(update, fetchNewObject, upsert)
 
-    findAndModify(selector, updateOp, sort, fields,
+    findAndModify(
+      selector,
+      updateOp,
+      sort,
+      fields,
       bypassDocumentValidation = bypassDocumentValidation,
       writeConcern = writeConcern,
       maxTime = maxTime,
       collation = collation,
-      arrayFilters = arrayFilters)
+      arrayFilters = arrayFilters
+    )
   }
 
   /**
@@ -728,19 +816,27 @@ trait GenericCollection[P <: SerializationPack]
    * @param swriter $swriterParam
    */
   def findAndRemove[S](
-    selector: S,
-    sort: Option[pack.Document] = None,
-    fields: Option[pack.Document] = None,
-    writeConcern: WriteConcern = this.writeConcern,
-    maxTime: Option[FiniteDuration] = None,
-    collation: Option[Collation] = None,
-    arrayFilters: Seq[pack.Document] = Seq.empty)(implicit swriter: pack.Writer[S], ec: ExecutionContext): Future[FindAndModifyResult] = findAndModify[S](
-    selector, removeModifier, sort, fields,
+      selector: S,
+      sort: Option[pack.Document] = None,
+      fields: Option[pack.Document] = None,
+      writeConcern: WriteConcern = this.writeConcern,
+      maxTime: Option[FiniteDuration] = None,
+      collation: Option[Collation] = None,
+      arrayFilters: Seq[pack.Document] = Seq.empty
+    )(implicit
+      swriter: pack.Writer[S],
+      ec: ExecutionContext
+    ): Future[FindAndModifyResult] = findAndModify[S](
+    selector,
+    removeModifier,
+    sort,
+    fields,
     bypassDocumentValidation = false,
     writeConcern = writeConcern,
     maxTime = maxTime,
     collation = collation,
-    arrayFilters = arrayFilters)
+    arrayFilters = arrayFilters
+  )
 
   /**
    * $aggregation.
@@ -757,24 +853,30 @@ trait GenericCollection[P <: SerializationPack]
    * @param reader $readerParam
    */
   def aggregateWith[T](
-    explain: Boolean = false,
-    allowDiskUse: Boolean = false,
-    bypassDocumentValidation: Boolean = false,
-    readConcern: ReadConcern = this.readConcern,
-    readPreference: ReadPreference = ReadPreference.primary,
-    batchSize: Option[Int] = None)(
-    f: AggregationFramework => AggregationPipeline)(
-    implicit
-    reader: pack.Reader[T],
-    cp: CursorProducer[T]): cp.ProducedCursor = {
+      explain: Boolean = false,
+      allowDiskUse: Boolean = false,
+      bypassDocumentValidation: Boolean = false,
+      readConcern: ReadConcern = this.readConcern,
+      readPreference: ReadPreference = ReadPreference.primary,
+      batchSize: Option[Int] = None
+    )(f: AggregationFramework => AggregationPipeline
+    )(implicit
+      reader: pack.Reader[T],
+      cp: CursorProducer[T]
+    ): cp.ProducedCursor = {
 
     val pipeline = f(AggregationFramework)
 
     val aggregateCursor: Cursor.WithOps[T] = aggregatorContext[T](
-      pipeline, explain, allowDiskUse,
-      bypassDocumentValidation, readConcern, readPreference,
-      this.writeConcern, batchSize).
-      prepared[Cursor.WithOps](CursorProducer.defaultCursorProducer[T]).cursor
+      pipeline,
+      explain,
+      allowDiskUse,
+      bypassDocumentValidation,
+      readConcern,
+      readPreference,
+      this.writeConcern,
+      batchSize
+    ).prepared[Cursor.WithOps](CursorProducer.defaultCursorProducer[T]).cursor
 
     cp.produce(aggregateCursor)
   }
@@ -828,19 +930,22 @@ trait GenericCollection[P <: SerializationPack]
    */
   @SuppressWarnings(Array("MaxParameters"))
   def aggregatorContext[T](
-    pipeline: List[PipelineOperator] = List.empty,
-    explain: Boolean = false,
-    allowDiskUse: Boolean = false,
-    bypassDocumentValidation: Boolean = false,
-    readConcern: ReadConcern = this.readConcern,
-    readPreference: ReadPreference = this.readPreference,
-    writeConcern: WriteConcern = this.writeConcern,
-    batchSize: Option[Int] = None,
-    cursorOptions: CursorOptions = CursorOptions.empty,
-    maxTime: Option[FiniteDuration] = None,
-    hint: Option[Hint] = None,
-    comment: Option[String] = None,
-    collation: Option[Collation] = None)(implicit reader: pack.Reader[T]): AggregatorContext[T] = {
+      pipeline: List[PipelineOperator] = List.empty,
+      explain: Boolean = false,
+      allowDiskUse: Boolean = false,
+      bypassDocumentValidation: Boolean = false,
+      readConcern: ReadConcern = this.readConcern,
+      readPreference: ReadPreference = this.readPreference,
+      writeConcern: WriteConcern = this.writeConcern,
+      batchSize: Option[Int] = None,
+      cursorOptions: CursorOptions = CursorOptions.empty,
+      maxTime: Option[FiniteDuration] = None,
+      hint: Option[Hint] = None,
+      comment: Option[String] = None,
+      collation: Option[Collation] = None
+    )(implicit
+      reader: pack.Reader[T]
+    ): AggregatorContext[T] = {
     new AggregatorContext[T](
       pipeline,
       explain,
@@ -855,7 +960,8 @@ trait GenericCollection[P <: SerializationPack]
       reader,
       hint,
       comment,
-      collation)
+      collation
+    )
   }
 
   /**
@@ -891,7 +997,10 @@ trait GenericCollection[P <: SerializationPack]
    *   implicit ec: ExecutionContext) = coll.delete(true).one(query)
    * }}}
    */
-  def delete(ordered: Boolean = true, writeConcern: WriteConcern = writeConcern): DeleteBuilder = prepareDelete(ordered, writeConcern)
+  def delete(
+      ordered: Boolean = true,
+      writeConcern: WriteConcern = writeConcern
+    ): DeleteBuilder = prepareDelete(ordered, writeConcern)
 
   // --- Internals ---
 
@@ -913,7 +1022,9 @@ trait GenericCollection[P <: SerializationPack]
   protected def watchFailure[T](future: => Future[T]): Future[T] =
     Try(future).recover { case NonFatal(e) => Future.failed(e) }.get
 
-  @inline protected def unsupportedVersion(metadata: reactivemongo.core.protocol.ProtocolMetadata) = new GenericDriverException(s"Unsupported MongoDB version: $metadata")
+  @inline protected def unsupportedVersion(
+      metadata: reactivemongo.core.protocol.ProtocolMetadata
+    ) = new GenericDriverException(s"Unsupported MongoDB version: $metadata")
 
   override def toString: String = s"collection[${name}]"
 }

@@ -34,15 +34,17 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
     "be set as" >> {
       "sort" in {
         b.sort must beNone and {
-          b.sort(BSONDocument("foo" -> 1)).
-            sort must beSome(BSONDocument("foo" -> 1))
+          b.sort(BSONDocument("foo" -> 1)).sort must beSome(
+            BSONDocument("foo" -> 1)
+          )
         }
       }
 
       "projection" in {
         b.projection must beNone and {
-          b.projection(BSONDocument("bar" -> 1)).
-            projection must beSome(BSONDocument("bar" -> 1))
+          b.projection(BSONDocument("bar" -> 1)).projection must beSome(
+            BSONDocument("bar" -> 1)
+          )
         }
       }
 
@@ -80,8 +82,8 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
 
       "readConcern" in {
         b.readConcern must_=== ReadConcern.Local and {
-          b.readConcern(ReadConcern.Majority).
-            readConcern must_=== ReadConcern.Majority
+          b.readConcern(ReadConcern.Majority)
+            .readConcern must_=== ReadConcern.Majority
         }
       }
 
@@ -111,22 +113,25 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
 
       "max" in {
         b.max must beNone and {
-          b.max(BSONDocument("bar" -> 1)).
-            max must beSome(BSONDocument("bar" -> 1))
+          b.max(BSONDocument("bar" -> 1)).max must beSome(
+            BSONDocument("bar" -> 1)
+          )
         }
       }
 
       "min" in {
         b.min must beNone and {
-          b.min(BSONDocument("bar" -> 1)).
-            min must beSome(BSONDocument("bar" -> 1))
+          b.min(BSONDocument("bar" -> 1)).min must beSome(
+            BSONDocument("bar" -> 1)
+          )
         }
       }
 
       "collation" in {
         val colla = Collation(
           locale = "en-US",
-          strength = Some(Collation.PrimaryStrength))
+          strength = Some(Collation.PrimaryStrength)
+        )
 
         b.collation must beNone and {
           b.collation(colla).collation must beSome(colla)
@@ -150,16 +155,17 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
   section("unit")
 
   "Merge" should {
-    lazy val coll = _root_.tests.Common.db(
-      s"querybuilder${System identityHashCode this}")
+    lazy val coll =
+      _root_.tests.Common.db(s"querybuilder${System identityHashCode this}")
 
-    lazy val ver = reactivemongo.api.tests.
-      maxWireVersion(_root_.tests.Common.db)
+    lazy val ver =
+      reactivemongo.api.tests.maxWireVersion(_root_.tests.Common.db)
 
     "write minimal query" in {
       val builder = coll.find(
         BSONDocument("username" -> "John Doe"),
-        Option.empty[BSONDocument])
+        Option.empty[BSONDocument]
+      )
 
       val elements = Seq.newBuilder[(String, BSONValue)] ++= Seq(
         "find" -> BSONString(coll.name),
@@ -171,7 +177,8 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
         "allowPartialResults" -> BSONBoolean(false),
         "singleBatch" -> BSONBoolean(false),
         "returnKey" -> BSONBoolean(false),
-        "showRecordId" -> BSONBoolean(false))
+        "showRecordId" -> BSONBoolean(false)
+      )
 
       if (ver.compareTo(MongoWireVersion.V34) < 0) {
         elements += ("snapshot" -> BSONBoolean(false))
@@ -181,7 +188,8 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
         "filter" -> BSONDocument("username" -> "John Doe"),
         "limit" -> BSONInteger(10), // maxDocs
         "readConcern" -> BSONDocument("level" -> "local"),
-        f"$$readPreference" -> BSONDocument("mode" -> "primary"))
+        f"$$readPreference" -> BSONDocument("mode" -> "primary")
+      )
 
       val expected = BSONDocument(elements.result())
       val res = builder.merge(ReadPreference.Primary, 10)
@@ -190,10 +198,13 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
     }
 
     "write with more options" >> {
-      lazy val builder1 = coll.find(
-        BSONDocument("username" -> "John Doe"), Option.empty[BSONDocument]).
-        sort(BSONDocument("age" -> 1)).
-        hint(coll.hint(BSONDocument("foo" -> 1)))
+      lazy val builder1 = coll
+        .find(
+          BSONDocument("username" -> "John Doe"),
+          Option.empty[BSONDocument]
+        )
+        .sort(BSONDocument("age" -> 1))
+        .hint(coll.hint(BSONDocument("foo" -> 1)))
 
       lazy val expected1: BSONDocument = {
         val elements = Seq.newBuilder[(String, BSONValue)] ++= Seq(
@@ -206,7 +217,8 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
           "allowPartialResults" -> BSONBoolean(false),
           "singleBatch" -> BSONBoolean(false),
           "returnKey" -> BSONBoolean(false),
-          "showRecordId" -> BSONBoolean(false))
+          "showRecordId" -> BSONBoolean(false)
+        )
 
         if (ver.compareTo(MongoWireVersion.V34) < 0) {
           elements += ("snapshot" -> BSONBoolean(false))
@@ -218,7 +230,8 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
           "sort" -> BSONDocument("age" -> 1),
           "hint" -> BSONDocument("foo" -> 1),
           "readConcern" -> BSONDocument("level" -> "local"),
-          f"$$readPreference" -> BSONDocument("mode" -> "primary"))
+          f"$$readPreference" -> BSONDocument("mode" -> "primary")
+        )
 
         BSONDocument(elements.result())
       }
@@ -240,8 +253,10 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
 
   // ---
 
-  object Factory extends PackSupport[Pack]
-    with HintFactory[Pack] with QueryBuilderFactory[Pack] {
+  object Factory
+      extends PackSupport[Pack]
+      with HintFactory[Pack]
+      with QueryBuilderFactory[Pack] {
 
     val pack = reactivemongo.api.tests.pack
 

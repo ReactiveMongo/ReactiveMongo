@@ -11,14 +11,15 @@ import reactivemongo.io.netty.channel.ChannelHandlerContext
  * if it contains more than one frame.
  */
 private[reactivemongo] class ResponseFrameDecoder
-  extends reactivemongo.io.netty.handler.codec.ByteToMessageDecoder {
+    extends reactivemongo.io.netty.handler.codec.ByteToMessageDecoder {
 
-  //private val rand = new scala.util.Random(System identityHashCode this)
+  // private val rand = new scala.util.Random(System identityHashCode this)
 
   override def decode(
-    context: ChannelHandlerContext,
-    buffer: ByteBuf,
-    out: JList[Object]): Unit = {
+      context: ChannelHandlerContext,
+      buffer: ByteBuf,
+      out: JList[Object]
+    ): Unit = {
 
     frames(buffer, buffer.readableBytes, out)
 
@@ -26,7 +27,11 @@ private[reactivemongo] class ResponseFrameDecoder
   }
 
   @annotation.tailrec
-  private def frames(buffer: ByteBuf, readableBytes: Int, out: JList[Object]): Unit = {
+  private def frames(
+      buffer: ByteBuf,
+      readableBytes: Int,
+      out: JList[Object]
+    ): Unit = {
     if (readableBytes > 0) {
       buffer.markReaderIndex()
 

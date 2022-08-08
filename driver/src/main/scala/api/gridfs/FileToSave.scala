@@ -5,11 +5,12 @@ package reactivemongo.api.gridfs
  * @tparam Id Type of the id of this file (generally BSON ObjectID).
  */
 final class FileToSave[Id, Document] private[api] (
-  val id: Id,
-  val filename: Option[String],
-  val contentType: Option[String],
-  val uploadDate: Option[Long],
-  val metadata: Document) extends FileMetadata[Id, Document] {
+    val id: Id,
+    val filename: Option[String],
+    val contentType: Option[String],
+    val uploadDate: Option[Long],
+    val metadata: Document)
+    extends FileMetadata[Id, Document] {
 
   @SuppressWarnings(Array("ComparingUnrelatedTypes"))
   override def equals(that: Any): Boolean = that match {

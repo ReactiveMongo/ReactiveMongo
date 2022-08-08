@@ -6,15 +6,22 @@ import reactivemongo.core.protocol.Response
 
 /** Internal cursor operations. */
 trait CursorOps[T] { cursor: Cursor[T] =>
+
   /** Sends the initial request. */
-  private[reactivemongo] def makeRequest(maxDocs: Int)(implicit ec: ExecutionContext): Future[Response]
+  private[reactivemongo] def makeRequest(
+      maxDocs: Int
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Response]
 
   /**
    * Returns a function that can be used to get the next response,
    * if allowed according the `maxDocs` and the cursor options
    * (cursor not exhausted, tailable, ...)
    */
-  private[reactivemongo] def nextResponse(maxDocs: Int): (ExecutionContext, Response) => Future[Option[Response]]
+  private[reactivemongo] def nextResponse(
+      maxDocs: Int
+    ): (ExecutionContext, Response) => Future[Option[Response]]
 
   /**
    * Returns an iterator to read the response documents,
@@ -27,7 +34,11 @@ trait CursorOps[T] { cursor: Cursor[T] =>
    *
    * @param id the cursor ID
    */
-  private[reactivemongo] def killCursor(id: Long)(implicit ec: ExecutionContext): Unit
+  private[reactivemongo] def killCursor(
+      id: Long
+    )(implicit
+      ec: ExecutionContext
+    ): Unit
 
   /** Indicates whether the underlying cursor is [[https://docs.mongodb.com/manual/core/tailable-cursors/ tailable]]. */
   def tailable: Boolean
@@ -40,12 +51,13 @@ trait CursorOps[T] { cursor: Cursor[T] =>
 }
 
 object CursorOps {
+
   /**
    * Wraps exception that has already been passed to the current error handler
    * and should not be recovered.
    */
   private[reactivemongo] case class UnrecoverableException(cause: Throwable)
-    extends scala.RuntimeException(cause)
-    with scala.util.control.NoStackTrace
+      extends scala.RuntimeException(cause)
+      with scala.util.control.NoStackTrace
 
 }

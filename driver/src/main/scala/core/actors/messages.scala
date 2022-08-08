@@ -15,8 +15,8 @@ import reactivemongo.core.protocol.{ RequestMaker, Response, ProtocolMetadata }
  * @param requestMaker the request maker
  */
 private[reactivemongo] final class ExpectingResponse(
-  val requestMaker: RequestMaker,
-  val pinnedNode: Option[String]) {
+    val requestMaker: RequestMaker,
+    val pinnedNode: Option[String]) {
   val promise: Promise[Response] = Promise()
 
   /** The future response of this request. */
@@ -47,6 +47,7 @@ private[reactivemongo] sealed class Close {
  * The MongoDBSystem actor must not be used after this message has been sent.
  */
 private[reactivemongo] case object Close extends Close {
+
   @SuppressWarnings(Array("VariableShadowing"))
   def apply(src: String, timeout: FiniteDuration): Close = {
     def t = timeout
@@ -70,9 +71,9 @@ private[reactivemongo] case class ChannelDisconnected(channelId: ChannelId)
 
 /** Message sent when the primary has been discovered. */
 private[reactivemongo] class PrimaryAvailable(
-  val metadata: ProtocolMetadata,
-  val setName: Option[String],
-  val isMongos: Boolean) {
+    val metadata: ProtocolMetadata,
+    val setName: Option[String],
+    val isMongos: Boolean) {
 
   override def equals(that: Any): Boolean = that match {
     case other: PrimaryAvailable =>
@@ -101,9 +102,9 @@ private[reactivemongo] object PrimaryAvailable {
 private[reactivemongo] case object PrimaryUnavailable
 
 private[reactivemongo] class SetAvailable(
-  val metadata: ProtocolMetadata,
-  val setName: Option[String],
-  val isMongos: Boolean) {
+    val metadata: ProtocolMetadata,
+    val setName: Option[String],
+    val isMongos: Boolean) {
 
   override def equals(that: Any): Boolean = that match {
     case other: SetAvailable =>

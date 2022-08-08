@@ -18,15 +18,15 @@ package reactivemongo.api
  * }}}
  */
 final class Collation private[api] (
-  _locale: String,
-  _caseLevel: Option[Boolean],
-  _caseFirst: Option[Collation.CaseFirst],
-  _strength: Option[Collation.Strength],
-  _numericOrdering: Option[Boolean],
-  _alternate: Option[Collation.Alternate],
-  _maxVariable: Option[Collation.MaxVariable],
-  _backwards: Option[Boolean],
-  _normalization: Option[Boolean]) {
+    _locale: String,
+    _caseLevel: Option[Boolean],
+    _caseFirst: Option[Collation.CaseFirst],
+    _strength: Option[Collation.Strength],
+    _numericOrdering: Option[Boolean],
+    _alternate: Option[Collation.Alternate],
+    _maxVariable: Option[Collation.MaxVariable],
+    _backwards: Option[Boolean],
+    _normalization: Option[Boolean]) {
 
   /** The [[https://docs.mongodb.com/manual/reference/collation-locales-defaults/#collation-languages-locales ICU locale]] */
   @inline def locale: String = _locale
@@ -84,8 +84,17 @@ final class Collation private[api] (
   // ---
 
   private[api] def tupled =
-    (locale, caseLevel, caseFirst, strength, numericOrdering, alternate,
-      maxVariable, backwards, normalization)
+    (
+      locale,
+      caseLevel,
+      caseFirst,
+      strength,
+      numericOrdering,
+      alternate,
+      maxVariable,
+      backwards,
+      normalization
+    )
 
 }
 
@@ -93,18 +102,29 @@ final class Collation private[api] (
  * [[Collation]] utilities.
  */
 object Collation {
+
   def apply(
-    locale: String,
-    caseLevel: Option[Boolean] = None,
-    caseFirst: Option[CaseFirst] = None,
-    strength: Option[Strength] = None,
-    numericOrdering: Option[Boolean] = None,
-    alternate: Option[Alternate] = None,
-    maxVariable: Option[MaxVariable] = None,
-    backwards: Option[Boolean] = None,
-    normalization: Option[Boolean] = None): Collation =
-    new Collation(locale, caseLevel, caseFirst, strength, numericOrdering,
-      alternate, maxVariable, backwards, normalization)
+      locale: String,
+      caseLevel: Option[Boolean] = None,
+      caseFirst: Option[CaseFirst] = None,
+      strength: Option[Strength] = None,
+      numericOrdering: Option[Boolean] = None,
+      alternate: Option[Alternate] = None,
+      maxVariable: Option[MaxVariable] = None,
+      backwards: Option[Boolean] = None,
+      normalization: Option[Boolean] = None
+    ): Collation =
+    new Collation(
+      locale,
+      caseLevel,
+      caseFirst,
+      strength,
+      numericOrdering,
+      alternate,
+      maxVariable,
+      backwards,
+      normalization
+    )
 
   // ---
 
@@ -131,15 +151,17 @@ object Collation {
   // ---
 
   @inline private[api] def serialize[P <: SerializationPack](
-    pack: P,
-    collation: Collation): pack.Document =
+      pack: P,
+      collation: Collation
+    ): pack.Document =
     serializeWith(pack, collation)(pack.newBuilder)
 
   @SuppressWarnings(Array("UnusedMethodParameter"))
   private[api] def serializeWith[P <: SerializationPack](
-    pack: P,
-    collation: Collation)(
-    builder: SerializationPack.Builder[pack.type]): pack.Document = {
+      pack: P,
+      collation: Collation
+    )(builder: SerializationPack.Builder[pack.type]
+    ): pack.Document = {
 
     import builder.{ elementProducer => element, int, string, boolean }
 
@@ -182,7 +204,9 @@ object Collation {
     builder.document(elements.result())
   }
 
-  private[api] def read[P <: SerializationPack](pack: P): pack.Document => Option[Collation] = {
+  private[api] def read[P <: SerializationPack](
+      pack: P
+    ): pack.Document => Option[Collation] = {
     val decoder = pack.newDecoder
 
     import decoder.{ booleanLike, string }
@@ -193,14 +217,15 @@ object Collation {
           locale,
           _caseLevel = booleanLike(doc, "caseLevel"),
           _caseFirst = string(doc, "caseFirst").map(new Collation.CaseFirst(_)),
-          _strength = decoder.int(
-            doc, "strength").map(new Collation.Strength(_)),
+          _strength =
+            decoder.int(doc, "strength").map(new Collation.Strength(_)),
           _numericOrdering = booleanLike(doc, "numericOrdering"),
           _alternate = string(doc, "alternate").map(new Collation.Alternate(_)),
-          _maxVariable = string(
-            doc, "maxVariable").map(new Collation.MaxVariable(_)),
+          _maxVariable =
+            string(doc, "maxVariable").map(new Collation.MaxVariable(_)),
           _backwards = booleanLike(doc, "backwards"),
-          _normalization = booleanLike(doc, "normalization"))
+          _normalization = booleanLike(doc, "normalization")
+        )
       }
     }
   }

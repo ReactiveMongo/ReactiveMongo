@@ -13,7 +13,8 @@ import reactivemongo.api.commands.{
 }
 
 /** The meta commands for collection that require the serialization pack. */
-private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPack] { self: GenericCollection[P] =>
+private[reactivemongo] trait GenericCollectionMetaCommands[
+    P <: SerializationPack] { self: GenericCollection[P] =>
 
   /**
    * [[https://docs.mongodb.com/manual/reference/method/db.createView/ Creates a view]] on this collection, using an aggregation pipeline.
@@ -52,10 +53,13 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
    * @param collation the view collation
    */
   def createView(
-    name: String,
-    operator: PipelineOperator,
-    pipeline: Seq[PipelineOperator],
-    collation: Option[Collation] = None)(implicit ec: ExecutionContext): Future[Unit] = {
+      name: String,
+      operator: PipelineOperator,
+      pipeline: Seq[PipelineOperator],
+      collation: Option[Collation] = None
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Unit] = {
 
     val cmd = new CreateView(name, operator, pipeline, collation)
 
@@ -68,10 +72,12 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
   // ---
 
   private final class CreateView(
-    val viewName: String,
-    val operator: PipelineOperator,
-    val pipeline: Seq[PipelineOperator],
-    val collation: Option[Collation]) extends CollectionCommand with CommandWithResult[Unit] {
+      val viewName: String,
+      val operator: PipelineOperator,
+      val pipeline: Seq[PipelineOperator],
+      val collation: Option[Collation])
+      extends CollectionCommand
+      with CommandWithResult[Unit] {
     val commandKind = CommandKind.CreateView
   }
 
@@ -86,10 +92,12 @@ private[reactivemongo] trait GenericCollectionMetaCommands[P <: SerializationPac
 
       elements ++= Seq(
         element("create", string(cmd.command.viewName)),
-        element("viewOn", string(cmd.collection)))
+        element("viewOn", string(cmd.collection))
+      )
 
       val pipeline = builder.array(
-        cmd.command.operator.makePipe +: cmd.command.pipeline.map(_.makePipe))
+        cmd.command.operator.makePipe +: cmd.command.pipeline.map(_.makePipe)
+      )
 
       elements += element("pipeline", pipeline)
 

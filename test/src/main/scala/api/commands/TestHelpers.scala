@@ -11,47 +11,62 @@ import reactivemongo.core.errors.DatabaseException
 
 /** TestHelpers about commands. */
 object TestHelpers {
+
   /** '''EXPERIMENTAL:''' Test factory for [[WriteResult]] */
   @SuppressWarnings(Array("MethodNames"))
   def WriteResult(
-    ok: Boolean = true,
-    n: Int = 1,
-    writeErrors: Seq[WriteError] = Nil,
-    writeConcernError: Option[WriteConcernError] = None,
-    code: Option[Int] = None,
-    errmsg: Option[String] = None): WriteResult =
+      ok: Boolean = true,
+      n: Int = 1,
+      writeErrors: Seq[WriteError] = Nil,
+      writeConcernError: Option[WriteConcernError] = None,
+      code: Option[Int] = None,
+      errmsg: Option[String] = None
+    ): WriteResult =
     new DefaultWriteResult(ok, n, writeErrors, writeConcernError, code, errmsg)
 
   /** '''EXPERIMENTAL:''' */
   @SuppressWarnings(Array("MethodNames"))
   def WriteError(
-    errmsg: Option[String] = None,
-    code: Option[Int] = None,
-    lastOp: Option[Long] = None,
-    singleShard: Option[String] = None,
-    wnote: Option[WriteConcern.W] = None,
-    wtimeout: Boolean = false,
-    waited: Option[Int] = None,
-    wtime: Option[Int] = None,
-    writeErrors: Seq[WriteError] = Seq.empty,
-    writeConcernError: Option[WriteConcernError] = None): WriteResult with DatabaseException = new WriteException(errmsg, code, lastOp, singleShard,
-    wnote, wtimeout, waited, wtime, writeErrors, writeConcernError)
+      errmsg: Option[String] = None,
+      code: Option[Int] = None,
+      lastOp: Option[Long] = None,
+      singleShard: Option[String] = None,
+      wnote: Option[WriteConcern.W] = None,
+      wtimeout: Boolean = false,
+      waited: Option[Int] = None,
+      wtime: Option[Int] = None,
+      writeErrors: Seq[WriteError] = Seq.empty,
+      writeConcernError: Option[WriteConcernError] = None
+    ): WriteResult with DatabaseException = new WriteException(
+    errmsg,
+    code,
+    lastOp,
+    singleShard,
+    wnote,
+    wtimeout,
+    waited,
+    wtime,
+    writeErrors,
+    writeConcernError
+  )
 
   // ---
 
   private final class WriteException(
-    val errmsg: Option[String],
-    val code: Option[Int],
-    val lastOp: Option[Long],
-    val singleShard: Option[String],
-    val wnote: Option[WriteConcern.W],
-    val wtimeout: Boolean,
-    val waited: Option[Int],
-    val wtime: Option[Int],
-    val writeErrors: Seq[WriteError],
-    val writeConcernError: Option[WriteConcernError])
-    extends Exception with InternalWriteResult
-    with DatabaseException with NoStackTrace {
+      val errmsg: Option[String],
+      val code: Option[Int],
+      val lastOp: Option[Long],
+      val singleShard: Option[String],
+      val wnote: Option[WriteConcern.W],
+      val wtimeout: Boolean,
+      val waited: Option[Int],
+      val wtime: Option[Int],
+      val writeErrors: Seq[WriteError],
+      val writeConcernError: Option[WriteConcernError])
+      extends Exception
+      with InternalWriteResult
+      with DatabaseException
+      with NoStackTrace {
 
     val ok: Boolean = false
 
@@ -67,7 +82,21 @@ object TestHelpers {
 
     override lazy val message = errmsg.getOrElse("<none>")
 
-    override protected lazy val tupled = Tuple13(ok, errmsg, code, lastOp, n, singleShard, updatedExisting, wnote, wtimeout, waited, wtime, writeErrors, writeConcernError)
+    override protected lazy val tupled = Tuple13(
+      ok,
+      errmsg,
+      code,
+      lastOp,
+      n,
+      singleShard,
+      updatedExisting,
+      wnote,
+      wtimeout,
+      waited,
+      wtime,
+      writeErrors,
+      writeConcernError
+    )
 
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>

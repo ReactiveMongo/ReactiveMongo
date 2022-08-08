@@ -18,7 +18,8 @@ import org.specs2.concurrent.ExecutionEnv
 import _root_.tests.{ Common, NettyEmbedder }
 
 final class ChannelFactorySpec(implicit ee: ExecutionEnv)
-  extends org.specs2.mutable.Specification with AfterAll {
+    extends org.specs2.mutable.Specification
+    with AfterAll {
 
   "Channel factory".title
 
@@ -52,14 +53,17 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
     "manage isMaster command" in {
       val cid = DefaultChannelId.newInstance()
       val expectedResp = {
-        val documents = Unpooled.buffer(
-          isMasterRespBytes.size, isMasterRespBytes.size)
+        val documents =
+          Unpooled.buffer(isMasterRespBytes.size, isMasterRespBytes.size)
 
         documents.writeBytes(isMasterRespBytes)
 
         _response(
-          messageHeader(205, 13, 0, 1), reply(8, 0, 0, 1),
-          documents, responseInfo(cid))
+          messageHeader(205, 13, 0, 1),
+          reply(8, 0, 0, 1),
+          documents,
+          responseInfo(cid)
+        )
       }
 
       val response = Promise[Response]()
@@ -91,8 +95,10 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
       NettyEmbedder.withChannel2(cid, true) { chan =>
         initChannel(factory, 0, chan, "foo", 27017, actorRef)
 
-        chan.writeAndFlush(req).addListener(printOnError).
-          addListener(new ChannelFutureListener {
+        chan
+          .writeAndFlush(req)
+          .addListener(printOnError)
+          .addListener(new ChannelFutureListener {
             def operationComplete(op: ChannelFuture): Unit = {
               if (!sentRequest.isCompleted && op.isSuccess) {
                 val buf = chan.readOutbound[ByteBuf]
@@ -128,25 +134,27 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
 
       "be loaded" in {
         def actor = new Actor {
-          val receive: Receive = {
-            case _ => ()
-          }
+          val receive: Receive = { case _ => () }
         }
 
         val actorRef = akka.testkit.TestActorRef(actor, "test3")
 
-        createChannel(factory, actorRef, "foo", 27017, 0).
-          aka("channel") must beSuccessfulTry[Channel].like {
-            case chan => arch must beLike[String] {
+        createChannel(factory, actorRef, "foo", 27017, 0).aka(
+          "channel"
+        ) must beSuccessfulTry[Channel].like {
+          case chan =>
+            arch must beLike[String] {
               case "osx" =>
-                chan.close(); chan.getClass.getName must startWith(
-                  s"${basePkg}.kqueue.KQueue")
+                chan.close();
+                chan.getClass.getName must startWith(
+                  s"${basePkg}.kqueue.KQueue"
+                )
 
               case "linux" =>
-                chan.close(); chan.getClass.getName must startWith(
-                  s"${basePkg}.epoll.Epoll")
+                chan.close();
+                chan.getClass.getName must startWith(s"${basePkg}.epoll.Epoll")
             }
-          }
+        }
       }
     }
   }
@@ -165,8 +173,7 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
 
           case IsMasterResponse(resp) if (chanConnected.isCompleted) => {
             result.tryComplete(scala.util.Try {
-              val bson = pack.readAndDeserialize(
-                resp, pack.IdentityReader)
+              val bson = pack.readAndDeserialize(resp, pack.IdentityReader)
 
               pack.deserialize(bson, isMasterReader)
             })
@@ -181,49 +188,79 @@ final class ChannelFactorySpec(implicit ee: ExecutionEnv)
 
       val actorRef = akka.testkit.TestActorRef(actor, "test2")
 
-      createChannel(factory, actorRef,
+      createChannel(
+        factory,
+        actorRef,
         host = Common.primaryHost.takeWhile(_ != ':'),
         port = Common.primaryHost.dropWhile(_ != ':').drop(1).toInt,
-        0).
-        aka("channel") must beSuccessfulTry[Channel].like {
-          case chan =>
-            chanConnected.future must beEqualTo({}).await(1, timeout) and {
-              chan.writeAndFlush(isMasterRequest()).addListener(printOnError)
+        0
+      ).aka("channel") must beSuccessfulTry[Channel].like {
+        case chan =>
+          chanConnected.future must beEqualTo({}).await(1, timeout) and {
+            chan.writeAndFlush(isMasterRequest()).addListener(printOnError)
 
-              result.future must beLike[IsMasterResult] {
-                case IsMasterResult(true, 16777216, 48000000, _,
-                  Some(_), _, min, max, _, _, _, _, _) => min must be_<(max)
+            result.future must beLike[IsMasterResult] {
+              case IsMasterResult(
+                    true,
+                    16777216,
+                    48000000,
+                    _,
+                    Some(_),
+                    _,
+                    min,
+                    max,
+                    _,
+                    _,
+                    _,
+                    _,
+                    _
+                  ) =>
+                min must be_<(max)
 
-              }.await(1, timeout) and {
-                if (!chan.closeFuture.isDone) {
-                  chan.close()
-                }
+            }.await(1, timeout) and {
+              if (!chan.closeFuture.isDone) {
+                chan.close()
+              }
 
-                actorRef.stop()
+              actorRef.stop()
 
-                Common.nettyNativeArch.fold(ok) {
-                  case "osx" => chan.getClass.getName must startWith(
-                    "reactivemongo.io.netty.channel.kqueue.KQueue")
+              Common.nettyNativeArch.fold(ok) {
+                case "osx" =>
+                  chan.getClass.getName must startWith(
+                    "reactivemongo.io.netty.channel.kqueue.KQueue"
+                  )
 
-                  case "linux" => chan.getClass.getName must startWith(
-                    "reactivemongo.io.netty.channel.epoll.Epoll")
+                case "linux" =>
+                  chan.getClass.getName must startWith(
+                    "reactivemongo.io.netty.channel.epoll.Epoll"
+                  )
 
-                }
               }
             }
-        }
+          }
+      }
     }
   }
 
   // ---
 
-  lazy val isMasterRespBytes = Array[Byte](-87, 0, 0, 0, 8, 105, 115, 109, 97, 115, 116, 101, 114, 0, 1, 16, 109, 97, 120, 66, 115, 111, 110, 79, 98, 106, 101, 99, 116, 83, 105, 122, 101, 0, 0, 0, 0, 1, 16, 109, 97, 120, 77, 101, 115, 115, 97, 103, 101, 83, 105, 122, 101, 66, 121, 116, 101, 115, 0, 0, 108, -36, 2, 16, 109, 97, 120, 87, 114, 105, 116, 101, 66, 97, 116, 99, 104, 83, 105, 122, 101, 0, -24, 3, 0, 0, 9, 108, 111, 99, 97, 108, 84, 105, 109, 101, 0, -88, 86, 56, -100, 95, 1, 0, 0, 16, 109, 97, 120, 87, 105, 114, 101, 86, 101, 114, 115, 105, 111, 110, 0, 5, 0, 0, 0, 16, 109, 105, 110, 87, 105, 114, 101, 86, 101, 114, 115, 105, 111, 110, 0, 0, 0, 0, 0, 8, 114, 101, 97, 100, 79, 110, 108, 121, 0, 0, 1, 111, 107, 0, 0, 0, 0, 0, 0, 0, -16, 63, 0)
+  lazy val isMasterRespBytes = Array[Byte](-87, 0, 0, 0, 8, 105, 115, 109, 97,
+    115, 116, 101, 114, 0, 1, 16, 109, 97, 120, 66, 115, 111, 110, 79, 98, 106,
+    101, 99, 116, 83, 105, 122, 101, 0, 0, 0, 0, 1, 16, 109, 97, 120, 77, 101,
+    115, 115, 97, 103, 101, 83, 105, 122, 101, 66, 121, 116, 101, 115, 0, 0,
+    108, -36, 2, 16, 109, 97, 120, 87, 114, 105, 116, 101, 66, 97, 116, 99, 104,
+    83, 105, 122, 101, 0, -24, 3, 0, 0, 9, 108, 111, 99, 97, 108, 84, 105, 109,
+    101, 0, -88, 86, 56, -100, 95, 1, 0, 0, 16, 109, 97, 120, 87, 105, 114, 101,
+    86, 101, 114, 115, 105, 111, 110, 0, 5, 0, 0, 0, 16, 109, 105, 110, 87, 105,
+    114, 101, 86, 101, 114, 115, 105, 111, 110, 0, 0, 0, 0, 0, 8, 114, 101, 97,
+    100, 79, 110, 108, 121, 0, 0, 1, 111, 107, 0, 0, 0, 0, 0, 0, 0, -16, 63, 0)
 
   def afterAll(): Unit = {
     releaseChannelFactory(factory, scala.concurrent.Promise())
   }
 
   def printOnError = new ChannelFutureListener {
+
     def operationComplete(op: ChannelFuture): Unit = {
       if (!op.isSuccess) op.cause.printStackTrace()
     }

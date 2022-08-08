@@ -17,11 +17,7 @@ package reactivemongo.util
 
 //import scala.language.implicitConversions
 
-import scala.concurrent.{
-  Future,
-  Promise,
-  duration
-}, duration.Duration
+import scala.concurrent.{ Future, Promise, duration }, duration.Duration
 
 private[reactivemongo] object ExtendedFutures {
   import akka.actor.ActorSystem

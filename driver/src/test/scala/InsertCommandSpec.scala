@@ -22,10 +22,11 @@ final class InsertCommandSpec extends org.specs2.mutable.Specification {
         "insert" -> "foo",
         "ordered" -> false,
         "documents" -> (firstDoc +: otherDocs),
-        "bypassDocumentValidation" -> false)
+        "bypassDocumentValidation" -> false
+      )
 
-      val writeConcern = BSONDocument(
-        "writeConcern" -> BSONDocument("w" -> 1, "j" -> false))
+      val writeConcern =
+        BSONDocument("writeConcern" -> BSONDocument("w" -> 1, "j" -> false))
 
       // ---
 
@@ -38,25 +39,31 @@ final class InsertCommandSpec extends org.specs2.mutable.Specification {
 
         withInsert(new Support(Some(session))) { (insert, writer) =>
           val lsid = BSONDocument(
-            "lsid" -> BSONDocument(
-              "id" -> BSONBinary(session.lsid)))
+            "lsid" -> BSONDocument("id" -> BSONBinary(session.lsid))
+          )
 
           // w/o transaction started
           writer(insert) must_=== (base ++ lsid ++ writeConcern) and {
-            session.startTransaction(WriteConcern.Default, None).
-              aka("transaction") must beSuccessfulTry[(SessionTransaction, Boolean)].which { _ =>
-                // w/ transaction started
+            session
+              .startTransaction(WriteConcern.Default, None)
+              .aka("transaction") must beSuccessfulTry[
+              (SessionTransaction, Boolean)
+            ].which { _ =>
+              // w/ transaction started
 
-                writer(insert) must_=== (base ++ lsid ++ BSONDocument(
-                  "txnNumber" -> 1L,
-                  "startTransaction" -> true, // as first command in tx
-                  "autocommit" -> false))
-              }
+              writer(insert) must_=== (base ++ lsid ++ BSONDocument(
+                "txnNumber" -> 1L,
+                "startTransaction" -> true, // as first command in tx
+                "autocommit" -> false
+              ))
+            }
           } and {
             // w/o 'startTransaction' flag after first command in tx
 
             writer(insert) must_=== (base ++ lsid ++ BSONDocument(
-              "txnNumber" -> 1L, "autocommit" -> false))
+              "txnNumber" -> 1L,
+              "autocommit" -> false
+            ))
           }
         }
       }
@@ -70,9 +77,15 @@ final class InsertCommandSpec extends org.specs2.mutable.Specification {
 
   private lazy val otherDocs = Seq(
     BSONDocument("_id" -> 2, "value" -> "bar"),
-    BSONDocument("_id" -> 3, "value" -> "lorem"))
+    BSONDocument("_id" -> 3, "value" -> "lorem")
+  )
 
-  private def withInsert[T](support: Support)(f: Function2[ResolvedCollectionCommand[support.Insert], support.InsertCmd => support.pack.Document, T]): T = f(
+  private def withInsert[T](
+      support: Support
+    )(f: Function2[ResolvedCollectionCommand[
+        support.Insert
+      ], support.InsertCmd => support.pack.Document, T]
+    ): T = f(
     new ResolvedCollectionCommand(
       collection = "foo",
       command = new support.Insert(
@@ -80,13 +93,17 @@ final class InsertCommandSpec extends org.specs2.mutable.Specification {
         tail = otherDocs,
         ordered = false,
         writeConcern = WriteConcern.Default,
-        bypassDocumentValidation = false)),
-    support.pack.serialize(_: support.InsertCmd, support.insertWriter))
+        bypassDocumentValidation = false
+      )
+    ),
+    support.pack.serialize(_: support.InsertCmd, support.insertWriter)
+  )
 
   import reactivemongo.api.tests.Pack
 
   private class Support(s: Option[Session] = None)
-    extends PackSupport[Pack] with InsertCommand[Pack] {
+      extends PackSupport[Pack]
+      with InsertCommand[Pack] {
 
     val pack = reactivemongo.api.tests.pack
 

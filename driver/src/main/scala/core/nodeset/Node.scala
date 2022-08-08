@@ -17,16 +17,16 @@ import reactivemongo.core.netty.ChannelFactory
  * @param statusChanged the time the status has last changed (in nanos)
  */
 private[reactivemongo] final class Node(
-  val name: String,
-  val aliases: Set[String],
-  val status: NodeStatus,
-  val connections: Vector[Connection],
-  val authenticated: Set[Authenticated],
-  val tags: Map[String, String],
-  val protocolMetadata: ProtocolMetadata,
-  val pingInfo: PingInfo,
-  val isMongos: Boolean,
-  val statusChanged: Long) {
+    val name: String,
+    val aliases: Set[String],
+    val status: NodeStatus,
+    val connections: Vector[Connection],
+    val authenticated: Set[Authenticated],
+    val tags: Map[String, String],
+    val protocolMetadata: ProtocolMetadata,
+    val pingInfo: PingInfo,
+    val isMongos: Boolean,
+    val statusChanged: Long) {
 
   /** All the node names (including its aliases) */
   lazy val names: Set[String] = aliases + name
@@ -41,7 +41,8 @@ private[reactivemongo] final class Node(
   }
 
   val connected: Vector[Connection] = connections.filter(c =>
-    !c.signaling && c.status == ConnectionStatus.Connected)
+    !c.signaling && c.status == ConnectionStatus.Connected
+  )
 
   /**
    * The [[connected]] connections with no required authentication,
@@ -50,32 +51,37 @@ private[reactivemongo] final class Node(
   val authenticatedConnections = RoundRobiner(
     connected.filter(_.authenticated.forall { auth =>
       authenticated.contains(auth)
-    }))
+    })
+  )
 
   lazy val signaling: Option[Connection] =
     connections.find(c => c.signaling && c.status == ConnectionStatus.Connected)
 
   @SuppressWarnings(Array("VariableShadowing"))
   def createSignalingConnection(
-    channelFactory: ChannelFactory,
-    heartbeatFrequencyMS: Int,
-    receiver: ActorRef): Try[Node] = signaling match {
+      channelFactory: ChannelFactory,
+      heartbeatFrequencyMS: Int,
+      receiver: ActorRef
+    ): Try[Node] = signaling match {
     case Some(_) => Success(this)
 
     case _ =>
       createConnection(
-        channelFactory, heartbeatFrequencyMS, receiver, true).map { con =>
-        copy(connections = con +: connections)
-      }
+        channelFactory,
+        heartbeatFrequencyMS,
+        receiver,
+        true
+      ).map { con => copy(connections = con +: connections) }
   }
 
   /* Create channels (not for signaling). */
   @SuppressWarnings(Array("VariableShadowing"))
   private[core] def createUserConnections(
-    channelFactory: ChannelFactory,
-    maxIdleTimeMS: Int,
-    receiver: ActorRef,
-    upTo: Int): Try[Node] = {
+      channelFactory: ChannelFactory,
+      maxIdleTimeMS: Int,
+      receiver: ActorRef,
+      upTo: Int
+    ): Try[Node] = {
     val count = connections.count(!_.signaling)
 
     if (count < upTo) {
@@ -84,22 +90,29 @@ private[reactivemongo] final class Node(
         maxIdleTimeMS,
         receiver,
         upTo - count,
-        Vector.empty).map { created => copy(connections = connections ++ created) }
+        Vector.empty
+      ).map { created => copy(connections = connections ++ created) }
     } else Success(this)
   }
 
   @annotation.tailrec
   private def createChannels(
-    channelFactory: ChannelFactory,
-    maxIdleTimeMS: Int,
-    receiver: ActorRef,
-    count: Int,
-    created: Vector[Connection]): Try[Vector[Connection]] = {
+      channelFactory: ChannelFactory,
+      maxIdleTimeMS: Int,
+      receiver: ActorRef,
+      count: Int,
+      created: Vector[Connection]
+    ): Try[Vector[Connection]] = {
     if (count > 0) {
       createConnection(channelFactory, maxIdleTimeMS, receiver, false) match {
         case Success(con) =>
           createChannels(
-            channelFactory, maxIdleTimeMS, receiver, count - 1, con +: created)
+            channelFactory,
+            maxIdleTimeMS,
+            receiver,
+            count - 1,
+            con +: created
+          )
 
         case Failure(cause) => Failure(cause)
       }
@@ -109,38 +122,71 @@ private[reactivemongo] final class Node(
   }
 
   @inline private[core] def createConnection(
-    channelFactory: ChannelFactory,
-    maxIdleTimeMS: Int,
-    receiver: ActorRef,
-    _signaling: Boolean): Try[Connection] =
+      channelFactory: ChannelFactory,
+      maxIdleTimeMS: Int,
+      receiver: ActorRef,
+      _signaling: Boolean
+    ): Try[Connection] =
     channelFactory.create(host, port, maxIdleTimeMS, receiver).map { chan =>
       new Connection(
-        chan, ConnectionStatus.Connecting, Set.empty, None, _signaling)
+        chan,
+        ConnectionStatus.Connecting,
+        Set.empty,
+        None,
+        _signaling
+      )
     }
 
   def withAlias(as: String): Node =
-    new Node(name, aliases + as, status, connections, authenticated, tags,
-      protocolMetadata, pingInfo, isMongos, statusChanged)
+    new Node(
+      name,
+      aliases + as,
+      status,
+      connections,
+      authenticated,
+      tags,
+      protocolMetadata,
+      pingInfo,
+      isMongos,
+      statusChanged
+    )
 
   @SuppressWarnings(Array("VariableShadowing"))
   def copy(
-    name: String = this.name,
-    status: NodeStatus = this.status,
-    connections: Vector[Connection] = this.connections,
-    authenticated: Set[Authenticated] = this.authenticated,
-    tags: Map[String, String] = tags,
-    protocolMetadata: ProtocolMetadata = this.protocolMetadata,
-    pingInfo: PingInfo = this.pingInfo,
-    isMongos: Boolean = this.isMongos,
-    aliases: Set[String] = this.aliases,
-    statusChanged: Long = this.statusChanged): Node =
-    new Node(name, aliases, status, connections, authenticated, tags,
-      protocolMetadata, pingInfo, isMongos, statusChanged)
+      name: String = this.name,
+      status: NodeStatus = this.status,
+      connections: Vector[Connection] = this.connections,
+      authenticated: Set[Authenticated] = this.authenticated,
+      tags: Map[String, String] = tags,
+      protocolMetadata: ProtocolMetadata = this.protocolMetadata,
+      pingInfo: PingInfo = this.pingInfo,
+      isMongos: Boolean = this.isMongos,
+      aliases: Set[String] = this.aliases,
+      statusChanged: Long = this.statusChanged
+    ): Node =
+    new Node(
+      name,
+      aliases,
+      status,
+      connections,
+      authenticated,
+      tags,
+      protocolMetadata,
+      pingInfo,
+      isMongos,
+      statusChanged
+    )
 
-  @inline private[core] def pickConnectionByChannelId(id: ChannelId): Option[Connection] = connections.find(_.channel.id == id)
+  @inline private[core] def pickConnectionByChannelId(
+      id: ChannelId
+    ): Option[Connection] = connections.find(_.channel.id == id)
 
   @SuppressWarnings(Array("VariableShadowing"))
-  private[core] def updateByChannelId(id: ChannelId)(fc: Connection => Connection)(fn: Node => Node): Node = {
+  private[core] def updateByChannelId(
+      id: ChannelId
+    )(fc: Connection => Connection
+    )(fn: Node => Node
+    ): Node = {
     val (updCons, updated) = utils.update(connections) {
       case conn if (conn.channel.id == id) => fc(conn)
     }
@@ -158,15 +204,27 @@ private[reactivemongo] final class Node(
       else s"${(ns / 1000000000L).toString}s"
     }
 
-    s"""Node[$name: $status<${statusChanged}ns> (${authenticatedConnections.size}/${connected.size}/${connections.filterNot(_.signaling).size} available connections), latency=${latency}, authenticated={${authenticated.map(_.toShortString) mkString ", "}}]"""
+    s"""Node[$name: $status<${statusChanged}ns> (${authenticatedConnections.size}/${connected.size}/${connections
+        .filterNot(_.signaling)
+        .size} available connections), latency=${latency}, authenticated={${authenticated
+        .map(_.toShortString) mkString ", "}}]"""
   }
 
   /** Returns the read-only information about this node. */
-  def info = new NodeInfo(name, aliases, host, port, status,
+  def info = new NodeInfo(
+    name,
+    aliases,
+    host,
+    port,
+    status,
     connections.count(!_.signaling),
     connected.size,
-    authenticatedConnections.size, tags,
-    protocolMetadata, pingInfo, isMongos)
+    authenticatedConnections.size,
+    tags,
+    protocolMetadata,
+    pingInfo,
+    isMongos
+  )
 
   override def equals(that: Any): Boolean = that match {
     case other: Node =>
@@ -177,12 +235,22 @@ private[reactivemongo] final class Node(
 
   override def hashCode: Int = tupled.hashCode
 
-  lazy val tupled = (name, status, connections,
-    authenticated, tags, protocolMetadata, pingInfo, isMongos)
+  lazy val tupled = (
+    name,
+    status,
+    connections,
+    authenticated,
+    tags,
+    protocolMetadata,
+    pingInfo,
+    isMongos
+  )
 }
 
 private[reactivemongo] object Node {
+
   object Queryable {
+
     def unapply(node: Node): Option[Node] =
       Option(node).filter(_.status.queryable)
   }
@@ -194,22 +262,34 @@ private[reactivemongo] object Node {
  * @param authenticated the number of authenticated connections
  */
 final class NodeInfo private[reactivemongo] (
-  val name: String,
-  val aliases: Set[String],
-  val host: String,
-  val port: Int,
-  val status: NodeStatus,
-  val connections: Int,
-  val connected: Int,
-  val authenticated: Int,
-  val tags: Map[String, String],
-  val protocolMetadata: ProtocolMetadata,
-  val pingInfo: PingInfo,
-  val isMongos: Boolean) {
+    val name: String,
+    val aliases: Set[String],
+    val host: String,
+    val port: Int,
+    val status: NodeStatus,
+    val connections: Int,
+    val connected: Int,
+    val authenticated: Int,
+    val tags: Map[String, String],
+    val protocolMetadata: ProtocolMetadata,
+    val pingInfo: PingInfo,
+    val isMongos: Boolean) {
 
   private[reactivemongo] lazy val tupled =
-    (name, aliases, host, port, status, connections,
-      connected, authenticated, tags, protocolMetadata, pingInfo, isMongos)
+    (
+      name,
+      aliases,
+      host,
+      port,
+      status,
+      connections,
+      connected,
+      authenticated,
+      tags,
+      protocolMetadata,
+      pingInfo,
+      isMongos
+    )
 
   /** All the node names (including its aliases) */
   def names: Set[String] = aliases + name

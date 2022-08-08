@@ -18,10 +18,16 @@ package reactivemongo.api.collections
 import reactivemongo.api.{ ReadPreference, SerializationPack }
 
 private[reactivemongo] object QueryCodecs {
-  @inline def writeReadPref[P <: SerializationPack](pack: P): ReadPreference => pack.Document = writeReadPref[pack.type](pack.newBuilder)
 
-  def writeReadPref[P <: SerializationPack](builder: SerializationPack.Builder[P]): ReadPreference => builder.pack.Document =
-    { (readPreference: ReadPreference) =>
+  @inline def writeReadPref[P <: SerializationPack](
+      pack: P
+    ): ReadPreference => pack.Document =
+    writeReadPref[pack.type](pack.newBuilder)
+
+  def writeReadPref[P <: SerializationPack](
+      builder: SerializationPack.Builder[P]
+    ): ReadPreference => builder.pack.Document = {
+    (readPreference: ReadPreference) =>
       import builder.{ elementProducer => element, document, string }
 
       val mode = readPreference match {
@@ -37,16 +43,17 @@ private[reactivemongo] object QueryCodecs {
 
       readPreference match {
         case ReadPreference.Taggable(tagSet) if tagSet.nonEmpty => {
-          elements += element("tags", builder.array(tagSet.map { tags =>
-            document(tags.toSeq.map {
-              case (k, v) => element(k, string(v))
+          elements += element(
+            "tags",
+            builder.array(tagSet.map { tags =>
+              document(tags.toSeq.map { case (k, v) => element(k, string(v)) })
             })
-          }))
+          )
         }
 
         case _ => ()
       }
 
       document(elements.result())
-    }
+  }
 }

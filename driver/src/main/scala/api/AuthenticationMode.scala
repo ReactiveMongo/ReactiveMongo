@@ -2,6 +2,7 @@ package reactivemongo.api
 
 /** The mode/[[https://docs.mongodb.com/manual/core/authentication-mechanisms/ mechanism of authentication]] */
 sealed trait AuthenticationMode {
+
   /** The mode name (e.g. `SCRAM-SHA-1`) */
   def name: String
 
@@ -20,14 +21,16 @@ private[reactivemongo] sealed trait ScramAuthentication {
 
 /** [[https://docs.mongodb.com/manual/core/security-scram/index.html SCRAM]]-SHA-1 authentication (since MongoDB 3.6) */
 case object ScramSha1Authentication
-  extends AuthenticationMode with ScramAuthentication {
+    extends AuthenticationMode
+    with ScramAuthentication {
 
   val name = "SCRAM-SHA-1"
 }
 
 /** [[https://docs.mongodb.com/manual/core/security-scram/index.html SCRAM]]-SHA-256 authentication (see MongoDB 4.0) */
 case object ScramSha256Authentication
-  extends AuthenticationMode with ScramAuthentication {
+    extends AuthenticationMode
+    with ScramAuthentication {
 
   val name = "SCRAM-SHA-256"
 }

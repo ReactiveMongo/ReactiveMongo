@@ -22,9 +22,11 @@ import reactivemongo.api.commands.{
  * @define orderedParam the ordered behaviour
  */
 trait DeleteOps[P <: SerializationPack]
-  extends DeleteCommand[P] with CommandCodecsWithPack[P]
-  with MultiBulkWriteResultFactory[P] with UpsertedFactory[P]
-  with LastErrorFactory[P] {
+    extends DeleteCommand[P]
+    with CommandCodecsWithPack[P]
+    with MultiBulkWriteResultFactory[P]
+    with UpsertedFactory[P]
+    with LastErrorFactory[P] {
   collection: GenericCollection[P] =>
 
   /**
@@ -32,8 +34,9 @@ trait DeleteOps[P <: SerializationPack]
    * @param writeConcern writeConcernParam
    */
   private[reactivemongo] final def prepareDelete(
-    ordered: Boolean,
-    writeConcern: WriteConcern): DeleteBuilder = {
+      ordered: Boolean,
+      writeConcern: WriteConcern
+    ): DeleteBuilder = {
     if (ordered) new OrderedDelete(writeConcern)
     else new UnorderedDelete(writeConcern)
   }
@@ -46,6 +49,7 @@ trait DeleteOps[P <: SerializationPack]
    * @define collationParam the collation
    */
   sealed trait DeleteBuilder {
+
     /** $orderedParam */
     def ordered: Boolean
 
@@ -62,7 +66,15 @@ trait DeleteOps[P <: SerializationPack]
      * @param limit $limitParam
      * @param collation $collationParam
      */
-    final def one[Q, U](q: Q, limit: Option[Int] = None, collation: Option[Collation] = None)(implicit ec: ExecutionContext, qw: pack.Writer[Q]): Future[WriteResult] = element[Q, U](q, limit, collation).flatMap { upd => execute(Seq(upd)) }
+    final def one[Q, U](
+        q: Q,
+        limit: Option[Int] = None,
+        collation: Option[Collation] = None
+      )(implicit
+        ec: ExecutionContext,
+        qw: pack.Writer[Q]
+      ): Future[WriteResult] =
+      element[Q, U](q, limit, collation).flatMap { upd => execute(Seq(upd)) }
 
     /**
      * Prepares an [[DeleteElement]].
@@ -73,7 +85,13 @@ trait DeleteOps[P <: SerializationPack]
      *
      * @see [[many]]
      */
-    final def element[Q, U](q: Q, limit: Option[Int] = None, collation: Option[Collation] = None)(implicit qw: pack.Writer[Q]): Future[DeleteElement] =
+    final def element[Q, U](
+        q: Q,
+        limit: Option[Int] = None,
+        collation: Option[Collation] = None
+      )(implicit
+        qw: pack.Writer[Q]
+      ): Future[DeleteElement] =
       (Try(pack.serialize(q, qw)).map { query =>
         new DeleteElement(query, limit.getOrElse(0), collation)
       }) match {
@@ -106,15 +124,22 @@ trait DeleteOps[P <: SerializationPack]
      * }
      * }}}
      */
-    final def many(deletes: Iterable[DeleteElement])(implicit ec: ExecutionContext): Future[MultiBulkWriteResult] = {
-      val bulkProducer = BulkOps.bulks(
-        deletes, maxBsonSize, metadata.maxBulkSize) { d =>
-        elementEnvelopeSize + pack.bsonSize(d.q)
-      }
+    final def many(
+        deletes: Iterable[DeleteElement]
+      )(implicit
+        ec: ExecutionContext
+      ): Future[MultiBulkWriteResult] = {
+      val bulkProducer =
+        BulkOps.bulks(deletes, maxBsonSize, metadata.maxBulkSize) { d =>
+          elementEnvelopeSize + pack.bsonSize(d.q)
+        }
 
-      BulkOps.bulkApply[DeleteElement, WriteResult](
-        bulkProducer)({ bulk => execute(bulk.toSeq) }, bulkRecover).
-        map(MultiBulkWriteResult(_))
+      BulkOps
+        .bulkApply[DeleteElement, WriteResult](bulkProducer)(
+          { bulk => execute(bulk.toSeq) },
+          bulkRecover
+        )
+        .map(MultiBulkWriteResult(_))
     }
 
     // ---
@@ -125,7 +150,9 @@ trait DeleteOps[P <: SerializationPack]
     private def maxBsonSize = {
       // Command envelope to compute accurate BSON size limit
       val emptyCmd = new ResolvedCollectionCommand(
-        collection.name, new Delete(Seq.empty, ordered, writeConcern))
+        collection.name,
+        new Delete(Seq.empty, ordered, writeConcern)
+      )
 
       val doc = pack.serialize(emptyCmd, deleteWriter(None))
 
@@ -138,25 +165,31 @@ trait DeleteOps[P <: SerializationPack]
       val elements = Seq[pack.ElementProducer](
         builder.elementProducer("q", emptyDoc),
         builder.elementProducer("limit", builder.int(0)),
-        builder.elementProducer("collation", emptyDoc))
+        builder.elementProducer("collation", emptyDoc)
+      )
 
       pack.bsonSize(builder.document(elements))
     }
 
-    private final def execute(deletes: Seq[DeleteElement])(
-      implicit
-      ec: ExecutionContext): Future[WriteResult] = {
+    private final def execute(
+        deletes: Seq[DeleteElement]
+      )(implicit
+        ec: ExecutionContext
+      ): Future[WriteResult] = {
       val cmd = new Delete(deletes, ordered, writeConcern)
 
-      Future.successful(cmd).flatMap(
-        runCommand(_, writePreference).flatMap { wr =>
+      Future
+        .successful(cmd)
+        .flatMap(runCommand(_, writePreference).flatMap { wr =>
           val flattened = wr.flatten
 
           if (!flattened.ok) {
             // was ordered, with one doc => fail if has an error
-            Future.failed(lastError(flattened).
-              getOrElse[Exception](new GenericDriverException(
-                s"fails to delete: $deletes")))
+            Future.failed(
+              lastError(flattened).getOrElse[Exception](
+                new GenericDriverException(s"fails to delete: $deletes")
+              )
+            )
 
           } else Future.successful(wr)
         })
@@ -169,7 +202,8 @@ trait DeleteOps[P <: SerializationPack]
     Option.empty[Exception => Future[WriteResult]]
 
   private final class OrderedDelete(
-    val writeConcern: WriteConcern) extends DeleteBuilder {
+      val writeConcern: WriteConcern)
+      extends DeleteBuilder {
 
     val ordered = true
     val bulkRecover = orderedRecover
@@ -180,25 +214,30 @@ trait DeleteOps[P <: SerializationPack]
       case lastError: WriteResult =>
         Future.successful(lastError)
 
-      case cause => Future.successful(new LastError(
-        ok = false,
-        errmsg = Option(cause.getMessage),
-        code = Option.empty,
-        lastOp = Some(2002), // InsertOp
-        n = 0,
-        singleShard = Option.empty[String],
-        updatedExisting = false,
-        upserted = Option.empty,
-        wnote = Option.empty[WriteConcern.W],
-        wtimeout = false,
-        waited = Option.empty[Int],
-        wtime = Option.empty[Int],
-        writeErrors = Seq.empty,
-        writeConcernError = Option.empty))
+      case cause =>
+        Future.successful(
+          new LastError(
+            ok = false,
+            errmsg = Option(cause.getMessage),
+            code = Option.empty,
+            lastOp = Some(2002), // InsertOp
+            n = 0,
+            singleShard = Option.empty[String],
+            updatedExisting = false,
+            upserted = Option.empty,
+            wnote = Option.empty[WriteConcern.W],
+            wtimeout = false,
+            waited = Option.empty[Int],
+            wtime = Option.empty[Int],
+            writeErrors = Seq.empty,
+            writeConcernError = Option.empty
+          )
+        )
     }
 
   private final class UnorderedDelete(
-    val writeConcern: WriteConcern) extends DeleteBuilder {
+      val writeConcern: WriteConcern)
+      extends DeleteBuilder {
 
     val ordered = false
     val bulkRecover = unorderedRecover

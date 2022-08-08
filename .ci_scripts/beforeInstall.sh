@@ -21,7 +21,7 @@ SCRIPT_DIR=`dirname $0 | sed -e "s|^\./|$PWD/|"`
 
 echo "[INFO] MongoDB major version: $MONGO_VER"
 
-MONGO_MINOR="3.2.10"
+MONGO_MINOR="3.6.23"
 
 if [ "v$MONGO_VER" = "v6" ]; then
     MONGO_MINOR="6.0.0"

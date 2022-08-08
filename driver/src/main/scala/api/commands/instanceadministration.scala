@@ -5,14 +5,18 @@ import reactivemongo.api.{ SerializationPack, WriteConcern }
 import reactivemongo.core.errors.GenericDriverException
 
 private[reactivemongo] object DropDatabase
-  extends Command with CommandWithResult[Unit] {
+    extends Command
+    with CommandWithResult[Unit] {
 
   val commandKind = CommandKind.DropDatabase
 
-  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[DropDatabase.type] = {
+  private[api] def writer[P <: SerializationPack](
+      pack: P
+    ): pack.Writer[DropDatabase.type] = {
     val builder = pack.newBuilder
-    val cmd = builder.document(Seq(
-      builder.elementProducer("dropDatabase", builder.int(1))))
+    val cmd = builder.document(
+      Seq(builder.elementProducer("dropDatabase", builder.int(1)))
+    )
 
     pack.writer[DropDatabase.type](_ => cmd)
   }
@@ -21,16 +25,20 @@ private[reactivemongo] object DropDatabase
 }
 
 private[reactivemongo] object DropCollection
-  extends CollectionCommand with CommandWithResult[Unit] {
+    extends CollectionCommand
+    with CommandWithResult[Unit] {
 
   val commandKind = CommandKind.DropCollection
 
-  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[DropCollection.type]] = {
+  private[api] def writer[P <: SerializationPack](
+      pack: P
+    ): pack.Writer[ResolvedCollectionCommand[DropCollection.type]] = {
     val builder = pack.newBuilder
 
     pack.writer[ResolvedCollectionCommand[DropCollection.type]] { drop =>
-      builder.document(Seq(
-        builder.elementProducer("drop", builder.string(drop.collection))))
+      builder.document(
+        Seq(builder.elementProducer("drop", builder.string(drop.collection)))
+      )
     }
   }
 
@@ -38,13 +46,16 @@ private[reactivemongo] object DropCollection
 }
 
 private[reactivemongo] case class RenameCollection(
-  fullyQualifiedCollectionName: String,
-  fullyQualifiedTargetName: String,
-  dropTarget: Boolean = false) extends Command with CommandWithResult[Unit] {
+    fullyQualifiedCollectionName: String,
+    fullyQualifiedTargetName: String,
+    dropTarget: Boolean = false)
+    extends Command
+    with CommandWithResult[Unit] {
   val commandKind = CommandKind.RenameCollection
 }
 
 private[api] object RenameCollection {
+
   def writer[P <: SerializationPack](pack: P): pack.Writer[RenameCollection] = {
     val builder = pack.newBuilder
 
@@ -54,9 +65,11 @@ private[api] object RenameCollection {
       val elements = Seq[pack.ElementProducer](
         element(
           "renameCollection",
-          string(rename.fullyQualifiedCollectionName)),
+          string(rename.fullyQualifiedCollectionName)
+        ),
         element("to", string(rename.fullyQualifiedTargetName)),
-        element("dropTarget", builder.boolean(rename.dropTarget)))
+        element("dropTarget", builder.boolean(rename.dropTarget))
+      )
 
       builder.document(elements)
     }
@@ -64,14 +77,18 @@ private[api] object RenameCollection {
 }
 
 private[api] case class Create(
-  capped: Option[Capped] = None,
-  writeConcern: WriteConcern = WriteConcern.Default)
-  extends CollectionCommand with CommandWithResult[Unit] {
+    capped: Option[Capped] = None,
+    writeConcern: WriteConcern = WriteConcern.Default)
+    extends CollectionCommand
+    with CommandWithResult[Unit] {
   val commandKind = CommandKind.Create
 }
 
 private[api] object CreateCollection {
-  def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[Create]] = {
+
+  def writer[P <: SerializationPack](
+      pack: P
+    ): pack.Writer[ResolvedCollectionCommand[Create]] = {
     val builder = pack.newBuilder
     import builder.{ boolean, elementProducer => element }
 
@@ -82,7 +99,8 @@ private[api] object CreateCollection {
 
       elms ++= Seq(
         element("create", builder.string(create.collection)),
-        element("writeConcern", writeWriteConcern(create.command.writeConcern)))
+        element("writeConcern", writeWriteConcern(create.command.writeConcern))
+      )
 
       create.command.capped.foreach { capped =>
         elms += element("capped", boolean(true))
@@ -96,8 +114,9 @@ private[api] object CreateCollection {
 }
 
 private[reactivemongo] final class ConvertToCapped(
-  val capped: Capped)
-  extends CollectionCommand with CommandWithResult[Unit] {
+    val capped: Capped)
+    extends CollectionCommand
+    with CommandWithResult[Unit] {
 
   val commandKind = CommandKind.ConvertToCapped
 
@@ -115,17 +134,23 @@ private[reactivemongo] final class ConvertToCapped(
 }
 
 private[api] object ConvertToCapped {
-  def writer[P <: SerializationPack](pack: P): pack.Writer[ResolvedCollectionCommand[ConvertToCapped]] = {
+
+  def writer[P <: SerializationPack](
+      pack: P
+    ): pack.Writer[ResolvedCollectionCommand[ConvertToCapped]] = {
     val builder = pack.newBuilder
 
     pack.writer[ResolvedCollectionCommand[ConvertToCapped]] { convert =>
       val elms = Seq.newBuilder[pack.ElementProducer]
 
       elms += builder.elementProducer(
-        "convertToCapped", builder.string(convert.collection))
+        "convertToCapped",
+        builder.string(convert.collection)
+      )
 
-      Capped.writeTo[pack.type](pack)(
-        builder, elms += _)(convert.command.capped)
+      Capped.writeTo[pack.type](pack)(builder, elms += _)(
+        convert.command.capped
+      )
 
       builder.document(elms.result())
     }
@@ -136,15 +161,19 @@ private[api] case class CollectionNames(names: List[String])
 
 /** List the names of DB collections. */
 private[api] object ListCollectionNames
-  extends Command with CommandWithResult[CollectionNames] {
+    extends Command
+    with CommandWithResult[CollectionNames] {
 
   val commandKind = CommandKind.ListCollections
 
-  def writer[P <: SerializationPack](pack: P): pack.Writer[ListCollectionNames.type] = {
+  def writer[P <: SerializationPack](
+      pack: P
+    ): pack.Writer[ListCollectionNames.type] = {
     val builder = pack.newBuilder
 
-    val cmd = builder.document(Seq(
-      builder.elementProducer("listCollections", builder.int(1))))
+    val cmd = builder.document(
+      Seq(builder.elementProducer("listCollections", builder.int(1)))
+    )
 
     pack.writer[ListCollectionNames.type](_ => cmd)
   }
@@ -152,22 +181,32 @@ private[api] object ListCollectionNames
   def reader[P <: SerializationPack](pack: P): pack.Reader[CollectionNames] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandExceptionsReaderOpt[pack.type, CollectionNames](pack) { doc =>
-      (for {
-        cr <- decoder.child(doc, "cursor")
-        fb = decoder.children(cr, "firstBatch")
-        ns <- wtColNames[pack.type](pack)(decoder, fb, List.empty)
-      } yield CollectionNames(ns)).orElse[CollectionNames](
-        throw new GenericDriverException("fails to read collection names"))
-    }
+    CommandCodecs
+      .dealingWithGenericCommandExceptionsReaderOpt[pack.type, CollectionNames](
+        pack
+      ) { doc =>
+        (for {
+          cr <- decoder.child(doc, "cursor")
+          fb = decoder.children(cr, "firstBatch")
+          ns <- wtColNames[pack.type](pack)(decoder, fb, List.empty)
+        } yield CollectionNames(ns)).orElse[CollectionNames](
+          throw new GenericDriverException("fails to read collection names")
+        )
+      }
   }
 
   @annotation.tailrec
-  private def wtColNames[P <: SerializationPack](pack: P)(decoder: SerializationPack.Decoder[pack.type], meta: List[pack.Document], ns: List[String]): Option[List[String]] = meta match {
-    case d :: ds => decoder.string(d, "name") match {
-      case Some(n) => wtColNames[pack.type](pack)(decoder, ds, n :: ns)
-      case _       => Option.empty[List[String]] // error
-    }
+  private def wtColNames[P <: SerializationPack](
+      pack: P
+    )(decoder: SerializationPack.Decoder[pack.type],
+      meta: List[pack.Document],
+      ns: List[String]
+    ): Option[List[String]] = meta match {
+    case d :: ds =>
+      decoder.string(d, "name") match {
+        case Some(n) => wtColNames[pack.type](pack)(decoder, ds, n :: ns)
+        case _       => Option.empty[List[String]] // error
+      }
 
     case _ => Some(ns.reverse)
   }
@@ -194,23 +233,39 @@ private[api] object ListCollectionNames
  * @param configVersion the configuration version (since MongoDB 3.0)
  */
 final class ReplSetMember private[api] (
-  val _id: Long,
-  val name: String,
-  val health: Int,
-  val state: Int,
-  val stateStr: String,
-  val uptime: Long,
-  val optime: Long,
-  val lastHeartbeat: Option[Long],
-  val lastHeartbeatRecv: Option[Long],
-  val lastHeartbeatMessage: Option[String],
-  val electionTime: Option[Long],
-  val self: Boolean,
-  val pingMs: Option[Long],
-  val syncingTo: Option[String],
-  val configVersion: Option[Int]) {
+    val _id: Long,
+    val name: String,
+    val health: Int,
+    val state: Int,
+    val stateStr: String,
+    val uptime: Long,
+    val optime: Long,
+    val lastHeartbeat: Option[Long],
+    val lastHeartbeatRecv: Option[Long],
+    val lastHeartbeatMessage: Option[String],
+    val electionTime: Option[Long],
+    val self: Boolean,
+    val pingMs: Option[Long],
+    val syncingTo: Option[String],
+    val configVersion: Option[Int]) {
 
-  private[api] def tupled = Tuple15(_id, name, health, state, stateStr, uptime, optime, lastHeartbeat, lastHeartbeatRecv, lastHeartbeatMessage, electionTime, self, pingMs, syncingTo, configVersion)
+  private[api] def tupled = Tuple15(
+    _id,
+    name,
+    health,
+    state,
+    stateStr,
+    uptime,
+    optime,
+    lastHeartbeat,
+    lastHeartbeatRecv,
+    lastHeartbeatMessage,
+    electionTime,
+    self,
+    pingMs,
+    syncingTo,
+    configVersion
+  )
 
   override def equals(that: Any): Boolean = that match {
     case other: ReplSetMember =>
@@ -234,10 +289,10 @@ final class ReplSetMember private[api] (
  * @param members the list of the members of this replicate set
  */
 final class ReplSetStatus private[api] (
-  val name: String,
-  val time: Long,
-  val myState: Int,
-  val members: List[ReplSetMember]) {
+    val name: String,
+    val time: Long,
+    val myState: Int,
+    val members: List[ReplSetMember]) {
 
   private[api] lazy val tupled = Tuple4(name, time, myState, members)
 
@@ -258,20 +313,28 @@ final class ReplSetStatus private[api] (
  * The command [[http://docs.mongodb.org/manual/reference/command/replSetGetStatus/ replSetGetStatus]]
  */
 private[reactivemongo] object ReplSetGetStatus
-  extends Command with CommandWithResult[ReplSetStatus] {
+    extends Command
+    with CommandWithResult[ReplSetStatus] {
 
   val commandKind = CommandKind.ReplSetGetStatus
 
-  def writer[P <: SerializationPack](pack: P): pack.Writer[ReplSetGetStatus.type] = {
+  def writer[P <: SerializationPack](
+      pack: P
+    ): pack.Writer[ReplSetGetStatus.type] = {
     val builder = pack.newBuilder
-    val cmd = builder.document(Seq(builder.elementProducer(
-      "replSetGetStatus", builder.int(1))))
+    val cmd = builder.document(
+      Seq(builder.elementProducer("replSetGetStatus", builder.int(1)))
+    )
 
     pack.writer[ReplSetGetStatus.type](_ => cmd)
   }
 
   @SuppressWarnings(Array("UnusedMethodParameter"))
-  private def readMember[P <: SerializationPack](pack: P)(decoder: SerializationPack.Decoder[pack.type], doc: pack.Document): Option[ReplSetMember] = {
+  private def readMember[P <: SerializationPack](
+      pack: P
+    )(decoder: SerializationPack.Decoder[pack.type],
+      doc: pack.Document
+    ): Option[ReplSetMember] = {
     import decoder.{ int, long, string }
 
     for {
@@ -282,7 +345,14 @@ private[reactivemongo] object ReplSetGetStatus
       stateStr <- string(doc, "stateStr")
       uptime <- long(doc, "uptime")
       optime <- long(doc, "optimeDate")
-    } yield new ReplSetMember(id, name, health, state, stateStr, uptime, optime,
+    } yield new ReplSetMember(
+      id,
+      name,
+      health,
+      state,
+      stateStr,
+      uptime,
+      optime,
       long(doc, "lastHeartbeat"),
       long(doc, "lastHeartbeatRecv"),
       string(doc, "lastHeartbeatMessage"),
@@ -290,22 +360,26 @@ private[reactivemongo] object ReplSetGetStatus
       decoder.booleanLike(doc, "self").getOrElse(false),
       long(doc, "pingMs"),
       string(doc, "syncingTo"),
-      int(doc, "configVersion"))
+      int(doc, "configVersion")
+    )
   }
 
   def reader[P <: SerializationPack](pack: P): pack.Reader[ReplSetStatus] = {
     val decoder = pack.newDecoder
 
-    CommandCodecs.dealingWithGenericCommandExceptionsReaderOpt[pack.type, ReplSetStatus](pack) { doc =>
-      (for {
-        name <- decoder.string(doc, "set")
-        time <- decoder.long(doc, "date")
-        myState <- decoder.int(doc, "myState")
-        members = decoder.children(doc, "members").flatMap { m =>
-          readMember[pack.type](pack)(decoder, m)
-        }
-      } yield new ReplSetStatus(name, time, myState, members))
-    }
+    CommandCodecs
+      .dealingWithGenericCommandExceptionsReaderOpt[pack.type, ReplSetStatus](
+        pack
+      ) { doc =>
+        (for {
+          name <- decoder.string(doc, "set")
+          time <- decoder.long(doc, "date")
+          myState <- decoder.int(doc, "myState")
+          members = decoder.children(doc, "members").flatMap { m =>
+            readMember[pack.type](pack)(decoder, m)
+          }
+        } yield new ReplSetStatus(name, time, myState, members))
+      }
   }
 }
 
@@ -323,7 +397,9 @@ private[api] object Resync extends Command with CommandWithResult[Unit] {
  * @param enable if true the the member enters the `RECOVERING` state
  */
 private[reactivemongo] final class ReplSetMaintenance(
-  val enable: Boolean = true) extends Command with CommandWithResult[Unit] {
+    val enable: Boolean = true)
+    extends Command
+    with CommandWithResult[Unit] {
   val commandKind = CommandKind.ReplSetMaintenance
 
   override def equals(that: Any): Boolean = that match {
@@ -344,12 +420,18 @@ private[reactivemongo] object ReplSetMaintenance {
   @inline def apply(enable: Boolean): ReplSetMaintenance =
     new ReplSetMaintenance(enable)
 
-  private[api] def writer[P <: SerializationPack](pack: P): pack.Writer[ReplSetMaintenance] = {
+  private[api] def writer[P <: SerializationPack](
+      pack: P
+    ): pack.Writer[ReplSetMaintenance] = {
     val builder = pack.newBuilder
 
     pack.writer[ReplSetMaintenance] { set =>
-      builder.document(Seq(builder.elementProducer(
-        "replSetMaintenance", builder.boolean(set.enable))))
+      builder.document(
+        Seq(
+          builder
+            .elementProducer("replSetMaintenance", builder.boolean(set.enable))
+        )
+      )
     }
   }
 }
@@ -358,6 +440,7 @@ private[reactivemongo] object ReplSetMaintenance {
  * The [[https://docs.mongodb.com/manual/reference/command/ping/ ping]] command.
  */
 private[reactivemongo] object PingCommand
-  extends Command with CommandWithResult[Boolean] {
+    extends Command
+    with CommandWithResult[Boolean] {
   val commandKind = CommandKind.Ping
 }

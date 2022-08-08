@@ -11,10 +11,15 @@ import reactivemongo.api.bson.collection.BSONSerializationPack
 import reactivemongo.core.errors.GenericDriverException
 
 private[reactivemongo] object ReplyDocumentIterator
-  extends ReplyDocumentIteratorLowPriority {
+    extends ReplyDocumentIteratorLowPriority {
 
   // BSON optimized parse alternative
-  def parse[A](pack: BSONSerializationPack.type)(response: Response)(implicit reader: pack.Reader[A]): Iterator[A] = response match {
+  def parse[A](
+      pack: BSONSerializationPack.type
+    )(response: Response
+    )(implicit
+      reader: pack.Reader[A]
+    ): Iterator[A] = response match {
     case Response.CommandError(_, _, _, cause) =>
       new FailingIterator[A](cause)
 
@@ -40,39 +45,50 @@ private[reactivemongo] object ReplyDocumentIterator
       }
     }
 
-    case _ => parseDocuments[BSONSerializationPack.type, A](
-      pack)(response.documents)
+    case _ =>
+      parseDocuments[BSONSerializationPack.type, A](pack)(response.documents)
   }
 
-  private[core] def parseDocuments[P <: SerializationPack, A](pack: P)(buffer: ByteBuf)(implicit reader: pack.Reader[A]): Iterator[A] = new Iterator[A] {
+  private[core] def parseDocuments[P <: SerializationPack, A](
+      pack: P
+    )(buffer: ByteBuf
+    )(implicit
+      reader: pack.Reader[A]
+    ): Iterator[A] = new Iterator[A] {
     override val isTraversableAgain = false
     override def hasNext = buffer.isReadable()
 
-    override def next() = try {
-      val sz = buffer.getIntLE(buffer.readerIndex)
-      val cbrb = reactivemongo.api.bson.buffer.
-        ReadableBuffer(buffer readSlice sz)
+    override def next() =
+      try {
+        val sz = buffer.getIntLE(buffer.readerIndex)
+        val cbrb =
+          reactivemongo.api.bson.buffer.ReadableBuffer(buffer readSlice sz)
 
-      pack.readAndDeserialize(cbrb, reader)
-    } catch {
-      case e: IndexOutOfBoundsException =>
-        /*
-         * If this happens, the buffer is exhausted,
-         * and there is probably a bug.
-         *
-         * It may happen if an enumerator relying on
-         * it is concurrently applied to many iteratees
-         * – which should not be done!
-         */
-        throw new ReplyDocumentIteratorExhaustedException(e)
-    }
+        pack.readAndDeserialize(cbrb, reader)
+      } catch {
+        case e: IndexOutOfBoundsException =>
+          /*
+           * If this happens, the buffer is exhausted,
+           * and there is probably a bug.
+           *
+           * It may happen if an enumerator relying on
+           * it is concurrently applied to many iteratees
+           * – which should not be done!
+           */
+          throw new ReplyDocumentIteratorExhaustedException(e)
+      }
   }
 }
 
 private[reactivemongo] sealed trait ReplyDocumentIteratorLowPriority {
   _self: ReplyDocumentIterator.type =>
 
-  def parse[P <: SerializationPack, A](pack: P)(response: Response)(implicit reader: pack.Reader[A]): Iterator[A] = response match {
+  def parse[P <: SerializationPack, A](
+      pack: P
+    )(response: Response
+    )(implicit
+      reader: pack.Reader[A]
+    ): Iterator[A] = response match {
     case Response.CommandError(_, _, _, cause) =>
       new FailingIterator[A](cause)
 
@@ -116,19 +132,21 @@ private[reactivemongo] sealed trait ReplyDocumentIteratorLowPriority {
   }
 
   protected final class FailingIterator[A](
-    cause: Throwable) extends Iterator[A] {
+      cause: Throwable)
+      extends Iterator[A] {
     val hasNext = false
     @inline def next(): A = throw cause
   }
 }
 
 private[reactivemongo] final class ReplyDocumentIteratorExhaustedException(
-  val cause: Exception) extends Exception(cause) {
+    val cause: Exception)
+    extends Exception(cause) {
 
   override def equals(that: Any): Boolean = that match {
     case other: ReplyDocumentIteratorExhaustedException =>
-      (this.cause == null && other.cause == null) || (
-        this.cause != null && this.cause.equals(other.cause))
+      (this.cause == null && other.cause == null) || (this.cause != null && this.cause
+        .equals(other.cause))
 
     case _ =>
       false

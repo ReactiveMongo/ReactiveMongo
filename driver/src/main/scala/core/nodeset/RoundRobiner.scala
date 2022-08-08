@@ -7,7 +7,12 @@ private[reactivemongo] abstract class RoundRobiner[A, M[T] <: Iterable[T]] {
 
   def pick: Option[A]
 
-  def pickWithFilterAndPriority(filter: A => Boolean, unpriorized: Int)(implicit ord: Ordering[A]): Option[A]
+  def pickWithFilterAndPriority(
+      filter: A => Boolean,
+      unpriorized: Int
+    )(implicit
+      ord: Ordering[A]
+    ): Option[A]
 
   def pickWithFilter(filter: A => Boolean): Option[A]
 
@@ -17,6 +22,7 @@ private[reactivemongo] abstract class RoundRobiner[A, M[T] <: Iterable[T]] {
 }
 
 private[reactivemongo] object RoundRobiner {
+
   def apply[A, M[T] <: Iterable[T]](subject: M[A]): RoundRobiner[A, M] =
     if (subject.isEmpty) empty[A, M] else wrapped(subject)
 
@@ -26,7 +32,12 @@ private[reactivemongo] object RoundRobiner {
 
       val pick: Option[A] = None
 
-      def pickWithFilterAndPriority(filter: A => Boolean, unpriorized: Int)(implicit ord: Ordering[A]): Option[A] = None
+      def pickWithFilterAndPriority(
+          filter: A => Boolean,
+          unpriorized: Int
+        )(implicit
+          ord: Ordering[A]
+        ): Option[A] = None
 
       def pickWithFilter(filter: A => Boolean): Option[A] = None
 
@@ -37,7 +48,9 @@ private[reactivemongo] object RoundRobiner {
       override val toString = f"RoundRobiner$$Empty"
     }
 
-  private def wrapped[A, M[T] <: Iterable[T]](subject: M[A]): RoundRobiner[A, M] = new RoundRobiner[A, M] {
+  private def wrapped[A, M[T] <: Iterable[T]](
+      subject: M[A]
+    ): RoundRobiner[A, M] = new RoundRobiner[A, M] {
     private var underlying = subject.iterator
 
     def toList: List[A] = subject.toList
@@ -53,10 +66,11 @@ private[reactivemongo] object RoundRobiner {
     def pick: Option[A] = Some(next())
 
     def pickWithFilterAndPriority(
-      filter: A => Boolean,
-      unpriorized: Int)(
-      implicit
-      ord: Ordering[A]): Option[A] = {
+        filter: A => Boolean,
+        unpriorized: Int
+      )(implicit
+        ord: Ordering[A]
+      ): Option[A] = {
       if (unpriorized < size) {
         pickWithFilterAndPriority(filter, 0, unpriorized, List.empty)
       } else {
@@ -66,20 +80,26 @@ private[reactivemongo] object RoundRobiner {
 
     @annotation.tailrec
     private def pickWithFilterAndPriority(
-      filter: A => Boolean,
-      tested: Int,
-      unpriorized: Int,
-      acc: List[A])(implicit ord: Ordering[A]): List[A] = {
+        filter: A => Boolean,
+        tested: Int,
+        unpriorized: Int,
+        acc: List[A]
+      )(implicit
+        ord: Ordering[A]
+      ): List[A] = {
       if (unpriorized > 0 && tested < size) {
         val v = next()
 
         if (filter(v)) {
           pickWithFilterAndPriority(
-            filter, tested + 1, unpriorized - 1, v :: acc)
+            filter,
+            tested + 1,
+            unpriorized - 1,
+            v :: acc
+          )
 
         } else {
-          pickWithFilterAndPriority(
-            filter, tested + 1, unpriorized, acc)
+          pickWithFilterAndPriority(filter, tested + 1, unpriorized, acc)
         }
       } else acc
     }

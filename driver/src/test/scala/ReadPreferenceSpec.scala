@@ -10,10 +10,13 @@ final class ReadPreferenceSpec extends org.specs2.mutable.Specification {
 
   section("unit")
   "BSON read preference" should {
-    Fragments.foreach[(ReadPreference, String)](Seq(
-      ReadPreference.primary -> "primary",
-      ReadPreference.secondary -> "secondary",
-      ReadPreference.nearest -> "nearest")) {
+    Fragments.foreach[(ReadPreference, String)](
+      Seq(
+        ReadPreference.primary -> "primary",
+        ReadPreference.secondary -> "secondary",
+        ReadPreference.nearest -> "nearest"
+      )
+    ) {
       case (pref, mode) =>
         s"""be encoded as '{ "mode": "$mode" }'""" in {
           bson(pref) must_=== BSONDocument("mode" -> mode)
@@ -21,18 +24,21 @@ final class ReadPreferenceSpec extends org.specs2.mutable.Specification {
     }
 
     "be taggable and" >> {
-      val tagSet = List(
-        Map("foo" -> "bar", "lorem" -> "ipsum"),
-        Map("dolor" -> "es"))
+      val tagSet =
+        List(Map("foo" -> "bar", "lorem" -> "ipsum"), Map("dolor" -> "es"))
       val bsonTags = BSONArray(
         BSONDocument("foo" -> "bar", "lorem" -> "ipsum"),
-        BSONDocument("dolor" -> "es"))
+        BSONDocument("dolor" -> "es")
+      )
 
-      Fragments.foreach[(ReadPreference, String)](Seq(
-        ReadPreference.primaryPreferred(tagSet) -> "primaryPreferred",
-        ReadPreference.secondary(tagSet) -> "secondary",
-        ReadPreference.secondaryPreferred(tagSet) -> "secondaryPreferred",
-        ReadPreference.nearest(tagSet) -> "nearest")) {
+      Fragments.foreach[(ReadPreference, String)](
+        Seq(
+          ReadPreference.primaryPreferred(tagSet) -> "primaryPreferred",
+          ReadPreference.secondary(tagSet) -> "secondary",
+          ReadPreference.secondaryPreferred(tagSet) -> "secondaryPreferred",
+          ReadPreference.nearest(tagSet) -> "nearest"
+        )
+      ) {
         case (pref, mode) =>
           val expected = BSONDocument("mode" -> mode, "tags" -> bsonTags)
 

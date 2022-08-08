@@ -13,8 +13,10 @@ ThisBuild / version := {
               nextPatch <- scala.util.Try(patch.toInt).map(_ + 1).toOption
               nextRc = {
                 if (rc startsWith "-RC") {
-                  scala.util.Try(rc.stripPrefix("-RC").toInt).
-                    map(_ + 1).toOption
+                  scala.util
+                    .Try(rc.stripPrefix("-RC").toInt)
+                    .map(_ + 1)
+                    .toOption
                 } else {
                   Option.empty[Int]
                 }

@@ -8,20 +8,21 @@ import reactivemongo.io.netty.channel.ChannelId
  * @param lastIsMasterId the ID of the last IsMaster request (or -1 if none)
  */
 private[reactivemongo] final class PingInfo(
-  val ping: Long,
-  val lastIsMasterTime: Long,
-  val lastIsMasterId: Int,
-  private[core] val channelId: Option[ChannelId],
-  private[core] val firstSent: Boolean) {
+    val ping: Long,
+    val lastIsMasterTime: Long,
+    val lastIsMasterId: Int,
+    private[core] val channelId: Option[ChannelId],
+    private[core] val firstSent: Boolean) {
 
   @SuppressWarnings(Array("VariableShadowing"))
   @inline def copy(
-    ping: Long = this.ping,
-    lastIsMasterTime: Long = this.lastIsMasterTime,
-    lastIsMasterId: Int = this.lastIsMasterId,
-    channelId: Option[ChannelId] = this.channelId,
-    firstSent: Boolean = this.firstSent): PingInfo = new PingInfo(
-    ping, lastIsMasterTime, lastIsMasterId, channelId, firstSent)
+      ping: Long = this.ping,
+      lastIsMasterTime: Long = this.lastIsMasterTime,
+      lastIsMasterId: Int = this.lastIsMasterId,
+      channelId: Option[ChannelId] = this.channelId,
+      firstSent: Boolean = this.firstSent
+    ): PingInfo =
+    new PingInfo(ping, lastIsMasterTime, lastIsMasterId, channelId, firstSent)
 
   override def equals(that: Any): Boolean = that match {
     case other: PingInfo =>
@@ -40,18 +41,21 @@ private[reactivemongo] final class PingInfo(
 }
 
 private[reactivemongo] object PingInfo {
+
   def apply(
-    ping: Long = Long.MaxValue,
-    lastIsMasterTime: Long = 0,
-    lastIsMasterId: Int = -1): PingInfo = new PingInfo(
-    ping, lastIsMasterTime, lastIsMasterId, None, false)
+      ping: Long = Long.MaxValue,
+      lastIsMasterTime: Long = 0,
+      lastIsMasterId: Int = -1
+    ): PingInfo =
+    new PingInfo(ping, lastIsMasterTime, lastIsMasterId, None, false)
 
   private[core] def apply(
-    ping: Long,
-    lastIsMasterTime: Long,
-    lastIsMasterId: Int,
-    channelId: ChannelId): PingInfo = new PingInfo(
-    ping, lastIsMasterTime, lastIsMasterId, Some(channelId), false)
+      ping: Long,
+      lastIsMasterTime: Long,
+      lastIsMasterId: Int,
+      channelId: ChannelId
+    ): PingInfo =
+    new PingInfo(ping, lastIsMasterTime, lastIsMasterId, Some(channelId), false)
 
   def unapply(other: PingInfo): Option[(Long, Long, Int)] = Some(other.tupled)
 }

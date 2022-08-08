@@ -3,22 +3,28 @@ package reactivemongo.core
 import reactivemongo.api.{ SerializationPack, Version }
 
 private[reactivemongo] final class ClientMetadata(
-  val application: String) extends AnyVal {
+    val application: String)
+    extends AnyVal {
   @inline override def toString = application
 }
 
 private[reactivemongo] object ClientMetadata {
   case class Driver(name: String, version: String)
 
-  def serialize[P <: SerializationPack](pack: P): ClientMetadata => Option[pack.Document] = {
+  def serialize[P <: SerializationPack](
+      pack: P
+    ): ClientMetadata => Option[pack.Document] = {
     val maxSize = 512
     val builder = pack.newBuilder
 
     import builder.{ elementProducer => elem, document, string => str }
 
-    lazy val driver = document(Seq(
-      elem("name", str("ReactiveMongo")),
-      elem("version", str(Version.toString))))
+    lazy val driver = document(
+      Seq(
+        elem("name", str("ReactiveMongo")),
+        elem("version", str(Version.toString))
+      )
+    )
 
     lazy val fullOs: pack.ElementProducer = {
       import sys.props
@@ -30,22 +36,30 @@ private[reactivemongo] object ClientMetadata {
         if (operatingSystemName startsWith "linux") "Linux"
         else if (operatingSystemName startsWith "mac") "Darwin"
         else if (operatingSystemName startsWith "windows") "Windows"
-        else if (operatingSystemName.startsWith("hp-ux") ||
+        else if (
+          operatingSystemName.startsWith("hp-ux") ||
           operatingSystemName.startsWith("aix") ||
           operatingSystemName.startsWith("irix") ||
           operatingSystemName.startsWith("solaris") ||
-          operatingSystemName.startsWith("sunos")) {
+          operatingSystemName.startsWith("sunos")
+        ) {
           "Unix"
         } else {
           "unknown"
         }
       }
 
-      elem("os", document(Seq(
-        elem("type", str(osType)),
-        elem("name", str(operatingSystemName)),
-        elem("architecture", str(props.getOrElse("os.arch", "unknown"))),
-        elem("version", str(props.getOrElse("os.version", "unknown"))))))
+      elem(
+        "os",
+        document(
+          Seq(
+            elem("type", str(osType)),
+            elem("name", str(operatingSystemName)),
+            elem("architecture", str(props.getOrElse("os.arch", "unknown"))),
+            elem("version", str(props.getOrElse("os.version", "unknown")))
+          )
+        )
+      )
 
     }
 
@@ -66,9 +80,12 @@ private[reactivemongo] object ClientMetadata {
 
     { metadata =>
       val base = Seq(
-        elem("application", document(Seq(
-          elem("name", str(metadata.application))))),
-        elem("driver", driver))
+        elem(
+          "application",
+          document(Seq(elem("name", str(metadata.application))))
+        ),
+        elem("driver", driver)
+      )
 
       val baseDoc = document(base)
 

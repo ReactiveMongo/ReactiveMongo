@@ -10,6 +10,7 @@ sealed trait IndexType {
 }
 
 object IndexType {
+
   object Ascending extends IndexType {
     val valueStr = "1"
     @inline override def toString = "asc"
@@ -44,24 +45,34 @@ object IndexType {
     @inline override def toString = valueStr
   }
 
-  private[reactivemongo] def read[P <: SerializationPack](pack: P)(key: pack.Document, name: String): Option[IndexType] = {
+  private[reactivemongo] def read[P <: SerializationPack](
+      pack: P
+    )(key: pack.Document,
+      name: String
+    ): Option[IndexType] = {
     val decoder = pack.newDecoder
 
-    decoder.int(key, name).map { i =>
-      if (i > 0) Ascending
-      else Descending
-    }.orElse(decoder.string(key, name).flatMap {
-      case Geo2D.valueStr          => Some(Geo2D)
-      case Geo2DSpherical.valueStr => Some(Geo2DSpherical)
-      case GeoHaystack.valueStr    => Some(GeoHaystack)
-      case Hashed.valueStr         => Some(Hashed)
-      case Text.valueStr           => Some(Text)
-      case _                       => None
-    })
+    decoder
+      .int(key, name)
+      .map { i =>
+        if (i > 0) Ascending
+        else Descending
+      }
+      .orElse(decoder.string(key, name).flatMap {
+        case Geo2D.valueStr          => Some(Geo2D)
+        case Geo2DSpherical.valueStr => Some(Geo2DSpherical)
+        case GeoHaystack.valueStr    => Some(GeoHaystack)
+        case Hashed.valueStr         => Some(Hashed)
+        case Text.valueStr           => Some(Text)
+        case _                       => None
+      })
   }
 
   @SuppressWarnings(Array("UnusedMethodParameter"))
-  private[api] def write[P <: SerializationPack](pack: P)(builder: SerializationPack.Builder[pack.type]): IndexType => pack.Value = {
+  private[api] def write[P <: SerializationPack](
+      pack: P
+    )(builder: SerializationPack.Builder[pack.type]
+    ): IndexType => pack.Value = {
     case _: Ascending.type =>
       builder.int(1)
 

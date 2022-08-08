@@ -12,8 +12,8 @@ import reactivemongo.api.TestCompat._
 import reactivemongo.api.tests.{ builder, decoder }
 
 final class CommonUseCases(implicit ee: ExecutionEnv)
-  extends org.specs2.mutable.Specification
-  with org.specs2.specification.AfterAll {
+    extends org.specs2.mutable.Specification
+    with org.specs2.specification.AfterAll {
 
   "Common use cases".title
 
@@ -25,7 +25,12 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
   import Common.{ timeout, slowTimeout }
   import builder.regex
 
-  lazy val (db, slowDb) = Common.databases(s"reactivemongo-usecases-${System identityHashCode this}", Common.connection, Common.slowConnection, retries = 1)
+  lazy val (db, slowDb) = Common.databases(
+    s"reactivemongo-usecases-${System identityHashCode this}",
+    Common.connection,
+    Common.slowConnection,
+    retries = 1
+  )
 
   val colName = s"commonusecases${System identityHashCode this}"
   lazy val collection = db(colName)
@@ -41,41 +46,49 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
     }
 
     "insert some documents" in eventually(2, timeout / 2L) {
-      val docs = (18 to 60).map(i => BSONDocument(
-        "age" -> i, "name" -> s"Jack${i}"))
+      val docs =
+        (18 to 60).map(i => BSONDocument("age" -> i, "name" -> s"Jack${i}"))
 
       collection.delete.one(BSONDocument.empty).flatMap { _ =>
         collection.count(Option.empty[BSONDocument])
       } must beTypedEqualTo(0L).awaitFor(timeout) and {
         (for {
           _ /*result*/ <- collection.insert(ordered = true).many(docs)
-          count <- collection.count(Some(BSONDocument(
-            "age" -> BSONDocument(f"$$gte" -> 18, f"$$lte" -> 60))))
+          count <- collection.count(
+            Some(
+              BSONDocument(
+                "age" -> BSONDocument(f"$$gte" -> 18, f"$$lte" -> 60)
+              )
+            )
+          )
         } yield count) must beTypedEqualTo(43L).awaitFor(timeout)
       }
     }
 
     "find them" in {
       // batchSize (>1) allows us to test cursors ;)
-      val it = collection.find(BSONDocument()).batchSize(2).
-        sort(BSONDocument("age" -> 1)).cursor[BSONDocument]()
+      val it = collection
+        .find(BSONDocument())
+        .batchSize(2)
+        .sort(BSONDocument("age" -> 1))
+        .cursor[BSONDocument]()
 
-      //import reactivemongo.core.protocol.{ Response, Reply }
-      //import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
+      // import reactivemongo.core.protocol.{ Response, Reply }
+      // import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
 
-      it.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).
-        map(_.map { doc =>
-          decoder.int(doc, "age").mkString
-        }.mkString("")) must beTypedEqualTo((18 to 60).mkString("")).
-        await(1, timeout * 2)
+      it.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]())
+        .map(
+          _.map { doc => decoder.int(doc, "age").mkString }.mkString("")
+        ) must beTypedEqualTo((18 to 60).mkString("")).await(1, timeout * 2)
 
     }
 
     "find by regexp" in {
-      collection.find(BSONDocument("name" -> regex("ack2", ""))).
-        cursor[BSONDocument]().
-        collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).
-        map(_.size) must beTypedEqualTo(10).awaitFor(timeout)
+      collection
+        .find(BSONDocument("name" -> regex("ack2", "")))
+        .cursor[BSONDocument]()
+        .collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]())
+        .map(_.size) must beTypedEqualTo(10).awaitFor(timeout)
     }
 
     "find by regexp with flag" in {
@@ -83,11 +96,15 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
         BSONDocument(
           f"$$or" -> BSONArray(
             BSONDocument("name" -> regex("^jack2", "i")),
-            BSONDocument("name" -> regex("^jack3", "i"))))
+            BSONDocument("name" -> regex("^jack3", "i"))
+          )
+        )
 
-      collection.find(query).cursor[BSONDocument]().
-        collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).
-        map(_.size) aka "size" must beTypedEqualTo(20).await(1, timeout)
+      collection
+        .find(query)
+        .cursor[BSONDocument]()
+        .collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]())
+        .map(_.size) aka "size" must beTypedEqualTo(20).await(1, timeout)
     }
 
     "find them with a projection" >> {
@@ -95,14 +112,16 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
       val expected = (18 to 60).mkString("")
 
       def findSpec(c: DefaultCollection, t: FiniteDuration) = {
-        def it = c.find(BSONDocument.empty, Some(pjn)).
-          batchSize(2).cursor[BSONDocument]()
+        def it = c
+          .find(BSONDocument.empty, Some(pjn))
+          .batchSize(2)
+          .cursor[BSONDocument]()
 
-        //import reactivemongo.core.protocol.{ Response, Reply }
-        //import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
+        // import reactivemongo.core.protocol.{ Response, Reply }
+        // import reactivemongo.api.tests.{ makeRequest => req, nextResponse }
 
-        it.collect[List](
-          Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]()).map {
+        it.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]())
+          .map {
             _.map(doc => decoder.int(doc, "age").mkString).mkString("")
           } must beTypedEqualTo(expected).await(0, t)
       }
@@ -124,49 +143,65 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
           "entry" -> BSONInteger(1),
           "type" -> BSONString("telephone"),
           "professional" -> BSONBoolean(true),
-          "value" -> BSONString("+331234567890")))
+          "value" -> BSONString("+331234567890")
+        )
+      )
 
       val array2 = BSONArray(
         BSONDocument(
           "entry" -> BSONInteger(2),
           "type" -> BSONString("mail"),
           "professional" -> BSONBoolean(true),
-          "value" -> BSONString("joe@plop.com")))
+          "value" -> BSONString("joe@plop.com")
+        )
+      )
 
       val doc = BSONDocument(
         "name" -> BSONString("Joe"),
-        "contacts" -> (array ++ array2))
+        "contacts" -> (array ++ array2)
+      )
 
       collection.insert.one(doc).flatMap { _ =>
         collection.find(BSONDocument("name" -> "Joe")).one[BSONDocument]
       } must beSome[BSONDocument].which { fetched =>
-        val contactsString = decoder.children(fetched, "contacts").map { c =>
-          decoder.string(c, "type").mkString + ":" +
-            decoder.string(c, "value").mkString
-        }.mkString(",")
+        val contactsString = decoder
+          .children(fetched, "contacts")
+          .map { c =>
+            decoder.string(c, "type").mkString + ":" +
+              decoder.string(c, "value").mkString
+          }
+          .mkString(",")
 
         contactsString must_=== "telephone:+331234567890,mail:joe@plop.com"
       }.awaitFor(timeout)
     }
 
     "insert a weird doc" in {
-      val doc = BSONDocument("coucou" -> BSONString("coucou"), "plop" -> BSONInteger(1), "plop" -> BSONInteger(2))
+      val doc = BSONDocument(
+        "coucou" -> BSONString("coucou"),
+        "plop" -> BSONInteger(1),
+        "plop" -> BSONInteger(2)
+      )
 
-      collection.insert.one(doc).
-        map(_ => {}) must beTypedEqualTo({}).await(1, timeout)
+      collection.insert.one(doc).map(_ => {}) must beTypedEqualTo({})
+        .await(1, timeout)
     }
 
     "find this weird doc" in {
-      collection.find(BSONDocument("coucou" -> BSONString("coucou"))).
-        one[BSONDocument] must beSome.await(1, timeout)
+      collection
+        .find(BSONDocument("coucou" -> BSONString("coucou")))
+        .one[BSONDocument] must beSome.await(1, timeout)
     }
 
     "fail with this error" in {
-      val query = BSONDocument(f"$$and" ->
-        BSONDocument("name" -> BSONString("toto")))
+      val query = BSONDocument(
+        f"$$and" ->
+          BSONDocument("name" -> BSONString("toto"))
+      )
 
-      Await.result(collection.find(query).one[BSONDocument], timeout).
-        aka("findOne") must throwA[Exception]
+      Await
+        .result(collection.find(query).one[BSONDocument], timeout)
+        .aka("findOne") must throwA[Exception]
     }
   }
 }

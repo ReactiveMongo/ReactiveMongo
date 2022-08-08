@@ -15,10 +15,10 @@ package reactivemongo.api
  * }}}
  */
 final class WriteConcern private[api] (
-  _w: WriteConcern.W,
-  _j: Boolean,
-  _fsync: Boolean,
-  _wtimeout: Option[Int]) {
+    _w: WriteConcern.W,
+    _j: Boolean,
+    _fsync: Boolean,
+    _wtimeout: Option[Int]) {
 
   @inline def w: WriteConcern.W = _w
 
@@ -35,10 +35,11 @@ final class WriteConcern private[api] (
 
   @SuppressWarnings(Array("VariableShadowing"))
   def copy(
-    w: WriteConcern.W = _w,
-    j: Boolean = _j,
-    fsync: Boolean = _fsync,
-    wtimeout: Option[Int] = _wtimeout): WriteConcern =
+      w: WriteConcern.W = _w,
+      j: Boolean = _j,
+      fsync: Boolean = _fsync,
+      wtimeout: Option[Int] = _wtimeout
+    ): WriteConcern =
     new WriteConcern(w, j, fsync, wtimeout)
 
   override def equals(that: Any): Boolean = that match {
@@ -55,11 +56,13 @@ final class WriteConcern private[api] (
 
 /** [[WriteConcern]] utilities. */
 object WriteConcern {
+
   def apply(
-    w: WriteConcern.W,
-    j: Boolean,
-    fsync: Boolean,
-    wtimeout: Option[Int]): WriteConcern =
+      w: WriteConcern.W,
+      j: Boolean,
+      fsync: Boolean,
+      wtimeout: Option[Int]
+    ): WriteConcern =
     new WriteConcern(w, j, fsync, wtimeout)
 
   // ---
@@ -74,6 +77,7 @@ object WriteConcern {
 
   /** [[https://docs.mongodb.com/manual/reference/write-concern/index.html#writeconcern.%3Ccustom-write-concern-name%3E Tagged]] acknowledgment */
   final class TagSet private[api] (val tag: String) extends W {
+
     override def equals(that: Any): Boolean = that match {
       case other: TagSet =>
         (tag == null && other.tag == null) || (tag != null && tag == other.tag)
@@ -98,6 +102,7 @@ object WriteConcern {
 
   /** Requests acknowledgment [[https://docs.mongodb.com/manual/reference/write-concern/index.html#writeconcern.%3Cnumber%3E by at least]] `i` nodes. */
   final class WaitForAcknowledgments private[api] (val i: Int) extends W {
+
     override def equals(that: Any): Boolean = that match {
       case other: WaitForAcknowledgments => i == other.i
       case _                             => false
@@ -109,6 +114,7 @@ object WriteConcern {
   }
 
   object WaitForAcknowledgments {
+
     @inline def apply(i: Int): WaitForAcknowledgments =
       new WaitForAcknowledgments(i)
 
@@ -134,10 +140,28 @@ object WriteConcern {
     WriteConcern(new WaitForAcknowledgments(1), true, false, None)
 
   @SuppressWarnings(Array("MethodNames"))
-  def ReplicaAcknowledged(n: Int, timeout: Int, journaled: Boolean): WriteConcern = WriteConcern(new WaitForAcknowledgments(if (n < 2) 2 else n), journaled, false, (if (timeout <= 0) None else Some(timeout)))
+  def ReplicaAcknowledged(
+      n: Int,
+      timeout: Int,
+      journaled: Boolean
+    ): WriteConcern = WriteConcern(
+    new WaitForAcknowledgments(if (n < 2) 2 else n),
+    journaled,
+    false,
+    (if (timeout <= 0) None else Some(timeout))
+  )
 
   @SuppressWarnings(Array("MethodNames"))
-  def TagReplicaAcknowledged(tag: String, timeout: Int, journaled: Boolean): WriteConcern = WriteConcern(new TagSet(tag), journaled, false, (if (timeout <= 0) None else Some(timeout)))
+  def TagReplicaAcknowledged(
+      tag: String,
+      timeout: Int,
+      journaled: Boolean
+    ): WriteConcern = WriteConcern(
+    new TagSet(tag),
+    journaled,
+    false,
+    (if (timeout <= 0) None else Some(timeout))
+  )
 
   /** The default [[WriteConcern]] */
   @SuppressWarnings(Array("MethodNames"))

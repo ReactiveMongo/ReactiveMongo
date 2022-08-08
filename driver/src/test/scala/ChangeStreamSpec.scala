@@ -16,8 +16,9 @@ import util.WithTemporaryCollection._
 import util.{ MongoSkips, WithTemporaryDb }
 
 final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
-  extends org.specs2.mutable.Specification
-  with WithTemporaryDb with MongoSkips {
+    extends org.specs2.mutable.Specification
+    with WithTemporaryDb
+    with MongoSkips {
 
   "Change stream".title
 
@@ -29,9 +30,7 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
         withTmpCollection(db) { (coll: BSONCollection) =>
           // given
           val cursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
-          val testDocument = BSONDocument(
-            "_id" -> "test",
-            "foo" -> "bar")
+          val testDocument = BSONDocument("_id" -> "test", "foo" -> "bar")
 
           // when
           val results = for {
@@ -78,8 +77,9 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
                 haveField[String]("_id") that beTypedEqualTo("test")
               }
             } and {
-              haveField[BSONDocument](
-                "fullDocument") that beTypedEqualTo(testDocument)
+              haveField[BSONDocument]("fullDocument") that beTypedEqualTo(
+                testDocument
+              )
             }
           }.await(2, timeout))
         }
@@ -93,19 +93,19 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
 
           // given
           val initialCursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
-          val testDocument1 = BSONDocument(
-            "_id" -> "resume_test1",
-            "foo" -> "bar")
-          val testDocument2 = BSONDocument(
-            "_id" -> "resume_test2",
-            "foo" -> "baz")
+          val testDocument1 =
+            BSONDocument("_id" -> "resume_test1", "foo" -> "bar")
+          val testDocument2 =
+            BSONDocument("_id" -> "resume_test2", "foo" -> "baz")
 
           // when
           val result = foldOne(initialCursor).flatMap { firstEvent =>
             firstEvent.get("_id") match {
               case Some(eventId) =>
-                coll.watch(offset = Some(ResumeAfter(eventId))).
-                  cursor[Cursor.WithOps].head
+                coll
+                  .watch(offset = Some(ResumeAfter(eventId)))
+                  .cursor[Cursor.WithOps]
+                  .head
 
               case _ => Future.failed(new Exception("The event had no id"))
             }
@@ -125,8 +125,9 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
                 haveField[String]("_id") that beTypedEqualTo("resume_test2")
               }
             } and {
-              haveField[BSONDocument](
-                "fullDocument") that beTypedEqualTo(testDocument2)
+              haveField[BSONDocument]("fullDocument") that beTypedEqualTo(
+                testDocument2
+              )
             }
           }.await(2, timeout))
         }
@@ -140,20 +141,21 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
 
           // given
           val initialCursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
-          val testDocument1 = BSONDocument(
-            "_id" -> "clusterTime_test1",
-            "foo" -> "bar")
-          val testDocument2 = BSONDocument(
-            "_id" -> "clusterTime_test2",
-            "foo" -> "baz")
+          val testDocument1 =
+            BSONDocument("_id" -> "clusterTime_test1", "foo" -> "bar")
+          val testDocument2 =
+            BSONDocument("_id" -> "clusterTime_test2", "foo" -> "baz")
 
           // when
           val result = foldOne(initialCursor).flatMap { firstEvent =>
             firstEvent.long("clusterTime") match {
               case Some(clusterTime) =>
-                coll.watch[BSONDocument](
-                  offset = Some(StartAt(operationTime = clusterTime))).
-                  cursor[Cursor.WithOps].head
+                coll
+                  .watch[BSONDocument](
+                    offset = Some(StartAt(operationTime = clusterTime))
+                  )
+                  .cursor[Cursor.WithOps]
+                  .head
 
               case _ =>
                 Future.failed(new Exception("The event had no clusterTime"))
@@ -170,12 +172,14 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
               haveField[String]("operationType") that beTypedEqualTo("insert")
             } and {
               haveField[BSONDocument]("documentKey") that {
-                haveField[String](
-                  "_id") that beTypedEqualTo("clusterTime_test1")
+                haveField[String]("_id") that beTypedEqualTo(
+                  "clusterTime_test1"
+                )
               }
             } and {
-              haveField[BSONDocument](
-                "fullDocument") that beTypedEqualTo(testDocument1)
+              haveField[BSONDocument]("fullDocument") that beTypedEqualTo(
+                testDocument1
+              )
             }
           }.await(1, timeout))
         }
@@ -197,11 +201,10 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
           // corresponds to the second update.
           def result: R = {
             // given
-            val initialCursor = coll.watch[BSONDocument]().cursor[Cursor.WithOps]
+            val initialCursor =
+              coll.watch[BSONDocument]().cursor[Cursor.WithOps]
             val id = s"lookup_test${System identityHashCode initialCursor}"
-            val testDocument = BSONDocument(
-              "_id" -> id,
-              fieldName -> "bar1")
+            val testDocument = BSONDocument("_id" -> id, fieldName -> "bar1")
 
             import coll.AggregationFramework.ChangeStream.ResumeAfter
 
@@ -209,19 +212,31 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
               firstEvent.get("_id") match {
                 case None => Future.failed(new Exception("The event had no id"))
                 case Some(eventId) =>
-
                   // when
                   for {
-                    _ <- coll.update(ordered = false).one(
-                      BSONDocument("_id" -> id),
-                      BSONDocument(f"$$set" -> BSONDocument(fieldName -> "bar2")))
-                    _ <- coll.update(ordered = false).one(
-                      BSONDocument("_id" -> id),
-                      BSONDocument(f"$$set" -> BSONDocument(fieldName -> lastValue)))
-                    resumedCursor = coll.watch[BSONDocument](
-                      offset = Some(ResumeAfter(eventId)),
-                      fullDocumentStrategy = Some(
-                        ChangeStreams.FullDocumentStrategy.UpdateLookup)).cursor[Cursor.WithOps]
+                    _ <- coll
+                      .update(ordered = false)
+                      .one(
+                        BSONDocument("_id" -> id),
+                        BSONDocument(
+                          f"$$set" -> BSONDocument(fieldName -> "bar2")
+                        )
+                      )
+                    _ <- coll
+                      .update(ordered = false)
+                      .one(
+                        BSONDocument("_id" -> id),
+                        BSONDocument(
+                          f"$$set" -> BSONDocument(fieldName -> lastValue)
+                        )
+                      )
+                    resumedCursor = coll
+                      .watch[BSONDocument](
+                        offset = Some(ResumeAfter(eventId)),
+                        fullDocumentStrategy =
+                          Some(ChangeStreams.FullDocumentStrategy.UpdateLookup)
+                      )
+                      .cursor[Cursor.WithOps]
 
                     event <- delayBy(500.millis)(resumedCursor.head)
                   } yield event
@@ -229,9 +244,13 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
             }
 
             // See comment above
-            (id, delayBy(500.millis) {
-              coll.insert(ordered = false).one(testDocument).map(_ => {})
-            }, res)
+            (
+              id,
+              delayBy(500.millis) {
+                coll.insert(ordered = false).one(testDocument).map(_ => {})
+              },
+              res
+            )
           }
 
           // then
@@ -240,14 +259,18 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
               insertion must beTypedEqualTo({}).awaitFor(timeout) and {
                 res must {
                   {
-                    haveField[String]("operationType") that beTypedEqualTo("update")
+                    haveField[String]("operationType") that beTypedEqualTo(
+                      "update"
+                    )
                   } and {
                     haveField[BSONDocument]("documentKey") that {
                       haveField[String]("_id") that beTypedEqualTo(id)
                     }
                   } and {
                     haveField[BSONDocument]("fullDocument") that {
-                      haveField[String](fieldName) that beTypedEqualTo(lastValue)
+                      haveField[String](fieldName) that beTypedEqualTo(
+                        lastValue
+                      )
                     }
                   }
                 }.await(1, timeout)
@@ -258,7 +281,10 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
     }
   }
 
-  @inline private def skipIfNotRSAndNotVersionAtLeast[R: AsResult](version: MongoWireVersion)(r: => R) = skippedIf(isNotReplicaSet, isNotAtLeast(db, version))(r)
+  @inline private def skipIfNotRSAndNotVersionAtLeast[R: AsResult](
+      version: MongoWireVersion
+    )(r: => R
+    ) = skippedIf(isNotReplicaSet, isNotAtLeast(db, version))(r)
 
   // head will always fail on a changeStream cursor, so we need to fold a single element
   private def foldOne[T](cursor: Cursor.WithOps[T]): Future[T] =
@@ -270,11 +296,14 @@ final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
       }
     }
 
-  private def delayBy[T](duration: FiniteDuration)(f: => Future[T]): Future[T] = {
+  private def delayBy[T](
+      duration: FiniteDuration
+    )(f: => Future[T]
+    ): Future[T] = {
     val promise = Promise[T]()
 
-    tests.Common.driverSystem.scheduler.
-      scheduleOnce(duration)(f.onComplete(promise.complete))
+    tests.Common.driverSystem.scheduler
+      .scheduleOnce(duration)(f.onComplete(promise.complete))
 
     promise.future
   }

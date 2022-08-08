@@ -14,9 +14,10 @@ import reactivemongo.core.actors.{ ChannelConnected, ChannelDisconnected }
 import reactivemongo.util.LazyLogger
 
 private[reactivemongo] class MongoHandler(
-  supervisor: String,
-  connection: String,
-  receiver: ActorRef) extends ChannelDuplexHandler {
+    supervisor: String,
+    connection: String,
+    receiver: ActorRef)
+    extends ChannelDuplexHandler {
 
   private var last: Long = -1L // in nano-precision
 
@@ -31,7 +32,9 @@ private[reactivemongo] class MongoHandler(
   }
 
   override def userEventTriggered(
-    ctx: ChannelHandlerContext, evt: Any): Unit = {
+      ctx: ChannelHandlerContext,
+      evt: Any
+    ): Unit = {
     evt match {
       case _: IdleStateEvent => {
         if (last != -1L) {
@@ -39,7 +42,8 @@ private[reactivemongo] class MongoHandler(
 
           log(
             ctx,
-            s"Channel has been inactive for ${now - last} (last = $last)")
+            s"Channel has been inactive for ${now - last} (last = $last)"
+          )
         }
 
         ctx.channel.close() // configured timeout - See channelInactive
@@ -84,20 +88,21 @@ private[reactivemongo] class MongoHandler(
 
         receiver ! response
 
-        //super.channelRead(ctx, msg) - Do not bubble as it's the last handler
+        // super.channelRead(ctx, msg) - Do not bubble as it's the last handler
       }
 
       case _ => {
         log(ctx, s"Unexpected message: $msg")
-        //super.channelRead(ctx, msg)
+        // super.channelRead(ctx, msg)
       }
     }
   }
 
   override def write(
-    ctx: ChannelHandlerContext,
-    msg: Any,
-    promise: ChannelPromise): Unit = {
+      ctx: ChannelHandlerContext,
+      msg: Any,
+      promise: ChannelPromise
+    ): Unit = {
     log(ctx, "Channel is requested to write")
 
     last = System.nanoTime()
@@ -108,7 +113,7 @@ private[reactivemongo] class MongoHandler(
   override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) = {
     log(ctx, s"Error on channel #${ctx.channel.id}", cause)
 
-    //super.exceptionCaught(ctx, cause) - Do not bubble as it's the last handler
+    // super.exceptionCaught(ctx, cause) - Do not bubble as it's the last handler
   }
 
   override def handlerAdded(ctx: ChannelHandlerContext): Unit = {
@@ -143,15 +148,17 @@ private[reactivemongo] class MongoHandler(
 
   @inline def warn(ctx: ChannelHandlerContext, s: String) =
     MongoHandler.logger.warn(
-      s"[$supervisor/$connection] $s (channel ${ctx.channel})")
+      s"[$supervisor/$connection] $s (channel ${ctx.channel})"
+    )
 
   @inline def log(ctx: ChannelHandlerContext, s: String) =
     MongoHandler.logger.trace(
-      s"[$supervisor/$connection] $s (channel ${ctx.channel})")
+      s"[$supervisor/$connection] $s (channel ${ctx.channel})"
+    )
 
   @inline def log(ctx: ChannelHandlerContext, s: String, cause: Throwable) =
-    MongoHandler.logger.trace(
-      s"[$supervisor/$connection] $s (channel ${ctx.channel})", cause)
+    MongoHandler.logger
+      .trace(s"[$supervisor/$connection] $s (channel ${ctx.channel})", cause)
 }
 
 private[reactivemongo] object MongoHandler {

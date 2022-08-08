@@ -33,6 +33,7 @@ private[commands] trait AggregationPipeline[P <: SerializationPack] {
    * }}}
    */
   object PipelineOperator {
+
     def apply(pipe: => pack.Document): PipelineOperator = new PipelineOperator {
       val makePipe = pipe
     }

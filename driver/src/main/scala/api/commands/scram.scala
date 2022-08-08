@@ -19,7 +19,8 @@ import reactivemongo.core.errors.{ CommandException => CmdErr }
 
 // --- MongoDB SCRAM authentication ---
 
-private[reactivemongo] sealed trait ScramChallenge[M <: AuthenticationMode.Scram] {
+private[reactivemongo] sealed trait ScramChallenge[
+    M <: AuthenticationMode.Scram] {
   protected def mechanism: M
 
   def conversationId: Int
@@ -29,15 +30,17 @@ private[reactivemongo] sealed trait ScramChallenge[M <: AuthenticationMode.Scram
 }
 
 private[reactivemongo] case class ScramSha1Challenge(
-  conversationId: Int,
-  payload: Array[Byte]) extends ScramChallenge[ScramSha1Authentication.type] {
+    conversationId: Int,
+    payload: Array[Byte])
+    extends ScramChallenge[ScramSha1Authentication.type] {
 
   val mechanism = ScramSha1Authentication
 }
 
 private[reactivemongo] case class ScramSha256Challenge(
-  conversationId: Int,
-  payload: Array[Byte]) extends ScramChallenge[ScramSha256Authentication.type] {
+    conversationId: Int,
+    payload: Array[Byte])
+    extends ScramChallenge[ScramSha256Authentication.type] {
 
   val mechanism = ScramSha256Authentication
 }
@@ -45,7 +48,9 @@ private[reactivemongo] case class ScramSha256Challenge(
 /**
  * Command to start with Mongo SCRAM authentication.
  */
-private[reactivemongo] sealed trait ScramInitiate[M <: AuthenticationMode.Scram] extends Command with CommandWithResult[ScramChallenge[M]] {
+private[reactivemongo] sealed trait ScramInitiate[M <: AuthenticationMode.Scram]
+    extends Command
+    with CommandWithResult[ScramChallenge[M]] {
   val commandKind = CommandKind.SaslStart
 
   /** The user name */
@@ -65,25 +70,33 @@ private[reactivemongo] sealed trait ScramInitiate[M <: AuthenticationMode.Scram]
 }
 
 private[reactivemongo] case class ScramSha1Initiate(
-  user: String) extends ScramInitiate[ScramSha1Authentication.type] {
+    user: String)
+    extends ScramInitiate[ScramSha1Authentication.type] {
   val mechanism = ScramSha1Authentication
 }
 
 private[reactivemongo] object ScramSha1Initiate {
   import ScramInitiate.Result
 
-  @inline def reader[P <: SerializationPack](pack: P): pack.Reader[Result[ScramSha1Authentication.type]] = ScramInitiate.reader(pack, ScramSha1Authentication)(ScramSha1Challenge.apply)
+  @inline def reader[P <: SerializationPack](
+      pack: P
+    ): pack.Reader[Result[ScramSha1Authentication.type]] = ScramInitiate
+    .reader(pack, ScramSha1Authentication)(ScramSha1Challenge.apply)
 }
 
 private[reactivemongo] case class ScramSha256Initiate(
-  user: String) extends ScramInitiate[ScramSha256Authentication.type] {
+    user: String)
+    extends ScramInitiate[ScramSha256Authentication.type] {
   val mechanism = ScramSha256Authentication
 }
 
 private[reactivemongo] object ScramSha256Initiate {
   import ScramInitiate.Result
 
-  @inline def reader[P <: SerializationPack](pack: P): pack.Reader[Result[ScramSha256Authentication.type]] = ScramInitiate.reader(pack, ScramSha256Authentication)(ScramSha256Challenge.apply)
+  @inline def reader[P <: SerializationPack](
+      pack: P
+    ): pack.Reader[Result[ScramSha256Authentication.type]] = ScramInitiate
+    .reader(pack, ScramSha256Authentication)(ScramSha256Challenge.apply)
 
 }
 
@@ -91,9 +104,10 @@ private[reactivemongo] object ScramInitiate {
   type Result[M <: AuthenticationMode.Scram] = Either[CmdErr, ScramChallenge[M]]
 
   def reader[P <: SerializationPack, M <: AuthenticationMode.Scram](
-    pack: P,
-    mechanism: M)(
-    f: (Int, Array[Byte]) => ScramChallenge[M]): pack.Reader[Result[M]] = {
+      pack: P,
+      mechanism: M
+    )(f: (Int, Array[Byte]) => ScramChallenge[M]
+    ): pack.Reader[Result[M]] = {
     val decoder = pack.newDecoder
 
     import decoder.{ int, string }
@@ -101,43 +115,57 @@ private[reactivemongo] object ScramInitiate {
     pack.reader[Result[M]] { doc =>
       string(doc, "errmsg") match {
         case Some(error) =>
-          Left(FailedAuthentication(pack)(
-            error, int(doc, "code"), Some(doc)))
+          Left(FailedAuthentication(pack)(error, int(doc, "code"), Some(doc)))
 
         case _ =>
           (for {
             cid <- int(doc, "conversationId")
             pay <- decoder.binary(doc, "payload")
-          } yield f(cid, pay)).
-            fold[Result[M]](Left(FailedAuthentication(pack)(
-              s"invalid $mechanism challenge response: ${pack pretty doc}",
-              None,
-              Some(doc))))(Right(_))
+          } yield f(cid, pay)).fold[Result[M]](
+            Left(
+              FailedAuthentication(pack)(
+                s"invalid $mechanism challenge response: ${pack pretty doc}",
+                None,
+                Some(doc)
+              )
+            )
+          )(Right(_))
       }
     }
   }
 
-  def writer[P <: SerializationPack, M <: AuthenticationMode.Scram](pack: P, mechanism: M): pack.Writer[ScramInitiate[M]] = {
+  def writer[P <: SerializationPack, M <: AuthenticationMode.Scram](
+      pack: P,
+      mechanism: M
+    ): pack.Writer[ScramInitiate[M]] = {
     val builder = pack.newBuilder
 
     import builder.{ elementProducer => elem }
 
     pack.writer[ScramInitiate[M]] { cmd =>
-      builder.document(Seq(
-        elem("saslStart", builder.int(1)),
-        elem("mechanism", builder.string(mechanism.name)),
-        elem("payload", builder.binary(ByteString(cmd.message).toArray[Byte]))))
+      builder.document(
+        Seq(
+          elem("saslStart", builder.int(1)),
+          elem("mechanism", builder.string(mechanism.name)),
+          elem("payload", builder.binary(ByteString(cmd.message).toArray[Byte]))
+        )
+      )
     }
   }
 
   // Request utility
   private val rand = new scala.util.Random(this.hashCode)
+
   private val authChars = util.toStream(new Iterator[Char] {
-    val chars = rand.shuffle("""!"#$%&'()*+-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~""".toIndexedSeq)
+
+    val chars = rand.shuffle(
+      """!"#$%&'()*+-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~""".toIndexedSeq
+    )
 
     val hasNext = true
 
     var i = 0
+
     def next(): Char = {
       if (i == chars.length) {
         i = 1
@@ -163,14 +191,17 @@ private[reactivemongo] object ScramInitiate {
  * @param request the next client request for the SCRAM authentication
  */
 private[reactivemongo] case class ScramNegociation(
-  serverSignature: Array[Byte],
-  requestConversationId: Int,
-  requestPayload: String)
+    serverSignature: Array[Byte],
+    requestConversationId: Int,
+    requestPayload: String)
 
 /**
  * Command to continue with Mongo SCRAM authentication.
  */
-private[reactivemongo] sealed trait ScramStartNegociation[M <: AuthenticationMode.Scram] extends Command with CommandWithResult[Either[SuccessfulAuthentication, Array[Byte]]] {
+private[reactivemongo] sealed trait ScramStartNegociation[
+    M <: AuthenticationMode.Scram]
+    extends Command
+    with CommandWithResult[Either[SuccessfulAuthentication, Array[Byte]]] {
   val commandKind = CommandKind.SaslContinue
 
   protected def mechanism: M
@@ -210,57 +241,76 @@ private[reactivemongo] sealed trait ScramStartNegociation[M <: AuthenticationMod
     val response = ScramNegociation.parsePayload(challenge)
 
     for {
-      rand <- response.get("r").filter(_ startsWith randomPrefix).
-        toRight(CmdErr(s"invalid $mechanism random prefix")).right
+      rand <- response
+        .get("r")
+        .filter(_ startsWith randomPrefix)
+        .toRight(CmdErr(s"invalid $mechanism random prefix"))
+        .right
 
-      salt <- response.get("s").flatMap[Array[Byte]] { s =>
-        try {
-          Some(Base64 decodeBase64 s)
-        } catch {
-          case NonFatal(_) => None
+      salt <- response
+        .get("s")
+        .flatMap[Array[Byte]] { s =>
+          try {
+            Some(Base64 decodeBase64 s)
+          } catch {
+            case NonFatal(_) => None
+          }
         }
-      }.toRight(CmdErr(s"invalid $mechanism password salt")).right
+        .toRight(CmdErr(s"invalid $mechanism password salt"))
+        .right
 
-      iter <- response.get("i").flatMap[Int] { i =>
-        try {
-          Some(i.toInt)
-        } catch {
-          case NonFatal(_) => None
+      iter <- response
+        .get("i")
+        .flatMap[Int] { i =>
+          try {
+            Some(i.toInt)
+          } catch {
+            case NonFatal(_) => None
+          }
         }
-      }.toRight(CmdErr(s"invalid $mechanism iteration count")).right
+        .toRight(CmdErr(s"invalid $mechanism iteration count"))
+        .right
 
       hashCredential <- credential.right
-      nego <- try {
-        val nonce = s"c=biws,r=$rand" // biws = base64("n,,")
-        val saltedPassword: Array[Byte] = {
-          val digest = hashCredential
+      nego <-
+        try {
+          val nonce = s"c=biws,r=$rand" // biws = base64("n,,")
+          val saltedPassword: Array[Byte] = {
+            val digest = hashCredential
 
-          val spec = new PBEKeySpec(
-            digest.toCharArray, salt, iter, storedKeySize)
+            val spec =
+              new PBEKeySpec(digest.toCharArray, salt, iter, storedKeySize)
 
-          keyFactory.generateSecret(spec).getEncoded
+            keyFactory.generateSecret(spec).getEncoded
+          }
+          val authMsg =
+            s"${startMessage drop 3},$challenge,$nonce".getBytes("UTF-8")
+
+          val clientKey = hmac(saltedPassword, ScramNegociation.ClientKeySeed)
+
+          val clientSig = hmac(digest(clientKey), authMsg)
+          val clientProof = util
+            .lazyZip(clientKey, clientSig)
+            .map((a, b) => (a ^ b).toByte)
+            .toArray
+
+          val message = s"$nonce,p=${Base64 encodeBase64String clientProof}"
+          val serverKey = hmac(saltedPassword, ScramNegociation.ServerKeySeed)
+
+          Right(
+            ScramNegociation(
+              serverSignature = hmac(serverKey, authMsg),
+              requestConversationId = conversationId,
+              requestPayload = message
+            )
+          ).right
+
+        } catch {
+          case NonFatal(err) =>
+            Left(
+              CmdErr(s"fails to negociate $mechanism: ${err.getMessage}")
+            ).right
         }
-        val authMsg =
-          s"${startMessage drop 3},$challenge,$nonce".getBytes("UTF-8")
-
-        val clientKey = hmac(saltedPassword, ScramNegociation.ClientKeySeed)
-
-        val clientSig = hmac(digest(clientKey), authMsg)
-        val clientProof = util.lazyZip(clientKey, clientSig).map(
-          (a, b) => (a ^ b).toByte).toArray
-
-        val message = s"$nonce,p=${Base64 encodeBase64String clientProof}"
-        val serverKey = hmac(saltedPassword, ScramNegociation.ServerKeySeed)
-
-        Right(ScramNegociation(
-          serverSignature = hmac(serverKey, authMsg),
-          requestConversationId = conversationId,
-          requestPayload = message)).right
-
-      } catch {
-        case NonFatal(err) => Left(CmdErr(
-          s"fails to negociate $mechanism: ${err.getMessage}")).right
-      }
     } yield nego
   }
 
@@ -269,12 +319,13 @@ private[reactivemongo] sealed trait ScramStartNegociation[M <: AuthenticationMod
 }
 
 private[reactivemongo] case class ScramSha1StartNegociation(
-  user: String,
-  password: String,
-  conversationId: Int,
-  payload: Array[Byte],
-  randomPrefix: String,
-  startMessage: String) extends ScramStartNegociation[ScramSha1Authentication.type] {
+    user: String,
+    password: String,
+    conversationId: Int,
+    payload: Array[Byte],
+    randomPrefix: String,
+    startMessage: String)
+    extends ScramStartNegociation[ScramSha1Authentication.type] {
   val mechanism = ScramSha1Authentication
 
   import org.apache.commons.codec.digest.{
@@ -305,12 +356,13 @@ private[reactivemongo] object ScramSha1StartNegociation {
 }
 
 private[reactivemongo] case class ScramSha256StartNegociation(
-  user: String,
-  password: String,
-  conversationId: Int,
-  payload: Array[Byte],
-  randomPrefix: String,
-  startMessage: String) extends ScramStartNegociation[ScramSha256Authentication.type] {
+    user: String,
+    password: String,
+    conversationId: Int,
+    payload: Array[Byte],
+    randomPrefix: String,
+    startMessage: String)
+    extends ScramStartNegociation[ScramSha256Authentication.type] {
   val mechanism = ScramSha256Authentication
 
   import org.apache.commons.codec.digest.{
@@ -340,6 +392,7 @@ private[reactivemongo] object ScramSha256StartNegociation {
 }
 
 private[reactivemongo] object ScramNegociation {
+
   /**
    * Parses the UTF-8 `payload` as a map of properties exchanged
    * during the SCRAM authentication.
@@ -365,7 +418,10 @@ private[reactivemongo] object ScramNegociation {
 }
 
 private[reactivemongo] object ScramStartNegociation {
-  def writer[P <: SerializationPack, M <: AuthenticationMode.Scram](pack: P): pack.Writer[ScramStartNegociation[M]] = {
+
+  def writer[P <: SerializationPack, M <: AuthenticationMode.Scram](
+      pack: P
+    ): pack.Writer[ScramStartNegociation[M]] = {
     val builder = pack.newBuilder
 
     import builder.{ elementProducer => elem, int }
@@ -378,11 +434,16 @@ private[reactivemongo] object ScramStartNegociation {
           throw error
 
         case Right(start) =>
-          builder.document(Seq(
-            saslContinue,
-            elem("conversationId", int(start.requestConversationId)),
-            elem("payload", builder.binary(
-              ByteString(start.requestPayload).toArray[Byte]))))
+          builder.document(
+            Seq(
+              saslContinue,
+              elem("conversationId", int(start.requestConversationId)),
+              elem(
+                "payload",
+                builder.binary(ByteString(start.requestPayload).toArray[Byte])
+              )
+            )
+          )
       }
     }
   }
@@ -390,7 +451,9 @@ private[reactivemongo] object ScramStartNegociation {
   type Result = Either[CmdErr, Either[SuccessfulAuthentication, Array[Byte]]]
 
   def reader[P <: SerializationPack, M <: AuthenticationMode.Scram](
-    pack: P, mechanism: M): pack.Reader[Result] = {
+      pack: P,
+      mechanism: M
+    ): pack.Reader[Result] = {
 
     val decoder = pack.newDecoder
 
@@ -405,9 +468,11 @@ private[reactivemongo] object ScramStartNegociation {
           if (decoder.booleanLike(doc, "done") contains true) {
             Right(Left(SilentSuccessfulAuthentication))
           } else {
-            decoder.binary(doc, "payload").fold[Result](
-              Left(CmdErr(s"missing ${mechanism} payload")))(
-                bytes => Right(Right(bytes)))
+            decoder
+              .binary(doc, "payload")
+              .fold[Result](Left(CmdErr(s"missing ${mechanism} payload")))(
+                bytes => Right(Right(bytes))
+              )
           }
       }
     }
@@ -419,13 +484,18 @@ private[reactivemongo] object ScramStartNegociation {
  * @param payload the request payload
  */
 private[reactivemongo] case class ScramFinalNegociation(
-  conversationId: Int,
-  payload: Array[Byte]) extends Command with CommandWithResult[SuccessfulAuthentication] {
+    conversationId: Int,
+    payload: Array[Byte])
+    extends Command
+    with CommandWithResult[SuccessfulAuthentication] {
   val commandKind = CommandKind.Authenticate
 }
 
 private[reactivemongo] object ScramFinalNegociation {
-  def writer[P <: SerializationPack](pack: P): pack.Writer[ScramFinalNegociation] = {
+
+  def writer[P <: SerializationPack](
+      pack: P
+    ): pack.Writer[ScramFinalNegociation] = {
     val builder = pack.newBuilder
 
     import builder.{ elementProducer => elem, int }
@@ -433,10 +503,13 @@ private[reactivemongo] object ScramFinalNegociation {
     val saslContinue = elem("saslContinue", int(1))
 
     pack.writer[ScramFinalNegociation] { nego =>
-      builder.document(Seq(
-        saslContinue,
-        elem("conversationId", int(nego.conversationId)),
-        elem("payload", builder.binary(nego.payload))))
+      builder.document(
+        Seq(
+          saslContinue,
+          elem("conversationId", int(nego.conversationId)),
+          elem("payload", builder.binary(nego.payload))
+        )
+      )
     }
   }
 }

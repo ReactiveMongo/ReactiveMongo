@@ -27,31 +27,41 @@ private[reactivemongo] object LazyLogger {
     new LazyLogger(LoggerFactory getLogger name)
 
   final class LazyLogger private[reactivemongo] (logger: Logger) {
+
     /** Returns the corresponding SLF4J logger. */
     def slf4j = logger
 
-    def trace(s: => String): Unit = { if (logger.isTraceEnabled) logger.trace(s) }
+    def trace(s: => String): Unit = {
+      if (logger.isTraceEnabled) logger.trace(s)
+    }
+
     def trace(s: => String, e: => Throwable): Unit = {
       if (logger.isTraceEnabled) logger.trace(s, e)
     }
 
     lazy val isDebugEnabled = logger.isDebugEnabled
     def debug(s: => String): Unit = { if (isDebugEnabled) logger.debug(s) }
+
     def debug(s: => String, e: => Throwable): Unit = {
       if (isDebugEnabled) logger.debug(s, e)
     }
 
     def info(s: => String): Unit = { if (logger.isInfoEnabled) logger.info(s) }
+
     def info(s: => String, e: => Throwable): Unit = {
       if (logger.isInfoEnabled) logger.info(s, e)
     }
 
     def warn(s: => String): Unit = { if (logger.isWarnEnabled) logger.warn(s) }
+
     def warn(s: => String, e: => Throwable): Unit = {
       if (logger.isWarnEnabled) logger.warn(s, e)
     }
 
-    def error(s: => String): Unit = { if (logger.isErrorEnabled) logger.error(s) }
+    def error(s: => String): Unit = {
+      if (logger.isErrorEnabled) logger.error(s)
+    }
+
     def error(s: => String, e: => Throwable): Unit = {
       if (logger.isErrorEnabled) logger.error(s, e)
     }

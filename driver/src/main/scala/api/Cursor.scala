@@ -80,7 +80,14 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    *     { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
    * }}}
    */
-  def foldBulks[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ec: ExecutionContext): Future[A]
+  def foldBulks[A](
+      z: => A,
+      maxDocs: Int = -1
+    )(suc: (A, Iterator[T]) => Cursor.State[A],
+      err: ErrorHandler[A] = FailOnError[A]()
+    )(implicit
+      ec: ExecutionContext
+    ): Future[A]
 
   /**
    * $foldBulks
@@ -108,7 +115,14 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    *     })
    * }}}
    */
-  def foldBulksM[A](z: => A, maxDocs: Int = -1)(suc: (A, Iterator[T]) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ec: ExecutionContext): Future[A]
+  def foldBulksM[A](
+      z: => A,
+      maxDocs: Int = -1
+    )(suc: (A, Iterator[T]) => Future[Cursor.State[A]],
+      err: ErrorHandler[A] = FailOnError[A]()
+    )(implicit
+      ec: ExecutionContext
+    ): Future[A]
 
   /**
    * $foldWhile
@@ -130,7 +144,14 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    *     { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
    * }}}
    */
-  def foldWhile[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Cursor.State[A], err: ErrorHandler[A] = FailOnError[A]())(implicit ec: ExecutionContext): Future[A]
+  def foldWhile[A](
+      z: => A,
+      maxDocs: Int = -1
+    )(suc: (A, T) => Cursor.State[A],
+      err: ErrorHandler[A] = FailOnError[A]()
+    )(implicit
+      ec: ExecutionContext
+    ): Future[A]
 
   /**
    * $foldWhile
@@ -156,7 +177,14 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    *     })
    * }}}
    */
-  def foldWhileM[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => Future[Cursor.State[A]], err: ErrorHandler[A] = FailOnError[A]())(implicit ec: ExecutionContext): Future[A]
+  def foldWhileM[A](
+      z: => A,
+      maxDocs: Int = -1
+    )(suc: (A, T) => Future[Cursor.State[A]],
+      err: ErrorHandler[A] = FailOnError[A]()
+    )(implicit
+      ec: ExecutionContext
+    ): Future[A]
 
   /**
    * $foldWhile
@@ -178,8 +206,16 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    *     { (l, e) => println("last valid value: " + l); Cursor.Fail(e) })
    * }}}
    */
-  def fold[A](z: => A, maxDocs: Int = -1)(suc: (A, T) => A)(implicit ec: ExecutionContext): Future[A] = foldWhile[A](z, maxDocs)(
-    { (st, v) => Cursor.Cont[A](suc(st, v)) }, FailOnError[A]())
+  def fold[A](
+      z: => A,
+      maxDocs: Int = -1
+    )(suc: (A, T) => A
+    )(implicit
+      ec: ExecutionContext
+    ): Future[A] = foldWhile[A](z, maxDocs)(
+    { (st, v) => Cursor.Cont[A](suc(st, v)) },
+    FailOnError[A]()
+  )
 
   /**
    * $getHead, or fails with [[Cursor.NoSuchResultException]] if none.
@@ -239,7 +275,10 @@ object Cursor {
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
   @SuppressWarnings(Array("MethodNames"))
-  def FailOnError[A](callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}): ErrorHandler[A] = (v: A, e: Throwable) => { callback(v, e); Fail(e): State[A] }
+  def FailOnError[A](
+      callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}
+    ): ErrorHandler[A] =
+    (v: A, e: Throwable) => { callback(v, e); Fail(e): State[A] }
 
   /**
    * Error handler to end on error (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Done Done]]).
@@ -247,7 +286,10 @@ object Cursor {
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
   @SuppressWarnings(Array("MethodNames"))
-  def DoneOnError[A](callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}): ErrorHandler[A] = (v: A, e: Throwable) => { callback(v, e); Done(v): State[A] }
+  def DoneOnError[A](
+      callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}
+    ): ErrorHandler[A] =
+    (v: A, e: Throwable) => { callback(v, e); Done(v): State[A] }
 
   /**
    * Error handler to continue on error (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Cont Cont]]).
@@ -255,7 +297,10 @@ object Cursor {
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
   @SuppressWarnings(Array("MethodNames"))
-  def ContOnError[A](callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}): ErrorHandler[A] = (v: A, e: Throwable) => { callback(v, e); Cont(v): State[A] }
+  def ContOnError[A](
+      callback: (A, Throwable) => Unit = (_: A, _: Throwable) => {}
+    ): ErrorHandler[A] =
+    (v: A, e: Throwable) => { callback(v, e); Cont(v): State[A] }
 
   /**
    * Value handler, ignoring the values (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Cont Cont]]).
@@ -263,7 +308,9 @@ object Cursor {
    * @param callback the callback function applied on each value.
    */
   @SuppressWarnings(Array("MethodNames"))
-  def Ignore[A](callback: A => Unit = (_: A) => {}): (Unit, A) => State[Unit] = { (_, a) => Cont(callback(a)) }
+  def Ignore[A](
+      callback: A => Unit = (_: A) => {}
+    ): (Unit, A) => State[Unit] = { (_, a) => Cont(callback(a)) }
 
   /**
    * Flattens the given future [[reactivemongo.api.Cursor]]
@@ -277,10 +324,15 @@ object Cursor {
    *   Cursor.flatten(cursor)
    * }}}
    */
-  def flatten[T, C[_] <: Cursor[_]](future: Future[C[T]])(implicit fs: CursorFlattener[C]): C[T] = fs.flatten(future)
+  def flatten[T, C[_] <: Cursor[_]](
+      future: Future[C[T]]
+    )(implicit
+      fs: CursorFlattener[C]
+    ): C[T] = fs.flatten(future)
 
   /** A state of the cursor processing. */
   sealed trait State[T] {
+
     /**
      * @param f the function applied on the statue value
      */
@@ -322,33 +374,29 @@ object Cursor {
 
   /** Indicates that a required result cannot be found. */
   case object NoSuchResultException
-    extends java.util.NoSuchElementException()
-    with scala.util.control.NoStackTrace
+      extends java.util.NoSuchElementException()
+      with scala.util.control.NoStackTrace
 
   private[api] val DefaultBatchSize = 101
 
   /** '''EXPERIMENTAL''' */
   final class Reference(
-    val collectionName: String,
-    val cursorId: Long,
-    val numberToReturn: Int,
-    val tailable: Boolean,
-    val pinnedNode: Option[String]) {
+      val collectionName: String,
+      val cursorId: Long,
+      val numberToReturn: Int,
+      val tailable: Boolean,
+      val pinnedNode: Option[String]) {
 
     override def equals(that: Any): Boolean = that match {
       case null => false
 
       case other: Reference =>
-        (this.cursorId == other.cursorId) && (
-          this.tailable == other.tailable) && (
-            this.numberToReturn == other.numberToReturn) && (
-              (this.pinnedNode == null && other.pinnedNode == null) ||
-              (this.pinnedNode != null &&
-                this.pinnedNode == other.pinnedNode)) && (
-                  (this.collectionName == null &&
-                    other.collectionName == null) ||
-                    (this.collectionName != null &&
-                      this.collectionName == other.collectionName))
+        (this.cursorId == other.cursorId) && (this.tailable == other.tailable) && (this.numberToReturn == other.numberToReturn) && ((this.pinnedNode == null && other.pinnedNode == null) ||
+          (this.pinnedNode != null &&
+            this.pinnedNode == other.pinnedNode)) && ((this.collectionName == null &&
+          other.collectionName == null) ||
+          (this.collectionName != null &&
+            this.collectionName == other.collectionName))
 
       case _ => false
     }
@@ -364,23 +412,22 @@ object Cursor {
       MurmurHash3.mixLast(nh4, pinnedNode.##)
     }
 
-    override def toString: String = s"""Result(collection = $collectionName, cursorId = $cursorId, numberToReturn = $numberToReturn, tailable = $tailable, pinnedNode = ${pinnedNode.getOrElse("<none>")})"""
+    override def toString: String =
+      s"""Result(collection = $collectionName, cursorId = $cursorId, numberToReturn = $numberToReturn, tailable = $tailable, pinnedNode = ${pinnedNode
+          .getOrElse("<none>")})"""
   }
 
   /** '''EXPERIMENTAL''' */
   final class Result[T] private[api] (
-    val value: T,
-    val reference: Reference) {
+      val value: T,
+      val reference: Reference) {
 
     @SuppressWarnings(Array("NullParameter", "ComparingUnrelatedTypes"))
     override def equals(that: Any): Boolean = that match {
       case null => false
 
       case other: Result[_] =>
-        ((this.value == null && other.value == null) || (
-          this.value != null && this.value == other.value)) && ((
-            this.reference == null && other.reference == null) || (
-              this.reference != null && this.reference == other.reference))
+        ((this.value == null && other.value == null) || (this.value != null && this.value == other.value)) && ((this.reference == null && other.reference == null) || (this.reference != null && this.reference == other.reference))
 
       case _ => false
     }
@@ -397,6 +444,7 @@ object Cursor {
 
   /** '''EXPERIMENTAL''' */
   object Result {
+
     def unapply[T](other: Result[T]): Option[(T, Reference)] =
       Option(other).map { r => r.value -> r.reference }
   }

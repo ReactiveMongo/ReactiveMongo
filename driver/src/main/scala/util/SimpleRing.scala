@@ -71,7 +71,7 @@ private[reactivemongo] final class SimpleRing[T: ClassTag](val capacity: Int) {
   override def equals(that: Any): Boolean = that match {
     case other: SimpleRing[_] =>
       internalState() == other.internalState() &&
-        (queue: ArrayOps[T]).equals(other.queue)
+      (queue: ArrayOps[T]).equals(other.queue)
 
     case _ =>
       false

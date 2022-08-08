@@ -22,6 +22,7 @@ package reactivemongo.api
  * ([[reactivemongo.api.collections.GenericCollection]]).
  */
 trait Collection {
+
   /** The database which this collection belongs to. */
   def db: DB
 
@@ -43,6 +44,7 @@ trait Collection {
  * This is used to get an implementation implicitly when getting a reference of a [[Collection]].
  */
 trait CollectionProducer[+C <: Collection] {
+
   /**
    * Resolve a [[Collection]] reference.
    *
@@ -50,5 +52,9 @@ trait CollectionProducer[+C <: Collection] {
    * @param name the name of the collection
    * @param failoverStrategy the failover strategy for the collection operations
    */
-  def apply(db: DB, name: String, failoverStrategy: FailoverStrategy = FailoverStrategy()): C
+  def apply(
+      db: DB,
+      name: String,
+      failoverStrategy: FailoverStrategy = FailoverStrategy()
+    ): C
 }
