@@ -42,7 +42,7 @@ trait ChangeStreamOps[P <: SerializationPack] {
   final def watch[T](
       offset: Option[ChangeStream.Offset] = None,
       pipeline: List[PipelineOperator] = Nil,
-      maxTime: Option[FiniteDuration] = None,
+      @deprecatedName('maxTime) maxAwaitTime: Option[FiniteDuration] = None,
       fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None
     )(implicit
       reader: pack.Reader[T]
@@ -52,7 +52,7 @@ trait ChangeStreamOps[P <: SerializationPack] {
         pipeline = (new ChangeStream(offset, fullDocumentStrategy)) +: pipeline,
         readConcern = ReadConcern.Majority,
         cursorOptions = CursorOptions.empty.tailable,
-        maxTime = maxTime
+        maxAwaitTime = maxAwaitTime
       )
     }
   }
@@ -102,5 +102,4 @@ trait ChangeStreamOps[P <: SerializationPack] {
       ): AC[T] = context.prepared[AC].cursor
 
   }
-
 }

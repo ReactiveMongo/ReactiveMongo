@@ -83,6 +83,8 @@ final class Driver(core: Project) {
           val mtp = ProblemFilters.exclude[MissingTypesProblem](_)
           val fcp = ProblemFilters.exclude[FinalClassProblem](_)
           val fmp = ProblemFilters.exclude[FinalMethodProblem](_)
+          val nmfp = ProblemFilters.exclude[NewMixinForwarderProblem](_)
+          val ufbp = ProblemFilters.exclude[UpdateForwarderBodyProblem](_)
 
           Seq(
             mtp("reactivemongo.api.ConnectionState$"),
@@ -96,7 +98,18 @@ final class Driver(core: Project) {
             fcp("reactivemongo.core.protocol.RequestMaker"),
             mtp("reactivemongo.core.protocol.RequestMaker$"),
             fmp("reactivemongo.api.DefaultCursor#GetMoreCursor.builder")
-          )
+          ) ++ ({
+            // Private
+            val prefix =
+              "reactivemongo.api.collections.GenericCollection.aggregatorContext"
+
+            (prefix +: (1 to 13).map(i => s"${prefix}$$default$$${i}")).map(
+              p => {
+                if (scalaBinaryVersion.value == "2.11") ufbp(p)
+                else nmfp(p)
+              }
+            )
+          })
         },
         Test / testOptions += {
           val log = streams.value.log
