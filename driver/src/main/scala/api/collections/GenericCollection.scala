@@ -93,6 +93,7 @@ trait GenericCollection[P <: SerializationPack]
     with FindAndModifyOps[P]
     with ChangeStreamOps[P]
     with AggregationOps[P]
+    with GenericCollectionWithAggregatorContext[P]
     with GenericCollectionMetaCommands[P]
     with QueryBuilderFactory[P] { self =>
 
@@ -879,89 +880,6 @@ trait GenericCollection[P <: SerializationPack]
     ).prepared[Cursor.WithOps](CursorProducer.defaultCursorProducer[T]).cursor
 
     cp.produce(aggregateCursor)
-  }
-
-  /**
-   * [[http://docs.mongodb.org/manual/reference/command/aggregate/ Aggregates]] the matching documents.
-   *
-   * {{{
-   * import scala.concurrent.Future
-   * import scala.concurrent.ExecutionContext.Implicits.global
-   *
-   * import reactivemongo.api.Cursor
-   * import reactivemongo.api.bson._
-   * import reactivemongo.api.bson.collection.BSONCollection
-   *
-   * def populatedStates(cities: BSONCollection): Future[List[BSONDocument]] = {
-   *   import cities.AggregationFramework
-   *   import AggregationFramework.{ Group, Match, SumField }
-   *
-   *   cities.aggregatorContext[BSONDocument](
-   *     List(Group(BSONString(f"$$state"))(
-   *       "totalPop" -> SumField("population")),
-   *         Match(BSONDocument("totalPop" ->
-   *           BSONDocument(f"$$gte" -> 10000000L))))
-   *   ).prepared.cursor.collect[List](
-   *     maxDocs = 3,
-   *     err = Cursor.FailOnError[List[BSONDocument]]()
-   *   )
-   * }
-   * }}}
-   *
-   * @tparam T $resultTParam
-   *
-   * @param pipeline $pipelineParam
-   * @param otherOperators $otherOpsParam
-   * @param cursor aggregation cursor option (optional)
-   * @param explain $explainParam of the pipeline (default: `false`)
-   * @param allowDiskUse $allowDiskUseParam (default: `false`)
-   * @param bypassDocumentValidation $bypassDocumentValidationParam (default: `false`)
-   * @param readConcern $readConcernParam
-   * @param readPreference $readPrefParam
-   * @param writeConcern $writeConcernParam
-   * @param batchSize $aggBatchSizeParam
-   * @param cursorOptions the options for the result cursor
-   * @param maxTime $maxTimeParam
-   * @param hint $hintParam
-   * @param comment the [[https://docs.mongodb.com/manual/reference/method/cursor.comment/#cursor.comment comment]] to annotation the aggregation command
-   * @param collation $collationParam
-   * @param reader $readerParam
-   * @param cp $cursorProducerParam
-   */
-  @SuppressWarnings(Array("MaxParameters"))
-  def aggregatorContext[T](
-      pipeline: List[PipelineOperator] = List.empty,
-      explain: Boolean = false,
-      allowDiskUse: Boolean = false,
-      bypassDocumentValidation: Boolean = false,
-      readConcern: ReadConcern = this.readConcern,
-      readPreference: ReadPreference = this.readPreference,
-      writeConcern: WriteConcern = this.writeConcern,
-      batchSize: Option[Int] = None,
-      cursorOptions: CursorOptions = CursorOptions.empty,
-      maxTime: Option[FiniteDuration] = None,
-      hint: Option[Hint] = None,
-      comment: Option[String] = None,
-      collation: Option[Collation] = None
-    )(implicit
-      reader: pack.Reader[T]
-    ): AggregatorContext[T] = {
-    new AggregatorContext[T](
-      pipeline,
-      explain,
-      allowDiskUse,
-      bypassDocumentValidation,
-      readConcern,
-      writeConcern,
-      readPreference,
-      batchSize,
-      cursorOptions,
-      maxTime,
-      reader,
-      hint,
-      comment,
-      collation
-    )
   }
 
   /**
