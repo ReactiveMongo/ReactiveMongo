@@ -50,7 +50,5 @@ object Dependencies {
     "com.lmax" % "disruptor" % "3.4.4" % Test
   )
 
-  val shapelessTest = "com.chuusai" %% "shapeless" % "2.3.7"
-
   val commonsCodec = "commons-codec" % "commons-codec" % "1.15"
 }

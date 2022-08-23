@@ -57,11 +57,31 @@ trait AggregationOps[P <: SerializationPack] {
       val readPreference: ReadPreference,
       val batchSize: Option[Int],
       val cursorOptions: CursorOptions,
+      val maxAwaitTime: Option[FiniteDuration],
       val maxTime: Option[FiniteDuration],
       val reader: pack.Reader[T],
       val hint: Option[Hint],
       val comment: Option[String],
       val collation: Option[Collation]) {
+
+    def withMaxTime(time: Option[FiniteDuration]): AggregatorContext[T] =
+      new AggregatorContext[T](
+        pipeline,
+        explain,
+        allowDiskUse,
+        bypassDocumentValidation,
+        readConcern,
+        writeConcern,
+        readPreference,
+        batchSize,
+        cursorOptions,
+        maxAwaitTime,
+        maxTime = time,
+        reader,
+        hint,
+        comment,
+        collation
+      )
 
     def prepared[AC[U] <: Cursor.WithOps[U]](
         implicit
@@ -95,7 +115,8 @@ trait AggregationOps[P <: SerializationPack] {
         context.writeConcern,
         context.hint,
         context.comment,
-        context.collation
+        context.collation,
+        context.maxTime
       )
 
       val cursor = runner.cursor[T, Aggregate[T]](
@@ -103,7 +124,7 @@ trait AggregationOps[P <: SerializationPack] {
         cmd,
         context.cursorOptions,
         context.readPreference,
-        context.maxTime.map(_.toMillis)
+        context.maxAwaitTime.map(_.toMillis)
       )
 
       cp.produce(cursor)
@@ -117,6 +138,7 @@ trait AggregationOps[P <: SerializationPack] {
    * @param batchSize the batch size
    * @param bypassDocumentValidation available only if you specify the \$out aggregation operator
    * @param readConcern the read concern (since MongoDB 3.2)
+   * @param maxTime
    */
   private[api] final class Aggregate[T](
       val pipeline: Seq[PipelineOperator],
@@ -129,7 +151,8 @@ trait AggregationOps[P <: SerializationPack] {
       val writeConcern: WriteConcern,
       val hint: Option[Hint],
       val comment: Option[String],
-      val collation: Option[Collation])
+      val collation: Option[Collation],
+      val maxTime: Option[FiniteDuration])
       extends CollectionCommand
       with CommandWithPack[pack.type]
       with CommandWithResult[T] {
@@ -175,6 +198,10 @@ trait AggregationOps[P <: SerializationPack] {
       )
 
       if (cmd.wireVersion >= MongoWireVersion.V32) {
+        cmd.maxTime.map(_.toMillis).filter(_ < Int.MaxValue).foreach { ms =>
+          elements += element("maxTimeMS", builder.int(ms.toInt))
+        }
+
         elements += element(
           "bypassDocumentValidation",
           boolean(cmd.bypassDocumentValidation)

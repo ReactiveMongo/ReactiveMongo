@@ -105,6 +105,15 @@ object Compiler {
         )
       } else Seq.empty
     },
+    // Silent mock
+    Test / doc / scalacOptions ++= List("-skip-packages", "com.github.ghik"),
+    Compile / packageBin / mappings ~= {
+      _.filter { case (_, path) => !path.startsWith("com/github/ghik") }
+    },
+    Compile / packageSrc / mappings ~= {
+      _.filter { case (_, path) => path != "silent.scala" }
+    },
+    //
     Compile / scalacOptions ++= {
       val v = scalaBinaryVersion.value
 
