@@ -75,7 +75,7 @@ final class Driver(core: Project) {
           "dnsjava" % "dnsjava" % "3.5.1",
           commonsCodec,
           specs.value,
-          "ch.qos.logback" % "logback-classic" % "1.2.11" % Test
+          "ch.qos.logback" % "logback-classic" % "1.4.0" % Test
         ) ++ logApi,
         mimaBinaryIssueFilters ++= {
           import com.typesafe.tools.mima.core._
