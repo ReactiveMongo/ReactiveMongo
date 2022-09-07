@@ -9,7 +9,7 @@ SBT_OPTS="-Dtest.primaryHost=$PRIMARY_HOST -Dtest.slowPrimaryHost=$PRIMARY_SLOW_
 SBT_OPTS="$SBT_OPTS -Dtest.slowProxyDelay=300 -Dtest.slowFailoverRetries=12"
 SBT_OPTS="$SBT_OPTS -Dreactivemongo.collectThreadTrace=true"
 
-TEST_OPTS=""
+TEST_OPTS="asap"
 
 echo "[INFO] Running integration tests ..."
 
@@ -17,11 +17,11 @@ echo "[INFO] Running integration tests ..."
 echo "- MongoDB major: $MONGO_VER"
 
 if [ "v$MONGO_VER" = "v3" ]; then
-    TEST_OPTS="exclude gt_mongo32,ge_mongo4,unit"
+    TEST_OPTS="$TEST_OPTS exclude gt_mongo32,ge_mongo4,unit"
 elif [ "v$MONGO_VER" = "v4" -o "v$MONGO_VER" = "v5" ]; then
-    TEST_OPTS="exclude unit"
+    TEST_OPTS="$TEST_OPTS exclude unit"
 else
-    TEST_OPTS="exclude gt_mongo32,ge_mongo4,unit"
+    TEST_OPTS="$TEST_OPTS exclude gt_mongo32,ge_mongo4,unit"
 fi
 
 if [ ! "$MONGO_PROFILE" = "x509" ]; then
