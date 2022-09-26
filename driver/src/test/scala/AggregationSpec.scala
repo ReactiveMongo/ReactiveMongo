@@ -12,6 +12,7 @@ import reactivemongo.api.bson.{
   BSONInteger,
   BSONLong,
   BSONNull,
+  BSONObjectID,
   BSONString,
   BSONTimestamp,
   Macros,
@@ -2282,6 +2283,64 @@ db.accounts.aggregate([
         op.name must_=== "custom" and (doc(op) must_=== expected)
       }
 
+      "autocomplete" >> {
+        "with minimal options" in {
+          val op = Autocomplete(
+            query = "foo",
+            path =
+              SearchString("title", "alternateAnalyzer", Seq("anotherField")),
+            score = None,
+            fuzzy = None,
+            tokenOrder = None
+          )
+
+          op.name must_=== "autocomplete" and {
+            doc(op) must_=== BSONDocument(
+              "query" -> "foo",
+              "path" -> Seq(
+                BSONDocument(
+                  "value" -> "title",
+                  "multi" -> "alternateAnalyzer"
+                ),
+                string("anotherField")
+              )
+            )
+          }
+        }
+
+        "with all options" in {
+          val op = Autocomplete(
+            query = "bar",
+            path = "title" -> Seq("description", "tags"),
+            score = Some(AtlasScore.constant(1.23D)),
+            fuzzy = Some(
+              Fuzzy(
+                maxEdits = 3,
+                prefixLength = 2,
+                maxExpansions = 5
+              )
+            ),
+            tokenOrder = Some(Autocomplete.AnyTokenOrder)
+          )
+
+          op.name must_=== "autocomplete" and {
+            doc(op) must_=== BSONDocument(
+              "query" -> "bar",
+              "path" -> Seq("title", "description", "tags"),
+              "score" -> BSONDocument(
+                "constant" -> BSONDocument("value" -> 1.23D)
+              ),
+              "fuzzy" -> BSONDocument(
+                "maxEdits" -> 3,
+                "prefixLength" -> 2,
+                "maxExpansions" -> 5
+              ),
+              "tokenOrder" -> "any"
+            )
+          }
+        }
+      }
+
       "term" >> {
         "with minimal options" in {
           term1.name must_=== "term" and {
@@ -2396,7 +2455,7 @@ db.accounts.aggregate([
               query = "foo" -> Seq.empty,
               path = "title" -> Nil,
               fuzzy = Some(
-                Text.Fuzzy(maxEdits = 3, prefixLength = 2, maxExpansions = 5)
+                Fuzzy(maxEdits = 3, prefixLength = 2, maxExpansions = 5)
               )
             )
           ) must_=== BSONDocument(
@@ -2478,6 +2537,12 @@ db.accounts.aggregate([
 
           doc(builder.result()) must_=== expected1 and {
             doc(
+              builder.result(AtlasScore.boost(45.6D))
+            ) must_=== (expected1 ++ BSONDocument(
+              "score" -> BSONDocument("boost" -> BSONDocument("value" -> 45.6D))
+            ))
+          } and {
+            doc(
               newBuilder(Compound.must, term1 -> Seq(text1)).result()
             ) must_=== expected1
           } and {
@@ -2531,17 +2596,233 @@ db.accounts.aggregate([
         }
       }
 
+      "embeddedDocument" in {
+        val mini = EmbeddedDocument(path = "foo", operator = Exists("title"))
+
+        mini.name must_=== "embeddedDocument" and {
+          doc(mini) must_=== BSONDocument(
+            "path" -> "foo",
+            "operator" -> BSONDocument(
+              "exists" -> BSONDocument("path" -> "title")
+            )
+          )
+        } and {
+          doc(
+            EmbeddedDocument(
+              path = "bar",
+              operator = Exists("title"),
+              score = AtlasScore.constant(3.45D)
+            )
+          ) must_=== BSONDocument(
+            "path" -> "bar",
+            "operator" -> BSONDocument(
+              "exists" -> BSONDocument("path" -> "title")
+            ),
+            "score" -> BSONDocument(
+              "constant" -> BSONDocument("value" -> 3.45D)
+            )
+          )
+        }
+      }
+
+      "equals" >> {
+        "with boolean value" in {
+          val op = Equals("foo", value = true)
+
+          op.name must_=== "equals" and {
+            doc(op) must_=== BSONDocument("path" -> "foo", "value" -> true)
+          } and {
+            doc(
+              Equals(
+                path = "bar",
+                value = false,
+                score = AtlasScore.constant(1.23D)
+              )
+            ) must_=== BSONDocument(
+              "path" -> "bar",
+              "value" -> false,
+              "score" -> BSONDocument(
+                "constant" -> BSONDocument("value" -> 1.23D)
+              )
+            )
+          }
+        }
+
+        "with boolean value" in {
+          val oid = BSONObjectID.generate()
+          val op = Equals("foo", objectId = oid)
+
+          doc(op) must_=== BSONDocument("path" -> "foo", "value" -> oid) and {
+            doc(
+              Equals(
+                path = "bar",
+                objectId = oid,
+                score = AtlasScore.constant(1.23D)
+              )
+            ) must_=== BSONDocument(
+              "path" -> "bar",
+              "value" -> oid,
+              "score" -> BSONDocument(
+                "constant" -> BSONDocument("value" -> 1.23D)
+              )
+            )
+          }
+        }
+      }
+
       "exists" in {
         val op = Exists("title" -> Nil)
 
         op.name must_=== "exists" and {
-          doc(op) must_=== BSONDocument("path" -> "title") and {
-            doc(
-              Exists("title" -> Seq("description", "tags"))
-            ) must_=== BSONDocument(
-              "path" -> Seq("title", "description", "tags")
+          doc(op) must_=== BSONDocument("path" -> "title")
+        } and {
+          doc(
+            Exists("title" -> Seq("description", "tags"))
+          ) must_=== BSONDocument(
+            "path" -> Seq("title", "description", "tags")
+          )
+        } and {
+          doc(Exists("foo", AtlasScore.boost(45.6D))) must_=== BSONDocument(
+            "path" -> "foo",
+            "score" -> BSONDocument("boost" -> BSONDocument("value" -> 45.6D))
+          )
+        }
+      }
+
+      "facet" in {
+        val op = AtlasSearch.Facet(
+          operator = Exists("title"),
+          facet = "foo" -> AtlasSearch.Facet.facet("bar")
+        )
+
+        op.name must_=== "facet" and {
+          doc(op) must_=== BSONDocument(
+            "operator" -> BSONDocument(
+              "exists" -> BSONDocument("path" -> "title")
+            ),
+            "facets" -> BSONDocument(
+              "foo" -> BSONDocument(
+                "type" -> "string",
+                "path" -> BSONDocument(
+                  "bar" -> BSONDocument("type" -> "stringFacet")
+                )
+              )
             )
-          }
+          )
+
+        } and {
+          doc(
+            AtlasSearch.Facet(
+              operator = Exists("title"),
+              facets = Map(
+                "foo" -> AtlasSearch.Facet.facet("bar"),
+                "lorem" -> AtlasSearch.Facet.facet("ipsum", 1234)
+              )
+            )
+          ) must_=== BSONDocument(
+            "operator" -> BSONDocument(
+              "exists" -> BSONDocument("path" -> "title")
+            ),
+            "facets" -> BSONDocument(
+              "foo" -> BSONDocument(
+                "type" -> "string",
+                "path" -> BSONDocument(
+                  "bar" -> BSONDocument("type" -> "stringFacet")
+                )
+              ),
+              "lorem" -> BSONDocument(
+                "type" -> "string",
+                "path" -> BSONDocument(
+                  "ipsum" -> BSONDocument("type" -> "stringFacet")
+                ),
+                "numBuckets" -> 1234
+              )
+            )
+          )
+        }
+      }
+
+      "geoShape" in {
+        val op = GeoShape(
+          path = "foo",
+          relation = GeoShape.ContainsRelation,
+          geometry = BSONDocument("lorem" -> "ipsum")
+        )
+
+        op.name must_=== "geoShape" and {
+          doc(op) must_=== BSONDocument(
+            "path" -> "foo",
+            "relation" -> "contains",
+            "geometry" -> BSONDocument("lorem" -> "ipsum")
+          )
+        } and {
+          doc(
+            GeoShape(
+              path = "lorem",
+              relation = GeoShape.IntersectsRelation,
+              geometry = BSONDocument("foo" -> 1),
+              score = AtlasScore.constant(1.23D)
+            )
+          ) must_=== BSONDocument(
+            "path" -> "lorem",
+            "relation" -> "intersects",
+            "geometry" -> BSONDocument("foo" -> 1),
+            "score" -> BSONDocument(
+              "constant" -> BSONDocument("value" -> 1.23D)
+            )
+          )
+        }
+      }
+
+      "geoWithin" in {
+        val op = GeoWithin(
+          path = "foo",
+          bounds = GeoWithin.box(BSONDocument("bar" -> 1))
+        )
+
+        op.name must_=== "geoWithin" and {
+          doc(op) must_=== BSONDocument(
+            "path" -> "foo",
+            "box" -> BSONDocument("bar" -> 1)
+          )
+        } and {
+          doc(
+            GeoWithin(
+              path = "lorem",
+              bounds = GeoWithin.circle(BSONDocument("ipsum" -> 2)),
+              score = AtlasScore.constant(1.23D)
+            )
+          ) must_=== BSONDocument(
+            "path" -> "lorem",
+            "circle" -> BSONDocument("ipsum" -> 2),
+            "score" -> BSONDocument(
+              "constant" -> BSONDocument("value" -> 1.23D)
+            )
+          )
+        }
+      }
+
+      "moreLikeThis" in {
+        val op = MoreLikeThis(BSONDocument("foo" -> "bar"))
+
+        op.name must_=== "moreLikeThis" and {
+          doc(op) must_=== BSONDocument(
+            "like" -> Seq(BSONDocument("foo" -> "bar"))
+          )
+        } and {
+          doc(
+            MoreLikeThis(
+              BSONDocument("bar" -> 2),
+              BSONDocument("lorem" -> "ipsum"),
+              BSONDocument("third" -> 3)
+            )
+          ) must_=== BSONDocument(
+            "like" -> Seq(
+              BSONDocument("bar" -> 2),
+              BSONDocument("lorem" -> "ipsum"),
+              BSONDocument("third" -> 3)
+            )
+          )
         }
       }
 
@@ -2645,6 +2926,24 @@ db.accounts.aggregate([
             "score" -> BSONDocument("boost" -> BSONDocument("value" -> 2.1D))
           )
 
+        }
+      }
+
+      "span" in {
+        val op = Span("foo" -> BSONDocument("bar" -> 1))
+
+        op.name must_=== "span" and {
+          doc(op) must_=== BSONDocument("foo" -> BSONDocument("bar" -> 1))
+        } and {
+          doc(
+            Span(
+              ("bar" -> BSONDocument("foo" -> 2)),
+              ("lorem" -> BSONDocument("lorem" -> "ipsum"))
+            )
+          ) must_=== BSONDocument(
+            "bar" -> BSONDocument("foo" -> 2),
+            "lorem" -> BSONDocument("lorem" -> "ipsum")
+          )
         }
       }
 
