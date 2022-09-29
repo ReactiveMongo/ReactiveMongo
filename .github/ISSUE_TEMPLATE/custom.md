@@ -1,6 +1,6 @@
 ---
-name: Custom issue template
-about: Describe this issue template's purpose here.
+name: Driver issue or feature request
+about: Confirmed driver issue or actionable feature request
 title: ''
 labels: ''
 assignees: ''

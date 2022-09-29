@@ -7,7 +7,8 @@ lazy val `ReactiveMongo-Core` = project
     libraryDependencies ++= {
       val deps = Dependencies.shaded.value
 
-      ("org.reactivemongo" %% "reactivemongo-bson-api" % version.value) +: deps ++: Seq(
+      ("org.reactivemongo" %% "reactivemongo-bson-api" % version.value)
+        .exclude("org.slf4j", "*") +: deps ++: Seq(
         "com.github.luben" % "zstd-jni" % "1.5.2-3",
         "org.xerial.snappy" % "snappy-java" % "1.1.8.4",
         Dependencies.specs.value
