@@ -290,7 +290,7 @@ jobs:
         default: 10
       scala_version:
         type: string
-        default: "2.12.16"
+        default: "2.12.17"
       akka_version:
         type: string
         default: "2.5.23"
