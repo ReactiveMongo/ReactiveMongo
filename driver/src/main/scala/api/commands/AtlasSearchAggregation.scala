@@ -3,22 +3,37 @@ package reactivemongo.api.commands
 import reactivemongo.api.{ PackSupport, SerializationPack }
 
 /**
+ * @define indexParam the index name
  * @define queryParam the value or values to search for
  * @define pathParam the indexed field or fields to search
  * @define scoreParam the optional score modifier (default: `None`)
+ * @define fuzzyParam enable the fuzzy search (default: `None`)
  */
 private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
   aggregation: PackSupport[P] with AggregationFramework[P] =>
 
   /**
    * '''EXPERIMENTAL:''' See [[AtlasSearch$]]
+   *
+   * @param index $indexParam (optional)
    */
   final class AtlasSearch private[api] (
-      val operator: AtlasSearch.Operator)
+      val operator: AtlasSearch.Operator,
+      val index: Option[String])
       extends PipelineOperator {
 
-    def makePipe: pack.Document =
-      pipe(f"$$search", pipe(operator.name, operator.document))
+    def makePipe: pack.Document = {
+      import builder.{ elementProducer => elm }
+
+      val doc = Seq.newBuilder[pack.ElementProducer] += elm(
+        operator.name,
+        operator.document
+      )
+
+      index.foreach { index => doc += elm("index", builder.string(index)) }
+
+      pipe(f"$$search", builder.document(doc.result()))
+    }
 
     @inline override def hashCode: Int = operator.hashCode
 
@@ -181,12 +196,21 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
      *   )
      * }}}
      */
-    def apply(operator: Operator): AtlasSearch = new AtlasSearch(operator)
+    def apply(operator: Operator): AtlasSearch = new AtlasSearch(operator, None)
+
+    /**
+     * @param operator the Atlas Search top [[https://docs.atlas.mongodb.com/reference/atlas-search/query-syntax/#fts-operators operator]]
+     * @param index $indexParam (optional)
+     */
+    def apply(operator: Operator, index: String): AtlasSearch =
+      new AtlasSearch(operator, Some(index))
 
     // ---
 
     /** '''EXPERIMENTAL:''' See [[Operator$]] */
     sealed trait Operator {
+
+      /** The operator name */
       def name: String
 
       private[api] def document: pack.Document
@@ -303,6 +327,151 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
     // ---
 
+    /** '''EXPERIMENTAL:''' Fuzzy search options */
+    final class Fuzzy private[api] (
+        val maxEdits: Int,
+        val prefixLength: Int,
+        val maxExpansions: Int) {
+      private lazy val tupled = Tuple3(maxEdits, prefixLength, maxExpansions)
+
+      private[api] def document: pack.Document = {
+        import builder.{ elementProducer => elm }
+
+        builder.document(
+          Seq(
+            elm("maxEdits", builder.int(maxEdits)),
+            elm("prefixLength", builder.int(prefixLength)),
+            elm("maxExpansions", builder.int(maxExpansions))
+          )
+        )
+      }
+
+      override def hashCode = tupled.hashCode
+
+      override def equals(that: Any): Boolean = that match {
+        case other: this.type =>
+          this.tupled == other.tupled
+
+        case _ =>
+          false
+      }
+
+      override def toString =
+        s"Fuzzy(maxEdits = $maxEdits, prefixLength = $prefixLength, maxExpansions = $maxExpansions)"
+    }
+
+    /**
+     * '''EXPERIMENTAL:''' Fuzzy search options.
+     *
+     * {{{
+     * import reactivemongo.api.bson.collection.BSONCollection
+     *
+     * def prepare(coll: BSONCollection): coll.AggregationFramework.AtlasSearch.Fuzzy = coll.AggregationFramework.AtlasSearch.Fuzzy(
+     *   maxEdits = 1, prefixLength = 2
+     * )
+     * }}}
+     */
+    object Fuzzy {
+
+      /**
+       * @param maxEdits the maximum number of single-character edits required to match the specified search term
+       * @param prefixLength the number of characters at the beginning of the result that must exactly match the search term
+       * @param maxExpansions the maximum number of variations to generate and search for
+       */
+      def apply(
+          maxEdits: Int = 2,
+          prefixLength: Int = 0,
+          maxExpansions: Int = 50
+        ): Fuzzy = new Fuzzy(maxEdits, prefixLength, maxExpansions)
+    }
+
+    /**
+     * '''EXPERIMENTAL:''' See [[Autocomplete$]]
+     *
+     * @param query $queryParam
+     * @param path $pathParam
+     * @param score $scoreParam
+     * @param fuzzy $fuzzyParam
+     * @param tokenOrder the order in which to search for tokens
+     */
+    final class Autocomplete private[api] (
+        val query: SearchString,
+        val path: SearchString,
+        val score: Option[Score],
+        val fuzzy: Option[Fuzzy],
+        val tokenOrder: Option[Autocomplete.TokenOrder])
+        extends Operator {
+
+      val name = "autocomplete"
+
+      def document: pack.Document = {
+        import builder.{ elementProducer => elm }
+
+        val opts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+          elm("query", query.value),
+          elm("path", path.value)
+        )
+
+        score.foreach { sc => opts += elm("score", sc.document) }
+
+        fuzzy.foreach { mod => opts += elm("fuzzy", mod.document) }
+
+        tokenOrder.foreach { order =>
+          opts += elm("tokenOrder", builder.string(order.name))
+        }
+
+        builder.document(opts.result())
+      }
+
+      private lazy val tupled = Tuple5(query, path, score, fuzzy, tokenOrder)
+
+      override def equals(that: Any): Boolean = that match {
+        case other: this.type =>
+          this.tupled == other.tupled
+
+        case _ =>
+          false
+      }
+
+      override def hashCode: Int = tupled.hashCode
+
+      override def toString: String = s"Autocomplete${tupled.toString}"
+    }
+
+    /** '''EXPERIMENTAL:''' [[https://www.mongodb.com/docs/atlas/atlas-search/autocomplete Autocomplete]] operator for [[Autocomplete]]. */
+    object Autocomplete {
+
+      /**
+       * @param query $queryParam
+       * @param path $pathParam
+       * @param score $scoreParam
+       */
+      def apply(
+          query: SearchString,
+          path: SearchString,
+          score: Option[Score],
+          fuzzy: Option[Fuzzy],
+          tokenOrder: Option[Autocomplete.TokenOrder]
+        ): Autocomplete =
+        new Autocomplete(query, path, score, fuzzy, tokenOrder)
+
+      // ---
+
+      sealed trait TokenOrder {
+        def name: String
+
+        @inline final override def toString = name
+      }
+
+      case object AnyTokenOrder extends TokenOrder {
+        val name = "any"
+      }
+
+      case object SequentialTokenOrder extends TokenOrder {
+        val name = "sequential"
+      }
+    }
+
     /**
      * '''EXPERIMENTAL:''' See [[Term$]]
      *
@@ -373,7 +542,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
       override def toString = s"SearchTerm${tupled.toString}"
     }
 
-    /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/term/#term-ref Term]] operator for [[]]. */
+    /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/term/#term-ref Term]] operator for [[Term]]. */
     object Term {
 
       /**
@@ -451,7 +620,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
     final class Text private[api] (
         val query: SearchString,
         val path: SearchString,
-        val fuzzy: Option[Text.Fuzzy],
+        val fuzzy: Option[Fuzzy],
         val score: Option[Score])
         extends Operator {
 
@@ -468,7 +637,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         fuzzy.foreach { mod =>
           elms += elm(
             "fuzzy",
-            builder.document(
+            builder.document( // HERE
               Seq(
                 elm("maxEdits", builder.int(mod.maxEdits)),
                 elm("prefixLength", builder.int(mod.prefixLength)),
@@ -521,58 +690,10 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
       def apply(
           query: SearchString,
           path: SearchString,
-          fuzzy: Option[Text.Fuzzy] = None,
+          fuzzy: Option[Fuzzy] = None,
           score: Option[Score] = None
-        ): Text =
-        new Text(query, path, fuzzy, score)
+        ): Text = new Text(query, path, fuzzy, score)
 
-      // ---
-
-      /** '''EXPERIMENTAL:''' Fuzzy search options */
-      final class Fuzzy private[api] (
-          val maxEdits: Int,
-          val prefixLength: Int,
-          val maxExpansions: Int) {
-        private lazy val tupled = Tuple3(maxEdits, prefixLength, maxExpansions)
-
-        override def hashCode = tupled.hashCode
-
-        override def equals(that: Any): Boolean = that match {
-          case other: this.type =>
-            this.tupled == other.tupled
-
-          case _ =>
-            false
-        }
-
-        override def toString =
-          s"Fuzzy(maxEdits = $maxEdits, prefixLength = $prefixLength, maxExpansions = $maxExpansions)"
-      }
-
-      /**
-       * '''EXPERIMENTAL:''' Fuzzy search options.
-       *
-       * {{{
-       * import reactivemongo.api.bson.collection.BSONCollection
-       *
-       * def prepare(coll: BSONCollection): coll.AggregationFramework.AtlasSearch.Text.Fuzzy = coll.AggregationFramework.AtlasSearch.Text.Fuzzy(
-       *   maxEdits = 1, prefixLength = 2
-       * )
-       * }}}
-       */
-      object Fuzzy {
-
-        /**
-         * @param maxEdits the maximum number of single-character edits required to match the specified search term
-         * @param prefixLength the number of characters at the beginning of the result that must exactly match the search term
-         * @param maxExpansions the maximum number of variations to generate and search for
-         */
-        def apply(
-            maxEdits: Int = 2,
-            prefixLength: Int = 0,
-            maxExpansions: Int = 50
-          ): Fuzzy = new Fuzzy(maxEdits, prefixLength, maxExpansions)
-      }
     }
 
     /**
@@ -653,7 +774,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
     final class Compound private[api] (
         val head: Compound.Clause,
         val next: Seq[Compound.Clause],
-        val minimumShouldMatch: Option[Int])
+        val minimumShouldMatch: Option[Int],
+        val score: Option[Score])
         extends Operator {
       val name = "compound"
 
@@ -664,6 +786,8 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
           builder.document(Seq(elm(op.name, op.document)))
 
         val elms = Seq.newBuilder[pack.ElementProducer]
+
+        score.foreach { sc => elms += elm("score", sc.document) }
 
         def clauseElm(c: Compound.Clause): Unit = {
           import c._1.{ toString => clauseType },
@@ -956,7 +1080,10 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
           minimumShouldMatch: Option[Int]) {
 
         def result(): Compound =
-          new Compound(head, next.reverse, minimumShouldMatch)
+          new Compound(head, next.reverse, minimumShouldMatch, None)
+
+        def result(score: Score): Compound =
+          new Compound(head, next.reverse, minimumShouldMatch, Some(score))
 
         /**
          * $appendBrief with a single operator. $appendWarning.
@@ -1106,18 +1233,185 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
     }
 
     /**
+     * '''EXPERIMENTAL:''' See [[EmbeddedDocument$]]
+     *
+     * @param path $pathParam
+     * @param score $scoreParam
+     */
+    final class EmbeddedDocument private[api] (
+        val path: SearchString,
+        val operator: Operator,
+        val score: Option[Score])
+        extends Operator {
+
+      val name = "embeddedDocument"
+
+      def document: pack.Document = {
+        import builder.{ elementProducer => elm }
+
+        val opts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+          elm("path", path.value),
+          elm("operator", pipe(operator.name, operator.document))
+        )
+
+        score.foreach { sc => opts += elm("score", sc.document) }
+
+        builder.document(opts.result())
+      }
+
+      private lazy val tupled = Tuple3(path, operator, score)
+
+      @inline override def hashCode: Int = tupled.hashCode
+
+      override def equals(that: Any): Boolean = that match {
+        case other: this.type =>
+          this.tupled == other.tupled
+
+        case _ =>
+          false
+      }
+
+      override def toString = s"EmbeddedDocument${tupled.toString}"
+    }
+
+    /** '''EXPERIMENTAL:''' [[https://www.mongodb.com/docs/atlas/atlas-search/embedded-document/ EmbeddedDocument]] operator for Atlas Search */
+    object EmbeddedDocument {
+
+      /**
+       * @param path $pathParam
+       *
+       * {{{
+       * import reactivemongo.api.bson.collection.BSONCollection
+       *
+       * def prepare(coll: BSONCollection) =
+       *   coll.AggregationFramework.AtlasSearch.EmbeddedDocument(
+       *     path = "field",
+       *     operator = coll.AggregationFramework.AtlasSearch.Exists("nested")
+       *   )
+       * }}}
+       */
+      def apply(path: SearchString, operator: Operator): EmbeddedDocument =
+        new EmbeddedDocument(path, operator, None)
+
+      /**
+       * @param path $pathParam
+       * @param score $scoreParam
+       */
+      def apply(
+          path: SearchString,
+          operator: Operator,
+          score: Score
+        ): EmbeddedDocument = new EmbeddedDocument(path, operator, Some(score))
+
+    }
+
+    /**
+     * '''EXPERIMENTAL:''' See [[Equals$]]
+     *
+     * @param path $pathParam
+     * @param score $scoreParam
+     */
+    final class Equals private[api] (
+        val path: SearchString,
+        val value: pack.Value,
+        val score: Option[Score])
+        extends Operator {
+
+      val name = "equals"
+
+      def document: pack.Document = {
+        import builder.{ elementProducer => elm }
+
+        val opts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+          elm("path", path.value),
+          elm("value", value)
+        )
+
+        score.foreach { sc => opts += elm("score", sc.document) }
+
+        builder.document(opts.result())
+      }
+
+      private lazy val tupled = Tuple3(path, value, score)
+
+      @inline override def hashCode: Int = tupled.hashCode
+
+      override def equals(that: Any): Boolean = that match {
+        case other: this.type =>
+          this.tupled == other.tupled
+
+        case _ =>
+          false
+      }
+
+      override def toString = s"Equals${tupled.toString}"
+    }
+
+    /** '''EXPERIMENTAL:''' [[https://www.mongodb.com/docs/atlas/atlas-search/equals/ Equals]] operator for Atlas Search */
+    object Equals {
+
+      /**
+       * @param path $pathParam
+       */
+      def apply(
+          path: SearchString,
+          value: Boolean
+        ): Equals =
+        new Equals(path, value = builder.boolean(value), score = None)
+
+      /**
+       * @param path $pathParam
+       */
+      def apply(
+          path: SearchString,
+          value: Boolean,
+          score: Score
+        ): Equals =
+        new Equals(path, value = builder.boolean(value), score = Some(score))
+
+      /**
+       * @param path $pathParam
+       */
+      def apply(
+          path: SearchString,
+          objectId: pack.Value
+        ): Equals =
+        new Equals(path, value = objectId, score = None)
+
+      /**
+       * @param path $pathParam
+       */
+      def apply(
+          path: SearchString,
+          objectId: pack.Value,
+          score: Score
+        ): Equals =
+        new Equals(path, value = objectId, score = Some(score))
+    }
+
+    /**
      * '''EXPERIMENTAL:''' See [[Exists$]]
      *
      * @param path $pathParam
+     * @param score $scoreParam
      */
     final class Exists private[api] (
-        val path: SearchString)
+        val path: SearchString,
+        val score: Option[Score])
         extends Operator {
 
       val name = "exists"
 
-      def document: pack.Document =
-        builder.document(Seq(builder.elementProducer("path", path.value)))
+      def document: pack.Document = {
+        import builder.{ elementProducer => elm }
+
+        val opts =
+          Seq.newBuilder[pack.ElementProducer] += elm("path", path.value)
+
+        score.foreach { sc => opts += elm("score", sc.document) }
+
+        builder.document(opts.result())
+      }
 
       @inline override def hashCode: Int = path.hashCode
 
@@ -1146,7 +1440,382 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        * }}}
        */
       def apply(path: SearchString): Exists =
-        new Exists(path)
+        new Exists(path, None)
+
+      /**
+       * @param path $pathParam
+       * @param score $scoreParam
+       */
+      def apply(path: SearchString, score: Score): Exists =
+        new Exists(path, Some(score))
+
+    }
+
+    /**
+     * '''EXPERIMENTAL:''' See [[Facet$]]
+     *
+     * @param operator
+     * @param score $scoreParam
+     */
+    final class Facet private[api] (
+        val operator: Operator,
+        val facets: Map[String, Facet.FacetOption])
+        extends Operator {
+      val name = "facet"
+
+      def document: pack.Document = {
+        import builder.{ document => doc, elementProducer => elm, string }
+
+        val facetElms = Seq.newBuilder[pack.ElementProducer]
+
+        facets.foreach {
+          case (nme, fct) =>
+            val facetDoc = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+              elm("type", string("string")),
+              elm(
+                "path",
+                doc(Seq(elm(fct.path, pipe("type", string("stringFacet")))))
+              )
+            )
+
+            fct.numBuckets.foreach { num =>
+              facetDoc += elm("numBuckets", builder.int(num))
+            }
+
+            facetElms += elm(nme, doc(facetDoc.result()))
+        }
+
+        doc(
+          Seq(
+            elm("operator", pipe(operator.name, operator.document)),
+            elm("facets", doc(facetElms.result()))
+          )
+        )
+      }
+
+      private lazy val tupled = Tuple2(operator, facets)
+
+      override def equals(that: Any): Boolean = that match {
+        case other: this.type =>
+          this.tupled == other.tupled
+
+        case _ =>
+          false
+      }
+
+      override def hashCode: Int = tupled.hashCode
+
+      override def toString = s"Facet${tupled.toString}"
+    }
+
+    /** '''EXPERIMENTAL:''' [[https://www.mongodb.com/docs/atlas/atlas-search/facet/ Facet]] operator for Atlas Search */
+    object Facet {
+
+      def apply(
+          operator: Operator,
+          facet: (String, FacetOption)
+        ): Facet =
+        new Facet(operator, Map(facet))
+
+      def apply(
+          operator: Operator,
+          facets: Map[String, FacetOption]
+        ): Facet =
+        new Facet(operator, facets)
+
+      def facet(path: String): FacetOption = new FacetOption(path, None)
+
+      def facet(path: String, numBuckets: Int): FacetOption =
+        new FacetOption(path, Some(numBuckets))
+
+      // ---
+
+      final class FacetOption private[api] (
+          val path: String,
+          val numBuckets: Option[Int]) {
+
+        private lazy val tupled = Tuple2(path, numBuckets)
+
+        override def equals(that: Any): Boolean = that match {
+          case other: this.type =>
+            this.tupled == other.tupled
+
+          case _ =>
+            false
+        }
+
+        override def hashCode: Int = tupled.hashCode
+
+        override def toString = s"FacetOption${tupled.toString}"
+      }
+    }
+
+    /**
+     * '''EXPERIMENTAL:''' See [[GeoShape$]]
+     *
+     * @see [[https://www.mongodb.com/docs/atlas/atlas-search/geoShape/ geoShape]] operator
+     *
+     * @param path $pathParam
+     * @param score $scoreParam
+     */
+    final class GeoShape private[api] (
+        val path: SearchString,
+        val relation: GeoShape.Relation,
+        val geometry: pack.Document,
+        val score: Option[Score])
+        extends Operator {
+
+      val name = "geoShape"
+
+      def document: pack.Document = {
+        import builder.{ elementProducer => elm }
+
+        val opts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+          elm("path", path.value),
+          elm("relation", builder.string(relation.name)),
+          elm("geometry", geometry)
+        )
+
+        score.foreach { sc => opts += elm("score", sc.document) }
+
+        builder.document(opts.result())
+      }
+
+      private lazy val tupled = Tuple4(path, relation, geometry, score)
+
+      override def equals(that: Any): Boolean = that match {
+        case other: this.type =>
+          this.tupled == other.tupled
+
+        case _ =>
+          false
+      }
+
+      override def hashCode: Int = tupled.hashCode
+
+      override def toString = s"GeoShape${tupled.toString}"
+    }
+
+    /** '''EXPERIMENTAL:''' [[https://www.mongodb.com/docs/atlas/atlas-search/geoShape/ geoShape]] operator for Atlas Search */
+    object GeoShape {
+
+      /**
+       * @param path $pathParam
+       * @param score $scoreParam
+       */
+      def apply(
+          path: SearchString,
+          relation: GeoShape.Relation,
+          geometry: pack.Document
+        ): GeoShape =
+        new GeoShape(path, relation, geometry, None)
+
+      /**
+       * @param path $pathParam
+       * @param score $scoreParam
+       */
+      def apply(
+          path: SearchString,
+          relation: GeoShape.Relation,
+          geometry: pack.Document,
+          score: Score
+        ): GeoShape = new GeoShape(path, relation, geometry, Some(score))
+
+      // ---
+
+      sealed trait Relation {
+        def name: String
+      }
+
+      case object ContainsRelation extends Relation {
+        val name = "contains"
+      }
+
+      case object DisjointRelation extends Relation {
+        val name = "disjoint"
+      }
+
+      case object IntersectsRelation extends Relation {
+        val name = "intersects"
+      }
+
+      case object WithinRelation extends Relation {
+        val name = "within"
+      }
+    }
+
+    /**
+     * '''EXPERIMENTAL:''' See [[GeoWithin$]]
+     *
+     * @see [[https://www.mongodb.com/docs/atlas/atlas-search/geoWithin/ geoWithin]] operator
+     *
+     * @param path $pathParam
+     * @param bounds
+     * @param score $scoreParam
+     */
+    final class GeoWithin private[api] (
+        val path: SearchString,
+        val bounds: GeoWithin.Bounds,
+        val score: Option[Score])
+        extends Operator {
+
+      val name = "geoWithin"
+
+      def document: pack.Document = {
+        import builder.{ elementProducer => elm }
+
+        val opts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+          elm("path", path.value),
+          elm(bounds.name, bounds.value)
+        )
+
+        score.foreach { sc => opts += elm("score", sc.document) }
+
+        builder.document(opts.result())
+      }
+
+      private lazy val tupled = Tuple3(path, bounds, score)
+
+      override def hashCode: Int = tupled.hashCode
+
+      override def equals(that: Any): Boolean = that match {
+        case other: this.type =>
+          this.tupled == other.tupled
+
+        case _ =>
+          false
+      }
+
+      override def toString = s"GeoWithin${tupled.toString}"
+    }
+
+    /** '''EXPERIMENTAL:''' [[https://www.mongodb.com/docs/atlas/atlas-search/geoWithin/ geoWithin]] operator for Atlas Search */
+    object GeoWithin {
+
+      /**
+       * @param path $pathParam
+       */
+      def apply(path: SearchString, bounds: Bounds): GeoWithin =
+        new GeoWithin(path, bounds, None)
+
+      /**
+       * @param path $pathParam
+       * @param score $scoreParam
+       */
+      def apply(path: SearchString, bounds: Bounds, score: Score): GeoWithin =
+        new GeoWithin(path, bounds, Some(score))
+
+      def box(bounds: pack.Document) = new Box(bounds)
+
+      def circle(bounds: pack.Document) = new Circle(bounds)
+
+      def geometry(bounds: pack.Document) = new Geometry(bounds)
+
+      // ---
+
+      sealed trait Bounds {
+        def name: String
+
+        private[api] def value: pack.Document
+      }
+
+      final class Box private[api] (
+          private[api] override val value: pack.Document)
+          extends Bounds {
+
+        val name = "box"
+
+        override def equals(that: Any): Boolean = that match {
+          case other: this.type =>
+            this.value == other.value
+
+          case _ =>
+            false
+        }
+
+        override def hashCode: Int = value.hashCode
+
+        override def toString = s"Box${pack pretty value}"
+      }
+
+      final class Circle private[api] (
+          private[api] override val value: pack.Document)
+          extends Bounds {
+
+        val name = "circle"
+
+        override def equals(that: Any): Boolean = that match {
+          case other: this.type =>
+            this.value == other.value
+
+          case _ =>
+            false
+        }
+
+        override def hashCode: Int = value.hashCode
+
+        override def toString = s"Circle${pack pretty value}"
+      }
+
+      final class Geometry private[api] (
+          private[api] override val value: pack.Document)
+          extends Bounds {
+
+        val name = "geometry"
+
+        override def equals(that: Any): Boolean = that match {
+          case other: this.type =>
+            this.value == other.value
+
+          case _ =>
+            false
+        }
+
+        override def hashCode: Int = value.hashCode
+
+        override def toString = s"Geometry${pack pretty value}"
+      }
+    }
+
+    /**
+     * '''EXPERIMENTAL:''' See [[MoreLikeThis$]]
+     *
+     * @see [[https://www.mongodb.com/docs/atlas/atlas-search/morelikethis/ moreLikeThis]] operator
+     */
+    final class MoreLikeThis private[api] (
+        query: pack.Document,
+        queries: Seq[pack.Document])
+        extends Operator {
+
+      val name = "moreLikeThis"
+
+      private lazy val concat = query +: queries
+
+      def document: pack.Document = pipe("like", builder.array(concat))
+
+      @inline override def hashCode: Int = concat.hashCode
+
+      override def equals(that: Any): Boolean = that match {
+        case other: this.type =>
+          this.concat == other.concat
+
+        case _ =>
+          false
+      }
+
+      override def toString: String =
+        "MoreLikeThis" + concat.map(pack.pretty).mkString("[", ", ", "]")
+
+    }
+
+    /** '''EXPERIMENTAL:''' [[https://www.mongodb.com/docs/atlas/atlas-search/morelikethis/ MoreLikeThis]] operator for Atlas Search */
+    object MoreLikeThis {
+
+      def apply(
+          query: pack.Document,
+          queries: pack.Document*
+        ): MoreLikeThis =
+        new MoreLikeThis(query, queries)
     }
 
     /**
@@ -1260,6 +1929,137 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
       def double(value: Double): Origin =
         new Origin(builder.double(value))
+    }
+
+    /**
+     * '''EXPERIMENTAL:''' See [[Wildcard$]]
+     *
+     * @param query $queryParam
+     * @param path $pathParam
+     * @param score $scoreParam
+     */
+    final class Wildcard private[api] (
+        val query: SearchString,
+        val path: SearchString,
+        val allowAnalyzedField: Boolean,
+        val score: Option[Score])
+        extends Operator {
+
+      val name = "wildcard"
+
+      def document: pack.Document = {
+        import builder.{ elementProducer => elm }
+
+        val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+          elm("query", query.value),
+          elm("path", path.value),
+          elm("allowAnalyzedField", builder.boolean(allowAnalyzedField))
+        )
+
+        score.foreach { sc => elms += elm("score", sc.document) }
+
+        builder.document(elms.result())
+      }
+
+      private lazy val tupled = Tuple4(query, path, allowAnalyzedField, score)
+
+      @inline override def hashCode: Int = tupled.hashCode
+
+      override def equals(that: Any): Boolean = that match {
+        case other: this.type =>
+          this.tupled == other.tupled
+
+        case _ =>
+          false
+      }
+
+      override def toString = s"SearchWildcard${tupled.toString}"
+    }
+
+    /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/wildcard/#wildcard-ref Wildcard]] operator for Atlas Search */
+    object Wildcard {
+
+      /**
+       * @param query $queryParam
+       * @param path $pathParam
+       * @param allowAnalyzedField the value to use to calculate scores of Atlas  result documents
+       * @param score $scoreParam
+       */
+      def apply(
+          query: SearchString,
+          path: SearchString,
+          allowAnalyzedField: Boolean = false,
+          score: Option[Score] = None
+        ): Wildcard =
+        new Wildcard(query, path, allowAnalyzedField, score)
+    }
+
+    /**
+     * '''EXPERIMENTAL:''' See [[QueryString$]].
+     *
+     * @param defaultPath the indexed field to search by default
+     * @param query the [[https://docs.atlas.mongodb.com/reference/atlas-search/queryString/#description query string]]
+     * @param score $scoreParam
+     */
+    final class QueryString private[api] (
+        val defaultPath: String,
+        val query: String,
+        val score: Option[Score])
+        extends Operator {
+
+      val name = "queryString"
+
+      def document: pack.Document = {
+        import builder.{ elementProducer => elm, string }
+
+        val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+          elm("defaultPath", string(defaultPath)),
+          elm("query", string(query))
+        )
+
+        score.foreach { sc => elms += elm("score", sc.document) }
+
+        builder.document(elms.result())
+      }
+
+      private lazy val tupled = Tuple3(defaultPath, query, score)
+
+      override def hashCode: Int = tupled.hashCode
+
+      override def equals(that: Any): Boolean = that match {
+        case other: this.type =>
+          this.tupled == other.tupled
+
+        case _ =>
+          false
+      }
+
+      override def toString = s"SearchQueryString${tupled.toString}"
+    }
+
+    /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/query-syntax/#query-syntax-ref Query string]] operator for Atlas Search. */
+    object QueryString {
+
+      /**
+       * @param defaultPath the indexed field to search by default
+       * @param query the [[https://docs.atlas.mongodb.com/reference/atlas-search/queryString/#description query string]]
+       * @param score $scoreParam
+       *
+       * {{{
+       * import reactivemongo.api.bson.collection.BSONCollection
+       *
+       * def prepare(coll: BSONCollection): coll.AggregationFramework.AtlasSearch.QueryString = coll.AggregationFramework.AtlasSearch.QueryString(
+       *   defaultPath = "title",
+       *   query = "Rocky AND (IV OR 4 OR Four)"
+       * )
+       * }}}
+       */
+      def apply(
+          defaultPath: String,
+          query: String,
+          score: Option[Score] = None
+        ): QueryString =
+        new QueryString(defaultPath, query, score)
     }
 
     /**
@@ -1451,69 +2251,11 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
     }
 
     /**
-     * '''EXPERIMENTAL:''' See [[Wildcard$]]
+     * '''EXPERIMENTAL:''' See [[Regex$]]
      *
-     * @param query $queryParam
      * @param path $pathParam
      * @param score $scoreParam
      */
-    final class Wildcard private[api] (
-        val query: SearchString,
-        val path: SearchString,
-        val allowAnalyzedField: Boolean,
-        val score: Option[Score])
-        extends Operator {
-
-      val name = "wildcard"
-
-      def document: pack.Document = {
-        import builder.{ elementProducer => elm }
-
-        val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
-          elm("query", query.value),
-          elm("path", path.value),
-          elm("allowAnalyzedField", builder.boolean(allowAnalyzedField))
-        )
-
-        score.foreach { sc => elms += elm("score", sc.document) }
-
-        builder.document(elms.result())
-      }
-
-      private lazy val tupled = Tuple4(query, path, allowAnalyzedField, score)
-
-      @inline override def hashCode: Int = tupled.hashCode
-
-      override def equals(that: Any): Boolean = that match {
-        case other: this.type =>
-          this.tupled == other.tupled
-
-        case _ =>
-          false
-      }
-
-      override def toString = s"SearchWildcard${tupled.toString}"
-    }
-
-    /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/wildcard/#wildcard-ref Wildcard]] operator for Atlas Search */
-    object Wildcard {
-
-      /**
-       * @param query $queryParam
-       * @param path $pathParam
-       * @param allowAnalyzedField the value to use to calculate scores of Atlas  result documents
-       * @param score $scoreParam
-       */
-      def apply(
-          query: SearchString,
-          path: SearchString,
-          allowAnalyzedField: Boolean = false,
-          score: Option[Score] = None
-        ): Wildcard =
-        new Wildcard(query, path, allowAnalyzedField, score)
-    }
-
-    /** '''EXPERIMENTAL:''' See [[Regex$]] */
     final class Regex private[api] (
         val query: SearchString,
         val path: SearchString,
@@ -1581,72 +2323,51 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         new Regex(query, path, allowAnalyzedField, score)
     }
 
-    /**
-     * '''EXPERIMENTAL:''' See [[QueryString$]].
-     *
-     * @param defaultPath the indexed field to search by default
-     * @param query the [[https://docs.atlas.mongodb.com/reference/atlas-search/queryString/#description query string]]
-     * @param score $scoreParam
-     */
-    final class QueryString private[api] (
-        val defaultPath: String,
-        val query: String,
-        val score: Option[Score])
+    /** '''EXPERIMENTAL:''' See [[Span$]] */
+    final class Span private[api] (
+        val clause: (String, pack.Document),
+        val clauses: Seq[(String, pack.Document)])
         extends Operator {
+      // TODO: Test
 
-      val name = "queryString"
+      val name = "span"
 
       def document: pack.Document = {
-        import builder.{ elementProducer => elm, string }
+        import builder.{ elementProducer => elm }
 
-        val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
-          elm("defaultPath", string(defaultPath)),
-          elm("query", string(query))
+        val opts = Seq.newBuilder[pack.ElementProducer] += elm(
+          clause._1,
+          clause._2
         )
 
-        score.foreach { sc => elms += elm("score", sc.document) }
+        clauses.foreach { case (nme, cls) => opts += elm(nme, cls) }
 
-        builder.document(elms.result())
+        builder.document(opts.result())
       }
 
-      private lazy val tupled = Tuple3(defaultPath, query, score)
+      private lazy val concat = clause +: clauses
 
-      override def hashCode: Int = tupled.hashCode
+      override def hashCode: Int = concat.hashCode
 
       override def equals(that: Any): Boolean = that match {
         case other: this.type =>
-          this.tupled == other.tupled
+          this.concat == other.concat
 
         case _ =>
           false
       }
 
-      override def toString = s"SearchQueryString${tupled.toString}"
+      override def toString: String = "Span" + concat.mkString("[", ", ", "]")
     }
 
-    /** '''EXPERIMENTAL:''' [[https://docs.atlas.mongodb.com/reference/atlas-search/query-syntax/#query-syntax-ref Query string]] operator for Atlas Search. */
-    object QueryString {
+    /** '''EXPERIMENTAL:''' [[https://www.mongodb.com/docs/atlas/atlas-search/span/ Span]] operator for Atlas Search */
+    object Span {
 
-      /**
-       * @param defaultPath the indexed field to search by default
-       * @param query the [[https://docs.atlas.mongodb.com/reference/atlas-search/queryString/#description query string]]
-       * @param score $scoreParam
-       *
-       * {{{
-       * import reactivemongo.api.bson.collection.BSONCollection
-       *
-       * def prepare(coll: BSONCollection): coll.AggregationFramework.AtlasSearch.QueryString = coll.AggregationFramework.AtlasSearch.QueryString(
-       *   defaultPath = "title",
-       *   query = "Rocky AND (IV OR 4 OR Four)"
-       * )
-       * }}}
-       */
       def apply(
-          defaultPath: String,
-          query: String,
-          score: Option[Score] = None
-        ): QueryString =
-        new QueryString(defaultPath, query, score)
+          clause: (String, pack.Document),
+          clauses: (String, pack.Document)*
+        ): Span =
+        new Span(clause, clauses)
     }
   }
 }
