@@ -231,10 +231,12 @@ private[reactivemongo] trait IsMasterCommand[P <: SerializationPack] {
 
       new IsMasterResult(
         isMaster = booleanLike(doc, "ismaster").getOrElse(false), // `ismaster`
-        maxBsonObjectSize = int(doc, "maxBsonObjectSize")
-          .getOrElse(16777216), // default = 16 * 1024 * 1024
-        maxMessageSizeBytes = int(doc, "maxMessageSizeBytes")
-          .getOrElse(48000000), // default = 48000000, mongod >= 2.4
+        maxBsonObjectSize = int(doc, "maxBsonObjectSize").getOrElse(
+          16777216
+        ), // default = 16 * 1024 * 1024
+        maxMessageSizeBytes = int(doc, "maxMessageSizeBytes").getOrElse(
+          48000000
+        ), // default = 48000000, mongod >= 2.4
         maxWriteBatchSize = int(doc, "maxWriteBatchSize").getOrElse(1000),
         localTime = long(doc, "localTime"), // date? mongod >= 2.2
         logicalSessionTimeoutMinutes =
