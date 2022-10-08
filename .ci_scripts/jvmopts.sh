@@ -14,3 +14,5 @@ fi
 if [ ! `uname` = "Darwin" ]; then
   export _JAVA_OPTIONS="$JVM_OPTS"
 fi
+
+export SBT_OPTS="$SBT_OPTS $JVM_OPTS"
