@@ -9,7 +9,7 @@ SBT_OPTS="-Dtest.primaryHost=$PRIMARY_HOST -Dtest.slowPrimaryHost=$PRIMARY_SLOW_
 SBT_OPTS="$SBT_OPTS -Dtest.slowProxyDelay=300 -Dtest.slowFailoverRetries=12"
 SBT_OPTS="$SBT_OPTS -Dreactivemongo.collectThreadTrace=true"
 
-TEST_OPTS="asap"
+TEST_OPTS=""
 
 echo "[INFO] Running integration tests ..."
 
