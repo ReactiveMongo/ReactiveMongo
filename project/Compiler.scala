@@ -93,7 +93,7 @@ object Compiler {
     libraryDependencies ++= {
       // Silencer
       if (!scalaBinaryVersion.value.startsWith("3")) {
-        val silencerVersion = "1.7.10"
+        val silencerVersion = "1.7.12"
 
         Seq(
           compilerPlugin(
