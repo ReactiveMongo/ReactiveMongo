@@ -360,7 +360,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
               new ClosedException(supervisor, name, istate)
             )(err => warn("Already completed request on close", err))
 
-          case _ => (/* already completed */ )
+          case _ => ( /* already completed */ )
         }
 
         resps.clear()
