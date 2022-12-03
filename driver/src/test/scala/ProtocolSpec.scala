@@ -237,7 +237,7 @@ final class ProtocolSpec(implicit ee: ExecutionEnv)
           } and {
             import response.{ documents, info }
 
-            val offset = header.size + (/*reply*/ 4 + 8 + 4 + 4)
+            val offset = header.size + ( /*reply*/ 4 + 8 + 4 + 4)
             val docsSize = msg1Bytes.size - offset
 
             // Alter the internal buffer to ensure the `documents` one is detached
