@@ -54,7 +54,7 @@ final class NettyProxy(
 
       // Configure the bootstrap.
       val bossGroup = new NioEventLoopGroup(1)
-      val workerGroup = new NioEventLoopGroup()
+      val workerGroup = new NioEventLoopGroup(threadCount)
 
       lazy val serverBootstrap = new ServerBootstrap()
         .option(ChannelOption.SO_REUSEADDR, JBool.TRUE)
