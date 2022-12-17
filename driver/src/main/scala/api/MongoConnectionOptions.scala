@@ -25,6 +25,7 @@ final class MongoConnectionOptions private[reactivemongo] (
     _nbChannelsPerNode: Int,
     _maxInFlightRequestsPerChannel: Option[Int],
     _minIdleChannelsPerNode: Int,
+    _nettyEventLoopThreads: Int,
 
     // read and write preferences
     _writeConcern: WriteConcern,
@@ -97,6 +98,9 @@ final class MongoConnectionOptions private[reactivemongo] (
   /** The minimum number of idle channels per node */
   @inline def minIdleChannelsPerNode: Int = _minIdleChannelsPerNode
 
+  /** The number of threads in the netty event loop. 0 lets Netty decide, which by default will select 2 times the number of available processors. */
+  @inline def nettyEventLoopThreads: Int = _nettyEventLoopThreads
+
   // --- Read and write preferences
 
   /** The default [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]] */
@@ -147,6 +151,7 @@ final class MongoConnectionOptions private[reactivemongo] (
       _nbChannelsPerNode = this.nbChannelsPerNode,
       _maxInFlightRequestsPerChannel = this.maxInFlightRequestsPerChannel,
       _minIdleChannelsPerNode = this.minIdleChannelsPerNode,
+      _nettyEventLoopThreads = this.nettyEventLoopThreads,
       _writeConcern = this.writeConcern,
       _readPreference = this.readPreference,
       _failoverStrategy = this.failoverStrategy,
@@ -174,6 +179,7 @@ final class MongoConnectionOptions private[reactivemongo] (
       _nbChannelsPerNode = this.nbChannelsPerNode,
       _maxInFlightRequestsPerChannel = this.maxInFlightRequestsPerChannel,
       _minIdleChannelsPerNode = this.minIdleChannelsPerNode,
+      _nettyEventLoopThreads = this.nettyEventLoopThreads,
       _writeConcern = this.writeConcern,
       _readPreference = this.readPreference,
       _failoverStrategy = this.failoverStrategy,
@@ -203,6 +209,7 @@ final class MongoConnectionOptions private[reactivemongo] (
       maxInFlightRequestsPerChannel: Option[Int] =
         _maxInFlightRequestsPerChannel,
       minIdleChannelsPerNode: Int = _minIdleChannelsPerNode,
+      nettyEventLoopThreads: Int = _nettyEventLoopThreads,
       writeConcern: WriteConcern = _writeConcern,
       readPreference: ReadPreference = _readPreference,
       failoverStrategy: FailoverStrategy = _failoverStrategy,
@@ -226,6 +233,7 @@ final class MongoConnectionOptions private[reactivemongo] (
       _nbChannelsPerNode = nbChannelsPerNode,
       _maxInFlightRequestsPerChannel = maxInFlightRequestsPerChannel,
       _minIdleChannelsPerNode = minIdleChannelsPerNode,
+      _nettyEventLoopThreads = nettyEventLoopThreads,
       _writeConcern = writeConcern,
       _readPreference = readPreference,
       _failoverStrategy = failoverStrategy,
@@ -304,6 +312,7 @@ object MongoConnectionOptions {
       nbChannelsPerNode: Int = 10,
       maxInFlightRequestsPerChannel: Option[Int] = Some(200),
       minIdleChannelsPerNode: Int = 1,
+      nettyEventLoopThreads: Int = 0,
       writeConcern: WriteConcern = WriteConcern.Default,
       readPreference: ReadPreference = ReadPreference.primary,
       failoverStrategy: FailoverStrategy = FailoverStrategy.default,
@@ -326,6 +335,7 @@ object MongoConnectionOptions {
       _nbChannelsPerNode = nbChannelsPerNode,
       _maxInFlightRequestsPerChannel = maxInFlightRequestsPerChannel,
       _minIdleChannelsPerNode = minIdleChannelsPerNode,
+      _nettyEventLoopThreads = nettyEventLoopThreads,
       _writeConcern = writeConcern,
       _readPreference = readPreference,
       _failoverStrategy = failoverStrategy,
