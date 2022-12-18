@@ -2,7 +2,7 @@ import sbt._
 import sbt.Keys._
 
 object Dependencies {
-  val nettyVer = "4.1.66.Final"
+  val nettyVer = "4.1.85.Final"
   val netty = "io.netty" % "netty-handler" % nettyVer
 
   val shaded = Def.setting[Seq[ModuleID]] {
@@ -32,7 +32,11 @@ object Dependencies {
   }
 
   val specsVer = Def.setting[String] {
-    "4.5.1" /*"4.3.5"*/
+    if (scalaBinaryVersion.value == "2.11") {
+      "4.10.6"
+    } else {
+      "4.19.0"
+    }
   }
 
   val specs = Def.setting[ModuleID] {

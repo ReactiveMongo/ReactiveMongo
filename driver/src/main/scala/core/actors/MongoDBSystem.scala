@@ -244,6 +244,16 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
   private[reactivemongo] def getNodeSet = _nodeSet // For test purposes
 
+  private lazy val signalingTimeoutMS: Int = {
+    if (options.heartbeatFrequencyMS <= 0) {
+      0
+    } else {
+      val v = options.heartbeatFrequencyMS.toLong * 1.5D
+
+      if (v <= Int.MaxValue) v.toInt else 0
+    }
+  }
+
   /** On start or restart. */
   private def initNodeSet(): Try[NodeSet] = {
     val nanow = System.nanoTime()
@@ -275,7 +285,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     seedNodeSet.updateAll { n =>
       n.createSignalingConnection(
         channelFactory,
-        options.heartbeatFrequencyMS,
+        signalingTimeoutMS,
         self
       ) match {
         case Success(node) => node
@@ -564,7 +574,10 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
             n.updateByChannelId(channelId)({ con =>
               n.createConnection(
                 channelFactory,
-                options.maxIdleTimeMS,
+                {
+                  if (con.signaling) signalingTimeoutMS
+                  else options.maxIdleTimeMS
+                },
                 self,
                 con.signaling
               ) match {
@@ -1387,7 +1400,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
               n.createSignalingConnection(
                 channelFactory,
-                options.heartbeatFrequencyMS,
+                signalingTimeoutMS,
                 self
               ) match {
                 case Success(upd) =>
