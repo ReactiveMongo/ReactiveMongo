@@ -1,8 +1,8 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.{ SerializationPack, WriteConcern }
-
 import reactivemongo.core.errors.GenericDriverException
+
+import reactivemongo.api.{ SerializationPack, WriteConcern }
 
 private[reactivemongo] object DropDatabase
     extends Command

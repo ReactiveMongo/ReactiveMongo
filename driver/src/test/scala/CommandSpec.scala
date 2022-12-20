@@ -2,20 +2,18 @@ package reactivemongo
 
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.api.{ DB, ReadPreference }
-import reactivemongo.api.bson.BSONDocument
-
 import reactivemongo.core.errors.DatabaseException
 
+import reactivemongo.api.{ DB, ReadPreference }
+import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.commands.{
   CommandException,
   ReplSetGetStatus,
   ReplSetMaintenance
 }
+import reactivemongo.api.tests.{ commands, decoder }
 
 import org.specs2.concurrent.ExecutionEnv
-
-import reactivemongo.api.tests.{ commands, decoder }
 
 final class CommandSpec(implicit ee: ExecutionEnv)
     extends org.specs2.mutable.Specification {

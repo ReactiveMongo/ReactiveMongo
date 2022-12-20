@@ -16,6 +16,7 @@
 package reactivemongo
 
 import scala.collection.immutable.{ ListSet, Map, Set }
+
 import scala.concurrent.ExecutionContext
 
 private[reactivemongo] trait UtilCompat {

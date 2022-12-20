@@ -4,31 +4,29 @@ import scala.util.control.NonFatal
 
 import scala.collection.immutable.ListSet
 
+import reactivemongo.core.errors.CommandException
+import reactivemongo.core.nodeset.{
+  Authenticate,
+  Connection,
+  ScramAuthenticating
+}
+import reactivemongo.core.protocol.Response
+
 import reactivemongo.api.{
   AuthenticationMode,
   ReadPreference,
   ScramSha1Authentication,
   ScramSha256Authentication
 }
-
-import reactivemongo.core.errors.CommandException
-
 import reactivemongo.api.commands.{
   Command,
   CommandKind,
   FailedAuthentication,
-  SuccessfulAuthentication,
   ScramFinalNegociation,
   ScramInitiate,
   ScramNegociation,
-  ScramStartNegociation
-}
-
-import reactivemongo.core.protocol.Response
-import reactivemongo.core.nodeset.{
-  Authenticate,
-  Connection,
-  ScramAuthenticating
+  ScramStartNegociation,
+  SuccessfulAuthentication
 }
 
 private[reactivemongo] trait MongoScramSha1Authentication

@@ -7,8 +7,8 @@ import scala.concurrent.duration._
 
 import reactivemongo.api.{
   AsyncDriver,
-  DB,
   Compressor,
+  DB,
   FailoverStrategy,
   MongoConnection,
   MongoConnectionOptions,

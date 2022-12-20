@@ -1,20 +1,22 @@
 package reactivemongo
 
-import java.net.SocketAddress
 import java.nio.channels.ClosedChannelException
 
-import scala.concurrent.Future
+import java.net.SocketAddress
 
 import scala.collection.immutable.ListSet
 
+import scala.concurrent.Future
+
 import reactivemongo.io.netty.channel.{
-  DefaultChannelPromise,
   ChannelFuture,
   ChannelId,
-  DefaultChannelId
+  DefaultChannelId,
+  DefaultChannelPromise
 }
 import reactivemongo.io.netty.channel.embedded.EmbeddedChannel
 
+import reactivemongo.core.actors.StandardDBSystem
 import reactivemongo.core.nodeset.{
   Connection,
   ConnectionStatus,
@@ -24,8 +26,6 @@ import reactivemongo.core.nodeset.{
   PingInfo
 }
 import reactivemongo.core.protocol.ProtocolMetadata
-
-import reactivemongo.core.actors.StandardDBSystem
 
 import reactivemongo.api.MongoConnectionOptions
 

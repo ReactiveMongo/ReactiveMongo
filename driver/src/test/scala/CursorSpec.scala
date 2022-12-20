@@ -2,14 +2,13 @@ import scala.concurrent.{ Await, Future }
 import scala.concurrent.duration._
 
 import reactivemongo.api.Cursor
-
+import reactivemongo.api.TestCompat._
 import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.bson.collection.BSONCollection
 
 import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.Common
-import reactivemongo.api.TestCompat._
 
 final class CursorSpec(implicit val ee: ExecutionEnv)
     extends org.specs2.mutable.Specification

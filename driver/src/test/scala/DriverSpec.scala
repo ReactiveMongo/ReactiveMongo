@@ -1,6 +1,10 @@
 import scala.concurrent.{ Await, Future, Promise }
 
-import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
+import reactivemongo.core.actors.Exceptions.{
+  InternalState,
+  PrimaryUnavailableException
+}
+import reactivemongo.core.protocol.ProtocolMetadata
 
 import reactivemongo.api.{
   AuthenticationMode,
@@ -12,16 +16,7 @@ import reactivemongo.api.{
   WriteConcern,
   X509Authentication
 }
-
 import reactivemongo.api.bson.BSONDocument
-
-import reactivemongo.core.actors.Exceptions.{
-  InternalState,
-  PrimaryUnavailableException
-}
-
-import reactivemongo.core.protocol.ProtocolMetadata
-
 import reactivemongo.api.commands.{
   DBUserRole,
   FailedAuthentication,
@@ -29,6 +24,8 @@ import reactivemongo.api.commands.{
 }
 
 import org.specs2.concurrent.ExecutionEnv
+
+import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
 
 final class DriverSpec(implicit ee: ExecutionEnv)
     extends org.specs2.mutable.Specification {

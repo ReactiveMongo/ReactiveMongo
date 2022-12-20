@@ -19,13 +19,11 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.io.netty.buffer.ByteBuf
 
-import reactivemongo.api.bson.buffer.WritableBuffer
-
 import reactivemongo.core.protocol.{
   Message,
+  MongoWireVersion,
   Query,
-  QueryFlags,
-  MongoWireVersion
+  QueryFlags
 }
 
 import reactivemongo.api.{
@@ -41,7 +39,7 @@ import reactivemongo.api.{
   ReadPreference,
   SerializationPack
 }
-
+import reactivemongo.api.bson.buffer.WritableBuffer
 import reactivemongo.api.commands.CommandCodecs
 
 /** Query build factory */

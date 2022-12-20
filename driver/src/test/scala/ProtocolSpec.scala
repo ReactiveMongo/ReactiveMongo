@@ -3,8 +3,8 @@ import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 import reactivemongo.api.Compressor
 import reactivemongo.api.bson.BSONDocument
 
-import org.specs2.specification.core.Fragments
 import org.specs2.concurrent.ExecutionEnv
+import org.specs2.specification.core.Fragments
 
 final class ProtocolSpec(implicit ee: ExecutionEnv)
     extends org.specs2.mutable.Specification {

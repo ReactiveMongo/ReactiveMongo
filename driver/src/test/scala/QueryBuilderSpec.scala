@@ -3,6 +3,7 @@ package reactivemongo
 import reactivemongo.core.protocol.MongoWireVersion
 
 import reactivemongo.api.{
+  tests,
   Collation,
   Collection,
   FailoverStrategy,
@@ -10,8 +11,6 @@ import reactivemongo.api.{
   ReadConcern,
   ReadPreference
 }
-import reactivemongo.api.collections.{ HintFactory, QueryBuilderFactory }
-
 import reactivemongo.api.bson.{
   BSONBoolean,
   BSONDocument,
@@ -19,8 +18,9 @@ import reactivemongo.api.bson.{
   BSONString,
   BSONValue
 }
+import reactivemongo.api.collections.{ HintFactory, QueryBuilderFactory }
 
-import reactivemongo.api.tests, tests.Pack
+import tests.Pack
 
 final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
   "Query builder".title

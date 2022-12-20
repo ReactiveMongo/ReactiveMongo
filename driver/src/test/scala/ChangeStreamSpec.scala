@@ -1,19 +1,19 @@
-import scala.concurrent.duration._
 import scala.concurrent.{ Future, Promise }
+import scala.concurrent.duration._
 
-import org.specs2.concurrent.ExecutionEnv
-import org.specs2.execute.AsResult
-import org.specs2.matcher.Matcher
+import reactivemongo.core.protocol.MongoWireVersion
 
 import reactivemongo.api.{ ChangeStreams, Cursor }
 import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.bson.collection.BSONCollection
 
-import reactivemongo.core.protocol.MongoWireVersion
+import org.specs2.concurrent.ExecutionEnv
+import org.specs2.execute.AsResult
+import org.specs2.matcher.Matcher
 
+import util.{ MongoSkips, WithTemporaryDb }
 import util.BsonMatchers._
 import util.WithTemporaryCollection._
-import util.{ MongoSkips, WithTemporaryDb }
 
 final class ChangeStreamSpec(implicit val ee: ExecutionEnv)
     extends org.specs2.mutable.Specification

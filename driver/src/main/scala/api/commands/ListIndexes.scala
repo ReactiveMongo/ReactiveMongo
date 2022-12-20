@@ -3,7 +3,6 @@ package reactivemongo.api.commands
 import reactivemongo.core.errors.GenericDriverException
 
 import reactivemongo.api.SerializationPack
-
 import reactivemongo.api.indexes.Index
 
 /**

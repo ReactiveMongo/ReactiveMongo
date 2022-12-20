@@ -1,8 +1,7 @@
 package reactivemongo.api
 
-import reactivemongo.api.commands.{ CommandCodecs, WriteResult }
-
 import reactivemongo.api.bson.collection.{ BSONSerializationPack => SerPack }
+import reactivemongo.api.commands.{ CommandCodecs, WriteResult }
 
 private[reactivemongo] object Serialization {
   type Pack = SerPack.type

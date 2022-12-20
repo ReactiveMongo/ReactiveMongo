@@ -1,10 +1,10 @@
 package reactivemongo.api
 
 import java.util.UUID
-
 import java.util.concurrent.atomic.AtomicReference
 
 import scala.util.{ Failure, Try }
+
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.core.errors.GenericDriverException

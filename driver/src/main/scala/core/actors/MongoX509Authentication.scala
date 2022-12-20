@@ -2,22 +2,20 @@ package reactivemongo.core.actors
 
 import scala.collection.immutable.ListSet
 
-import reactivemongo.api.ReadPreference
+import reactivemongo.core.nodeset.{
+  Authenticate,
+  Connection,
+  X509Authenticating
+}
+import reactivemongo.core.protocol.Response
 
+import reactivemongo.api.ReadPreference
 import reactivemongo.api.commands.{
   AuthenticationResult,
   Command,
   CommandKind,
   X509Authenticate
 }
-
-import reactivemongo.core.nodeset.{
-  Authenticate,
-  Connection,
-  X509Authenticating
-}
-
-import reactivemongo.core.protocol.Response
 
 private[reactivemongo] trait MongoX509Authentication { system: MongoDBSystem =>
   private lazy val writer = X509Authenticate.writer(pack)

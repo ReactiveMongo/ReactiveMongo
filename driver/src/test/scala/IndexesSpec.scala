@@ -1,18 +1,17 @@
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.api.indexes.{ Index, IndexType },
-IndexType.{ Hashed, Geo2D, Geo2DSpherical }
-import reactivemongo.api.commands.CommandException
-
-import reactivemongo.api.bson.BSONDocument
-
 import reactivemongo.core.errors.DatabaseException
 
-import reactivemongo.api.tests.{ pack, Pack }
 import reactivemongo.api.TestCompat._
+import reactivemongo.api.bson.BSONDocument
+import reactivemongo.api.commands.CommandException
+import reactivemongo.api.indexes.{ Index, IndexType }
+import reactivemongo.api.tests.{ pack, Pack }
 
 import org.specs2.concurrent.ExecutionEnv
+
+import IndexType.{ Hashed, Geo2D, Geo2DSpherical }
 
 final class IndexesSpec(implicit ee: ExecutionEnv)
     extends org.specs2.mutable.Specification

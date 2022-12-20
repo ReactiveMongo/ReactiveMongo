@@ -15,7 +15,7 @@
  */
 package reactivemongo.api
 
-import scala.util.control.{ NonFatal, NoStackTrace }
+import scala.util.control.{ NoStackTrace, NonFatal }
 
 import scala.collection.immutable.ListSet
 import scala.collection.mutable.{ Map => MMap }
@@ -23,30 +23,30 @@ import scala.collection.mutable.{ Map => MMap }
 import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
-import akka.util.Timeout
-import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
-import akka.pattern.ask
-
-import reactivemongo.core.protocol.{ ProtocolMetadata, Response }
-
 import reactivemongo.core.actors.{
   AuthRequest,
   Close,
   Closed,
   Exceptions,
+  ExpectingResponse,
   PickNode,
   PrimaryAvailable,
   PrimaryUnavailable,
   RegisterMonitor,
-  ExpectingResponse,
   SetAvailable,
   SetUnavailable
 }
 import reactivemongo.core.nodeset.Authenticate
+import reactivemongo.core.protocol.{ ProtocolMetadata, Response }
 
 import reactivemongo.api.commands.SuccessfulAuthentication
 
-import reactivemongo.util, util.{ LazyLogger, SRVRecordResolver, TXTResolver }
+import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
+import akka.pattern.ask
+import akka.util.Timeout
+import reactivemongo.util
+
+import util.{ LazyLogger, SRVRecordResolver, TXTResolver }
 
 private[api] case class ConnectionState(
     metadata: ProtocolMetadata,

@@ -15,15 +15,16 @@
  */
 package reactivemongo.api.indexes
 
+import scala.concurrent.{ ExecutionContext, Future }
+
 import reactivemongo.api.{
+  Collation,
   DB,
   DBMetaCommands,
-  Collation,
   ReadPreference,
   Serialization,
   SerializationPack
 }
-
 import reactivemongo.api.commands.{
   Command,
   CommandCodecs,
@@ -33,8 +34,6 @@ import reactivemongo.api.commands.{
   ResolvedCollectionCommand,
   WriteResult
 }
-
-import scala.concurrent.{ Future, ExecutionContext }
 
 /**
  * Indexes manager at database level.

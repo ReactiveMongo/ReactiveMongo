@@ -1,5 +1,4 @@
-import reactivemongo.api.{ DB, WriteConcern, tests => apiTests }
-
+import reactivemongo.api.{ tests => apiTests, DB, WriteConcern }
 import reactivemongo.api.bson.BSONDocument
 
 trait DBSessionSpec { specs: DatabaseSpec =>

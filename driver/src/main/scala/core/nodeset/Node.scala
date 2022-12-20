@@ -1,16 +1,15 @@
 package reactivemongo.core.nodeset
 
-import scala.collection.immutable.Set
-
 import scala.util.{ Failure, Success, Try }
+
+import scala.collection.immutable.Set
 
 import reactivemongo.io.netty.channel.ChannelId
 
-import akka.actor.ActorRef
-
+import reactivemongo.core.netty.ChannelFactory
 import reactivemongo.core.protocol.ProtocolMetadata
 
-import reactivemongo.core.netty.ChannelFactory
+import akka.actor.ActorRef
 
 /**
  * @param name the main name of the node

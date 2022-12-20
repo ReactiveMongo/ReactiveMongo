@@ -1,16 +1,15 @@
 package reactivemongo.core.protocol
 
-import akka.actor.ActorRef
-
 import reactivemongo.io.netty.channel.{
-  ChannelHandlerContext,
   ChannelDuplexHandler,
+  ChannelHandlerContext,
   ChannelPromise
 }
 import reactivemongo.io.netty.handler.timeout.IdleStateEvent
 
 import reactivemongo.core.actors.{ ChannelConnected, ChannelDisconnected }
 
+import akka.actor.ActorRef
 import reactivemongo.util.LazyLogger
 
 private[reactivemongo] class MongoHandler(

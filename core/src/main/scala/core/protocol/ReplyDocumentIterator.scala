@@ -4,11 +4,10 @@ import scala.util.control.NonFatal
 
 import reactivemongo.io.netty.buffer.ByteBuf
 
-import reactivemongo.api.SerializationPack
-
-import reactivemongo.api.bson.collection.BSONSerializationPack
-
 import reactivemongo.core.errors.GenericDriverException
+
+import reactivemongo.api.SerializationPack
+import reactivemongo.api.bson.collection.BSONSerializationPack
 
 private[reactivemongo] object ReplyDocumentIterator
     extends ReplyDocumentIteratorLowPriority {

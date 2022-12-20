@@ -7,7 +7,6 @@ import scala.concurrent.{ ExecutionContext, Future }
 import reactivemongo.core.errors.GenericDriverException
 
 import reactivemongo.api.{ SerializationPack, WriteConcern }
-
 import reactivemongo.api.commands.{
   CommandCodecsWithPack,
   InsertCommand,

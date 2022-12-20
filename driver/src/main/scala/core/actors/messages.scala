@@ -3,11 +3,11 @@ package reactivemongo.core.actors
 import scala.concurrent.{ Future, Promise }
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.api.ReadPreference
-
 import reactivemongo.io.netty.channel.ChannelId
 
-import reactivemongo.core.protocol.{ RequestMaker, Response, ProtocolMetadata }
+import reactivemongo.core.protocol.{ ProtocolMetadata, RequestMaker, Response }
+
+import reactivemongo.api.ReadPreference
 
 /**
  * A request expecting a response.

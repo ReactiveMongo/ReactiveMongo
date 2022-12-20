@@ -5,18 +5,12 @@ import scala.util.{ Failure, Success }
 import scala.concurrent.{ Future, Promise }
 import scala.concurrent.duration._
 
-import akka.actor.Actor
-import akka.testkit.TestActorRef
-
 import reactivemongo.io.netty.channel.{
   ChannelFuture,
   ChannelFutureListener,
   ChannelId,
   DefaultChannelId
 }
-
-import org.specs2.execute.Result
-import org.specs2.concurrent.ExecutionEnv
 
 import reactivemongo.core.actors.StandardDBSystem
 import reactivemongo.core.nodeset.{ Authenticate, Connection, Node, NodeSet }
@@ -29,7 +23,12 @@ import reactivemongo.api.{
   ReadPreference
 }
 
+import org.specs2.concurrent.ExecutionEnv
+import org.specs2.execute.Result
+
 import _root_.tests.Common
+import akka.actor.Actor
+import akka.testkit.TestActorRef
 
 final class MonitorSpec(implicit ee: ExecutionEnv)
     extends org.specs2.mutable.Specification {

@@ -1,9 +1,14 @@
 package reactivemongo
 
-import reactivemongo.api.{ NodeSetSession, SessionTransaction }
+import reactivemongo.api.{
+  NodeSetSession,
+  PackSupport,
+  Session,
+  SessionTransaction,
+  WriteConcern
+}
 import reactivemongo.api.bson.{ BSONArray, BSONBinary, BSONDocument }
 import reactivemongo.api.commands.{ DeleteCommand, ResolvedCollectionCommand }
-import reactivemongo.api.{ PackSupport, Session, WriteConcern }
 
 final class DeleteCommandSpec extends org.specs2.mutable.Specification {
   "Delete command".title

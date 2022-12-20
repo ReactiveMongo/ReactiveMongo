@@ -1,10 +1,10 @@
 package util
 
+import reactivemongo.api.bson.{ BSONDocument, BSONReader }
+
 import org.specs2.matcher.Matcher
 import org.specs2.matcher.Matchers._
 import org.specs2.matcher.MustExpectations._
-
-import reactivemongo.api.bson.{ BSONDocument, BSONReader }
 
 object BsonMatchers {
 

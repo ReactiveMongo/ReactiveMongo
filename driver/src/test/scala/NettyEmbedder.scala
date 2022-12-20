@@ -5,11 +5,11 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import reactivemongo.io.netty.channel.{
   Channel,
-  ChannelId,
   ChannelFuture,
   ChannelFutureListener,
-  ChannelPromise,
-  ChannelHandlerContext
+  ChannelHandlerContext,
+  ChannelId,
+  ChannelPromise
 }
 import reactivemongo.io.netty.channel.embedded.EmbeddedChannel
 

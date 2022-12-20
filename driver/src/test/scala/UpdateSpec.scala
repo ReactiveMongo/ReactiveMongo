@@ -2,14 +2,11 @@ import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.ReadPreference
-
-import reactivemongo.api.commands.WriteResult
-
 import reactivemongo.api.bson.{ BSONDocument, BSONString }
+import reactivemongo.api.commands.WriteResult
+import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 
 import _root_.tests.Common
-
-import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 
 trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
   import reactivemongo.api.TestCompat._

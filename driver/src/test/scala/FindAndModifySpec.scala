@@ -1,13 +1,11 @@
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.WriteConcern
-import reactivemongo.api.commands.CommandException
-
 import reactivemongo.api.bson.BSONDocument
+import reactivemongo.api.commands.CommandException
+import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 
 import org.specs2.concurrent.ExecutionEnv
-
-import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 
 final class FindAndModifySpec(implicit ee: ExecutionEnv)
     extends org.specs2.mutable.Specification {

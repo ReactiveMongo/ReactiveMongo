@@ -1,8 +1,8 @@
 package reactivemongo.core.protocol
 
-import reactivemongo.api.bson.BSONDocument
-
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
+
+import reactivemongo.api.bson.BSONDocument
 
 final class ResponseDecoderSpec extends org.specs2.mutable.Specification {
   "Response decoder".title

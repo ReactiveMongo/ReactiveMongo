@@ -4,28 +4,26 @@ import scala.util.{ Failure, Success, Try }
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.util.ExtendedFutures.delayedFuture
-
-import reactivemongo.api.bson.buffer.WritableBuffer
-
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
+import reactivemongo.core.actors.{ Exceptions, ExpectingResponse }
 import reactivemongo.core.protocol.{
   GetMore,
-  Message,
   KillCursors,
+  Message,
   MongoWireVersion,
   Query,
   QueryFlags,
-  RequestMaker,
-  Response,
   ReplyDocumentIterator,
-  ReplyDocumentIteratorExhaustedException
+  ReplyDocumentIteratorExhaustedException,
+  RequestMaker,
+  Response
 }
 
-import reactivemongo.core.actors.{ Exceptions, ExpectingResponse }
-
+import reactivemongo.api.bson.buffer.WritableBuffer
 import reactivemongo.api.commands.{ CommandCodecs, CommandKind }
+
+import reactivemongo.util.ExtendedFutures.delayedFuture
 
 private[reactivemongo] object DefaultCursor {
   import Cursor.{ State, Cont, Fail, logger }

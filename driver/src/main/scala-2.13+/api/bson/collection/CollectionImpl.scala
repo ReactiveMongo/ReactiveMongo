@@ -7,7 +7,6 @@ import reactivemongo.api.{
   ReadPreference,
   Serialization
 }
-
 import reactivemongo.api.collections.GenericCollection
 
 /**

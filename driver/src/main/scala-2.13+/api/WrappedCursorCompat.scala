@@ -1,6 +1,7 @@
 package reactivemongo.api
 
 import scala.collection.Factory
+
 import scala.concurrent.{ ExecutionContext, Future }
 
 private[api] trait WrappedCursorCompat[T] { _self: WrappedCursor[T] =>

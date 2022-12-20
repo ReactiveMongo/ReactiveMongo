@@ -2,6 +2,8 @@ import scala.collection.immutable.ListSet
 
 import scala.concurrent.Future
 
+import reactivemongo.core.errors.ReactiveMongoException
+
 import reactivemongo.api.{
   Compressor,
   MongoConnection,
@@ -9,17 +11,15 @@ import reactivemongo.api.{
   ReadConcern,
   ScramSha1Authentication,
   ScramSha256Authentication,
-  X509Authentication,
-  WriteConcern
-}, MongoConnection.URIParsingException
-
-import reactivemongo.core.errors.ReactiveMongoException
+  WriteConcern,
+  X509Authentication
+}
+import reactivemongo.api.tests.{ parseURIWithDB, ParsedURI }
 
 import org.specs2.concurrent.ExecutionEnv
-
 import org.specs2.specification.core.Fragments
 
-import reactivemongo.api.tests.{ ParsedURI, parseURIWithDB }
+import MongoConnection.URIParsingException
 
 final class MongoURISpec(implicit ee: ExecutionEnv)
     extends org.specs2.mutable.Specification {

@@ -3,10 +3,10 @@ package reactivemongo.core.protocol
 import reactivemongo.io.netty.buffer.ByteBuf
 
 import reactivemongo.core.protocol.buffer.{
+  writeTupleToBuffer4,
   ChannelBufferReadable,
   ChannelBufferWritable,
-  IntChannelInteroperable,
-  writeTupleToBuffer4
+  IntChannelInteroperable
 }
 
 /**

@@ -1,5 +1,7 @@
 package reactivemongo.api.commands
 
+import reactivemongo.core.protocol.MongoWireVersion
+
 import reactivemongo.api.{
   Collation,
   PackSupport,
@@ -7,8 +9,6 @@ import reactivemongo.api.{
   Session,
   WriteConcern
 }
-
-import reactivemongo.core.protocol.MongoWireVersion
 
 trait FindAndModifyCommand[P <: SerializationPack] {
   _self: PackSupport[P] =>

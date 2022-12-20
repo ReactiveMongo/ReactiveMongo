@@ -2,7 +2,7 @@ package reactivemongo.api.collections
 
 import scala.collection.generic.CanBuildFrom
 
-import scala.concurrent.{ Future, ExecutionContext }
+import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{ Collation, ReadConcern, SerializationPack }
 

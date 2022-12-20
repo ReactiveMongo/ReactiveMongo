@@ -1,6 +1,7 @@
 package reactivemongo.api
 
 import scala.collection.generic.CanBuildFrom
+
 import scala.concurrent.{ ExecutionContext, Future }
 
 private[api] trait FlattenedCursorCompat[T] { _: FlattenedCursor[T] =>

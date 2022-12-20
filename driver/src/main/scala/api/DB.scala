@@ -19,18 +19,17 @@ import scala.util.{ Failure, Success }
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.core.protocol.MongoWireVersion
-
 import reactivemongo.core.errors.GenericDriverException
+import reactivemongo.core.protocol.MongoWireVersion
 
 import reactivemongo.api.commands.{
   Command,
   CommandException,
   EndSessions,
+  EndTransaction,
   StartSession,
   StartSessionResult,
-  SuccessfulAuthentication,
-  EndTransaction
+  SuccessfulAuthentication
 }
 
 /**

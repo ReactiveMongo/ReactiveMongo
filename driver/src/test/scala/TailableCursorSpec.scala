@@ -3,10 +3,9 @@ import scala.concurrent.duration._
 
 import reactivemongo.api.{ Cursor, DB }
 import reactivemongo.api.bson.BSONDocument
+import reactivemongo.api.tests.{ decoder, reader => docReader }
 
 import _root_.tests.Common
-
-import reactivemongo.api.tests.{ decoder, reader => docReader }
 
 trait TailableCursorSpec { specs: CursorSpec =>
 

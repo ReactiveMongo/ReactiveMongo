@@ -4,15 +4,13 @@ import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.commands.{
   AuthenticationRestriction,
-  CreateUserCommand,
   CollectionNames,
   CommandCodecs,
+  CreateUserCommand,
   RenameCollection
 }
-
-import reactivemongo.api.indexes.IndexesManager
-
 import reactivemongo.api.gridfs.GridFS
+import reactivemongo.api.indexes.IndexesManager
 
 import Serialization.{ Pack, internalSerializationPack, unitReader }
 

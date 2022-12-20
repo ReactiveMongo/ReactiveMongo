@@ -17,9 +17,9 @@ package reactivemongo.util
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import org.xbill.DNS.{ Name, Record, SRVRecord }
-
 import reactivemongo.core.errors.GenericDriverException
+
+import org.xbill.DNS.{ Name, Record, SRVRecord }
 
 /**
  * @param srvPrefix the SRV prefix (default: `_mongodb._tcp`)

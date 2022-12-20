@@ -2,48 +2,45 @@ package reactivemongo.api
 
 import scala.util.Try
 
+import scala.collection.immutable.ListSet
+
 import scala.concurrent.{ ExecutionContext, Future, Promise }
 import scala.concurrent.duration.{ FiniteDuration, SECONDS }
 
-import scala.collection.immutable.ListSet
-
-import akka.util.Timeout
-import akka.actor.ActorRef
-
-import reactivemongo.io.netty.channel.{ ChannelId, DefaultChannelId }
-
-import reactivemongo.io.netty.channel.Channel
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
+import reactivemongo.io.netty.channel.{ Channel, ChannelId, DefaultChannelId }
 
+import reactivemongo.core.actors
 import reactivemongo.core.errors.DatabaseException
+import reactivemongo.core.netty.ChannelFactory
+import reactivemongo.core.nodeset.{ Authenticate, NodeSet }
 import reactivemongo.core.protocol.{
-  Query,
   MessageHeader,
+  Query,
+  Reply,
   Request,
   RequestOp,
-  Reply,
   Response,
-  ResponseInfo,
+  ResponseDecoder,
   ResponseFrameDecoder,
-  ResponseDecoder
+  ResponseInfo
 }
-import reactivemongo.core.netty.ChannelFactory
 
-import reactivemongo.core.nodeset.{ Authenticate, NodeSet }
-import reactivemongo.core.actors, actors.{
+import reactivemongo.api.bson.BSONDocument
+import reactivemongo.api.bson.collection.BSONSerializationPack
+import reactivemongo.api.collections.QueryCodecs
+import reactivemongo.api.commands.CommandKind
+
+import akka.actor.ActorRef
+import akka.util.Timeout
+
+import actors.{
   ChannelConnected,
   ChannelDisconnected,
   MongoDBSystem,
   RequestIdGenerator,
   StandardDBSystem
 }
-
-import reactivemongo.api.bson.BSONDocument
-import reactivemongo.api.bson.collection.BSONSerializationPack
-
-import reactivemongo.api.collections.QueryCodecs
-
-import reactivemongo.api.commands.CommandKind
 
 package object tests { self =>
   type Pack = Serialization.Pack

@@ -1,20 +1,19 @@
 package reactivemongo.core.nodeset
 
+import scala.util.{ Failure, Success, Try }
+
 import scala.collection.immutable.{ ListSet, Set }
 
 import scala.math.Ordering
 
-import scala.util.{ Failure, Success, Try }
-
-import akka.actor.ActorRef
-
 import reactivemongo.io.netty.channel.ChannelId
 
+import reactivemongo.core.netty.ChannelFactory
 import reactivemongo.core.protocol.ProtocolMetadata
 
-import reactivemongo.core.netty.ChannelFactory
-
 import reactivemongo.api.{ Compressor, ReadPreference }
+
+import akka.actor.ActorRef
 
 /**
  * @param name the replicaSet name

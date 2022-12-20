@@ -1,6 +1,4 @@
-import scala.concurrent._, duration.FiniteDuration
-
-import reactivemongo.api.bson.BSONDocument
+import scala.concurrent._
 
 import reactivemongo.api.{
   Cursor,
@@ -9,15 +7,16 @@ import reactivemongo.api.{
   ReadPreference,
   WriteConcern
 }
-
+import reactivemongo.api.TestCompat._
+import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.commands.CommandException
+import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 
 import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.Common
 
-import reactivemongo.api.TestCompat._
-import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
+import duration.FiniteDuration
 
 final class CollectionSpec(implicit protected val ee: ExecutionEnv)
     extends org.specs2.mutable.Specification

@@ -1,9 +1,9 @@
 package reactivemongo.api.commands
 
-import reactivemongo.api.SerializationPack
-
-import reactivemongo.core.protocol.Response
 import reactivemongo.core.errors.{ CommandException => CmdErr }
+import reactivemongo.core.protocol.Response
+
+import reactivemongo.api.SerializationPack
 
 /** An authentication result */
 sealed trait AuthenticationResult

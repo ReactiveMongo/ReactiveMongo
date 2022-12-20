@@ -1,8 +1,8 @@
 package reactivemongo.api
 
-import scala.concurrent.{ ExecutionContext, Future }
-
 import scala.collection.generic.CanBuildFrom
+
+import scala.concurrent.{ ExecutionContext, Future }
 
 import com.github.ghik.silencer.silent
 

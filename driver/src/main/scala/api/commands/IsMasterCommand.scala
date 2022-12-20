@@ -4,10 +4,10 @@ import java.util.Date
 
 import scala.collection.immutable.ListSet
 
-import reactivemongo.api.{ Compressor, SerializationPack }
-
 import reactivemongo.core.ClientMetadata
 import reactivemongo.core.nodeset.NodeStatus
+
+import reactivemongo.api.{ Compressor, SerializationPack }
 
 // See https://github.com/mongodb/specifications/blob/master/source/mongodb-handshake/handshake.rst
 // TODO: hello?

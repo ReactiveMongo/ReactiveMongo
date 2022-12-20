@@ -4,9 +4,9 @@ import java.nio.ByteBuffer
 
 import scala.util.Try
 
-import org.xerial.snappy.{ Snappy => Z }
-
 import reactivemongo.io.netty.buffer.ByteBuf
+
+import org.xerial.snappy.{ Snappy => Z }
 
 private[reactivemongo] final class Snappy {
 

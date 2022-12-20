@@ -8,11 +8,11 @@ import scala.util.control.NonFatal
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 import reactivemongo.io.netty.channel.{ ChannelHandlerContext, ChannelId }
 
+import reactivemongo.core.errors.DatabaseException
+
 import reactivemongo.api.Compressor
 import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.bson.collection.BSONSerializationPack
-
-import reactivemongo.core.errors.DatabaseException
 
 private[reactivemongo] class ResponseDecoder
     extends reactivemongo.io.netty.handler.codec.MessageToMessageDecoder[

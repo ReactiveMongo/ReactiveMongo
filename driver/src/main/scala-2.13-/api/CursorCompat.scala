@@ -1,7 +1,6 @@
 package reactivemongo.api
 
 import scala.collection.generic.CanBuildFrom
-
 import scala.collection.mutable.Builder
 
 import scala.concurrent.{ ExecutionContext, Future }
