@@ -247,7 +247,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
 
             case nodes1 =>
               nodes1.size must_=== 1 and {
-                isAvailable(con, 1.seconds) must beTrue.awaitFor(timeout)
+                isAvailable(con, 1.seconds) must beTrue.await(1, timeout)
               } and {
                 nodes1.flatMap(_.connections) must beLike[Vector[Connection]] {
                   case cons =>
@@ -305,7 +305,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
               // as the channel of the first connection used for isMaster
               // is deregistered/paused for now
               eventually(2, timeout) {
-                isAvailable(con, timeout) must beFalse.await(0, unavailTimeout)
+                isAvailable(con, timeout) must beFalse.awaitFor(unavailTimeout)
               }
             }
           } and {
@@ -453,7 +453,7 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
       "so re-connect quickly with a short heartbeat (500ms)" in {
         eventually(Common.ifX509(3)(2), timeout / 2L) {
           withClosedChannels(500, timeout) { (con, _) =>
-            isAvailable(con, timeout) must beTrue.awaitFor(timeout)
+            isAvailable(con, timeout) must beTrue.await(1, timeout)
           }
         }
       }
@@ -463,7 +463,9 @@ final class MonitorSpec(implicit ee: ExecutionEnv)
 
         eventually(Common.ifX509(4)(2), timeout / 2L) {
           withClosedChannels(3600000, slowTimeout) { (con, _) =>
-            isAvailable(con, slowTimeout) must beFalse.awaitFor(slowTimeout)
+            isAvailable(con, slowTimeout) must beFalse.awaitFor(
+              slowTimeout * 2L
+            )
           }
         }
       }

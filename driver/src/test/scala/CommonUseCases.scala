@@ -122,7 +122,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
         it.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]())
           .map {
             _.map(doc => decoder.int(doc, "age").mkString).mkString("")
-          } must beTypedEqualTo(expected).await(0, t)
+          } must beTypedEqualTo(expected).await(1, t)
       }
 
       "with the default connection" in {
