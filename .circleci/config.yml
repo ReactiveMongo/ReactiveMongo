@@ -6,7 +6,7 @@ commands:
     parameters:
       sbt_version:
         type: string
-        default: "1.7.1"
+        default: "1.8.0"
     steps:
       - restore_cache:
           name: Restore SBT cache
@@ -190,9 +190,11 @@ commands:
       - deploy:
           name: Publish artifacts to Sonatype Snapshots
           command: |
-                    sbt || echo 'Missing SBT'
                     export JAVA_HOME=/usr/local/openjdk-8/
                     export PATH=$PATH:~/sbt/bin:$JAVA_HOME/bin
+
+                    cd ~/repo
+                    sbt --version || echo 'Missing SBT'
 
                     if [ ! "${CIRCLE_BRANCH}" = "master" ]; then
                       echo "Skipped on branch ${CIRCLE_BRANCH}"
