@@ -2,6 +2,8 @@ package reactivemongo.api.collections
 
 import scala.concurrent.duration.FiniteDuration
 
+import reactivemongo.core.protocol.MongoWireVersion
+
 import reactivemongo.api.{
   Collation,
   Cursor,
@@ -13,7 +15,6 @@ import reactivemongo.api.{
   SerializationPack,
   WriteConcern
 }
-
 import reactivemongo.api.commands.{
   AggregationFramework => AggFramework,
   CollectionCommand,
@@ -23,7 +24,6 @@ import reactivemongo.api.commands.{
   CommandWithResult,
   ResolvedCollectionCommand
 }
-import reactivemongo.core.protocol.MongoWireVersion
 
 trait AggregationOps[P <: SerializationPack] {
   collection: GenericCollection[P] =>

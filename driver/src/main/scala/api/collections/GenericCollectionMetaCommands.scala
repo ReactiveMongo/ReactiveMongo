@@ -3,7 +3,6 @@ package reactivemongo.api.collections
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{ Collation, SerializationPack }
-
 import reactivemongo.api.commands.{
   CollectionCommand,
   Command,

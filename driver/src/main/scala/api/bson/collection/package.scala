@@ -1,7 +1,6 @@
 package reactivemongo.api.bson.collection
 
 import reactivemongo.api.{ CollectionMetaCommands, DB, FailoverStrategy }
-
 import reactivemongo.api.collections.{
   GenericCollection,
   GenericCollectionProducer

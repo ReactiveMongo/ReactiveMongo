@@ -1,14 +1,12 @@
 package util
 
+import scala.util.Random
+
 import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration.FiniteDuration
 
-import scala.util.Random
-
-import reactivemongo.api.bson.collection.BSONCollectionProducer
-
 import reactivemongo.api.{ CollectionProducer, DB }
-
+import reactivemongo.api.bson.collection.BSONCollectionProducer
 import reactivemongo.api.collections.GenericCollection
 
 object WithTemporaryCollection {

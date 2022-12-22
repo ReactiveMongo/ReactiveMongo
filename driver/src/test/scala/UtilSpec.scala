@@ -1,7 +1,7 @@
-import org.specs2.concurrent.ExecutionEnv
-
 import scala.concurrent.Future
 import scala.concurrent.duration._
+
+import org.specs2.concurrent.ExecutionEnv
 
 final class UtilSpec(implicit ee: ExecutionEnv)
     extends org.specs2.mutable.Specification {

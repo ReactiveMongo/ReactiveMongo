@@ -2,14 +2,13 @@ import scala.concurrent._
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api._
-
+import reactivemongo.api.TestCompat._
 import reactivemongo.api.bson.{ BSONDocument, BSONInteger, BSONString }
+import reactivemongo.api.tests.{ builder, decoder }
 
 import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.Common
-import reactivemongo.api.TestCompat._
-import reactivemongo.api.tests.{ builder, decoder }
 
 final class CommonUseCases(implicit ee: ExecutionEnv)
     extends org.specs2.mutable.Specification
@@ -123,7 +122,7 @@ final class CommonUseCases(implicit ee: ExecutionEnv)
         it.collect[List](Int.MaxValue, Cursor.FailOnError[List[BSONDocument]]())
           .map {
             _.map(doc => decoder.int(doc, "age").mkString).mkString("")
-          } must beTypedEqualTo(expected).await(0, t)
+          } must beTypedEqualTo(expected).await(1, t)
       }
 
       "with the default connection" in {

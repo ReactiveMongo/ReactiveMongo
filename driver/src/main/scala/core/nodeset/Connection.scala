@@ -1,10 +1,9 @@
 package reactivemongo.core.nodeset
 
-import scala.collection.immutable.{ ListSet, Set }
-
 import scala.util.{ Failure, Success, Try }
-
 import scala.util.control.NonFatal
+
+import scala.collection.immutable.{ ListSet, Set }
 
 import reactivemongo.io.netty.channel.{
   Channel,

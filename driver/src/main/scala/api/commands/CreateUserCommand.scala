@@ -1,13 +1,13 @@
 package reactivemongo.api.commands
 
+import reactivemongo.core.protocol.MongoWireVersion
+
 import reactivemongo.api.{
   AuthenticationMode,
   PackSupport,
   SerializationPack,
   WriteConcern
 }
-
-import reactivemongo.core.protocol.MongoWireVersion
 
 /**
  * [[https://docs.mongodb.com/manual/reference/command/createUser/#roles User role]]

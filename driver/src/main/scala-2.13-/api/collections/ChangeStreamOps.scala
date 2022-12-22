@@ -5,8 +5,8 @@ import scala.concurrent.duration.FiniteDuration
 import reactivemongo.api.{
   ChangeStreams,
   Cursor,
-  CursorProducer,
   CursorOptions,
+  CursorProducer,
   ReadConcern,
   SerializationPack
 }

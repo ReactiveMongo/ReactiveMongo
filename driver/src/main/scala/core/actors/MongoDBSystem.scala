@@ -15,22 +15,20 @@
  */
 package reactivemongo.core.actors
 
-import java.util.concurrent.TimeoutException
-
 import java.nio.channels.ClosedChannelException
 
-import java.net.InetSocketAddress
+import java.util.concurrent.TimeoutException
 
-import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
+import java.net.InetSocketAddress
 
 import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
 
 import scala.collection.{ Map => IMap }
-import scala.collection.mutable.{ Map => MMap }
 import scala.collection.immutable.ListSet
+import scala.collection.mutable.{ Map => MMap }
 
-import akka.actor.{ Actor, ActorRef, Cancellable }
+import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
 
 import reactivemongo.io.netty.channel.{
   ChannelFuture,
@@ -43,32 +41,9 @@ import reactivemongo.io.netty.channel.group.{
   DefaultChannelGroup
 }
 
-import reactivemongo.util.{ LazyLogger, SimpleRing }
-
-import reactivemongo.api.{ PackSupport, Serialization }
-
-import reactivemongo.api.bson.BSONDocumentReader
-import reactivemongo.api.bson.collection.BSONSerializationPack
-
-import reactivemongo.core.netty.ChannelFactory
-
 import reactivemongo.core.ClientMetadata
 import reactivemongo.core.errors.{ CommandException, GenericDriverException }
-import reactivemongo.core.protocol.{
-  GetMore,
-  Query,
-  Message => OpMsg,
-  QueryFlags,
-  KillCursors,
-  MongoWireVersion,
-  Request,
-  Response,
-  ProtocolMetadata
-}
-import reactivemongo.api.commands.{
-  FailedAuthentication,
-  SuccessfulAuthentication
-}
+import reactivemongo.core.netty.ChannelFactory
 import reactivemongo.core.nodeset.{
   Authenticate,
   Authenticated,
@@ -81,21 +56,39 @@ import reactivemongo.core.nodeset.{
   NodeStatus,
   PingInfo
 }
-import reactivemongo.api.{
-  MongoConnectionOptions,
-  ReadPreference,
-  WriteConcern
+import reactivemongo.core.protocol.{
+  GetMore,
+  KillCursors,
+  Message => OpMsg,
+  MongoWireVersion,
+  ProtocolMetadata,
+  Query,
+  QueryFlags,
+  Request,
+  Response
 }
 
+import reactivemongo.api.{
+  MongoConnectionOptions,
+  PackSupport,
+  ReadPreference,
+  Serialization,
+  WriteConcern
+}
+import reactivemongo.api.bson.BSONDocumentReader
+import reactivemongo.api.bson.collection.BSONSerializationPack
 import reactivemongo.api.commands.{
   CommandKind,
+  FailedAuthentication,
   LastErrorFactory,
+  SuccessfulAuthentication,
   UpsertedFactory
 }
 
-import external.reactivemongo.ConnectionListener
-
+import akka.actor.{ Actor, ActorRef, Cancellable }
 import com.github.ghik.silencer.silent
+import external.reactivemongo.ConnectionListener
+import reactivemongo.util.{ LazyLogger, SimpleRing }
 
 /** Main actor that processes the requests. */
 @SuppressWarnings(Array("NullAssignment"))
@@ -244,6 +237,16 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
   private[reactivemongo] def getNodeSet = _nodeSet // For test purposes
 
+  private lazy val signalingTimeoutMS: Int = {
+    if (options.heartbeatFrequencyMS <= 0) {
+      0
+    } else {
+      val v = options.heartbeatFrequencyMS.toLong * 1.5D
+
+      if (v <= Int.MaxValue) v.toInt else 0
+    }
+  }
+
   /** On start or restart. */
   private def initNodeSet(): Try[NodeSet] = {
     val nanow = System.nanoTime()
@@ -275,7 +278,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     seedNodeSet.updateAll { n =>
       n.createSignalingConnection(
         channelFactory,
-        options.heartbeatFrequencyMS,
+        signalingTimeoutMS,
         self
       ) match {
         case Success(node) => node
@@ -563,8 +566,10 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
             n.updateByChannelId(channelId)({ con =>
               n.createConnection(
-                channelFactory,
-                options.maxIdleTimeMS,
+                channelFactory, {
+                  if (con.signaling) signalingTimeoutMS
+                  else options.maxIdleTimeMS
+                },
                 self,
                 con.signaling
               ) match {
@@ -1387,7 +1392,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
               n.createSignalingConnection(
                 channelFactory,
-                options.heartbeatFrequencyMS,
+                signalingTimeoutMS,
                 self
               ) match {
                 case Success(upd) =>

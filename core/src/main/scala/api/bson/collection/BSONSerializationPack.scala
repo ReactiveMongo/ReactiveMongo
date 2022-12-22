@@ -6,17 +6,15 @@ import scala.util.{ Failure, Success, Try }
 
 import scala.reflect.ClassTag
 
+import reactivemongo.core.protocol.Response
+
+import reactivemongo.api.SerializationPack
+import reactivemongo.api.bson._
 import reactivemongo.api.bson.buffer.{
   DefaultBufferHandler,
   ReadableBuffer,
   WritableBuffer
 }
-
-import reactivemongo.core.protocol.Response
-
-import reactivemongo.api.SerializationPack
-
-import reactivemongo.api.bson._
 
 /** The default serialization pack. */
 object BSONSerializationPack extends SerializationPack { self =>

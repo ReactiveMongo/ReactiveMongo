@@ -3,7 +3,6 @@ package reactivemongo.api
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.commands._
-
 import reactivemongo.api.indexes.CollectionIndexesManager
 
 /**

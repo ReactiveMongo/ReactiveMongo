@@ -1,7 +1,6 @@
 package reactivemongo.api.commands
 
 import reactivemongo.api.SerializationPack
-
 import reactivemongo.api.indexes.{ Index, IndexesManager, NSIndex }
 
 /**

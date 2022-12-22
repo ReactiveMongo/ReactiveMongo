@@ -2,9 +2,9 @@ package reactivemongo.api.commands
 
 import scala.util.control.NoStackTrace
 
-import reactivemongo.api.{ PackSupport, SerializationPack, WriteConcern }
-
 import reactivemongo.core.errors.DatabaseException
+
+import reactivemongo.api.{ PackSupport, SerializationPack, WriteConcern }
 
 sealed trait WriteResult {
 

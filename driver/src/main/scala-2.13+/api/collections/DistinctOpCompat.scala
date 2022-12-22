@@ -1,8 +1,8 @@
 package reactivemongo.api.collections
 
-import scala.concurrent.{ ExecutionContext, Future }
-
 import scala.collection.Factory
+
+import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{ Collation, ReadConcern, SerializationPack }
 

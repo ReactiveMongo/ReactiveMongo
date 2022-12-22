@@ -2,20 +2,18 @@ package reactivemongo
 
 import scala.concurrent.Promise
 
-import akka.actor.Actor
-
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
-
 import reactivemongo.io.netty.channel.{
   Channel,
   ChannelFuture,
   ChannelFutureListener
 }
 
-import org.specs2.specification.AfterAll
 import org.specs2.concurrent.ExecutionEnv
+import org.specs2.specification.AfterAll
 
 import _root_.tests.{ Common, NettyEmbedder }
+import akka.actor.Actor
 
 final class ChannelFactorySpec(implicit ee: ExecutionEnv)
     extends org.specs2.mutable.Specification

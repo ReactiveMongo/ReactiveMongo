@@ -3,7 +3,6 @@ package reactivemongo.core.netty
 import scala.util.control.NonFatal
 
 import reactivemongo.io.netty.channel.{ Channel, EventLoopGroup }
-
 import reactivemongo.io.netty.channel.nio.NioEventLoopGroup
 import reactivemongo.io.netty.channel.socket.nio.NioSocketChannel
 

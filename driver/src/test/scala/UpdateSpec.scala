@@ -2,14 +2,11 @@ import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.api.ReadPreference
-
-import reactivemongo.api.commands.WriteResult
-
 import reactivemongo.api.bson.{ BSONDocument, BSONString }
+import reactivemongo.api.commands.WriteResult
+import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 
 import _root_.tests.Common
-
-import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 
 trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
   import reactivemongo.api.TestCompat._
@@ -125,9 +122,9 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
                   .find(BSONDocument.empty)
                   .cursor[BSONDocument]()
                   .collect[Set]() must beTypedEqualTo(Set(doc1, doc2, doc3))
-                  .await(1, timeout)
+                  .await(2, timeout)
               }
-          }.await(1, timeout)
+          }.awaitFor(timeout)
 
         update.maxBulkSize must_=== 2 and (eventually(2, timeout) {
           Future

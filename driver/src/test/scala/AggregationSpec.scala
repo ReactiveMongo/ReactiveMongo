@@ -3,7 +3,17 @@ import scala.collection.immutable.{ ListSet, Set }
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
+import reactivemongo.api.{
+  Cursor,
+  CursorOps,
+  CursorProducer,
+  ReadConcern,
+  WrappedCursor,
+  WrappedCursorOps
+}
 import reactivemongo.api.bson.{
+  array,
+  document,
   BSON,
   BSONArray,
   BSONDocument,
@@ -15,26 +25,16 @@ import reactivemongo.api.bson.{
   BSONObjectID,
   BSONString,
   BSONTimestamp,
-  Macros,
-  array,
-  document
+  Macros
 }
-import reactivemongo.api.{
-  Cursor,
-  CursorOps,
-  CursorProducer,
-  ReadConcern,
-  WrappedCursor,
-  WrappedCursorOps
-}
-import reactivemongo.api.indexes._, IndexType._
-
 import reactivemongo.api.bson.collection.BSONCollection
-
+import reactivemongo.api.indexes._
 import reactivemongo.api.tests.{ builder, pack }
 
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.specification.core.Fragments
+
+import IndexType._
 
 final class AggregationSpec(implicit ee: ExecutionEnv)
     extends org.specs2.mutable.Specification

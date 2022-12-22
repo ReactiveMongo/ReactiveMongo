@@ -1,7 +1,8 @@
 package util
 
-import reactivemongo.api.DB
 import reactivemongo.core.protocol.MongoWireVersion
+
+import reactivemongo.api.DB
 
 import org.specs2.execute.{ AsResult, Result }
 

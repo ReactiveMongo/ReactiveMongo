@@ -5,8 +5,8 @@ import reactivemongo.core.protocol.MongoWireVersion
 import reactivemongo.api.{
   Collation,
   PackSupport,
-  Session,
   SerializationPack,
+  Session,
   WriteConcern
 }
 

@@ -1,34 +1,9 @@
 package reactivemongo
 
-import scala.concurrent.{ Await, Future }
-
 import scala.collection.immutable.ListSet
 
+import scala.concurrent.{ Await, Future }
 import scala.math.Ordering
-
-import akka.actor.ActorRef
-import akka.testkit.TestActorRef
-
-import org.specs2.matcher.MatchResult
-import org.specs2.concurrent.ExecutionEnv
-
-import reactivemongo.api.{
-  AsyncDriver,
-  MongoConnection,
-  MongoConnectionOptions,
-  ReadPreference
-}
-
-import reactivemongo.core.protocol.ProtocolMetadata
-
-import reactivemongo.core.nodeset.{
-  Connection,
-  ConnectionStatus,
-  Node,
-  NodeSet,
-  NodeStatus,
-  PingInfo
-}
 
 import reactivemongo.core.actors.{
   PrimaryAvailable,
@@ -38,6 +13,28 @@ import reactivemongo.core.actors.{
   StandardDBSystem
 }
 import reactivemongo.core.actors.Exceptions.PrimaryUnavailableException
+import reactivemongo.core.nodeset.{
+  Connection,
+  ConnectionStatus,
+  Node,
+  NodeSet,
+  NodeStatus,
+  PingInfo
+}
+import reactivemongo.core.protocol.ProtocolMetadata
+
+import reactivemongo.api.{
+  AsyncDriver,
+  MongoConnection,
+  MongoConnectionOptions,
+  ReadPreference
+}
+
+import org.specs2.concurrent.ExecutionEnv
+import org.specs2.matcher.MatchResult
+
+import akka.actor.ActorRef
+import akka.testkit.TestActorRef
 
 final class NodeSetSpec(implicit val ee: ExecutionEnv)
     extends org.specs2.mutable.Specification

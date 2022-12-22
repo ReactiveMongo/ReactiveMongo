@@ -2,12 +2,12 @@ package reactivemongo.api.commands
 
 import scala.util.control.NoStackTrace
 
+import reactivemongo.core.errors.DatabaseException
+
 import reactivemongo.api.WriteConcern
 import reactivemongo.api.commands.WriteResult.{
   Internal => InternalWriteResult
 }
-
-import reactivemongo.core.errors.DatabaseException
 
 /** TestHelpers about commands. */
 object TestHelpers {

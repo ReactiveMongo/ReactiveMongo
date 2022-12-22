@@ -1,7 +1,7 @@
 package reactivemongo.core.protocol
 
-import reactivemongo.io.netty.channel.ChannelId
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
+import reactivemongo.io.netty.channel.ChannelId
 
 import reactivemongo.api.ReadPreference
 import reactivemongo.api.commands.CommandKind

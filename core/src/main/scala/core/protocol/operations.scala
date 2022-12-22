@@ -18,14 +18,14 @@ package reactivemongo.core.protocol
 import reactivemongo.io.netty.buffer.ByteBuf
 
 import reactivemongo.core.protocol.buffer.{
+  writeTupleToBuffer2,
+  writeTupleToBuffer3,
+  writeTupleToBuffer4,
   ChannelBufferReadable,
   ChannelBufferWritable,
   IntChannelInteroperable,
   LongChannelInteroperable,
-  StringChannelInteroperable,
-  writeTupleToBuffer2,
-  writeTupleToBuffer3,
-  writeTupleToBuffer4
+  StringChannelInteroperable
 }
 
 /** A Mongo Wire Protocol operation */

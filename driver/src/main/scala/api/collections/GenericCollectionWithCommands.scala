@@ -3,14 +3,13 @@ package reactivemongo.api.collections
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{ Cursor, ReadPreference, SerializationPack }
-
 import reactivemongo.api.commands.{
   CollectionCommand,
   Command,
   CommandWithResult,
   CursorFetcher,
-  ResponseResult,
-  ResolvedCollectionCommand
+  ResolvedCollectionCommand,
+  ResponseResult
 }
 
 /** Collection operations to run commands with */

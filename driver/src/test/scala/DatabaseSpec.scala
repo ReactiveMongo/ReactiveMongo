@@ -4,7 +4,6 @@ import scala.concurrent.duration.FiniteDuration
 import reactivemongo.core.errors.DatabaseException
 
 import reactivemongo.api.{ FailoverStrategy, MongoConnection }
-
 import reactivemongo.api.commands.CommandException
 
 import org.specs2.concurrent.ExecutionEnv

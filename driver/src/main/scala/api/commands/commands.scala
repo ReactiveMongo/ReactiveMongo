@@ -2,20 +2,20 @@ package reactivemongo.api.commands
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.api.{
-  Cursor,
-  CursorOptions,
-  Collection,
-  DB,
-  SerializationPack,
-  Session,
-  ReadPreference
-}
-import reactivemongo.api.bson.buffer.WritableBuffer
-
-import reactivemongo.core.protocol.{ Reply, Response, MongoWireVersion }
 import reactivemongo.core.actors.ExpectingResponse
 import reactivemongo.core.errors.GenericDriverException
+import reactivemongo.core.protocol.{ MongoWireVersion, Reply, Response }
+
+import reactivemongo.api.{
+  Collection,
+  Cursor,
+  CursorOptions,
+  DB,
+  ReadPreference,
+  SerializationPack,
+  Session
+}
+import reactivemongo.api.bson.buffer.WritableBuffer
 
 trait Command {
   protected[reactivemongo] def commandKind: CommandKind

@@ -2,8 +2,9 @@ package external.reactivemongo
 
 import scala.util.Try
 
-import reactivemongo.api.MongoConnectionOptions
 import reactivemongo.core.nodeset.NodeSetInfo
+
+import reactivemongo.api.MongoConnectionOptions
 
 /**
  * Listener definition for the connection events.

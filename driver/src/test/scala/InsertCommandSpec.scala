@@ -1,15 +1,13 @@
 package reactivemongo
 
-import reactivemongo.api.bson.{ BSONBinary, BSONDocument }
-
 import reactivemongo.api.{
-  PackSupport,
   NodeSetSession,
+  PackSupport,
   Session,
   SessionTransaction,
   WriteConcern
 }
-
+import reactivemongo.api.bson.{ BSONBinary, BSONDocument }
 import reactivemongo.api.commands.{ InsertCommand, ResolvedCollectionCommand }
 
 final class InsertCommandSpec extends org.specs2.mutable.Specification {

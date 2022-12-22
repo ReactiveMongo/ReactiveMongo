@@ -15,12 +15,11 @@
  */
 package reactivemongo.core.errors
 
-import reactivemongo.api.SerializationPack
+import scala.util.control.NoStackTrace
 
+import reactivemongo.api.SerializationPack
 import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.bson.collection.BSONSerializationPack
-
-import scala.util.control.NoStackTrace
 
 /** An error that can come from a MongoDB node or not. */
 sealed trait ReactiveMongoException extends Exception {

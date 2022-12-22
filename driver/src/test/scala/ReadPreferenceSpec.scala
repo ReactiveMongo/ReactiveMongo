@@ -1,9 +1,8 @@
-import reactivemongo.api.bson.{ BSONArray, BSONDocument }
 import reactivemongo.api.ReadPreference
+import reactivemongo.api.bson.{ BSONArray, BSONDocument }
+import reactivemongo.api.tests.{ bsonReadPref => bson }
 
 import org.specs2.specification.core.Fragments
-
-import reactivemongo.api.tests.{ bsonReadPref => bson }
 
 final class ReadPreferenceSpec extends org.specs2.mutable.Specification {
   "Read preference".title

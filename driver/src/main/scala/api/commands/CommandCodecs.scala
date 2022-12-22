@@ -2,14 +2,14 @@ package reactivemongo.api.commands
 
 import scala.util.Success
 
+import reactivemongo.core.errors.{ CommandException => CmdErr }
+
 import reactivemongo.api.{
   ReadConcern,
-  Session,
   SerializationPack,
+  Session,
   WriteConcern
 }
-
-import reactivemongo.core.errors.{ CommandException => CmdErr }
 
 private[reactivemongo] object CommandCodecs {
 

@@ -29,7 +29,9 @@ export PATH="$HOME/mongodb-linux-x86_64-amazon-$MONGO_MINOR/bin:$PATH"
 MONGO_DATA=`mktemp -d`
 MONGO_CONF_SUFFIX="26"
 
-if [ "v$MONGO_VER" = "v3" -o "v$MONGO_VER" = "v4" -o "v$MONGO_VER" = "v5" ]; then
+M3P=(v3 v4 v5 v6)
+
+if [ ${M3P[@]} =~ "v$MONGO_VER" ]; then
     MONGO_CONF_SUFFIX="3"
 fi
 

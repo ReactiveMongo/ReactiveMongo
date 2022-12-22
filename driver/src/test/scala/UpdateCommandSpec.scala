@@ -1,7 +1,5 @@
 package reactivemongo
 
-import reactivemongo.api.bson.{ BSONArray, BSONBinary, BSONDocument }
-
 import reactivemongo.core.protocol.MongoWireVersion
 
 import reactivemongo.api.{
@@ -11,12 +9,12 @@ import reactivemongo.api.{
   SessionTransaction,
   WriteConcern
 }
-
+import reactivemongo.api.bson.{ BSONArray, BSONBinary, BSONDocument }
 import reactivemongo.api.commands.{
+  ResolvedCollectionCommand,
   UpdateCommand,
   UpdateWriteResultFactory,
-  UpsertedFactory,
-  ResolvedCollectionCommand
+  UpsertedFactory
 }
 
 final class UpdateCommandSpec extends org.specs2.mutable.Specification {

@@ -1,15 +1,14 @@
 package reactivemongo.api
 
 import scala.util.{ Failure, Success }
-
 import scala.util.control.NonFatal
 
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
-import akka.actor.ActorSystem
-
 import reactivemongo.core.protocol.Response
+
+import akka.actor.ActorSystem
 
 private[api] final class FoldResponses[T](
     failoverStrategy: FailoverStrategy,

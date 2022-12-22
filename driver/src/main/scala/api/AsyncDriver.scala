@@ -5,25 +5,24 @@ import java.util.concurrent.atomic.AtomicLong
 import scala.util.{ Failure, Success }
 
 import scala.collection.mutable
+
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.{ FiniteDuration, MILLISECONDS, SECONDS }
-
-import com.typesafe.config.Config
-
-import akka.util.Timeout
-import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Terminated }
-import akka.pattern.ask
 
 import reactivemongo.core.actors.{
   Close,
   Closed,
   MongoDBSystem,
   StandardDBSystem,
-  StandardDBSystemWithX509,
-  StandardDBSystemWithScramSha256
+  StandardDBSystemWithScramSha256,
+  StandardDBSystemWithX509
 }
-
 import reactivemongo.core.nodeset.Authenticate
+
+import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Terminated }
+import akka.pattern.ask
+import akka.util.Timeout
+import com.typesafe.config.Config
 
 /**
  * The asynchronous driver (see [[MongoConnection]]).

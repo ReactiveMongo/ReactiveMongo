@@ -2,13 +2,13 @@ package reactivemongo.api
 
 import java.util.UUID
 
-import scala.reflect.ClassTag
-
 import scala.util.Try
 
-import reactivemongo.api.bson.buffer.{ ReadableBuffer, WritableBuffer }
+import scala.reflect.ClassTag
 
 import reactivemongo.core.protocol.Response
+
+import reactivemongo.api.bson.buffer.{ ReadableBuffer, WritableBuffer }
 
 trait SerializationPack extends SerializationPackCompat { self: Singleton =>
   type Value

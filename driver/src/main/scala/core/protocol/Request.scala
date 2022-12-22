@@ -1,7 +1,6 @@
 package reactivemongo.core.protocol
 
 import scala.util.{ Success, Try }
-
 import scala.util.control.NonFatal
 
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }

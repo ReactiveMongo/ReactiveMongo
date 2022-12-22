@@ -5,30 +5,28 @@ import scala.collection.immutable.Set
 import scala.concurrent.{ Await, Future, Promise }
 import scala.concurrent.duration._
 
-import akka.actor.ActorRef
-import akka.testkit.TestActorRef
+import reactivemongo.io.netty.channel.{ Channel, DefaultChannelId }
 
-import org.specs2.matcher.MatchResult
-
-import reactivemongo.api.bson.BSONDocument
-import reactivemongo.api.bson.buffer.ReadableBuffer
-import reactivemongo.api.bson.collection.BSONSerializationPack
-
-import reactivemongo.api.MongoConnectionOptions
-
+import reactivemongo.core.actors.StandardDBSystem
 import reactivemongo.core.nodeset.{
   Authenticated,
   Connection,
   ConnectionStatus,
-  NodeStatus,
-  Node
+  Node,
+  NodeStatus
 }
 import reactivemongo.core.protocol.Request
-import reactivemongo.core.actors.StandardDBSystem
 
-import reactivemongo.io.netty.channel.{ Channel, DefaultChannelId }
+import reactivemongo.api.MongoConnectionOptions
+import reactivemongo.api.bson.BSONDocument
+import reactivemongo.api.bson.buffer.ReadableBuffer
+import reactivemongo.api.bson.collection.BSONSerializationPack
+
+import org.specs2.matcher.MatchResult
 
 import _root_.tests.{ Common, NettyEmbedder }
+import akka.actor.ActorRef
+import akka.testkit.TestActorRef
 
 trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
   import reactivemongo.api.tests._

@@ -4,7 +4,7 @@ import javax.crypto.SecretKeyFactory
 
 import scala.util.control.NonFatal
 
-import akka.util.ByteString
+import reactivemongo.core.errors.{ CommandException => CmdErr }
 
 import reactivemongo.api.{
   AuthenticationMode,
@@ -13,9 +13,8 @@ import reactivemongo.api.{
   SerializationPack
 }
 
+import akka.util.ByteString
 import reactivemongo.util
-
-import reactivemongo.core.errors.{ CommandException => CmdErr }
 
 // --- MongoDB SCRAM authentication ---
 

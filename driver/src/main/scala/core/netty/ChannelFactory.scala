@@ -1,42 +1,40 @@
 package reactivemongo.core.netty
 
-import java.lang.{ Boolean => JBool }
-
 import java.util.concurrent.TimeUnit
+
+import java.lang.{ Boolean => JBool }
 
 import scala.util.{ Failure, Success, Try }
 
 import scala.concurrent.Promise
 
-import reactivemongo.io.netty.util.concurrent.{ Future, GenericFutureListener }
-
 import reactivemongo.io.netty.bootstrap.Bootstrap
-
 import reactivemongo.io.netty.channel.{
   Channel,
   ChannelFuture,
   ChannelFutureListener,
+  ChannelInitializer,
   ChannelOption,
   EventLoopGroup
-}, ChannelOption.{ CONNECT_TIMEOUT_MILLIS, SO_KEEPALIVE, TCP_NODELAY }
-
-import reactivemongo.io.netty.channel.ChannelInitializer
+}
 import reactivemongo.io.netty.handler.timeout.IdleStateHandler
+import reactivemongo.io.netty.util.concurrent.{ Future, GenericFutureListener }
 
-import akka.actor.ActorRef
-
-import reactivemongo.util.LazyLogger
-
+import reactivemongo.core.actors.ChannelDisconnected
+import reactivemongo.core.errors.GenericDriverException
 import reactivemongo.core.protocol.{
   MongoHandler,
   RequestEncoder,
-  ResponseFrameDecoder,
-  ResponseDecoder
+  ResponseDecoder,
+  ResponseFrameDecoder
 }
-import reactivemongo.core.actors.ChannelDisconnected
-import reactivemongo.core.errors.GenericDriverException
 
 import reactivemongo.api.MongoConnectionOptions
+
+import akka.actor.ActorRef
+import reactivemongo.util.LazyLogger
+
+import ChannelOption.{ CONNECT_TIMEOUT_MILLIS, SO_KEEPALIVE, TCP_NODELAY }
 
 /**
  * @param supervisor the name of the driver supervisor

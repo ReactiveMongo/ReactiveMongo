@@ -7,7 +7,6 @@ import reactivemongo.api.{
   CursorProducer,
   WrappedCursor
 }
-
 import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.bson.collection.BSONCollection
 

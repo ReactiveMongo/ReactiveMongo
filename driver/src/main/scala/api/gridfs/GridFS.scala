@@ -16,14 +16,17 @@
 package reactivemongo.api.gridfs
 
 import java.io.{ InputStream, OutputStream }
+
 import java.util.Arrays
+
 import java.security.MessageDigest
 
 import scala.util.control.NonFatal
 
+import scala.concurrent.{ ExecutionContext, Future }
 import scala.reflect.ClassTag
 
-import scala.concurrent.{ ExecutionContext, Future }
+import reactivemongo.core.errors.GenericDriverException
 
 import reactivemongo.api.{
   Collection,
@@ -38,15 +41,15 @@ import reactivemongo.api.{
   SerializationPack,
   Session
 }
-
+import reactivemongo.api.collections.QueryBuilderFactory
 import reactivemongo.api.commands.{
   CollStats,
-  Create,
-  CreateCollection,
   Command,
-  CommandException,
   CommandCodecs,
   CommandCodecsWithPack,
+  CommandException,
+  Create,
+  CreateCollection,
   DeleteCommand,
   InsertCommand,
   ResolvedCollectionCommand,
@@ -55,14 +58,10 @@ import reactivemongo.api.commands.{
   UpsertedFactory,
   WriteResult
 }
-
-import reactivemongo.core.errors.GenericDriverException
-
-import reactivemongo.api.collections.QueryBuilderFactory
-
-import reactivemongo.api.indexes.{ Index, IndexType }, IndexType.Ascending
-
 import reactivemongo.api.gridfs.{ FileToSave => SF, ReadFile => RF }
+import reactivemongo.api.indexes.{ Index, IndexType }
+
+import IndexType.Ascending
 
 /**
  * A GridFS store.

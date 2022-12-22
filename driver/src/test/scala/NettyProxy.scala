@@ -1,34 +1,31 @@
 package tests
 
-import java.lang.{ Boolean => JBool }
-
 import java.net.InetSocketAddress
+
+import java.lang.{ Boolean => JBool }
 
 import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
 
-import scala.concurrent.{ Future, ExecutionContext, Promise }
+import scala.concurrent.{ ExecutionContext, Future, Promise }
 
-import reactivemongo.io.netty.util.Version
+import reactivemongo.io.netty.bootstrap.{ Bootstrap, ServerBootstrap }
 import reactivemongo.io.netty.buffer.Unpooled
-
 import reactivemongo.io.netty.channel.{
   Channel,
   ChannelFuture,
-  ChannelOption,
   ChannelFutureListener,
   ChannelHandlerContext,
+  ChannelInboundHandlerAdapter,
   ChannelInitializer,
-  ChannelInboundHandlerAdapter
+  ChannelOption
 }
-
-import reactivemongo.io.netty.bootstrap.{ Bootstrap, ServerBootstrap }
-
 import reactivemongo.io.netty.channel.nio.NioEventLoopGroup
 import reactivemongo.io.netty.channel.socket.nio.{
-  NioSocketChannel,
-  NioServerSocketChannel
+  NioServerSocketChannel,
+  NioSocketChannel
 }
+import reactivemongo.io.netty.util.Version
 
 final class NettyProxy(
     localAddresses: Seq[InetSocketAddress],

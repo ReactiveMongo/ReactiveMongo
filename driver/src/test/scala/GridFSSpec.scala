@@ -3,13 +3,10 @@ import java.io.ByteArrayInputStream
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 
-import reactivemongo.api.bson.BSONDocument
-
 import reactivemongo.api.{ Cursor, DB, WrappedCursor }
-
-import reactivemongo.api.tests.{ pack, newBuilder }
-
+import reactivemongo.api.bson.BSONDocument
 import reactivemongo.api.gridfs.FileToSave
+import reactivemongo.api.tests.{ newBuilder, pack }
 
 import org.specs2.concurrent.ExecutionEnv
 

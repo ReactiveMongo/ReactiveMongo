@@ -21,10 +21,10 @@ import scala.util.control.NonFatal
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.FiniteDuration
 
+import reactivemongo.core.errors.GenericDriverException
+
 import reactivemongo.api._
 import reactivemongo.api.commands.CommandCodecs
-
-import reactivemongo.core.errors.GenericDriverException
 
 trait GenericCollectionProducer[
     P <: SerializationPack,

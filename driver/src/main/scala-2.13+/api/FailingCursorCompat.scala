@@ -1,10 +1,9 @@
 package reactivemongo.api
 
-import scala.annotation.unused
-
-import scala.concurrent.{ ExecutionContext, Future }
-
 import scala.collection.Factory
+
+import scala.annotation.unused
+import scala.concurrent.{ ExecutionContext, Future }
 
 private[api] trait FailingCursorCompat[T] { cursor: FailingCursor[T] =>
 

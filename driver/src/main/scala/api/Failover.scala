@@ -1,13 +1,12 @@
 package reactivemongo.api
 
-import scala.util.{ Try, Failure, Success }
+import scala.util.{ Failure, Success, Try }
 import scala.util.control.NonFatal
 
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
 import akka.pattern.after
-
 import reactivemongo.util.LazyLogger
 
 private[reactivemongo] final class Failover[A](
