@@ -162,32 +162,31 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
   private val nodeSetUpdated: NodeSetHandler =
     listener.fold[NodeSetHandler]({ (event: String, _, _) =>
       updateHistory(event); ()
-    }) {
-      l =>
-        { (event: String, previous: NodeSetInfo, updated: NodeSet) =>
-          updateHistory(event)
+    }) { l =>
+      { (event: String, previous: NodeSetInfo, updated: NodeSet) =>
+        updateHistory(event)
 
-          if (
-            context != null && context.system != null /* Akka workaround */
-          ) {
-            scheduler.scheduleOnce(1.second) {
-              requestTracker.withAwaiting { (responses, channels) =>
-                @SuppressWarnings(Array("UnsafeTraversableMethods"))
-                def maxAwaitingPerChannel = {
-                  if (channels.isEmpty) 0
-                  else channels.map(_._2).max
-                }
-
-                _setInfo = updated.info
-                  .withAwaitingRequests(responses.size, maxAwaitingPerChannel)
+        if (
+          context != null && context.system != null /* Akka workaround */
+        ) {
+          scheduler.scheduleOnce(1.second) {
+            requestTracker.withAwaiting { (responses, channels) =>
+              @SuppressWarnings(Array("UnsafeTraversableMethods"))
+              def maxAwaitingPerChannel = {
+                if (channels.isEmpty) 0
+                else channels.map(_._2).max
               }
 
-              l.nodeSetUpdated(supervisor, name, previous, _setInfo)
+              _setInfo = updated.info
+                .withAwaitingRequests(responses.size, maxAwaitingPerChannel)
             }
-          }
 
-          ()
+            l.nodeSetUpdated(supervisor, name, previous, _setInfo)
+          }
         }
+
+        ()
+      }
     }
 
   @inline private def userConnectionsPerNode = options.nbChannelsPerNode

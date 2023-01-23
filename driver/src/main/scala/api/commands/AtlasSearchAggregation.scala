@@ -791,7 +791,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
 
         def clauseElm(c: Compound.Clause): Unit = {
           import c._1.{ toString => clauseType },
-          c._2.{ _1 => firstOp, _2 => ops }
+            c._2.{ _1 => firstOp, _2 => ops }
 
           elms += elm(
             clauseType,
