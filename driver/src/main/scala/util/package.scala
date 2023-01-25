@@ -131,34 +131,33 @@ package object util extends UtilCompat {
   private[reactivemongo] def dnsResolve(
       srvPrefix: String = "_mongodb._tcp",
       timeout: FiniteDuration = dnsTimeout
-    ): SRVRecordResolver = {
-    implicit ec: ExecutionContext =>
-      { (name: String) =>
-        val service = Name.fromConstantString(name + '.')
+    ): SRVRecordResolver = { implicit ec: ExecutionContext =>
+    { (name: String) =>
+      val service = Name.fromConstantString(name + '.')
 
-        if (service.labels < 3) {
-          Future.failed[Array[Record]](
-            new GenericDriverException(
-              s"Invalid DNS service name (e.g. 'service.domain.tld'): $service"
-            )
+      if (service.labels < 3) {
+        Future.failed[Array[Record]](
+          new GenericDriverException(
+            s"Invalid DNS service name (e.g. 'service.domain.tld'): $service"
           )
+        )
 
-        } else
-          Future {
-            val srvName =
-              Name.concatenate(Name.fromConstantString(srvPrefix), service)
+      } else
+        Future {
+          val srvName =
+            Name.concatenate(Name.fromConstantString(srvPrefix), service)
 
-            val lookup = new Lookup(srvName, Type.SRV)
+          val lookup = new Lookup(srvName, Type.SRV)
 
-            lookup.setResolver {
-              val r = Lookup.getDefaultResolver
-              r.setTimeout(java.time.Duration ofSeconds timeout.toSeconds)
-              r
-            }
-
-            lookup.run()
+          lookup.setResolver {
+            val r = Lookup.getDefaultResolver
+            r.setTimeout(java.time.Duration ofSeconds timeout.toSeconds)
+            r
           }
-      }
+
+          lookup.run()
+        }
+    }
   }
 
   type TXTResolver = String => Future[ListSet[String]]
