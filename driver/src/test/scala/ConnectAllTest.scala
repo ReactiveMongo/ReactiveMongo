@@ -42,13 +42,12 @@ trait ConnectAllTest { _self: NodeSetSpec =>
       connectAll(sys, _)
     }
 
-    withNodeSet("connect all the nodes with synchronization") {
-      sys =>
-        { ns =>
-          ns.synchronized {
-            connectAll(sys, ns)
-          }
+    withNodeSet("connect all the nodes with synchronization") { sys =>
+      { ns =>
+        ns.synchronized {
+          connectAll(sys, ns)
         }
+      }
     }
 
     { // Make sure closed channels are properly handled

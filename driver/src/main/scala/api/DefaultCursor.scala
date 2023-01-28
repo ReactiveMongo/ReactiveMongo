@@ -494,14 +494,13 @@ private[reactivemongo] object DefaultCursor {
             }
           }
         }
-      } else {
-        (from: Int, _: Int, req32: ExpectingResponse) =>
-          { implicit ec: ExecutionContext =>
-            base(ec)(req32).map {
-              // Normalizes as 'new' cursor doesn't indicate such property
-              _.startingFrom(from)
-            }
+      } else { (from: Int, _: Int, req32: ExpectingResponse) =>
+        { implicit ec: ExecutionContext =>
+          base(ec)(req32).map {
+            // Normalizes as 'new' cursor doesn't indicate such property
+            _.startingFrom(from)
           }
+        }
       }
     }
 

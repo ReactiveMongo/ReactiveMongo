@@ -621,7 +621,7 @@ object MongoConnection {
           options: MongoConnectionOptions,
           ignoredOptions: List[String],
           db: Option[String]
-      ) =>
+        ) =>
         uriBuilder(hosts, options, ignoredOptions, db).recoverWith {
           case cause: IllegalArgumentException =>
             Future.failed[URI[T]](
