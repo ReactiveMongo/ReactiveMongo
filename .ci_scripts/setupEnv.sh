@@ -31,7 +31,7 @@ MONGO_CONF_SUFFIX="26"
 
 M3P=(v3 v4 v5 v6)
 
-if [ ${M3P[@]} =~ "v$MONGO_VER" ]; then
+if [[ ${M3P[@]} =~ "v$MONGO_VER" ]]; then
     MONGO_CONF_SUFFIX="3"
 fi
 
