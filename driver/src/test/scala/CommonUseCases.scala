@@ -10,7 +10,9 @@ import org.specs2.concurrent.ExecutionEnv
 
 import _root_.tests.Common
 
-final class CommonUseCases(implicit ee: ExecutionEnv)
+final class CommonUseCases(
+    implicit
+    ee: ExecutionEnv)
     extends org.specs2.mutable.Specification
     with org.specs2.specification.AfterAll {
 

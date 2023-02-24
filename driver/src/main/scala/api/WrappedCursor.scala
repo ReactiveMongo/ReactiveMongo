@@ -47,8 +47,14 @@ trait WrappedCursor[T] extends Cursor[T] with WrappedCursorCompat[T] {
       ec: ExecutionContext
     ): Future[A] = wrappee.foldWhileM(z, maxDocs)(suc, err)
 
-  final def head(implicit ec: ExecutionContext): Future[T] = wrappee.head
+  final def head(
+      implicit
+      ec: ExecutionContext
+    ): Future[T] = wrappee.head
 
-  final def headOption(implicit ec: ExecutionContext): Future[Option[T]] =
+  final def headOption(
+      implicit
+      ec: ExecutionContext
+    ): Future[Option[T]] =
     wrappee.headOption
 }

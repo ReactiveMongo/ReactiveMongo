@@ -140,7 +140,11 @@ trait GenericCollection[P <: SerializationPack]
    * @param pwriter the writer for the projection
    * @return $returnQueryBuilder
    */
-  def find[S](selector: S)(implicit swriter: pack.Writer[S]): QueryBuilder =
+  def find[S](
+      selector: S
+    )(implicit
+      swriter: pack.Writer[S]
+    ): QueryBuilder =
     find(selector, Option.empty[pack.Document])
 
   /**

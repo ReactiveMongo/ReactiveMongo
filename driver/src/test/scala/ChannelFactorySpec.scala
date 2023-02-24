@@ -15,7 +15,9 @@ import org.specs2.specification.AfterAll
 import _root_.tests.{ Common, NettyEmbedder }
 import akka.actor.Actor
 
-final class ChannelFactorySpec(implicit ee: ExecutionEnv)
+final class ChannelFactorySpec(
+    implicit
+    ee: ExecutionEnv)
     extends org.specs2.mutable.Specification
     with AfterAll {
 

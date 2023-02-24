@@ -577,7 +577,11 @@ private[reactivemongo] object DefaultCursor {
       }
     }
 
-    def killCursor(id: Long)(implicit ec: ExecutionContext): Unit =
+    def killCursor(
+        id: Long
+      )(implicit
+        ec: ExecutionContext
+      ): Unit =
       killCursors(id, "Cursor")
 
     private def killCursors(
@@ -612,7 +616,10 @@ private[reactivemongo] object DefaultCursor {
       }
     }
 
-    def head(implicit ec: ExecutionContext): Future[A] =
+    def head(
+        implicit
+        ec: ExecutionContext
+      ): Future[A] =
       makeRequest(1).flatMap { response =>
         val result = documentIterator(response)
 
@@ -621,7 +628,10 @@ private[reactivemongo] object DefaultCursor {
         } else Future(result.next())
       }
 
-    final def headOption(implicit ec: ExecutionContext): Future[Option[A]] =
+    final def headOption(
+        implicit
+        ec: ExecutionContext
+      ): Future[Option[A]] =
       makeRequest(1).flatMap { response =>
         val result = documentIterator(response)
 

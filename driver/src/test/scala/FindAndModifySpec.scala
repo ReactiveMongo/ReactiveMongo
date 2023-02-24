@@ -7,7 +7,9 @@ import reactivemongo.api.tests.{ builder, decoder, pack, reader, writer }
 
 import org.specs2.concurrent.ExecutionEnv
 
-final class FindAndModifySpec(implicit ee: ExecutionEnv)
+final class FindAndModifySpec(
+    implicit
+    ee: ExecutionEnv)
     extends org.specs2.mutable.Specification {
 
   "FindAndModify".title
@@ -41,7 +43,11 @@ final class FindAndModifySpec(implicit ee: ExecutionEnv)
       )
     }
 
-    def writeDocument[T](value: T)(implicit w: pack.Writer[T]) =
+    def writeDocument[T](
+        value: T
+      )(implicit
+        w: pack.Writer[T]
+      ) =
       pack.serialize(value, w)
 
     val jack1 = Person("Jack", "London", 27)

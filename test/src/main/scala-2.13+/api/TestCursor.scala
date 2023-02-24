@@ -80,10 +80,16 @@ class TestCursor[T] extends Cursor[T] {
       ctx: ExecutionContext
     ): Future[A] = Future.failed[A](NoSuchResultException)
 
-  def head(implicit ctx: ExecutionContext): Future[T] =
+  def head(
+      implicit
+      ctx: ExecutionContext
+    ): Future[T] =
     Future.failed[T](NoSuchResultException)
 
-  def headOption(implicit ctx: ExecutionContext): Future[Option[T]] =
+  def headOption(
+      implicit
+      ctx: ExecutionContext
+    ): Future[Option[T]] =
     Future.failed[Option[T]](NoSuchResultException)
 
   def peek[M[_]](

@@ -36,7 +36,9 @@ import org.specs2.matcher.MatchResult
 import akka.actor.ActorRef
 import akka.testkit.TestActorRef
 
-final class NodeSetSpec(implicit val ee: ExecutionEnv)
+final class NodeSetSpec(
+    implicit
+    val ee: ExecutionEnv)
     extends org.specs2.mutable.Specification
     with ConnectAllTest
     with UnresponsiveSecondaryTest {

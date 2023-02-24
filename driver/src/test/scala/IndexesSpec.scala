@@ -13,7 +13,9 @@ import org.specs2.concurrent.ExecutionEnv
 
 import IndexType.{ Hashed, Geo2D, Geo2DSpherical }
 
-final class IndexesSpec(implicit ee: ExecutionEnv)
+final class IndexesSpec(
+    implicit
+    ee: ExecutionEnv)
     extends org.specs2.mutable.Specification
     with org.specs2.specification.AfterAll {
 

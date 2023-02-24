@@ -8,7 +8,9 @@ import reactivemongo.api.collections.BulkOps._
 
 import org.specs2.concurrent.ExecutionEnv
 
-final class BulkOpsSpec(implicit ee: ExecutionEnv)
+final class BulkOpsSpec(
+    implicit
+    ee: ExecutionEnv)
     extends org.specs2.mutable.Specification {
 
   "Bulk operations".title

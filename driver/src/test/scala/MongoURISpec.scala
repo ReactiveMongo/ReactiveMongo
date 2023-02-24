@@ -21,7 +21,9 @@ import org.specs2.specification.core.Fragments
 
 import MongoConnection.URIParsingException
 
-final class MongoURISpec(implicit ee: ExecutionEnv)
+final class MongoURISpec(
+    implicit
+    ee: ExecutionEnv)
     extends org.specs2.mutable.Specification {
 
   "Mongo URI".title

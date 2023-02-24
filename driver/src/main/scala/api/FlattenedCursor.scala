@@ -7,7 +7,10 @@ class FlattenedCursor[T](
     extends Cursor[T]
     with FlattenedCursorCompat[T] {
 
-  final def head(implicit ec: ExecutionContext): Future[T] =
+  final def head(
+      implicit
+      ec: ExecutionContext
+    ): Future[T] =
     cursor.flatMap(_.head)
 
   final override def headOption(

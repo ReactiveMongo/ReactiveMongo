@@ -2146,7 +2146,11 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        *   coll.AggregationFramework.AtlasSearch.Range.greaterThan(2)
        * }}}
        */
-      def greaterThan[T](value: T)(implicit w: Writer[T]): Start =
+      def greaterThan[T](
+          value: T
+        )(implicit
+          w: Writer[T]
+        ): Start =
         new Start("gt", w.write(value))
 
       /**
@@ -2157,7 +2161,11 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        *   coll.AggregationFramework.AtlasSearch.Range.greaterThanOrEqual(1.23D)
        * }}}
        */
-      def greaterThanOrEqual[T](value: T)(implicit w: Writer[T]): Start =
+      def greaterThanOrEqual[T](
+          value: T
+        )(implicit
+          w: Writer[T]
+        ): Start =
         new Start("gte", w.write(value))
 
       /**
@@ -2168,7 +2176,11 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        *   coll.AggregationFramework.AtlasSearch.Range.lessThan(10)
        * }}}
        */
-      def lessThan[T](value: T)(implicit w: Writer[T]): End =
+      def lessThan[T](
+          value: T
+        )(implicit
+          w: Writer[T]
+        ): End =
         new End("lt", w.write(value))
 
       /**
@@ -2179,7 +2191,11 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
        *   coll.AggregationFramework.AtlasSearch.Range.lessThanOrEqual(7.5D)
        * }}}
        */
-      def lessThanOrEqual[T](value: T)(implicit w: Writer[T]): End =
+      def lessThanOrEqual[T](
+          value: T
+        )(implicit
+          w: Writer[T]
+        ): End =
         new End("lte", w.write(value))
 
       final class Start private[api] (

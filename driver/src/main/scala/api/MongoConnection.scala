@@ -167,7 +167,10 @@ final class MongoConnection private[reactivemongo] (
    *   }
    * }}}
    */
-  def close()(implicit timeout: FiniteDuration): Future[_] = {
+  def close(
+    )(implicit
+      timeout: FiniteDuration
+    ): Future[_] = {
     if (!monitorInited) {
       Future.successful({})
     } else {
@@ -616,8 +619,7 @@ object MongoConnection {
     val seedList = uri.startsWith("mongodb+srv://")
 
     val createUri = {
-      (
-          hosts: ListSet[(String, Int)],
+      (hosts: ListSet[(String, Int)],
           options: MongoConnectionOptions,
           ignoredOptions: List[String],
           db: Option[String]

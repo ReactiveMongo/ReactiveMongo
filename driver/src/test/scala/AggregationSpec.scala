@@ -36,7 +36,9 @@ import org.specs2.specification.core.Fragments
 
 import IndexType._
 
-final class AggregationSpec(implicit ee: ExecutionEnv)
+final class AggregationSpec(
+    implicit
+    ee: ExecutionEnv)
     extends org.specs2.mutable.Specification
     with org.specs2.specification.AfterAll {
 
