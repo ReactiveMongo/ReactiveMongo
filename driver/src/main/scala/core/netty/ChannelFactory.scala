@@ -7,6 +7,7 @@ import java.lang.{ Boolean => JBool }
 import scala.util.{ Failure, Success, Try }
 
 import scala.concurrent.Promise
+import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.io.netty.bootstrap.Bootstrap
 import reactivemongo.io.netty.channel.{
@@ -48,7 +49,6 @@ private[reactivemongo] final class ChannelFactory(
 
   private val pack = reactivemongo.core.netty.Pack()
   private val parentGroup: EventLoopGroup = pack.eventLoopGroup()
-  private val childGroup: EventLoopGroup = pack.eventLoopGroup()
 
   private val logger = LazyLogger("reactivemongo.core.nodeset.ChannelFactory")
 
@@ -241,24 +241,23 @@ private[reactivemongo] final class ChannelFactory(
     .option(CONNECT_TIMEOUT_MILLIS, timeoutMs)
     .handler(this)
 
-  private[reactivemongo] def release(callback: Promise[Unit]): Unit = {
-    parentGroup
-      .shutdownGracefully()
-      .addListener(new GenericFutureListener[Future[Any]] {
-        def operationComplete(f: Future[Any]): Unit = {
-          childGroup
-            .shutdownGracefully()
-            .addListener(new GenericFutureListener[Future[Any]] {
-              def operationComplete(g: Future[Any]): Unit = {
-                callback.success({}); ()
-              }
-            })
+  private[reactivemongo] def release(
+      callback: Promise[Unit],
+      timeout: FiniteDuration
+    ): Unit = {
+    def ok(): Unit = { callback.success({}); () }
 
-          ()
-        }
-      })
+    if (parentGroup.iterator.hasNext) {
+      parentGroup
+        .shutdownGracefully(0L, timeout.length, timeout.unit)
+        .addListener(new GenericFutureListener[Future[Any]] {
+          def operationComplete(f: Future[Any]): Unit = ok()
+        })
 
-    ()
+      ()
+    } else {
+      ok()
+    }
   }
 
   @inline private def debug(msg: => String) =

@@ -310,7 +310,7 @@ package object tests { self =>
     ): Try[Channel] = factory.create(host, port, idleMS, receiver)
 
   @inline def releaseChannelFactory(f: ChannelFactory, clb: Promise[Unit]) =
-    f.release(clb)
+    f.release(clb, FiniteDuration(5, SECONDS))
 
   object IsMasterCommand
       extends reactivemongo.api.commands.IsMasterCommand[Pack]

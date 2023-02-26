@@ -64,10 +64,12 @@ final class DriverSpec(
 
     "start and close with one connection open (using raw URI)" in {
       newAsyncDriver().close(timeout) must not(throwA[Exception])
+        .awaitFor(timeout)
     }
 
     "start and close with multiple connections open" in {
       newAsyncDriver().close(timeout) must not(throwA[Exception])
+        .awaitFor(timeout)
     }
 
     "use the failover strategy defined in the options" in {
