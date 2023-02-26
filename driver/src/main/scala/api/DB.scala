@@ -148,7 +148,10 @@ final class DB private[api] (
    *
    * @return The database reference updated with a new session
    */
-  @inline def startSession()(implicit ec: ExecutionContext): Future[DB] =
+  @inline def startSession(
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] =
     startSession(failIfAlreadyStarted = false)
 
   /**
@@ -321,7 +324,10 @@ final class DB private[api] (
    *
    * @return The database reference with transaction aborted (but not session)
    */
-  @inline def abortTransaction()(implicit ec: ExecutionContext): Future[DB] =
+  @inline def abortTransaction(
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] =
     abortTransaction(failIfNotStarted = false)
 
   /**
@@ -350,7 +356,10 @@ final class DB private[api] (
    *
    * @return The database reference with transaction commited (but not session)
    */
-  @inline def commitTransaction()(implicit ec: ExecutionContext): Future[DB] =
+  @inline def commitTransaction(
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] =
     commitTransaction(failIfNotStarted = false)
 
   /**
@@ -465,7 +474,10 @@ final class DB private[api] (
    *
    * @return The database reference with session ended
    */
-  @inline def endSession()(implicit ec: ExecutionContext): Future[DB] =
+  @inline def endSession(
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] =
     endSession(failIfNotStarted = false)
 
   /**
@@ -494,7 +506,10 @@ final class DB private[api] (
    *
    * @return The database reference with session aborted
    */
-  @inline def killSession()(implicit ec: ExecutionContext): Future[DB] =
+  @inline def killSession(
+    )(implicit
+      ec: ExecutionContext
+    ): Future[DB] =
     killSession(failIfNotStarted = false)
 
   /**

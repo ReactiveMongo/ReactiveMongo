@@ -187,7 +187,11 @@ private[api] final class FoldResponses[T](
   /**
    * Enqueues a `message` to be processed while fold the cursor results.
    */
-  private def ![M <: Msg](message: M)(implicit delay: Delay.Aux[M]): Unit = {
+  private def ![M <: Msg](
+      message: M
+    )(implicit
+      delay: Delay.Aux[M]
+    ): Unit = {
     actorSys.scheduler.scheduleOnce(delay.value)(handle(message))(ec)
 
     ()

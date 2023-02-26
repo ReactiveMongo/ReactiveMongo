@@ -10,7 +10,9 @@ import reactivemongo.api.tests.{ newBuilder, pack }
 
 import org.specs2.concurrent.ExecutionEnv
 
-final class GridFSSpec(implicit ee: ExecutionEnv)
+final class GridFSSpec(
+    implicit
+    ee: ExecutionEnv)
     extends org.specs2.mutable.Specification
     with org.specs2.specification.AfterAll {
 

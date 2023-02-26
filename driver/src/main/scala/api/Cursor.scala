@@ -234,7 +234,10 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * }
    * }}}
    */
-  def head(implicit ec: ExecutionContext): Future[T]
+  def head(
+      implicit
+      ec: ExecutionContext
+    ): Future[T]
 
   /**
    * $getHead, if any.
@@ -254,7 +257,10 @@ trait Cursor[T] extends CursorCompatAPI[T] {
    * }
    * }}}
    */
-  def headOption(implicit ec: ExecutionContext): Future[Option[T]]
+  def headOption(
+      implicit
+      ec: ExecutionContext
+    ): Future[Option[T]]
 }
 
 /** Cursor companion object */

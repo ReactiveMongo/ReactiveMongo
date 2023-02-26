@@ -125,8 +125,8 @@ private[reactivemongo] object Response {
       _documents: ByteBuf,
       _info: ResponseInfo,
       ns: String,
-      private[core] cursor: BSONDocument,
-      private[core] preloaded: Seq[BSONDocument])
+      private[core] val cursor: BSONDocument,
+      private[core] val preloaded: Seq[BSONDocument])
       extends Response(_header, _reply, _documents, _info) {
 
     private[reactivemongo] def cursorID(id: Long): Response =
@@ -140,7 +140,7 @@ private[reactivemongo] object Response {
       _header: MessageHeader,
       _reply: Reply,
       _info: ResponseInfo,
-      private[reactivemongo] cause: DatabaseException)
+      private[reactivemongo] val cause: DatabaseException)
       extends Response(_header, _reply, Unpooled.EMPTY_BUFFER, _info) {
     override lazy val error: Option[DatabaseException] = Some(cause)
 

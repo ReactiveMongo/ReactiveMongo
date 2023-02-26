@@ -74,9 +74,15 @@ private[api] final class FailingCursor[T](
       ec: ExecutionContext
     ): Future[A] = failure
 
-  def head(implicit ec: ExecutionContext): Future[T] = failure
+  def head(
+      implicit
+      ec: ExecutionContext
+    ): Future[T] = failure
 
-  def headOption(implicit ec: ExecutionContext): Future[Option[T]] = failure
+  def headOption(
+      implicit
+      ec: ExecutionContext
+    ): Future[Option[T]] = failure
 
 }
 

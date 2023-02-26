@@ -38,7 +38,10 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    *   implicit ec: ExecutionContext): Future[Unit] = db.drop()
    * }}}
    */
-  final def drop()(implicit ec: ExecutionContext): Future[Unit] =
+  final def drop(
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Unit] =
     Command
       .run(internalSerializationPack, failoverStrategy)
       .apply(self, DropDatabase, ReadPreference.primary)
@@ -91,7 +94,10 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    *   })
    * }}}
    */
-  final def indexesManager(implicit ec: ExecutionContext) = IndexesManager(self)
+  final def indexesManager(
+      implicit
+      ec: ExecutionContext
+    ) = IndexesManager(self)
 
   private[api] def indexesManager[P <: SerializationPack](
       pack: P

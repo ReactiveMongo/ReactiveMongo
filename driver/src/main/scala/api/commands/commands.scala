@@ -393,7 +393,11 @@ private[reactivemongo] object Command {
       } yield ResponseResult(resp, cursor.numberToReturn, result)
     }
 
-    def rawCommand[T](input: T)(implicit writer: pack.Writer[T]): RawCommand =
+    def rawCommand[T](
+        input: T
+      )(implicit
+        writer: pack.Writer[T]
+      ): RawCommand =
       RawCommand(pack.serialize(input, writer))
 
     case class RawCommand(document: pack.Document) extends Command {

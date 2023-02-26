@@ -15,7 +15,9 @@ import reactivemongo.api.tests.{ commands, decoder }
 
 import org.specs2.concurrent.ExecutionEnv
 
-final class CommandSpec(implicit ee: ExecutionEnv)
+final class CommandSpec(
+    implicit
+    ee: ExecutionEnv)
     extends org.specs2.mutable.Specification {
 
   "Commands".title

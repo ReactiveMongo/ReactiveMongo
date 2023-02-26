@@ -8,7 +8,9 @@ import reactivemongo.api.commands.CommandException
 
 import org.specs2.concurrent.ExecutionEnv
 
-final class DatabaseSpec(implicit protected val ee: ExecutionEnv)
+final class DatabaseSpec(
+    implicit
+    protected val ee: ExecutionEnv)
     extends org.specs2.mutable.Specification
     with DBSessionSpec {
 

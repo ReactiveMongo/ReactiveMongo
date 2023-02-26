@@ -43,7 +43,10 @@ final class NettyProxy(
 
   @inline def isStarted: Boolean = state.future.value.exists(_.isSuccess)
 
-  def start()(implicit ec: ExecutionContext): Future[State] = {
+  def start(
+    )(implicit
+      ec: ExecutionContext
+    ): Future[State] = {
     if (starting.getAndSet(true)) {
       state.future
     } else {

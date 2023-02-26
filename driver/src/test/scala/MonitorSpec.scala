@@ -30,7 +30,9 @@ import _root_.tests.Common
 import akka.actor.Actor
 import akka.testkit.TestActorRef
 
-final class MonitorSpec(implicit ee: ExecutionEnv)
+final class MonitorSpec(
+    implicit
+    ee: ExecutionEnv)
     extends org.specs2.mutable.Specification {
 
   "Monitor".title

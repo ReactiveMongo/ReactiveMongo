@@ -6,7 +6,9 @@ import reactivemongo.api.bson.BSONDocument
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.specification.core.Fragments
 
-final class ProtocolSpec(implicit ee: ExecutionEnv)
+final class ProtocolSpec(
+    implicit
+    ee: ExecutionEnv)
     extends org.specs2.mutable.Specification {
 
   "Protocol".title

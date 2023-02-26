@@ -446,7 +446,10 @@ sealed trait GridFS[P <: SerializationPack]
    * @return A future containing true if the index was created, false if it already exists.
    */
   @SuppressWarnings(Array("VariableShadowing"))
-  def ensureIndex()(implicit ec: ExecutionContext): Future[Boolean] = {
+  def ensureIndex(
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Boolean] = {
     val indexMngr = db.indexesManager[P](pack)(ec)
 
     for {
@@ -515,7 +518,10 @@ sealed trait GridFS[P <: SerializationPack]
    * exists on the database.
    */
   @SuppressWarnings(Array("VariableShadowing"))
-  def exists(implicit ec: ExecutionContext): Future[Boolean] = (for {
+  def exists(
+      implicit
+      ec: ExecutionContext
+    ): Future[Boolean] = (for {
     _ <- stats(chunkColl).filter { c => c.size > 0 || c.nindexes > 0 }
     _ <- stats(fileColl).filter { f => f.size > 0 || f.nindexes > 0 }
   } yield true).recover { case _ => false }
@@ -697,7 +703,11 @@ sealed trait GridFS[P <: SerializationPack]
   private implicit lazy val createWriter: pack.Writer[ResolvedCollectionCommand[Create]] =
     CreateCollection.writer[pack.type](pack)
 
-  private def create(coll: Collection)(implicit ec: ExecutionContext) =
+  private def create(
+      coll: Collection
+    )(implicit
+      ec: ExecutionContext
+    ) =
     runner(coll, createCollCmd, defaultReadPreference).recover {
       case CommandException.Code(48 /* already exists */ ) => ()
 
@@ -714,7 +724,11 @@ sealed trait GridFS[P <: SerializationPack]
   private implicit lazy val collStatsReader: pack.Reader[CollectionStats] =
     CollStats.reader[pack.type](pack)
 
-  @inline private def stats(coll: Collection)(implicit ec: ExecutionContext) =
+  @inline private def stats(
+      coll: Collection
+    )(implicit
+      ec: ExecutionContext
+    ) =
     runner(coll, collStatsCmd, defaultReadPreference)
 
   // ---

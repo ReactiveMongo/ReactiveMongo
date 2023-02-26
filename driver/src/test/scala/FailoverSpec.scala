@@ -6,7 +6,9 @@ import reactivemongo.api.tests._
 
 import org.specs2.concurrent.ExecutionEnv
 
-final class FailoverSpec(implicit ee: ExecutionEnv)
+final class FailoverSpec(
+    implicit
+    ee: ExecutionEnv)
     extends org.specs2.mutable.Specification {
 
   "Failover".title

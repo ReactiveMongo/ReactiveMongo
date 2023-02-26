@@ -42,7 +42,10 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *   }
    * }}}
    */
-  final def create()(implicit ec: ExecutionContext): Future[Unit] =
+  final def create(
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Unit] =
     command(self, Create(None), ReadPreference.primary)
 
   /**
@@ -114,7 +117,10 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    * The returned future will be completed with an error
    * if this collection does not exist.
    */
-  def drop()(implicit ec: ExecutionContext): Future[Unit] =
+  def drop(
+    )(implicit
+      ec: ExecutionContext
+    ): Future[Unit] =
     drop(false).map(_ => {})
 
   private implicit lazy val dropWriter: pack.Writer[ResolvedCollectionCommand[DropCollection.type]] =
@@ -201,7 +207,10 @@ private[api] trait CollectionMetaCommands { self: Collection =>
    *   coll.stats().map(_.capped)
    * }}}
    */
-  final def stats()(implicit ec: ExecutionContext): Future[CollectionStats] =
+  final def stats(
+    )(implicit
+      ec: ExecutionContext
+    ): Future[CollectionStats] =
     command(self, new CollStats(None), ReadPreference.primary)
 
   /**

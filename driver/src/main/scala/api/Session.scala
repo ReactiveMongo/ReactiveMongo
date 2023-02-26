@@ -102,11 +102,13 @@ private[reactivemongo] sealed class NodeSetSession(
   final def transaction: Try[SessionTransaction] =
     Try(txState.get()).filter(_.isStarted)
 
-  override private[reactivemongo] val startTransaction: (WriteConcern, Option[String]) => Try[(SessionTransaction, Boolean)] = {
-    (wc, _) =>
-      val startOp = new Session.IncTxnNumberIfNotStarted(wc)
+  override private[reactivemongo] val startTransaction: (
+      WriteConcern,
+      Option[String]
+    ) => Try[(SessionTransaction, Boolean)] = { (wc, _) =>
+    val startOp = new Session.IncTxnNumberIfNotStarted(wc)
 
-      Try(txState updateAndGet startOp).map(_ -> startOp.updated)
+    Try(txState updateAndGet startOp).map(_ -> startOp.updated)
   }
 
   final override private[reactivemongo] def transactionToFlag(): Boolean = {
@@ -125,7 +127,10 @@ private[reactivemongo] final class DistributedSession(
     causalConsistency: Boolean = true)
     extends NodeSetSession(lsid, causalConsistency) {
 
-  final override private[reactivemongo] val startTransaction: (WriteConcern, Option[String]) => Try[(SessionTransaction, Boolean)] = {
+  final override private[reactivemongo] val startTransaction: (
+      WriteConcern,
+      Option[String]
+    ) => Try[(SessionTransaction, Boolean)] = {
     case (wc, Some(txNode)) => {
       val startOp = new Session.IncTxnNumberAndPinNodeIfNotStarted(wc, txNode)
 

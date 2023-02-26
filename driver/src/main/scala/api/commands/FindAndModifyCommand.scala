@@ -139,7 +139,10 @@ trait FindAndModifyCommand[P <: SerializationPack] {
      * @param reader the reader of `T`
      * @tparam T the type to read the result as
      */
-    def result[T](implicit reader: pack.Reader[T]): Option[T] =
+    def result[T](
+        implicit
+        reader: pack.Reader[T]
+      ): Option[T] =
       value.map(pack.deserialize(_, reader))
 
     override def equals(that: Any): Boolean = that match {
