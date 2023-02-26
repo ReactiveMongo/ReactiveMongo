@@ -315,7 +315,11 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     }
   }
 
-  private def release(parentEvent: String): Future[NodeSet] = {
+  private def release(
+      parentEvent: String,
+      timeout: FiniteDuration
+    ): Future[NodeSet] = {
+
     if (closingFactory) {
       Future.successful(_nodeSet)
     } else {
@@ -338,16 +342,16 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
       // close all connections
       val done = Promise[Unit]()
+      def releaseFactory(): Unit = factory.release(done, timeout)
 
-      if (ns.nodes.nonEmpty) {
+      if (ns.nodes.exists(_.connections.nonEmpty)) {
         val relistener = new ChannelGroupFutureListener {
-          def operationComplete(future: ChannelGroupFuture): Unit =
-            factory.release(done)
+          def operationComplete(future: ChannelGroupFuture) = releaseFactory()
         }
 
         allChannelGroup(ns).close().addListener(relistener)
       } else {
-        done.success({})
+        releaseFactory()
       }
 
       // fail all requests waiting for a response
@@ -443,7 +447,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     info("Stopping the MongoDBSystem")
 
     try {
-      Await.result(release("PostStop"), heartbeatFrequency)
+      Await.result(release("PostStop", heartbeatFrequency), heartbeatFrequency)
     } catch {
       case NonFatal(_: TimeoutException) =>
         warn("Fails to stop in a timely manner")
@@ -722,13 +726,13 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       ()
     }
 
-    case Close(src) => {
+    case req @ Close(src) => {
       debug(s"Received Close request from $src, closing connections")
 
       // moving to closing state
       context become closing
 
-      release("Close").onComplete {
+      release("Close", req.timeout).onComplete {
         case Success(ns) => {
           val connectedCon = ns.nodes.foldLeft(0) { _ + _.connected.size }
 
