@@ -2147,7 +2147,6 @@ db.accounts.aggregate([
       makePipe(AggregationFramework.PlanCacheStats) must_=== BSONDocument(
         f"$$planCacheStats" -> BSONDocument.empty
       )
-
     }
 
     f"be $$replaceWith" in {
@@ -2182,7 +2181,6 @@ db.accounts.aggregate([
       makePipe(Unset("foo", List("bar", "lorem"))) must_=== BSONDocument(
         f"$$unset" -> List("foo", "bar", "lorem")
       )
-
     }
 
     f"be $$sample" in {
@@ -2191,6 +2189,44 @@ db.accounts.aggregate([
       makePipe(Sample(2)) must_=== BSONDocument(
         f"$$sample" -> BSONDocument("size" -> 2)
       )
+    }
+
+    f"be $$unionWith" in {
+      import AggregationFramework.{ UnionWith, Match }
+
+      makePipe(
+        UnionWith("foo", List(Match(BSONDocument("bar" -> 1))))
+      ) must_=== BSONDocument(
+        f"$$unionWith" -> BSONDocument(
+          "coll" -> "foo",
+          "pipeline" -> List(
+            BSONDocument(f"$$match" -> BSONDocument("bar" -> 1))
+          )
+        )
+      )
+    }
+
+    f"be $$documents" in {
+      import AggregationFramework.Documents
+
+      makePipe(Documents(BSONString(f"$$foo"))) must_=== BSONDocument(
+        f"$$documents" -> f"$$foo"
+      )
+    }
+
+    f"be $$group" >> {
+      "with a single ID field" in {
+        import AggregationFramework.{ Group, MaxField }
+
+        makePipe(
+          Group("lorem")("foo" -> MaxField("bar"))
+        ) must_=== BSONDocument(
+          f"$$group" -> BSONDocument(
+            "_id" -> f"$$lorem",
+            "foo" -> BSONDocument(f"$$max" -> f"$$bar")
+          )
+        )
+      }
     }
   }
 

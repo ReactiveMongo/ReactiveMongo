@@ -28,6 +28,10 @@ import reactivemongo.api.{ PackSupport, SerializationPack }
  * @define lookupPipelineDescription Performs an [[https://docs.mongodb.com/manual/reference/operator/aggregation/lookup/#join-conditions-and-uncorrelated-sub-queries uncorrelated lookup]]
  *
  * @define matchDescription [[http://docs.mongodb.org/manual/reference/aggregation/match/#_S_match Filters]] out documents from the stream that do not match the predicate
+ *
+ * @define unionWithDescription [[https://docs.mongodb.com/manual/reference/operator/aggregation/unionWith/ \$unionWith]] stage
+ *
+ * @define documentsDescription [[https://docs.mongodb.com/manual/reference/operator/aggregation/documents/ \$documents]] stage
  */
 trait AggregationFramework[P <: SerializationPack]
     extends GroupAggregation[P]
@@ -595,6 +599,12 @@ trait AggregationFramework[P <: SerializationPack]
     def apply(identifiers: pack.Value)(ops: (String, GroupFunction)*): Group =
       new Group(identifiers)(ops: _*)
 
+    /**
+     * @param idField the name of the ID field (without \$ prefix)
+     * @params ops the sequence of operators specifying aggregate calculation
+     */
+    def apply(idField: String)(ops: (String, GroupFunction)*): Group =
+      new Group(builder.string("$" + idField))(ops: _*)
   }
 
   /**
@@ -1807,6 +1817,81 @@ trait AggregationFramework[P <: SerializationPack]
           }
         )
     }
+  }
+
+  /**
+   * $unionWithDescription
+   *
+   * @param collection the name of the collection
+   * @param pipeline the union pipeline
+   */
+  final class UnionWith private[api] (
+      val collection: String,
+      val pipeline: List[PipelineOperator])
+      extends PipelineOperator {
+
+    protected[reactivemongo] val makePipe = pipe(
+      f"$$unionWith",
+      builder.document {
+        import builder.{ elementProducer => element }
+
+        Seq[pack.ElementProducer](
+          element("coll", builder.string(collection)),
+          element("pipeline", builder.array(pipeline.map(_.makePipe)))
+        )
+      }
+    )
+
+    private lazy val tupled = collection -> pipeline
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        other.tupled == this.tupled
+
+      case _ => false
+    }
+
+    override def toString = s"UnionWith${tupled.toString}"
+  }
+
+  /**
+   * $unionWithDescription
+   */
+  object UnionWith {
+
+    def apply(collection: String, pipeline: List[PipelineOperator]): UnionWith =
+      new UnionWith(collection, pipeline)
+  }
+
+  /**
+   * $documentsDescription
+   *
+   * @param expression the documents expression
+   */
+  final class Documents private[api] (val expression: pack.Value)
+      extends PipelineOperator {
+
+    protected[reactivemongo] val makePipe = pipe(f"$$documents", expression)
+
+    override def hashCode: Int = expression.hashCode
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        other.expression == this.expression
+
+      case _ => false
+    }
+
+    override def toString = s"Documents(${expression.toString})"
+  }
+
+  /**
+   * $documentsDescription
+   */
+  object Documents {
+    def apply(expression: pack.Value): Documents = new Documents(expression)
   }
 
   /**
