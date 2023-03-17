@@ -139,7 +139,7 @@ object Compiler {
   )
 
   private lazy val excludeOpt: String => Boolean = { opt =>
-    opt.startsWith("-X") || opt.startsWith("-Y") ||
-    opt.startsWith("-W") || opt.startsWith("-P:silencer")
+    (opt.startsWith("-X") && opt != "-Xmax-classfile-name") ||
+    opt.startsWith("-Y") || opt.startsWith("-W") || opt.startsWith("-P")
   }
 }

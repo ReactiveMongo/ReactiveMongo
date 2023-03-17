@@ -78,14 +78,14 @@ object Publish {
       )
     ),
     Compile / doc / sources ~= {
-      _.filterNot { f =>
+      _.filter { f =>
         val n = f.getName
         n.indexOf("/external/") == -1
       }
     },
     Compile / doc / scalacOptions ++= Seq(
-      /*"-diagrams", */ "-implicits",
-      "-skip-by-id:samples"
+      /*"-diagrams", */ "-implicits"
+      // "-skip-by-id:samples"
     ),
     Compile / doc / scalacOptions ++= Opts.doc.title("ReactiveMongo API"),
     Compile / doc / scalacOptions ++= Opts.doc.version(

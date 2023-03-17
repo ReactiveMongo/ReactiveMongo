@@ -36,6 +36,7 @@ import org.specs2.specification.core.Fragments
 
 import IndexType._
 
+// TODO: Refactor integration test as stage serialization unit test
 final class AggregationSpec(
     implicit
     ee: ExecutionEnv)
