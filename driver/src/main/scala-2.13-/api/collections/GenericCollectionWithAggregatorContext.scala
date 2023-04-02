@@ -59,7 +59,6 @@ private[collections] trait GenericCollectionWithAggregatorContext[
    * @tparam T $resultTParam
    *
    * @param pipeline $pipelineParam
-   * @param otherOperators $otherOpsParam
    * @param cursor aggregation cursor option (optional)
    * @param explain $explainParam of the pipeline (default: `false`)
    * @param allowDiskUse $allowDiskUseParam (default: `false`)

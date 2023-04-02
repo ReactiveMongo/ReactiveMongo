@@ -20,7 +20,7 @@ object Common extends AutoPlugin {
   )
 
   val filter = { (ms: Seq[(File, String)]) =>
-    ms filter {
+    ms.filter {
       case (file, path) =>
         path != "logback.xml" && !path.startsWith("toignore") &&
         !path.startsWith("samples")
