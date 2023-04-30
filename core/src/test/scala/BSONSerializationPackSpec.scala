@@ -30,19 +30,20 @@ final class BSONSerializationPackSpec extends org.specs2.mutable.Specification {
         val reply =
           Reply(flags = 0, cursorID = 0, startingFrom = 0, numberReturned = 0)
 
+        val exception =
+          CommandException(BSONSerializationPack)("Foo", None, None)
+
         val cmdErr = Response.CommandError(
           msgHdr,
           reply,
           responseInfo,
-          CommandException(BSONSerializationPack)("Foo", None, None)
+          exception
         )
 
         BSONSerializationPack.readAndDeserialize(
           response = cmdErr,
           reader = BSONSerializationPack.IdentityReader
-        )
-
-        ok
+        ) must throwA(exception)
       }
     }
   }

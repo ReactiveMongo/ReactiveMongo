@@ -901,8 +901,21 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       ()
     }
 
-    case response: Response if (RequestIdGenerator.isMaster accepts response) =>
-      onIsMaster(response)
+    case response: Response
+        if (RequestIdGenerator.isMaster accepts response) => {
+
+      val resp: Option[IsMasterCommand.IsMasterResult] =
+        try {
+          Option(pack.readAndDeserialize(response, isMasterReader))
+        } catch {
+          case NonFatal(cause) =>
+            warn("Unexpected isMaster response", cause)
+
+            None
+        }
+
+      resp.foreach(onIsMaster(response, _))
+    }
 
     case err @ Response.CommandError(_, _, _, cause)
         if (RequestIdGenerator.authenticate accepts err) => {
@@ -1296,9 +1309,10 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
   private lazy val isMasterReader = IsMasterCommand.reader(pack)
 
-  private def onIsMaster(response: Response): Unit = {
-    val isMaster = pack.readAndDeserialize(response, isMasterReader)
-
+  private def onIsMaster(
+      response: Response,
+      isMaster: IsMasterCommand.IsMasterResult
+    ): Unit = {
     trace(s"IsMaster response document: $isMaster")
 
     val updated = {
