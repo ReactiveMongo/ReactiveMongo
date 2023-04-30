@@ -161,7 +161,7 @@ private[reactivemongo] class ResponseDecoder
     val reply =
       Reply(flags = 0, cursorID = 0L, startingFrom = 0, numberReturned = 1)
 
-    decodeReply(channelId, frame, header, reply)
+    decodeReplyPayload(channelId, frame, header, reply)
 
     // TODO: Checksum if hasChecksum
   }
@@ -170,10 +170,13 @@ private[reactivemongo] class ResponseDecoder
       channelId: Option[ChannelId],
       frame: ByteBuf,
       header: MessageHeader
-    ): Response =
-    decodeReply(channelId, frame, header, Reply(frame))
+    ): Response = {
+    val reply = Reply(frame) // parse
 
-  private def decodeReply(
+    decodeReplyPayload(channelId, frame, header, reply)
+  }
+
+  private def decodeReplyPayload(
       channelId: Option[ChannelId],
       frame: ByteBuf,
       header: MessageHeader,
@@ -211,7 +214,7 @@ private[reactivemongo] class ResponseDecoder
 
           doc.getAsOpt[BSONDocument]("cursor") match {
             case Some(cursor) if ok => {
-              val withCursor: Option[Response] = for {
+              def withCursor: Option[Response] = for {
                 id <- cursor.long("id")
                 ns <- cursor.string("ns")
 
@@ -226,7 +229,7 @@ private[reactivemongo] class ResponseDecoder
 
               docs.resetReaderIndex()
 
-              withCursor getOrElse Response(header, reply, docs, info)
+              withCursor.getOrElse(Response(header, reply, docs, info))
             }
 
             case Some(_) => failed
