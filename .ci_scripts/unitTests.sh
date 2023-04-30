@@ -19,7 +19,7 @@ if [ "$SCALA_VERSION" = "2.11.12" ]; then
     sbt ++$SCALA_VERSION ';error ;scalafixAll -check ;scalafmtSbtCheck ;scalafmtCheckAll' > /dev/null || (
         cat >> /dev/stdout <<EOF
 [ERROR] Scalafmt check failed, see differences above.
-To fix, format your sources using ./build scalafmtAll before submitting a pull request.
+To fix, format your sources using 'sbt scalafmtAll' before submitting a pull request.
 Additionally, please squash your commits (eg, use git commit --amend) if you're going to update this pull request.
 EOF
 

@@ -69,6 +69,9 @@ object BSONSerializationPack extends SerializationPack { self =>
             readAndDeserialize(ReadableBuffer(docs), reader)
         }
 
+      case Response.CommandError(_, _, _, cause) =>
+        throw cause
+
       case _ =>
         readAndDeserialize(ReadableBuffer(response.documents), reader)
     }
