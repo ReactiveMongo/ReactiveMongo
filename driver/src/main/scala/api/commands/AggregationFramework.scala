@@ -601,7 +601,7 @@ trait AggregationFramework[P <: SerializationPack]
 
     /**
      * @param idField the name of the ID field (without \$ prefix)
-     * @params ops the sequence of operators specifying aggregate calculation
+     * @param ops the sequence of operators specifying aggregate calculation
      */
     def apply(idField: String)(ops: (String, GroupFunction)*): Group =
       new Group(builder.string("$" + idField))(ops: _*)

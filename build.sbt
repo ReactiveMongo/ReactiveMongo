@@ -62,19 +62,18 @@ lazy val `ReactiveMongo-Test` = project
 
 // ---
 
-def docSettings = Documentation(excludes = Seq.empty).settings
-
 lazy val `ReactiveMongo-Root` = project
   .in(file("."))
   .enablePlugins(ScalaUnidocPlugin)
   .settings(
-    docSettings ++ Seq(
-      mimaPreviousArtifacts := Set.empty,
-      publishArtifact := false,
-      publishTo := None,
-      publishLocal := {},
-      publish := {}
-    )
+    ScalaUnidoc / unidoc / unidocProjectFilter := {
+      inAnyProject -- inProjects(benchmarks, `ReactiveMongo-Core`)
+    },
+    mimaPreviousArtifacts := Set.empty,
+    publishArtifact := false,
+    publishTo := None,
+    publishLocal := {},
+    publish := {}
   )
   .aggregate(`ReactiveMongo-Core`, `ReactiveMongo`, `ReactiveMongo-Test`)
 

@@ -91,5 +91,5 @@ object Common extends AutoPlugin {
       Compile / packageSrc / mappings ~= filter,
       Compile / packageDoc / mappings ~= filter,
       testFrameworks ~= { _.filterNot(_ == TestFrameworks.ScalaTest) }
-    ) ++ Publish.settings ++ Publish.mimaSettings
+    ) ++ Publish.settings ++ Publish.mimaSettings ++ new Documentation().settings
 }

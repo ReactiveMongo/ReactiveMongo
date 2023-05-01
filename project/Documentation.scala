@@ -1,29 +1,34 @@
 import sbt._
 import sbt.Keys._
 
-import sbtunidoc.{ ScalaUnidocPlugin => UnidocPlugin }
-import sbtunidoc.BaseUnidocPlugin.autoImport._ //
+final class Documentation {
 
-final class Documentation(excludes: Seq[ProjectReference]) {
-  import UnidocPlugin.autoImport.ScalaUnidoc
-
-  val settings = UnidocPlugin.projectSettings ++ Seq(
-    ScalaUnidoc / unidoc / unidocProjectFilter := {
-      inAnyProject -- inProjects(excludes: _*)
-    },
+  val settings = Seq(
     apiMappings ++= Documentation
       .mappings("org.scala-lang", "http://scala-lang.org/api/%s/")(
         "scala-library"
       )
-      .value
+      .value,
+    Compile / doc / tastyFiles ~= {
+      _.filter {
+        _.toString.indexOf("/external/") == -1
+      }
+    },
+    Compile / doc / scalacOptions ++= {
+      if (scalaBinaryVersion.value != "3") {
+        Seq("-implicits")
+      } else {
+        Seq.empty
+      }
+    },
+    Compile / doc / scalacOptions ++= Opts.doc.title("ReactiveMongo API"),
+    Compile / doc / scalacOptions ++= Opts.doc.version(
+      Common.majorVersion.value
+    )
   )
 }
 
 object Documentation {
-
-  def apply(excludes: Seq[ProjectReference]): Documentation =
-    new Documentation(excludes)
-
   def mappings(
       org: String,
       location: String,
