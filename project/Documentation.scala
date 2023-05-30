@@ -29,6 +29,7 @@ final class Documentation {
 }
 
 object Documentation {
+
   def mappings(
       org: String,
       location: String,
