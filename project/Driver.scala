@@ -103,11 +103,11 @@ final class Driver(core: Project) {
             val prefix =
               "reactivemongo.api.collections.GenericCollection.aggregatorContext"
 
-            (prefix +: (1 to 13).map(i => s"${prefix}$$default$$${i}")).
-              map { p => 
+            (prefix +: (1 to 13).map(i => s"${prefix}$$default$$${i}")).map {
+              p =>
                 if (scalaBinaryVersion.value == "2.11") ufbp(p)
                 else nmfp(p)
-              }
+            }
           })
         },
         Test / testOptions += {
@@ -126,7 +126,7 @@ final class Driver(core: Project) {
             m.close()
           }
         },
-        Compile / packageBin / mappings ~= driverFilter,
+        Compile / packageBin / mappings ~= driverFilter
         // mappings in (Compile, packageDoc) ~= driverFilter,
       )
     )
