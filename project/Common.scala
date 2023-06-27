@@ -53,7 +53,7 @@ object Common extends AutoPlugin {
 
   override def projectSettings =
     Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
-      scalaVersion := "2.12.17",
+      scalaVersion := "2.12.18",
       crossScalaVersions := Seq(
         scala211,
         scalaVersion.value,
