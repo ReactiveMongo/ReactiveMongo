@@ -335,9 +335,9 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       val ns = updateNodeSet(s"${parentEvent}$$Release")(_.updateAll { node =>
         node.copy(connections = node.connected)
 
-      // Only keep already connected connection:
-      // - prevent to activate other connection
-      // - know which connections to be closed
+        // Only keep already connected connection:
+        // - prevent to activate other connection
+        // - know which connections to be closed
       })
 
       // close all connections
