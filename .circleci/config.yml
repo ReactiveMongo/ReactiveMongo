@@ -292,7 +292,7 @@ jobs:
         default: 10
       scala_version:
         type: string
-        default: "2.12.17"
+        default: "2.12.18"
       akka_version:
         type: string
         default: "2.5.23"
@@ -399,11 +399,11 @@ workflows:
   main_suite:
     jobs:
       - unit_test_suite:
-          name: unit_osx_jdk8_scala211
+          name: unit_osx_jdk8_scala212
           os: osx
           e: osx
           jdk_version: jdk8
-          scala_version: 2.11.12
+          scala_version: 2.12.18
           shaded: false
 
       - unit_test_suite:
@@ -412,7 +412,7 @@ workflows:
             name: openjdk
             version: 10
           jdk_version: openjdk10
-          scala_version: 2.12.17
+          scala_version: 2.12.18
 
       - integration_test_suite:
           name: mongo3_openjdk8_scala211_akka23
@@ -498,7 +498,7 @@ workflows:
               only:
                 - master
           requires:
-            - unit_osx_jdk8_scala211
+            - unit_osx_jdk8_scala212
             - unit_linux_openjdk10_scala212
             - mongo3_openjdk8_scala211_akka23
             - mongo4_openjdk8_scala213_akka25_rs
