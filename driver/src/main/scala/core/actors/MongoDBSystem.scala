@@ -1317,8 +1317,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
     val updated = {
       val respTo = response.header.responseTo
-      @inline def event =
-        s"IsMaster(${isMaster.isMaster}, ${respTo}, ${_nodeSet.toShortString})"
+
+      @inline def event = s"IsMasterResponse(${isMaster.isMaster}, ${respTo}, ${_nodeSet.toShortString})"
 
       updateNodeSet(event) { nodeSet =>
         val nodeSetWasReachable = nodeSet.isReachable
@@ -1327,8 +1327,14 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         val nanow = System.nanoTime()
 
         // Update the details of the node corresponding to the response chan
-        val prepared =
-          nodeSet.updateNodeByChannelId(response.info.channelId) { node =>
+        import nodeSet.{updateNodeByChannelId=>updateNode}
+
+        val prepared = updateNode(response.info.channelId) { node =>
+          if (respTo < node.pingInfo.lastIsMasterId) {
+            warn(s"Skip node update for delated response #$respTo < last #${node.pingInfo.lastIsMasterId}")
+
+            node
+          } else {
             val pingTime: Long = {
               if (node.pingInfo.lastIsMasterId == respTo) {
                 nanow - node.pingInfo.lastIsMasterTime
@@ -1389,6 +1395,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
             n
           }
+        }
 
         val discoveredNodes = isMaster.replicaSet.toSeq.flatMap {
           _.hosts.collect {

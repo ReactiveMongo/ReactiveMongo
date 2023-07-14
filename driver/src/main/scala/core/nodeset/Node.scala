@@ -195,17 +195,15 @@ private[reactivemongo] final class Node(
   }
 
   lazy val toShortString = {
-    def latency = {
-      import pingInfo.{ ping => ns }
-
+    def hns(ns: Long): String = {
       if (ns < 1000L) s"${ns.toString}ns"
       else if (ns < 100000000L) s"${(ns / 1000000L).toString}ms"
       else s"${(ns / 1000000000L).toString}s"
     }
 
-    s"""Node[$name: $status<${statusChanged}ns> (${authenticatedConnections.size}/${connected.size}/${connections
+    s"""Node[$name: $status<${hns(statusChanged)}> (${authenticatedConnections.size}/${connected.size}/${connections
         .filterNot(_.signaling)
-        .size} available connections), latency=${latency}, authenticated={${authenticated
+        .size} available connections), latency=${hns(pingInfo.ping)}, authenticated={${authenticated
         .map(_.toShortString) mkString ", "}}]"""
   }
 
