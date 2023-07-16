@@ -201,10 +201,15 @@ private[reactivemongo] final class Node(
       else s"${(ns / 1000000000L).toString}s"
     }
 
-    s"""Node[$name: $status<${hns(statusChanged)}> (${authenticatedConnections.size}/${connected.size}/${connections
+    s"""Node[$name: $status<${hns(
+        statusChanged
+      )}> (${authenticatedConnections.size}/${connected.size}/${connections
         .filterNot(_.signaling)
-        .size} available connections), latency=${hns(pingInfo.ping)}, authenticated={${authenticated
-        .map(_.toShortString) mkString ", "}}]"""
+        .size} available connections), latency=${hns(
+        pingInfo.ping
+      )}, authenticated={${authenticated.map(
+        _.toShortString
+      ) mkString ", "}}]"""
   }
 
   /** Returns the read-only information about this node. */
