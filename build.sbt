@@ -1,3 +1,6 @@
+import sbt.*
+import sbt.Keys.*
+
 lazy val `ReactiveMongo-Core` = project
   .in(file("core"))
   .settings(
@@ -51,14 +54,28 @@ lazy val `ReactiveMongo-Core` = project
     }
   )
 
-lazy val `ReactiveMongo` = new Driver(`ReactiveMongo-Core`).module
+
+lazy val `Actors-Akka` = project.in(file("actors-akka")).settings(
+  libraryDependencies ++= Dependencies.akka.value
+)
+
+lazy val `Actors-Pekko` = project.in(file("actors-pekko")).settings(
+  libraryDependencies ++= Dependencies.pekko.value
+)
+
+lazy val actorModule = Common.actorModule match {
+  case "pekko" => `Actors-Pekko`
+  case "akka" => `Actors-Akka`
+}
+
+lazy val `ReactiveMongo` = new Driver(`ReactiveMongo-Core`, actorModule).module
 
 lazy val `ReactiveMongo-Test` = project
   .in(file("test"))
   .settings(
     description := "ReactiveMongo test helpers"
   )
-  .dependsOn(`ReactiveMongo`)
+  .dependsOn(`ReactiveMongo`).dependsOn()
 
 // ---
 

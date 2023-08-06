@@ -1,10 +1,9 @@
 package reactivemongo
 
+import reactivemongo.actors.pattern.ask._
+
 import scala.collection.immutable.ListSet
-
 import scala.concurrent.{ Await, Future }
-import scala.math.Ordering
-
 import reactivemongo.core.actors.{
   PrimaryAvailable,
   PrimaryUnavailable,
@@ -22,19 +21,16 @@ import reactivemongo.core.nodeset.{
   PingInfo
 }
 import reactivemongo.core.protocol.ProtocolMetadata
-
 import reactivemongo.api.{
   AsyncDriver,
   MongoConnection,
   MongoConnectionOptions,
   ReadPreference
 }
-
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.matcher.MatchResult
-
-import akka.actor.ActorRef
-import akka.testkit.TestActorRef
+import reactivemongo.actors.actor.ActorRef
+import reactivemongo.actors.testkit.TestActorRef
 
 final class NodeSetSpec(
     implicit
@@ -204,8 +200,7 @@ final class NodeSetSpec(
         before = sys.underlyingActor._nodeSet.nodes.map(_.name)
 
         import scala.concurrent.duration._
-        import akka.pattern.ask
-        import akka.util.Timeout
+        import reactivemongo.actors.util.Timeout
 
         implicit def timeout: Timeout = Timeout(3.seconds)
 
@@ -333,7 +328,7 @@ final class NodeSetSpec(
     val supervisorName = s"withConAndSys-sup-${System identityHashCode ee}"
     val poolName = s"withConAndSys-con-${System identityHashCode f}"
 
-    @inline implicit def sys: akka.actor.ActorSystem =
+    @inline implicit def sys: reactivemongo.actors.actor.ActorSystem =
       reactivemongo.api.tests.system(drv)
 
     val auths = Seq(Authenticate(Common.commonDb, "test", Some("password")))

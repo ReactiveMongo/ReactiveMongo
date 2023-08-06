@@ -27,8 +27,8 @@ import org.specs2.concurrent.ExecutionEnv
 import org.specs2.execute.Result
 
 import _root_.tests.Common
-import akka.actor.Actor
-import akka.testkit.TestActorRef
+import reactivemongo.actors.actor.Actor
+import reactivemongo.actors.testkit.TestActorRef
 
 final class MonitorSpec(
     implicit
@@ -487,7 +487,7 @@ final class MonitorSpec(
     val supervisorName = s"monitorspec-sup-${System identityHashCode ee}"
     val poolName = s"monitorspec-con-${System identityHashCode f}"
 
-    implicit def sys: akka.actor.ActorSystem =
+    implicit def sys: reactivemongo.actors.actor.ActorSystem =
       reactivemongo.api.tests.system(drv)
 
     lazy val mongosystem = TestActorRef[StandardDBSystem](

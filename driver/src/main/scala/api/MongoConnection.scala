@@ -41,9 +41,9 @@ import reactivemongo.core.protocol.{ ProtocolMetadata, Response }
 
 import reactivemongo.api.commands.SuccessfulAuthentication
 
-import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
-import akka.pattern.ask
-import akka.util.Timeout
+import reactivemongo.actors.actor.{ Actor, ActorRef, ActorSystem, Props }
+import reactivemongo.actors.pattern.ask._
+import reactivemongo.actors.util.Timeout
 import reactivemongo.util
 
 import util.{ LazyLogger, SRVRecordResolver, TXTResolver }
@@ -275,7 +275,6 @@ final class MongoConnection private[reactivemongo] (
 
       monitor ! check
 
-      import akka.pattern.after
       import actorSystem.dispatcher
 
       def unavailResult = Future.failed[ConnectionState] {

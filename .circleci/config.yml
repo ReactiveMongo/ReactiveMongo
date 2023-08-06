@@ -37,6 +37,9 @@ commands:
       scala_version:
         type: string
         default: "2.13.8"
+      actor_module:
+        type: string
+        default: "akka"
       shaded:
         type: boolean
         default: true
@@ -64,6 +67,7 @@ commands:
           command: |
                     export PATH=$PATH:~/sbt/bin
                     export SCALA_VERSION="<< parameters.scala_version >>"
+                    export ACTOR_MODULE="<< parameters.actor_module >>"
                     SHADED="<< parameters.shaded >>"
                     export CI_CATEGORY="<< parameters.category >>"
 
@@ -258,6 +262,9 @@ jobs:
       scala_version:
         type: string
         default: "2.13.8"
+      actor_module:
+        type: string
+        default: "akka"
       shaded:
         type: boolean
         default: true
@@ -276,6 +283,7 @@ jobs:
       - build_n_tests:
           jdk_version: << parameters.jdk_version >>
           scala_version: << parameters.scala_version >>
+          actor_module: << parameters.actor_module >>
           shaded: << parameters.shaded >>
           category: UNIT_TESTS
 
@@ -296,6 +304,9 @@ jobs:
       akka_version:
         type: string
         default: "2.5.23"
+      actor_module:
+        type: string
+        default: "akka"
       shaded:
         type: boolean
         default: true
@@ -316,6 +327,7 @@ jobs:
 
     environment:
       AKKA_VERSION: << parameters.akka_version >>
+      ACTOR_MODULE: << parameters.actor_module >>
       MONGO_PROFILE: << parameters.mongo_profile >>
       MONGO_VER: << parameters.mongo_version >>
       OS_NAME: linux
@@ -333,6 +345,7 @@ jobs:
                     echo "Shaded? << parameters.shaded >>"
                     echo "Compressor: << parameters.compressor>>"
                     echo "Akka: version=$AKKA_VERSION"
+                    echo "Actor module: $ACTOR_MODULE"
 
       - setup_integration:
           mongo_version: $MONGO_VER
@@ -345,6 +358,7 @@ jobs:
           jdk_version: openjdk<< parameters.openjdk_version >>
           scala_version: << parameters.scala_version >>
           shaded: << parameters.shaded >>
+          actor_module: << parameters.actor_module >>
           compressor: << parameters.compressor >>
 
       - collect_test_reports
@@ -414,6 +428,15 @@ workflows:
           jdk_version: openjdk10
           scala_version: 2.12.18
 
+      - unit_test_suite:
+          name: unit_linux_openjdk10_scala212_pekko
+          e:
+            name: openjdk
+            version: 10
+          jdk_version: openjdk10
+          scala_version: 2.12.18
+          actor_module: pekko
+
       - integration_test_suite:
           name: mongo3_openjdk8_scala211_akka23
           openjdk_version: 8
@@ -434,6 +457,12 @@ workflows:
           mongo_version: 5
           mongo_profile: x509
           scala_version: 2.13.8
+
+      - integration_test_suite:
+          name: mongo5_openjdk10_scala213_pekko_x509
+          mongo_version: 5
+          scala_version: 2.13.8
+          actor_module: pekko
 
       - integration_test_suite:
           name: mongo6_openjdk11_scala31_akka26
@@ -512,6 +541,8 @@ workflows:
             - mongo4_openjdk10_scala211_akka25_mutualssl
             - mongo5_openjdk11_scala211_akka25_rs
             - mongo5_openjdk10_scala211_akka25_x509
+            - unit_linux_openjdk10_scala212_pekko
+            - mongo5_openjdk10_scala213_pekko_x509
 
       - trigger_dependent_builds:
           filters:

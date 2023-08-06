@@ -18,11 +18,11 @@ import reactivemongo.core.actors.{
   StandardDBSystemWithX509
 }
 import reactivemongo.core.nodeset.Authenticate
-
-import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Terminated }
-import akka.pattern.ask
-import akka.util.Timeout
+import reactivemongo.actors.actor.{ Actor, ActorRef, ActorSystem }
+import reactivemongo.actors.pattern.ask._
+import reactivemongo.actors.util.Timeout
 import com.typesafe.config.Config
+import reactivemongo.actors.actor.{ Props, Terminated }
 
 /**
  * The asynchronous driver (see [[MongoConnection]]).
@@ -38,7 +38,6 @@ import com.typesafe.config.Config
  *
  * @param config a custom configuration (otherwise the default options are used)
  * @param classLoader a classloader used to load the actor system
- *
  * @define parsedURIParam the URI parsed by [[reactivemongo.api.MongoConnection.fromString]]
  * @define connectionNameParam the name for the connection pool
  * @define optionsParam the options for the new connection pool

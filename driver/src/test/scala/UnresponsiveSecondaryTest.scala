@@ -25,8 +25,8 @@ import reactivemongo.api.bson.collection.BSONSerializationPack
 import org.specs2.matcher.MatchResult
 
 import _root_.tests.{ Common, NettyEmbedder }
-import akka.actor.ActorRef
-import akka.testkit.TestActorRef
+import reactivemongo.actors.actor.ActorRef
+import reactivemongo.actors.testkit.TestActorRef
 
 trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
   import reactivemongo.api.tests._
