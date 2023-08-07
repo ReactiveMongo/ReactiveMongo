@@ -12,5 +12,4 @@ package object actor {
   val Props = akka.actor.Props
   type Terminated = akka.actor.Terminated
   type Cancellable = akka.actor.Cancellable
-
 }

@@ -1,15 +1,9 @@
 package reactivemongo.actors
 
-import org.apache.pekko.util.{
-  ByteString => PekkoByteString,
-  Timeout => PekkoTimeout
-}
-
 package object util {
-  type Timeout = PekkoTimeout
-  val Timeout = PekkoTimeout
+  type Timeout = org.apache.pekko.util.Timeout
+  val Timeout = org.apache.pekko.util.Timeout
 
-  type ByteString = PekkoByteString
-  val ByteString = PekkoByteString
-
+  type ByteString = org.apache.pekko.util.ByteString
+  val ByteString = org.apache.pekko.util.ByteString
 }

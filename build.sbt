@@ -75,7 +75,7 @@ lazy val `ReactiveMongo-Test` = project
   .settings(
     description := "ReactiveMongo test helpers"
   )
-  .dependsOn(`ReactiveMongo`).dependsOn()
+  .dependsOn(`ReactiveMongo`)
 
 // ---
 

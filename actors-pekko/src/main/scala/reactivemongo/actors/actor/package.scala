@@ -12,5 +12,4 @@ package object actor {
   val Props = org.apache.pekko.actor.Props
   type Terminated = org.apache.pekko.actor.Terminated
   type Cancellable = org.apache.pekko.actor.Cancellable
-
 }

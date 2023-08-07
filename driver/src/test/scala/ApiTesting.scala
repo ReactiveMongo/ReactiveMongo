@@ -10,7 +10,6 @@ import scala.concurrent.duration.{ FiniteDuration, SECONDS }
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 import reactivemongo.io.netty.channel.{ Channel, ChannelId, DefaultChannelId }
 
-import reactivemongo.actors.pattern.ask._
 import reactivemongo.core.actors
 import reactivemongo.core.errors.DatabaseException
 import reactivemongo.core.netty.ChannelFactory
@@ -33,6 +32,7 @@ import reactivemongo.api.collections.QueryCodecs
 import reactivemongo.api.commands.CommandKind
 
 import reactivemongo.actors.actor.ActorRef
+import reactivemongo.actors.pattern.ask._
 import reactivemongo.actors.util.Timeout
 
 import actors.{

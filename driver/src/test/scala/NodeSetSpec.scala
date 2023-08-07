@@ -1,9 +1,9 @@
 package reactivemongo
 
-import reactivemongo.actors.pattern.ask._
-
 import scala.collection.immutable.ListSet
+
 import scala.concurrent.{ Await, Future }
+
 import reactivemongo.core.actors.{
   PrimaryAvailable,
   PrimaryUnavailable,
@@ -21,15 +21,19 @@ import reactivemongo.core.nodeset.{
   PingInfo
 }
 import reactivemongo.core.protocol.ProtocolMetadata
+
 import reactivemongo.api.{
   AsyncDriver,
   MongoConnection,
   MongoConnectionOptions,
   ReadPreference
 }
+
 import org.specs2.concurrent.ExecutionEnv
 import org.specs2.matcher.MatchResult
+
 import reactivemongo.actors.actor.ActorRef
+import reactivemongo.actors.pattern.ask._
 import reactivemongo.actors.testkit.TestActorRef
 
 final class NodeSetSpec(
