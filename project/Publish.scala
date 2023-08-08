@@ -50,7 +50,7 @@ object Publish {
     Test / publishArtifact := false,
     publishTo := Some(repoUrl).map(repoName at _),
     artifactName := { (sv: ScalaVersion, module: ModuleID, artifact: Artifact) =>
-      artifact.name + modulePostfix + "-" + module.revision + "." + artifact.extension
+      s"${artifact.name}$modulePostfix-${module.revision}.${artifact.extension}"
     },
     credentials += Credentials(
       repoName,
