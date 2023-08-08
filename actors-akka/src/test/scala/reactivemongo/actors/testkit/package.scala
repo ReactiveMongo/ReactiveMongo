@@ -1,9 +1,8 @@
 package reactivemongo.actors
 
 import akka.actor.Actor
-import akka.testkit.{ TestActorRef => PekkoTestActorRef }
 
 package object testkit {
-  type TestActorRef[T <: Actor] = PekkoTestActorRef[T]
-  val TestActorRef = PekkoTestActorRef
+  type TestActorRef[T <: Actor] = akka.testkit.TestActorRef[T]
+  val TestActorRef = akka.testkit.TestActorRef
 }
