@@ -354,15 +354,18 @@ final class MongoURISpec(
       ).awaitFor(timeout)
     }
 
-    val withKeyStore =
-      "mongodb://host1?keyStore=file:///tmp/foo&keyStoreType=PKCS12&keyStorePassword=bar"
+    {
+      val resource = new java.io.File("/tmp/foo").toURI
+
+      val withKeyStore =
+        s"mongodb://host1?keyStore=${resource}&keyStoreType=PKCS12&keyStorePassword=bar"
 
     s"fail to parse $withKeyStore" in {
       parseURI(withKeyStore) must beLike[ParsedURI] {
         case uri =>
           uri.options.keyStore must beSome(
             MongoConnectionOptions.KeyStore(
-              resource = new java.io.File("/tmp/foo").toURI,
+              resource = resource,
               password = Some("bar".toCharArray),
               storeType = "PKCS12",
               trust = true
@@ -370,6 +373,7 @@ final class MongoURISpec(
           )
 
       }.awaitFor(timeout)
+    }
     }
 
     val defaultFo = "mongodb://host1?rm.failover=default"

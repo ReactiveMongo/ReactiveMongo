@@ -425,7 +425,13 @@ object MongoConnectionOptions {
       case KeyStore(`_resource`, None, `_storeType`, `_trust`) =>
         password.isEmpty
 
-      case _ => false
+      case KeyStore(a, b, c, d) =>
+        println(s"___2: $a / $resource, ${a.toString == resource.toString} $b, $c, $d")
+        false
+
+      case _ =>
+        println(s"___3: $that")
+        false
     }
 
     override def hashCode: Int =
