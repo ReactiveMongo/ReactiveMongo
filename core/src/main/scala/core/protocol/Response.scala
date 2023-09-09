@@ -35,6 +35,7 @@ private[reactivemongo] sealed abstract class Response(
     } else None
   }
 
+  /** Update the response with the specified cursor `id`. */
   private[reactivemongo] def cursorID(id: Long): Response
 
   private[reactivemongo] def startingFrom(offset: Int): Response

@@ -16,7 +16,7 @@ echo "[INFO] Running integration tests ..."
 # MongoDB
 echo "- MongoDB major: $MONGO_VER"
 
-M4P=(v4 v5 v6)
+M4P=(v4 v5 v6 v7)
 
 if [ "v$MONGO_VER" = "v3" ]; then
     TEST_OPTS="$TEST_OPTS exclude gt_mongo32,ge_mongo4,unit"
@@ -24,6 +24,10 @@ elif [[ ${M4P[@]} =~ "v$MONGO_VER" ]]; then
     TEST_OPTS="$TEST_OPTS exclude unit"
 else
     TEST_OPTS="$TEST_OPTS exclude gt_mongo32,ge_mongo4,unit"
+fi
+
+if [ "v$MONGO_VER" = "v7" ]; then
+    TEST_OPTS="${TEST_OPTS},lt_mongo7"
 fi
 
 if [ ! "$MONGO_PROFILE" = "x509" ]; then
