@@ -37,7 +37,7 @@ object Common extends AutoPlugin {
   val scala211 = "2.11.12"
   val scala212 = "2.12.18"
   val scala213 = "2.13.8"
-  val scala31 = "3.2.2" // CI uses 3.1.2-RC1-bin-20220113-8d28d94-NIGHTLY"
+  val scala3 = "3.2.2" // CI uses 3.1.2-RC1-bin-20220113-8d28d94-NIGHTLY"
 
   def majorVersion = {
     val Major = """([0-9]+)\.([0-9]+)\..*""".r
@@ -58,7 +58,7 @@ object Common extends AutoPlugin {
   )
 
   lazy val scalaVersions: Seq[String] = {
-    if (actorModule == "akka") Seq(scala211, scala212, scala213, scala31)
+    if (actorModule == "akka") Seq(scala211, scala212, scala213, scala3)
     else Seq(scala212, scala213)
   }
 
