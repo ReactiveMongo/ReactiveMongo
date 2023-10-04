@@ -10,7 +10,7 @@ object Common extends AutoPlugin {
   override def trigger = allRequirements
   override def requires = JvmPlugin
 
-  lazy val actorModule = sys.env.get("ACTOR_MODULE") match {
+  lazy val actorModule = sys.env.getOrElse("ACTOR_MODULE", "akka")
     case Some("pekko") => "pekko"
     case _             => "akka"
   }
