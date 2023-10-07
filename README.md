@@ -31,7 +31,7 @@ Then go to the `ReactiveMongo` directory and launch the SBT build console:
 ```
 $ cd ReactiveMongo
 $ sbt
-> +publish-local
+> +publishLocal
 ```
 
 *Running tests:*

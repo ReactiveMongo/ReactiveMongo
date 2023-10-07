@@ -13,7 +13,7 @@ import reactivemongo.core.protocol.ProtocolMetadata
 
 import reactivemongo.api.{ Compressor, ReadPreference }
 
-import akka.actor.ActorRef
+import reactivemongo.actors.actor.ActorRef
 
 /**
  * @param name the replicaSet name
