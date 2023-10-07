@@ -11,9 +11,11 @@ import sbt.Keys._
 
 import com.typesafe.tools.mima.plugin.MimaKeys.mimaBinaryIssueFilters
 
-final class Driver(core: Project) {
+final class Driver(core: Project, actorModule: Project) {
   import Dependencies._
   import XmlUtil._
+
+  println(s"Using actor module ${actorModule.id}")
 
   lazy val module = Project("ReactiveMongo", file("driver"))
     .settings(
@@ -71,7 +73,7 @@ final class Driver(core: Project) {
             Seq.empty[ModuleID]
           }
         },
-        libraryDependencies ++= akka.value ++ Seq(
+        libraryDependencies ++= Seq(
           ("dnsjava" % "dnsjava" % "3.5.2").exclude("org.slf4j", "*"),
           commonsCodec,
           specs.value,
@@ -150,6 +152,7 @@ final class Driver(core: Project) {
       }
     }
     .dependsOn(core)
+    .dependsOn(actorModule % "compile->compile;test->test")
 
   // ---
 

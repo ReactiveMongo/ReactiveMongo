@@ -8,7 +8,7 @@ import scala.concurrent.duration.{ Duration, FiniteDuration }
 
 import reactivemongo.core.protocol.Response
 
-import akka.actor.ActorSystem
+import reactivemongo.actors.actor.ActorSystem
 
 private[api] final class FoldResponses[T](
     failoverStrategy: FailoverStrategy,

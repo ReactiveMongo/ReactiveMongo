@@ -85,9 +85,9 @@ import reactivemongo.api.commands.{
   UpsertedFactory
 }
 
-import akka.actor.{ Actor, ActorRef, Cancellable }
 import com.github.ghik.silencer.silent
 import external.reactivemongo.ConnectionListener
+import reactivemongo.actors.actor.{ Actor, ActorRef, Cancellable }
 import reactivemongo.util.{ LazyLogger, SimpleRing }
 
 /** Main actor that processes the requests. */
@@ -1318,7 +1318,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     val updated = {
       val respTo = response.header.responseTo
 
-      @inline def event = s"IsMasterResponse(${isMaster.isMaster}, ${respTo}, ${_nodeSet.toShortString})"
+      @inline def event =
+        s"IsMasterResponse(${isMaster.isMaster}, ${respTo}, ${_nodeSet.toShortString})"
 
       updateNodeSet(event) { nodeSet =>
         val nodeSetWasReachable = nodeSet.isReachable
@@ -1327,7 +1328,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         val nanow = System.nanoTime()
 
         // Update the details of the node corresponding to the response chan
-        import nodeSet.{updateNodeByChannelId=>updateNode}
+        import nodeSet.{ updateNodeByChannelId => updateNode }
 
         val prepared = updateNode(response.info.channelId) { node =>
           if (respTo < node.pingInfo.lastIsMasterId) {
