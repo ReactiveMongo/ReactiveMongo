@@ -31,6 +31,16 @@ object Dependencies {
     )
   }
 
+  val pekko = Def.setting[Seq[ModuleID]] {
+    val ver = "1.0.1"
+
+    Seq(
+      "org.apache.pekko" %% "pekko-actor" % ver,
+      "org.apache.pekko" %% "pekko-testkit" % ver % Test,
+      "org.apache.pekko" %% "pekko-slf4j" % ver % Test
+    )
+  }
+
   val specsVer = Def.setting[String] {
     if (scalaBinaryVersion.value == "2.11") {
       "4.10.6"

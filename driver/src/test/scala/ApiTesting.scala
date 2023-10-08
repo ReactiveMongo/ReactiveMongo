@@ -31,8 +31,9 @@ import reactivemongo.api.bson.collection.BSONSerializationPack
 import reactivemongo.api.collections.QueryCodecs
 import reactivemongo.api.commands.CommandKind
 
-import akka.actor.ActorRef
-import akka.util.Timeout
+import reactivemongo.actors.actor.ActorRef
+import reactivemongo.actors.pattern.ask._
+import reactivemongo.actors.util.Timeout
 
 import actors.{
   ChannelConnected,
@@ -183,7 +184,6 @@ package object tests { self =>
       options: MongoConnectionOptions,
       mongosystem: ActorRef
     ): Future[Any] = {
-    import akka.pattern.ask
 
     def message = d.addConnectionMsg(name, nodes, options, mongosystem)
     implicit def timeout: Timeout = Timeout(10, SECONDS)
