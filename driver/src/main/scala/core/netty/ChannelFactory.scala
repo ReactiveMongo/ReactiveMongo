@@ -32,7 +32,7 @@ import reactivemongo.core.protocol.{
 
 import reactivemongo.api.MongoConnectionOptions
 
-import akka.actor.ActorRef
+import reactivemongo.actors.actor.ActorRef
 import reactivemongo.util.LazyLogger
 
 import ChannelOption.{ CONNECT_TIMEOUT_MILLIS, SO_KEEPALIVE, TCP_NODELAY }

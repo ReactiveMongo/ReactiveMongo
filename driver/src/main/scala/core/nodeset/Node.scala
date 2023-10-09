@@ -9,7 +9,7 @@ import reactivemongo.io.netty.channel.ChannelId
 import reactivemongo.core.netty.ChannelFactory
 import reactivemongo.core.protocol.ProtocolMetadata
 
-import akka.actor.ActorRef
+import reactivemongo.actors.actor.ActorRef
 
 /**
  * @param name the main name of the node
