@@ -13,7 +13,7 @@ import org.specs2.concurrent.ExecutionEnv
 import org.specs2.specification.AfterAll
 
 import _root_.tests.{ Common, NettyEmbedder }
-import akka.actor.Actor
+import reactivemongo.actors.actor.Actor
 
 final class ChannelFactorySpec(
     implicit
@@ -41,7 +41,7 @@ final class ChannelFactorySpec(
   }, IsMasterCommand.IsMasterResult
 
   import Common.timeout
-  implicit def actorSys: akka.actor.ActorSystem = Common.driverSystem
+  implicit def actorSys: reactivemongo.actors.actor.ActorSystem = Common.driverSystem
 
   val factory = channelFactory("sup-1", "con-2", Common.DefaultOptions)
 
@@ -79,7 +79,7 @@ final class ChannelFactorySpec(
         }
       }
 
-      val actorRef = akka.testkit.TestActorRef(actor, "test1")
+      val actorRef = reactivemongo.actors.testkit.TestActorRef(actor, "test1")
 
       val req = isMasterRequest()
       val reqBytes: Array[Byte] = {
@@ -137,7 +137,7 @@ final class ChannelFactorySpec(
           val receive: Receive = { case _ => () }
         }
 
-        val actorRef = akka.testkit.TestActorRef(actor, "test3")
+        val actorRef = reactivemongo.actors.testkit.TestActorRef(actor, "test3")
 
         createChannel(factory, actorRef, "foo", 27017, 0).aka(
           "channel"
@@ -186,7 +186,7 @@ final class ChannelFactorySpec(
         }
       }
 
-      val actorRef = akka.testkit.TestActorRef(actor, "test2")
+      val actorRef = reactivemongo.actors.testkit.TestActorRef(actor, "test2")
 
       createChannel(
         factory,

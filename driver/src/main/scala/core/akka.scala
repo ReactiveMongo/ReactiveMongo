@@ -5,7 +5,7 @@ import scala.util.{ Failure, Success, Try }
 import scala.concurrent.Future
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
-import akka.actor.ActorSystem
+import reactivemongo.actors.actor.ActorSystem
 import reactivemongo.util.sameThreadExecutionContext
 
 private[reactivemongo] sealed trait SystemControl

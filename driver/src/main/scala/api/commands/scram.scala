@@ -13,7 +13,7 @@ import reactivemongo.api.{
   SerializationPack
 }
 
-import akka.util.ByteString
+import reactivemongo.actors.util.ByteString
 import reactivemongo.util
 
 // --- MongoDB SCRAM authentication ---
