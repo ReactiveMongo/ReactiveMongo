@@ -19,10 +19,16 @@ import reactivemongo.core.actors.{
 }
 import reactivemongo.core.nodeset.Authenticate
 
-import akka.actor.{ Actor, ActorRef, ActorSystem, Props, Terminated }
-import akka.pattern.ask
-import akka.util.Timeout
 import com.typesafe.config.Config
+import reactivemongo.actors.actor.{
+  Actor,
+  ActorRef,
+  ActorSystem,
+  Props,
+  Terminated
+}
+import reactivemongo.actors.pattern.ask._
+import reactivemongo.actors.util.Timeout
 
 /**
  * The asynchronous driver (see [[MongoConnection]]).

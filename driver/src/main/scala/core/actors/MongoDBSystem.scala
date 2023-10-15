@@ -85,9 +85,9 @@ import reactivemongo.api.commands.{
   UpsertedFactory
 }
 
-import akka.actor.{ Actor, ActorRef, Cancellable }
 import com.github.ghik.silencer.silent
 import external.reactivemongo.ConnectionListener
+import reactivemongo.actors.actor.{ Actor, ActorRef, Cancellable }
 import reactivemongo.util.{ LazyLogger, SimpleRing }
 
 /** Main actor that processes the requests. */

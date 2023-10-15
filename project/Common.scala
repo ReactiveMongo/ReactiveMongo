@@ -10,6 +10,8 @@ object Common extends AutoPlugin {
   override def trigger = allRequirements
   override def requires = JvmPlugin
 
+  lazy val actorModule = sys.env.getOrElse("ACTOR_MODULE", "akka")
+
   val baseSettings = Seq(
     organization := "org.reactivemongo",
     resolvers += Resolver.typesafeRepo("releases"),
@@ -30,8 +32,9 @@ object Common extends AutoPlugin {
   private val java8 = scala.util.Properties.isJavaAtLeast("1.8")
 
   val scala211 = "2.11.12"
+  val scala212 = "2.12.18"
   val scala213 = "2.13.8"
-  val scala31 = "3.2.2" // CI uses 3.1.2-RC1-bin-20220113-8d28d94-NIGHTLY"
+  val scala3 = "3.2.2" // CI uses 3.1.2-RC1-bin-20220113-8d28d94-NIGHTLY"
 
   def majorVersion = {
     val Major = """([0-9]+)\.([0-9]+)\..*""".r
@@ -51,15 +54,15 @@ object Common extends AutoPlugin {
     "Use ReactiveMongo-Shaded (see system property 'reactivemongo.shaded')"
   )
 
+  lazy val scalaVersions: Seq[String] = {
+    if (actorModule == "akka") Seq(scala211, scala212, scala213, scala3)
+    else Seq(scala212, scala213)
+  }
+
   override def projectSettings =
     Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
-      scalaVersion := "2.12.18",
-      crossScalaVersions := Seq(
-        scala211,
-        scalaVersion.value,
-        scala213,
-        scala31
-      ),
+      scalaVersion := scala212,
+      crossScalaVersions := scalaVersions,
       crossVersion := CrossVersion.binary,
       useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
       target := {

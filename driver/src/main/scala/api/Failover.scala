@@ -6,7 +6,7 @@ import scala.util.control.NonFatal
 import scala.concurrent.{ ExecutionContext, Future }
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
-import akka.pattern.after
+import reactivemongo.actors.pattern.after
 import reactivemongo.util.LazyLogger
 
 private[reactivemongo] final class Failover[A](

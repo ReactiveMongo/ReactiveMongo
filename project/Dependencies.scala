@@ -31,6 +31,16 @@ object Dependencies {
     )
   }
 
+  val pekko = Def.setting[Seq[ModuleID]] {
+    val ver = "1.0.1"
+
+    Seq(
+      "org.apache.pekko" %% "pekko-actor" % ver,
+      "org.apache.pekko" %% "pekko-testkit" % ver % Test,
+      "org.apache.pekko" %% "pekko-slf4j" % ver % Test
+    )
+  }
+
   val specsVer = Def.setting[String] {
     if (scalaBinaryVersion.value == "2.11") {
       "4.10.6"
@@ -51,7 +61,7 @@ object Dependencies {
 
   val logApi = Seq(
     slf4j % Provided,
-    "com.lmax" % "disruptor" % "3.4.4" % Test
+    "com.lmax" % "disruptor" % "4.0.0" % Test
   )
 
   val commonsCodec = "commons-codec" % "commons-codec" % "1.16.0"

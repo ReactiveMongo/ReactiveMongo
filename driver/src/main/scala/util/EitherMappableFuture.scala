@@ -22,7 +22,7 @@ import scala.concurrent.{ duration, Future, Promise }
 import duration.Duration
 
 private[reactivemongo] object ExtendedFutures {
-  import akka.actor.ActorSystem
+  import reactivemongo.actors.actor.ActorSystem
 
   // better way to this?
   def delayedFuture(millis: Long, system: ActorSystem): Future[Unit] = {
