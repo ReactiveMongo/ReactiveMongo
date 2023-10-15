@@ -61,7 +61,7 @@ object Dependencies {
 
   val logApi = Seq(
     slf4j % Provided,
-    "com.lmax" % "disruptor" % "3.4.4" % Test
+    "com.lmax" % "disruptor" % "4.0.0" % Test
   )
 
   val commonsCodec = "commons-codec" % "commons-codec" % "1.16.0"
