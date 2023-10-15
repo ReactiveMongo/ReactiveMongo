@@ -35,12 +35,23 @@ object Publish {
     mimaBinaryIssueFilters ++= Seq(missingMethodInOld)
   )
 
+  val modulePostfix = {
+    Common.actorModule match {
+      case "pekko" => "-pekko"
+      case _       => ""
+    }
+
+  }
+
   val siteUrl = "http://reactivemongo.org"
 
   lazy val settings = Seq(
     publishMavenStyle := true,
     Test / publishArtifact := false,
     publishTo := Some(repoUrl).map(repoName at _),
+    artifactName := { (sv: ScalaVersion, module: ModuleID, artifact: Artifact) =>
+      s"${artifact.name}$modulePostfix-${module.revision}.${artifact.extension}"
+    },
     credentials += Credentials(
       repoName,
       env("PUBLISH_REPO_ID"),

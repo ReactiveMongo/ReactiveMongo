@@ -51,7 +51,21 @@ lazy val `ReactiveMongo-Core` = project
     }
   )
 
-lazy val `ReactiveMongo` = new Driver(`ReactiveMongo-Core`).module
+
+lazy val `ReactiveMongo-Actors-Akka` = project.in(file("actors-akka")).settings(
+  libraryDependencies ++= Dependencies.akka.value
+)
+
+lazy val `ReactiveMongo-Actors-Pekko` = project.in(file("actors-pekko")).settings(
+  libraryDependencies ++= Dependencies.pekko.value
+)
+
+lazy val actorModule = Common.actorModule match {
+  case "pekko" => `ReactiveMongo-Actors-Pekko`
+  case "akka" => `ReactiveMongo-Actors-Akka`
+}
+
+lazy val `ReactiveMongo` = new Driver(`ReactiveMongo-Core`, actorModule).module
 
 lazy val `ReactiveMongo-Test` = project
   .in(file("test"))

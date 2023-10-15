@@ -9,7 +9,7 @@ import reactivemongo.io.netty.handler.timeout.IdleStateEvent
 
 import reactivemongo.core.actors.{ ChannelConnected, ChannelDisconnected }
 
-import akka.actor.ActorRef
+import reactivemongo.actors.actor.ActorRef
 import reactivemongo.util.LazyLogger
 
 private[reactivemongo] class MongoHandler(

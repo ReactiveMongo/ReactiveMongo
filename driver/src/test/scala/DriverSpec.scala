@@ -25,7 +25,7 @@ import reactivemongo.api.commands.{
 
 import org.specs2.concurrent.ExecutionEnv
 
-import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
+import reactivemongo.actors.actor.{ Actor, ActorRef, ActorSystem, Props }
 
 final class DriverSpec(
     implicit
@@ -476,7 +476,7 @@ final class DriverSpec(
     }
 
     val receive: Receive = {
-      case sys: akka.actor.ActorRef => {
+      case sys: reactivemongo.actors.actor.ActorRef => {
         // Manually register this as connection/system monitor
         sys ! reactivemongo.api.tests.RegisterMonitor
       }
