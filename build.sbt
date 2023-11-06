@@ -9,7 +9,7 @@ lazy val `ReactiveMongo-Core` = project
 
       ("org.reactivemongo" %% "reactivemongo-bson-api" % version.value)
         .exclude("org.slf4j", "*") +: deps ++: Seq(
-        "com.github.luben" % "zstd-jni" % "1.5.5-5",
+        "com.github.luben" % "zstd-jni" % "1.5.5-10",
         "org.xerial.snappy" % "snappy-java" % "1.1.10.1",
         Dependencies.specs.value
       )
@@ -51,18 +51,21 @@ lazy val `ReactiveMongo-Core` = project
     }
   )
 
+lazy val `ReactiveMongo-Actors-Akka` = project
+  .in(file("actors-akka"))
+  .settings(
+    libraryDependencies ++= Dependencies.akka.value
+  )
 
-lazy val `ReactiveMongo-Actors-Akka` = project.in(file("actors-akka")).settings(
-  libraryDependencies ++= Dependencies.akka.value
-)
-
-lazy val `ReactiveMongo-Actors-Pekko` = project.in(file("actors-pekko")).settings(
-  libraryDependencies ++= Dependencies.pekko.value
-)
+lazy val `ReactiveMongo-Actors-Pekko` = project
+  .in(file("actors-pekko"))
+  .settings(
+    libraryDependencies ++= Dependencies.pekko.value
+  )
 
 lazy val actorModule = Common.actorModule match {
   case "pekko" => `ReactiveMongo-Actors-Pekko`
-  case "akka" => `ReactiveMongo-Actors-Akka`
+  case "akka"  => `ReactiveMongo-Actors-Akka`
 }
 
 lazy val `ReactiveMongo` = new Driver(`ReactiveMongo-Core`, actorModule).module
