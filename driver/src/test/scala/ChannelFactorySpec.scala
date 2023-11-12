@@ -41,7 +41,9 @@ final class ChannelFactorySpec(
   }, IsMasterCommand.IsMasterResult
 
   import Common.timeout
-  implicit def actorSys: reactivemongo.actors.actor.ActorSystem = Common.driverSystem
+
+  implicit def actorSys: reactivemongo.actors.actor.ActorSystem =
+    Common.driverSystem
 
   val factory = channelFactory("sup-1", "con-2", Common.DefaultOptions)
 
