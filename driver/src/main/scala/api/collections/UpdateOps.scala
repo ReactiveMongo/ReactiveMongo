@@ -143,7 +143,7 @@ trait UpdateOps[P <: SerializationPack]
      *
      * @since MongoDB 4.2
      */
-    @com.github.ghik.silencer.silent(".*Experimental.*")
+    @annotation.nowarn
     final def one[Q](
         q: Q,
         u: AggregationFramework.Pipeline,

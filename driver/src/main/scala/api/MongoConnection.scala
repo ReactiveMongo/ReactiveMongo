@@ -464,8 +464,7 @@ object MongoConnection {
       extends Exception(message, cause)
       with NoStackTrace {
 
-    @com.github.ghik.silencer.silent
-    @SuppressWarnings(Array("NullParameter"))
+    @annotation.nowarn
     def this(message: String) = this(message, null)
   }
 
