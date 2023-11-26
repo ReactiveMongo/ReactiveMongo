@@ -94,7 +94,7 @@ trait Cursor1Spec { spec: CursorSpec =>
               r.numberReturned must_=== 10
             }
         }.await(1, timeout)
-        } and {
+      } and {
         req(cursor(), 101) must beLike[Response] {
           case resp =>
             val r = resp.reply
@@ -105,7 +105,7 @@ trait Cursor1Spec { spec: CursorSpec =>
               r.numberReturned must_=== 101 /* default batch size */
             }
         }.await(1, timeout)
-        } and {
+      } and {
         req(cursor(), Int.MaxValue /* unlimited */ ) must beLike[Response] {
           case resp =>
             val r = resp.reply
@@ -143,10 +143,10 @@ trait Cursor1Spec { spec: CursorSpec =>
                 rp2.numberReturned must_=== (batchSize - 1)
               } and {
                 nextResponse(cur, 1)(ee.ec, r2) must beNone.await(1, timeout)
-               }
+              }
           }.await(1, timeout)
-        } 
-         }
+        }
+      }
     }
 
     { // headOption
@@ -204,7 +204,7 @@ trait Cursor1Spec { spec: CursorSpec =>
                           ref3.collectionName must_=== cn
                         }
                     }.await(1, timeout)
-                   }
+                  }
               }.await(1, timeout) and {
                 getMore.peek[Set](1) must beLike[Cursor.Result[Set[Int]]] {
                   case Cursor.Result(s, ref4) =>
@@ -213,7 +213,7 @@ trait Cursor1Spec { spec: CursorSpec =>
                     } and {
                       ref4.collectionName must_=== cn
                     }
-                 }.await(1, timeout)
+                }.await(1, timeout)
               }
             }
         }.await(2, timeout)
@@ -296,7 +296,7 @@ trait Cursor1Spec { spec: CursorSpec =>
                 .batchSize(2096)
                 .cursor()
                 .fold(0, -1)({ (st, _) => st + 1 }) must beTypedEqualTo(16517)
-               .await(0, timeout * 2L)
+                .await(0, timeout * 2L)
             }
           }
 

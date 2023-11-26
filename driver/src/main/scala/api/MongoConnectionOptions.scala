@@ -426,7 +426,9 @@ object MongoConnectionOptions {
         password.isEmpty
 
       case KeyStore(a, b, c, d) =>
-        println(s"___2: $a / $resource, ${a.toString == resource.toString} $b, $c, $d")
+        println(
+          s"___2: $a / $resource, ${a.toString == resource.toString} $b, $c, $d"
+        )
         false
 
       case _ =>

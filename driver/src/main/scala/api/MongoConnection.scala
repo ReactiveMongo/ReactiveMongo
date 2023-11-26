@@ -83,7 +83,7 @@ final class MongoConnection private[reactivemongo] (
     private[reactivemongo] val name: String,
     private[api] val actorSystem: ActorSystem,
     private[api] val mongosystem: ActorRef,
-    /*private[api] */val options: MongoConnectionOptions) {
+    /*private[api] */ val options: MongoConnectionOptions) {
   import Exceptions._
 
   /**
