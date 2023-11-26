@@ -88,9 +88,7 @@ private[reactivemongo] object DefaultCursor {
               // See https://jira.mongodb.org/browse/SERVER-80713
               def res = response.cursorID(0)
 
-              sendCursorKill(cursorID).map(_ => res).recover {
-                case _ => res
-              }
+              sendCursorKill(cursorID).map(_ => res).recover { case _ => res }
             } else {
               Future.successful(response)
             }
