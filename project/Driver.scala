@@ -74,7 +74,7 @@ final class Driver(core: Project, actorModule: Project) {
           }
         },
         libraryDependencies ++= Seq(
-          ("dnsjava" % "dnsjava" % "3.5.2").exclude("org.slf4j", "*"),
+          ("dnsjava" % "dnsjava" % "3.5.3").exclude("org.slf4j", "*"),
           commonsCodec,
           specs.value,
           "ch.qos.logback" % "logback-classic" % "1.2.12" % Test
