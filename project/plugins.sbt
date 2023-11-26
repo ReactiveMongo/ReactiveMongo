@@ -7,7 +7,7 @@ resolvers ++= Seq(
 
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.5.2")
 
-addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.11.0")
+addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.11.1")
 
 addSbtPlugin("com.github.sbt" % "sbt-git" % "2.0.1")
 
