@@ -360,20 +360,20 @@ final class MongoURISpec(
       val withKeyStore =
         s"mongodb://host1?keyStore=${resource}&keyStoreType=PKCS12&keyStorePassword=bar"
 
-    s"fail to parse $withKeyStore" in {
-      parseURI(withKeyStore) must beLike[ParsedURI] {
-        case uri =>
-          uri.options.keyStore must beSome(
-            MongoConnectionOptions.KeyStore(
-              resource = resource,
-              password = Some("bar".toCharArray),
-              storeType = "PKCS12",
-              trust = true
+      s"fail to parse $withKeyStore" in {
+        parseURI(withKeyStore) must beLike[ParsedURI] {
+          case uri =>
+            uri.options.keyStore must beSome(
+              MongoConnectionOptions.KeyStore(
+                resource = resource,
+                password = Some("bar".toCharArray),
+                storeType = "PKCS12",
+                trust = true
+              )
             )
-          )
 
-      }.awaitFor(timeout)
-    }
+        }.awaitFor(timeout)
+      }
     }
 
     val defaultFo = "mongodb://host1?rm.failover=default"

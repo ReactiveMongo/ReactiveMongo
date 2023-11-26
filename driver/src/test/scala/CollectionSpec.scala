@@ -66,7 +66,7 @@ final class CollectionSpec(
         test(collection.create()) must beFalse.awaitFor(timeout) and {
           test(collection.create(failsIfExists = true)) must beFalse.awaitFor(
             timeout
-           )
+          )
         }
       } tag "lt_mongo7"
 
