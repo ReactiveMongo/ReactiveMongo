@@ -22,10 +22,13 @@ final class Driver(core: Project, actorModule: Project) {
       Seq(
         description := "ReactiveMongo is a Scala driver that provides fully non-blocking and asynchronous I/O operations ",
         scalacOptions ++= {
-          if (scalaBinaryVersion.value == "3") {
-            Seq("-Wconf:cat=deprecation&msg=.*(MongoWireVersion|reflectiveSelectableFromLangReflectiveCalls|right-biased|scheduleAtFixedRate|filterInPlace|AtlasSearch|Experimental).*:s")
+          if (scalaBinaryVersion.value == "2.11") {
+            Seq.empty[String]
           } else {
-            Seq.empty
+            val mongo30eol = "MongoDB\\ 3\\.0\\ EOL\\ reached\\ by\\ Feb\\ 2018"
+            val rightBiaised = "Either.*\\ right-biased"
+
+            Seq(s"-Wconf:cat=deprecation&msg=.*($mongo30eol|$rightBiaised|MongoWireVersion|reflectiveSelectableFromLangReflectiveCalls|right-biased|scheduleAtFixedRate|filterInPlace|AtlasSearch|Experimental).*:s")
           }
         },
         Compile / unmanagedSourceDirectories ++= {

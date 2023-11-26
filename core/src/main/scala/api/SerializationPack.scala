@@ -168,12 +168,11 @@ object SerializationPack {
      * @returnsNamedElement, if the element exists
      * with expected `T` as value type.
      */
-    @com.github.ghik.silencer.silent(".*\\ ev\\ .*is\\ never\\ used.*")
     final def value[T](
         document: pack.Document,
         name: String
       )(implicit
-        ev: T <:< pack.Value,
+        @annotation.nowarn ev: T <:< pack.Value,
         cls: ClassTag[T]
       ): Option[T] =
       get(document, name).collect { case `cls`(t) => t }
