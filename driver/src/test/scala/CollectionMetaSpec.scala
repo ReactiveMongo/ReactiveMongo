@@ -136,7 +136,7 @@ trait CollectionMetaSpec { collSpec: CollectionSpec =>
 
     "be dropped successfully if doesn't exist" in {
       col.drop(false) aka "dropped" must beFalse.await(1, timeout)
-    }
+    } tag "lt_mongo7"
   }
 
   object & {

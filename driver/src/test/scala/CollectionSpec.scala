@@ -54,6 +54,8 @@ final class CollectionSpec(
       }
 
       "with error when already exists (failsIfExists = true)" in {
+        // create is idempotent in MongoDB 7 (no error)
+
         def test(create: => Future[Unit]): Future[Boolean] =
           create.map(_ => true).recover {
             case CommandException.Code(48 /*already exists */ ) => false
@@ -66,7 +68,7 @@ final class CollectionSpec(
             timeout
           )
         }
-      }
+      } tag "lt_mongo7"
 
       "successfully when already exists (failsIfExists = false)" in {
         collection.create(failsIfExists = false) must beTypedEqualTo({})

@@ -1,26 +1,15 @@
 lazy val `ReactiveMongo-Core` = project
   .in(file("core"))
   .settings(
-    Compile / sourceDirectories ++= Seq(
-      (Compile / sourceDirectory).value / "scala-2.11+"
-    ),
     libraryDependencies ++= {
       val deps = Dependencies.shaded.value
 
       ("org.reactivemongo" %% "reactivemongo-bson-api" % version.value)
         .exclude("org.slf4j", "*") +: deps ++: Seq(
-        "com.github.luben" % "zstd-jni" % "1.5.5-5",
+        "com.github.luben" % "zstd-jni" % "1.5.5-11",
         "org.xerial.snappy" % "snappy-java" % "1.1.10.1",
         Dependencies.specs.value
       )
-    },
-    // Silent mock for Scala3
-    Test / doc / scalacOptions ++= List("-skip-packages", "com.github.ghik"),
-    Compile / packageBin / mappings ~= {
-      _.filter { case (_, path) => !path.startsWith("com/github/ghik") }
-    },
-    Compile / packageSrc / mappings ~= {
-      _.filter { case (_, path) => path != "silent.scala" }
     },
     //
     mimaBinaryIssueFilters ++= {
@@ -60,7 +49,10 @@ lazy val `ReactiveMongo-Actors-Akka` = project
 lazy val `ReactiveMongo-Actors-Pekko` = project
   .in(file("actors-pekko"))
   .settings(
-    libraryDependencies ++= Dependencies.pekko.value
+    libraryDependencies ++= Dependencies.pekko.value,
+    crossScalaVersions ~= {
+      _.filterNot(_ startsWith "2.11")
+    }
   )
 
 lazy val actorModule = Common.actorModule match {
