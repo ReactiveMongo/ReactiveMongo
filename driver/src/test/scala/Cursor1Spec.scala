@@ -41,6 +41,8 @@ trait Cursor1Spec { spec: CursorSpec =>
     }
 
     "request for cursor query" in {
+      // !! Need previous 'insert ...' test to provide the required fixtures
+
       import reactivemongo.api.tests.{
         makeRequest => req,
         nextResponse,
@@ -75,7 +77,7 @@ trait Cursor1Spec { spec: CursorSpec =>
           case resp =>
             val r = resp.reply
 
-            r.cursorID aka "cursor ID #3" must not(beEqualTo(0)) and {
+            r.cursorID aka "cursor ID #3" must not(beTypedEqualTo(0L)) and {
               r.startingFrom must_=== 0
             } and {
               r.numberReturned must_=== 128

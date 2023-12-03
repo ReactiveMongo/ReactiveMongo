@@ -81,11 +81,38 @@ private[reactivemongo] object DefaultCursor {
           case Response.CommandError(_, _, _, cause) =>
             Future.failed[Response](cause)
 
-          case response =>
-            Future.successful(response)
+          case response => {
+            val cursorID = response.reply.cursorID
+
+            if (response.reply.numberReturned == maxDocs && cursorID != 0) {
+              // See https://jira.mongodb.org/browse/SERVER-80713
+              def res = response.cursorID(0)
+
+              sendCursorKill(cursorID).map(_ => res).recover { case _ => res }
+            } else {
+              Future.successful(response)
+            }
+          }
         }
 
-      val builder = pack.newBuilder
+      private lazy val builder = pack.newBuilder
+
+      private lazy val makeCursorKill = DefaultCursor.makeCursorKill(
+        pack,
+        version = connection._metadata
+          .fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion),
+        dbName = db.name,
+        collectionName = collectionName,
+        readPreference = preference
+      )
+
+      def sendCursorKill(cursorID: Long): Future[Response] =
+        connection.sendExpectingResponse(
+          new ExpectingResponse(
+            requestMaker = makeCursorKill(cursorID),
+            pinnedNode = transaction.flatMap(_.pinnedNode)
+          )
+        )
 
       override val getMoreOpCmd: Function2[Long, Int, RequestMaker] = {
         import reactivemongo.api.collections.QueryCodecs
@@ -100,8 +127,8 @@ private[reactivemongo] object DefaultCursor {
             Seq.empty[pack.ElementProducer]
         }
 
-        val moreQry =
-          query.copy(flags = 0) // numberToSkip = 0, numberToReturn = 1)
+        // numberToSkip = 0, numberToReturn = 1)
+        val moreQry = query.copy(flags = 0)
         val collName = fullCollectionName.span(_ != '.')._2.tail
 
         { (cursorId, ntr) =>
@@ -111,7 +138,7 @@ private[reactivemongo] object DefaultCursor {
 
           val cmdOpts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
             elem("getMore", long(cursorId)),
-            elem(f"$$db", builder.string(database.name)),
+            elem(f"$$db", string(database.name)),
             elem(f"$$readPreference", pref),
             elem("collection", string(collName)),
             elem("batchSize", int(ntr))
@@ -212,7 +239,24 @@ private[reactivemongo] object DefaultCursor {
             Future.successful(response)
         }
 
-      val builder = pack.newBuilder
+      private lazy val builder = pack.newBuilder
+
+      private lazy val makeCursorKill = DefaultCursor.makeCursorKill(
+        pack,
+        version = connection._metadata
+          .fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion),
+        dbName = db.name,
+        collectionName = collectionName,
+        readPreference = preference
+      )
+
+      def sendCursorKill(cursorID: Long): Future[Response] =
+        connection.sendExpectingResponse(
+          new ExpectingResponse(
+            requestMaker = makeCursorKill(cursorID),
+            pinnedNode = transaction.flatMap(_.pinnedNode)
+          )
+        )
 
       val getMoreOpCmd: Function2[Long, Int, RequestMaker] = {
         def baseElmts: Seq[pack.ElementProducer] = db.session match {
@@ -326,6 +370,23 @@ private[reactivemongo] object DefaultCursor {
 
     final lazy val builder = _pack.newBuilder
 
+    private lazy val makeCursorKill = DefaultCursor.makeCursorKill(
+      _pack,
+      version = connection._metadata
+        .fold[MongoWireVersion](MongoWireVersion.V30)(_.maxWireVersion),
+      dbName = db.name,
+      collectionName = fullCollectionName,
+      readPreference = preference
+    )
+
+    def sendCursorKill(cursorID: Long): Future[Response] =
+      connection.sendExpectingResponse(
+        new ExpectingResponse(
+          requestMaker = makeCursorKill(cursorID),
+          pinnedNode = transaction.flatMap(_.pinnedNode)
+        )
+      )
+
     lazy val getMoreOpCmd: Function2[Long, Int, RequestMaker] = {
       import reactivemongo.api.collections.QueryCodecs
 
@@ -346,7 +407,6 @@ private[reactivemongo] object DefaultCursor {
           readPreference,
           None
         )
-
       } else {
         val collName = fullCollectionName.span(_ != '.')._2.tail
 
@@ -581,8 +641,7 @@ private[reactivemongo] object DefaultCursor {
         id: Long
       )(implicit
         ec: ExecutionContext
-      ): Unit =
-      killCursors(id, "Cursor")
+      ): Unit = killCursors(id, "Cursor")
 
     private def killCursors(
         cursorID: Long,
@@ -593,17 +652,7 @@ private[reactivemongo] object DefaultCursor {
       if (cursorID != 0) {
         logger.debug(s"[$logCat] Clean up $cursorID, sending KillCursors")
 
-        val result = connection.sendExpectingResponse(
-          new ExpectingResponse(
-            requestMaker = RequestMaker(
-              KillCursors(Set(cursorID)),
-              readPreference = preference
-            ),
-            pinnedNode = transaction.flatMap(_.pinnedNode)
-          )
-        )
-
-        result.onComplete {
+        sendCursorKill(cursorID).onComplete {
           case Failure(cause) =>
             logger.warn(s"[$logCat] Fails to kill cursor #${cursorID}", cause)
 
@@ -615,6 +664,8 @@ private[reactivemongo] object DefaultCursor {
         )
       }
     }
+
+    protected def sendCursorKill(cursorID: Long): Future[Response]
 
     def head(
         implicit
@@ -756,7 +807,18 @@ private[reactivemongo] object DefaultCursor {
         if (!hasNext(r1, maxDocs)) {
           Future.successful(Option.empty[Response])
         } else {
-          next(r1, maxDocs)(ec1)
+          next(r1, maxDocs)(ec1).map({
+            case Some(nextResp)
+                if (nextResp.reply.cursorID != 0 && maxDocs > 0 && (nextResp.reply.startingFrom + nextResp.reply.numberReturned) >= maxDocs) => {
+              // See https://jira.mongodb.org/browse/SERVER-80713
+              killCursor(nextResp.reply.cursorID)(ec1)
+
+              Some(nextResp.cursorID(0))
+            }
+
+            case nextResp =>
+              nextResp
+          })(ec1)
         }
       } else { (ec2: ExecutionContext, r2: Response) =>
         tailResponse(r2, maxDocs)(ec2)
@@ -780,6 +842,47 @@ private[reactivemongo] object DefaultCursor {
       batchSizeN
     } else {
       max - offset
+    }
+  }
+
+  private[api] def makeCursorKill[P <: SerializationPack](
+      pack: P,
+      version: MongoWireVersion,
+      dbName: String,
+      collectionName: String,
+      readPreference: ReadPreference
+    ): Long => RequestMaker = {
+    if (version.compareTo(MongoWireVersion.V51) < 0) { (cursorID: Long) =>
+      RequestMaker(
+        KillCursors(Set(cursorID)),
+        readPreference = readPreference
+      )
+    } else {
+      val builder = pack.newBuilder
+
+      import builder.{ elementProducer => elem, long, string }
+
+      { (cursorID: Long) =>
+        val cmdOpts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+          elem("killCursors", string(collectionName)),
+          elem("cursors", builder.array(Seq(long(cursorID))))
+        )
+
+        val cmd = builder.document(cmdOpts.result())
+        val buffer = WritableBuffer.empty
+
+        buffer.writeByte(0) // OpMsg payload type
+        pack.writeToBuffer(buffer, cmd)
+
+        RequestMaker(
+          kind = CommandKind.Query,
+          op = Query(0, dbName + f"$$cmd", 0, 1),
+          buffer.buffer,
+          readPreference = readPreference,
+          channelIdHint = None,
+          callerSTE = Seq.empty
+        )
+      }
     }
   }
 }

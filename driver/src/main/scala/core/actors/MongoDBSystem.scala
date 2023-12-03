@@ -85,7 +85,6 @@ import reactivemongo.api.commands.{
   UpsertedFactory
 }
 
-import com.github.ghik.silencer.silent
 import external.reactivemongo.ConnectionListener
 import reactivemongo.actors.actor.{ Actor, ActorRef, Cancellable }
 import reactivemongo.util.{ LazyLogger, SimpleRing }
@@ -411,7 +410,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
       if (ms < 100) 100.milliseconds else heartbeatFrequency
     }
 
-    @silent(".*schedule .*deprecated.*") @inline def schedule[T](msg: T) =
+    @annotation.nowarn @inline def schedule[T](msg: T) =
       scheduler.schedule(interval, interval, self, msg)
 
     refreshAllJob = schedule(RefreshAll)
@@ -1147,7 +1146,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     upd
   }
 
-  @silent("retain") private def retryAwaitingOnError(
+  private def retryAwaitingOnError(
       ns: NodeSet,
       discardedChannels: Map[ChannelId, Exception]
     ): Unit =
@@ -1156,7 +1155,10 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
       chans --= discardedChannels.keySet
 
-      resps.retain { (_, awaitingResponse) =>
+      @annotation.nowarn
+      val retain = resps.retain(_)
+
+      retain { (_, awaitingResponse) =>
         discardedChannels.get(awaitingResponse.channelID) match {
           case Some(error) => {
             val retriedChans = Set.newBuilder[ChannelId]

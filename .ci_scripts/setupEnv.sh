@@ -24,12 +24,18 @@ MONGO_CONF=`mktemp`
 
 echo "[INFO] Max connection: $MAX_CON"
 
-export PATH="$HOME/mongodb-linux-x86_64-amazon-$MONGO_MINOR/bin:$PATH"
+MONGO_ARCH="x86_64-amazon"
+
+if [ "v$MONGO_VER" = "v7" ]; then
+    ARCH="x86_64-amazon2"
+fi
+
+export PATH="$HOME/mongodb-linux-${MONGO_ARCH}-${MONGO_MINOR}/bin:$PATH"
 
 MONGO_DATA=`mktemp -d`
 MONGO_CONF_SUFFIX="26"
 
-M3P=(v3 v4 v5 v6)
+M3P=(v3 v4 v5 v6 v7)
 
 if [[ ${M3P[@]} =~ "v$MONGO_VER" ]]; then
     MONGO_CONF_SUFFIX="3"

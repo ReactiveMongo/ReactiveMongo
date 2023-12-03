@@ -2,7 +2,6 @@ import sbt._
 import sbt.Keys._
 
 object Compiler {
-  private val silencerVersion = Def.setting[String]("1.17.13")
 
   private def unmanaged(ver: String, base: File): Seq[File] =
     CrossVersion.partialVersion(ver) match {
@@ -30,23 +29,29 @@ object Compiler {
       "-unchecked",
       "-deprecation",
       "-feature",
-      "-Xfatal-warnings",
       "-language:higherKinds"
     ),
     scalacOptions ++= {
+      if (scalaBinaryVersion.value == "2.11") {
+        Seq.empty[String]
+      } else {
+        Seq("-Xfatal-warnings")
+      }
+    },
+    scalacOptions ++= {
       if (scalaBinaryVersion.value startsWith "2.") {
         Seq(
-          "-target:jvm-1.8",
           "-Xlint",
           "-g:vars"
         )
-      } else Seq()
+      } else Seq.empty
     },
     scalacOptions ++= {
       val sv = scalaBinaryVersion.value
 
       if (sv == "2.12") {
         Seq(
+          "-target:jvm-1.8",
           "-Xmax-classfile-name",
           "128",
           "-Ywarn-numeric-widen",
@@ -60,6 +65,7 @@ object Compiler {
         )
       } else if (sv == "2.11") {
         Seq(
+          "-target:jvm-1.8",
           "-Xmax-classfile-name",
           "128",
           "-Yopt:_",
@@ -69,6 +75,8 @@ object Compiler {
         )
       } else if (sv == "2.13") {
         Seq(
+          "-release",
+          "8",
           "-explaintypes",
           "-Werror",
           "-Wnumeric-widen",
@@ -83,47 +91,25 @@ object Compiler {
       }
     },
     Compile / console / scalacOptions ~= {
-      _.filterNot(o =>
-        o.startsWith("-X") || o.startsWith("-Y") || o.startsWith("-P:silencer")
-      )
+      _.filterNot(o => o.startsWith("-X") || o.startsWith("-Y"))
     },
     Test / scalacOptions ~= {
       _.filterNot(_ == "-Xfatal-warnings")
-    },
-    libraryDependencies ++= {
-      // Silencer
-      if (!scalaBinaryVersion.value.startsWith("3")) {
-        val silencerVersion = "1.17.13"
-
-        Seq(
-          compilerPlugin(
-            ("com.github.ghik" %% "silencer-plugin" % silencerVersion)
-              .cross(CrossVersion.full)
-          ),
-          ("com.github.ghik" %% "silencer-lib" % silencerVersion % Provided)
-            .cross(CrossVersion.full)
-        )
-      } else Seq.empty
-    },
-    // Silent mock
-    Test / doc / scalacOptions ++= List("-skip-packages", "com.github.ghik"),
-    Compile / packageBin / mappings ~= {
-      _.filter { case (_, path) => !path.startsWith("com/github/ghik") }
-    },
-    Compile / packageSrc / mappings ~= {
-      _.filter { case (_, path) => path != "silent.scala" }
     },
     //
     Compile / scalacOptions ++= {
       val v = scalaBinaryVersion.value
 
       val mongo30eol = "MongoDB\\ 3\\.0\\ EOL\\ reached\\ by\\ Feb\\ 2018"
-      val rightBiaised = "Either\\ is\\ now\\ right-biased"
+      val rightBiaised = "Either.*\\ right-biased"
 
-      if (v startsWith "3") {
+      if (v == "2.11") {
         Seq.empty
       } else {
-        Seq(s"-P:silencer:globalFilters=$mongo30eol;$rightBiaised")
+        Seq(
+          s"-Wconf:cat=deprecation&msg=($mongo30eol|$rightBiaised):s",
+          s"-Wconf:msg=.*nowarn.*\\ annotation.*:s"
+        )
       }
     },
     Compile / doc / scalacOptions ~= {

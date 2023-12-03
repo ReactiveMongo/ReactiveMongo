@@ -272,7 +272,7 @@ final class IndexesSpec(
     }
 
     "not have duplicate fixtures" in {
-      @com.github.ghik.silencer.silent("fold")
+      @annotation.nowarn
       def spec = Future
         .fold(fixturesInsert)(false) { (inserted, _) => inserted }
         .recover {

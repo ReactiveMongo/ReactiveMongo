@@ -22,10 +22,13 @@ final class Driver(core: Project, actorModule: Project) {
       Seq(
         description := "ReactiveMongo is a Scala driver that provides fully non-blocking and asynchronous I/O operations ",
         scalacOptions ++= {
-          if (scalaBinaryVersion.value == "3") {
-            Seq("-Wconf:cat=deprecation&msg=.*(MongoWireVersion|reflectiveSelectableFromLangReflectiveCalls|right-biased|scheduleAtFixedRate|filterInPlace|AtlasSearch|Experimental).*:s")
+          if (scalaBinaryVersion.value == "2.11") {
+            Seq.empty[String]
           } else {
-            Seq.empty
+            val mongo30eol = "MongoDB\\ 3\\.0\\ EOL\\ reached\\ by\\ Feb\\ 2018"
+            val rightBiaised = "Either.*\\ right-biased"
+
+            Seq(s"-Wconf:cat=deprecation&msg=.*($mongo30eol|$rightBiaised|MongoWireVersion|reflectiveSelectableFromLangReflectiveCalls|right-biased|scheduleAtFixedRate|filterInPlace|AtlasSearch|Experimental).*:s")
           }
         },
         Compile / unmanagedSourceDirectories ++= {
@@ -74,10 +77,10 @@ final class Driver(core: Project, actorModule: Project) {
           }
         },
         libraryDependencies ++= Seq(
-          ("dnsjava" % "dnsjava" % "3.5.2").exclude("org.slf4j", "*"),
+          ("dnsjava" % "dnsjava" % "3.5.3").exclude("org.slf4j", "*"),
           commonsCodec,
           specs.value,
-          "ch.qos.logback" % "logback-classic" % "1.2.12" % Test
+          "ch.qos.logback" % "logback-classic" % "1.2.13" % Test
         ) ++ logApi,
         mimaBinaryIssueFilters ++= {
           import com.typesafe.tools.mima.core._

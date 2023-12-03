@@ -4,11 +4,9 @@ import scala.collection.generic.CanBuildFrom
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import com.github.ghik.silencer.silent
-
 private[api] trait FailingCursorCompat[T] { cursor: FailingCursor[T] =>
 
-  @silent(".*\\ (maxDocs|ec|err|cbf).*\\ never\\ used.*")
+  @annotation.nowarn
   def collect[M[_]](
       maxDocs: Int,
       err: Cursor.ErrorHandler[M[T]]
@@ -17,7 +15,7 @@ private[api] trait FailingCursorCompat[T] { cursor: FailingCursor[T] =>
       ec: ExecutionContext
     ): Future[M[T]] = failure
 
-  @silent(".*\\ (maxDocs|ec|cbf).*\\ never\\ used.*")
+  @annotation.nowarn
   def peek[M[_]](
       maxDocs: Int
     )(implicit

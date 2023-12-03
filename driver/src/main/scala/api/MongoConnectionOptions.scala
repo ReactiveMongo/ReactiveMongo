@@ -425,14 +425,14 @@ object MongoConnectionOptions {
       case KeyStore(`_resource`, None, `_storeType`, `_trust`) =>
         password.isEmpty
 
-      case _ => false
+      case _ =>
+        false
     }
 
     override def hashCode: Int =
       (resource, storeType, password.map(Arrays.hashCode(_))).hashCode
 
-    @SuppressWarnings(Array("RedundantFinalizer"))
-    @com.github.ghik.silencer.silent("finalize\\ .*deprecated")
+    @annotation.nowarn
     override protected def finalize(): Unit = {
       password.foreach { p => p.indices.foreach { p(_) = '\u0000' } }
 
