@@ -74,12 +74,6 @@ echo "[INFO] Installing MongoDB ${MONGO_MINOR} ..."
 
 cd "$HOME"
 
-MONGO_ARCH="x86_64-amazon"
-
-if [ "v$MONGO_VER" = "v7" ]; then
-    ARCH="x86_64-amazon2"
-fi
-
 if [ "v$MONGO_VER" = "v6" -o "v$MONGO_VER" = "v7" ]; then
   MONGOSH="mongosh-1.10.6-linux-x64"
 
@@ -89,7 +83,13 @@ if [ "v$MONGO_VER" = "v6" -o "v$MONGO_VER" = "v7" ]; then
   ln -s "$PWD/$MONGOSH/bin/mongosh" "$MONGOSH/bin/mongo"
 fi
 
-MONGO_HOME="$HOME/mongodb-linux-$MONGO_ARCH-$MONGO_MINOR"
+MONGO_ARCH="x86_64-amazon"
+
+if [ "v$MONGO_VER" = "v6" -o "v$MONGO_VER" = "v7" ]; then
+    MONGO_ARCH="x86_64-amazon2"
+fi
+
+MONGO_HOME="$HOME/mongodb-linux-${MONGO_ARCH}-$MONGO_MINOR"
 
 if [ ! -x "$MONGO_HOME/bin/mongod" ]; then
     if [ -d "$MONGO_HOME" ]; then
