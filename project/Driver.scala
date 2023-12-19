@@ -17,14 +17,17 @@ final class Driver(core: Project, actorModule: Project) {
 
   println(s"Using actor module ${actorModule.id}")
 
+  val usePekko = settingKey[Boolean]("Use ReactiveMongo-Actors-Pekko")
+
   lazy val module = Project("ReactiveMongo", file("driver"))
     .settings(
       Seq(
+        usePekko := actorModule.id.endsWith("-Pekko"),
         version := {
           val ver = version.value
 
           val suffix = {
-            if (Common.actorModule == "pekko") "pekko"
+            if (usePekko.value) "pekko"
             else ""
           }
 
@@ -36,6 +39,17 @@ final class Driver(core: Project, actorModule: Project) {
 
               case (a, b) => s"${a}.${suffix}${b}"
             }
+          }
+        },
+        target := {
+          val path = target.value
+
+          if (usePekko.value) {
+            val name = path.getName
+
+            path.getParentFile / s"${name}-pekko"
+          } else {
+            path
           }
         },
         description := "ReactiveMongo is a Scala driver that provides fully non-blocking and asynchronous I/O operations ",
@@ -232,7 +246,7 @@ private[reactivemongo] object Trace {
 
   private def shadedNative(arch: String) = Def.setting[ModuleID] {
     if (Common.useShaded.value) {
-      val v = version.value
+      val v = (ThisBuild / version).value
 
       organization.value % s"reactivemongo-shaded-native-${arch}" % v
     } else {

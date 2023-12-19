@@ -35,14 +35,6 @@ object Publish {
     mimaBinaryIssueFilters ++= Seq(missingMethodInOld)
   )
 
-  val modulePostfix = {
-    Common.actorModule match {
-      case "pekko" => "-pekko"
-      case _       => ""
-    }
-
-  }
-
   val siteUrl = "http://reactivemongo.org"
 
   lazy val settings = Seq(
