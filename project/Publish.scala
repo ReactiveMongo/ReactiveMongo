@@ -49,9 +49,6 @@ object Publish {
     publishMavenStyle := true,
     Test / publishArtifact := false,
     publishTo := Some(repoUrl).map(repoName at _),
-    artifactName := { (sv: ScalaVersion, module: ModuleID, artifact: Artifact) =>
-      s"${artifact.name}$modulePostfix-${module.revision}.${artifact.extension}"
-    },
     credentials += Credentials(
       repoName,
       env("PUBLISH_REPO_ID"),

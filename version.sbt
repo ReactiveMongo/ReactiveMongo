@@ -24,7 +24,7 @@ ThisBuild / version := {
             } yield {
               nextRc match {
                 case Some(nrc) =>
-                  s"${maj}.${min}.${patch}-RC${nrc}-SNAPSHOT"
+                  s"${maj}.${min}.${patch}-RC${nrc}.SNAPSHOT"
 
                 case _ =>
                   s"${maj}.${min}.${nextPatch}-SNAPSHOT"

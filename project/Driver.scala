@@ -20,6 +20,24 @@ final class Driver(core: Project, actorModule: Project) {
   lazy val module = Project("ReactiveMongo", file("driver"))
     .settings(
       Seq(
+        version := {
+          val ver = version.value
+
+          val suffix = {
+            if (Common.actorModule == "pekko") "pekko"
+            else ""
+          }
+
+          if (suffix.isEmpty) {
+            ver
+          } else {
+            ver.span(_ != '-') match {
+              case (_, "") => s"${ver}.${suffix}"
+
+              case (a, b) => s"${a}.${suffix}${b}"
+            }
+          }
+        },
         description := "ReactiveMongo is a Scala driver that provides fully non-blocking and asynchronous I/O operations ",
         scalacOptions ++= {
           if (scalaBinaryVersion.value == "2.11") {

@@ -73,11 +73,17 @@ object Common extends AutoPlugin {
         val ver = (ThisBuild / version).value
         val suffix = {
           if (useShaded.value) "" // default ~> no suffix
-          else "-noshaded"
+          else "noshaded"
         }
 
-        ver.span(_ != '-') match {
-          case (a, b) => s"${a}${suffix}${b}"
+        if (suffix.isEmpty) {
+          ver
+        } else {
+          ver.span(_ != '-') match {
+            case (_, "") => s"${ver}.${suffix}"
+
+            case (a, b) => s"${a}.${suffix}${b}"
+          }
         }
       },
       Compile / unmanagedSourceDirectories ++= {

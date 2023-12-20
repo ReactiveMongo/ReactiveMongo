@@ -183,13 +183,6 @@ commands:
 
   publish_snapshots:
     description: Publish artifacts to Snapshots repository
-    parameters:
-      shaded:
-        type: boolean
-        default: true
-      compressor:
-        type: string
-        default: ""
     steps:
       - deploy:
           name: Publish artifacts to Sonatype Snapshots
@@ -213,26 +206,14 @@ commands:
                       echo "version in ThisBuild := \"$S\"" > version.sbt
                     fi
                     
-                    export PUBLISH_REPO_NAME="Sonatype Nexus Repository Manager"
-                    export PUBLISH_REPO_ID="oss.sonatype.org"
-                    export PUBLISH_REPO_URL="https://oss.sonatype.org/content/repositories/snapshots"
-                    
                     if [ "x$PUBLISH_USER" = "x" -o "x$PUBLISH_PASS" = "x" ]; then
                       echo "Missing publication credentials"
                       exit 1
                     fi
                     
-                    export SHADED="<< parameters.shaded >>"
                     export SBT_OPTS="$SBT_OPTS -Dreactivemongo.collectThreadTrace=true"
 
-                    echo "Publishing artifacts (shaded: $SHADED)"
-                    
-                    if [ "$SHADED" = "true" ]; then
-                      sbt +publish
-                    else
-                      export REACTIVEMONGO_SHADED=false
-                      sbt +publish
-                    fi
+                    ./project/snapshot.sh
 
 executors:
   osx:
@@ -381,9 +362,6 @@ jobs:
             - &snapshot_cache_key scala-{{ .Environment.CIRCLE_JOB }}-{{ checksum "build.sbt" }}-{{ checksum "project/Dependencies.scala" }}
 
       - publish_snapshots
-
-      - publish_snapshots:
-          shaded: false
 
       - save_cache:
           name: Update snapshot cache
