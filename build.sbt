@@ -7,7 +7,7 @@ lazy val `ReactiveMongo-Core` = project
       ("org.reactivemongo" %% "reactivemongo-bson-api" % version.value)
         .exclude("org.slf4j", "*") +: deps ++: Seq(
         "com.github.luben" % "zstd-jni" % "1.5.5-11",
-        "org.xerial.snappy" % "snappy-java" % "1.1.10.1",
+        "org.xerial.snappy" % "snappy-java" % "1.1.10.1", // .5 causes CI error
         Dependencies.specs.value
       )
     },
@@ -65,7 +65,8 @@ lazy val `ReactiveMongo` = new Driver(`ReactiveMongo-Core`, actorModule).module
 lazy val `ReactiveMongo-Test` = project
   .in(file("test"))
   .settings(
-    description := "ReactiveMongo test helpers"
+    description := "ReactiveMongo test helpers",
+    version := (`ReactiveMongo` / version).value
   )
   .dependsOn(`ReactiveMongo`)
 
@@ -84,7 +85,13 @@ lazy val `ReactiveMongo-Root` = project
     publishLocal := {},
     publish := {}
   )
-  .aggregate(`ReactiveMongo-Core`, `ReactiveMongo`, `ReactiveMongo-Test`)
+  .aggregate(
+    `ReactiveMongo-Core`,
+    `ReactiveMongo-Actors-Akka`,
+    `ReactiveMongo-Actors-Pekko`,
+    `ReactiveMongo`,
+    `ReactiveMongo-Test`
+  )
 
 lazy val benchmarks = (project in file("benchmarks"))
   .enablePlugins(JmhPlugin)
