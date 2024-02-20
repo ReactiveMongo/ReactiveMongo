@@ -64,5 +64,5 @@ object Dependencies {
     "com.lmax" % "disruptor" % "4.0.0" % Test
   )
 
-  val commonsCodec = "commons-codec" % "commons-codec" % "1.16.0"
+  val commonsCodec = "commons-codec" % "commons-codec" % "1.16.1"
 }
