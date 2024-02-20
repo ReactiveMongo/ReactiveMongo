@@ -70,6 +70,7 @@ final class ChannelFactorySpec(
 
       val response = Promise[Response]()
       def actor = new Actor {
+
         val receive: Receive = {
           case IsMasterResponse(resp) => {
             response.success(resp)
@@ -101,6 +102,7 @@ final class ChannelFactorySpec(
           .writeAndFlush(req)
           .addListener(printOnError)
           .addListener(new ChannelFutureListener {
+
             def operationComplete(op: ChannelFuture): Unit = {
               if (!sentRequest.isCompleted && op.isSuccess) {
                 val buf = chan.readOutbound[ByteBuf]
@@ -169,6 +171,7 @@ final class ChannelFactorySpec(
 
       def actor = new Actor {
         val isMasterReader = IsMasterCommand.reader(pack)
+
         val receive: Receive = {
           case msg if (msg.toString startsWith "ChannelConnected(") =>
             chanConnected.success(Common.logger.info(s"NIO $msg")); ()

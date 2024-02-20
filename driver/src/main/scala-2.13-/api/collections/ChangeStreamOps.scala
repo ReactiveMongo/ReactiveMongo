@@ -48,6 +48,7 @@ trait ChangeStreamOps[P <: SerializationPack] {
       reader: pack.Reader[T]
     ): WatchBuilder[T] = {
     new WatchBuilder[T] {
+
       protected val context: AggregatorContext[T] = aggregatorContext[T](
         pipeline = (new ChangeStream(offset, fullDocumentStrategy)) +: pipeline,
         readConcern = ReadConcern.Majority,
