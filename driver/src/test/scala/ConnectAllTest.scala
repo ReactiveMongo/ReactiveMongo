@@ -65,6 +65,7 @@ trait ConnectAllTest { _self: NodeSetSpec =>
                   chan
                 } else {
                   new EmbeddedChannel(chanId, false, false) {
+
                     override def connect(addr: SocketAddress): ChannelFuture = {
                       val p = new DefaultChannelPromise(chan)
 

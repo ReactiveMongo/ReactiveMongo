@@ -62,6 +62,7 @@ final class NettyProxy(
         .group(bossGroup, workerGroup)
         .childOption(ChannelOption.AUTO_READ, JBool.FALSE)
         .childHandler(new ChannelInitializer[NioSocketChannel] {
+
           def initChannel(ch: NioSocketChannel): Unit = {
             ch.pipeline()
               .addLast(new NettyProxyFrontendHandler(remoteAddress, delay))
@@ -79,6 +80,7 @@ final class NettyProxy(
           serverBootstrap
             .bind(localAddr)
             .addListener(new ChannelFutureListener {
+
               def operationComplete(ch: ChannelFuture): Unit = {
                 if (ch.isSuccess) {
                   log.info(s"Listen on ${ch.channel.localAddress}")
@@ -170,6 +172,7 @@ final class NettyProxyFrontendHandler(
     outboundChannel = f.channel()
 
     f.addListener(new ChannelFutureListener() {
+
       def operationComplete(future: ChannelFuture): Unit = {
         if (future.isSuccess) {
           // connection complete start to read first data
@@ -195,6 +198,7 @@ final class NettyProxyFrontendHandler(
       outboundChannel
         .writeAndFlush(msg)
         .addListener(new ChannelFutureListener() {
+
           def operationComplete(future: ChannelFuture): Unit = {
             if (future.isSuccess()) {
               // was able to flush out data, start to read the next chunk
@@ -252,6 +256,7 @@ final class NettyProxyBackendHandler(
     inboundChannel
       .writeAndFlush(msg)
       .addListener(new ChannelFutureListener() {
+
         def operationComplete(future: ChannelFuture): Unit = {
           if (future.isSuccess()) {
             ctx.channel().read()

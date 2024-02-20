@@ -307,6 +307,7 @@ sealed trait GridFS[P <: SerializationPack]
         n: Int,
         md: M,
         length: Int) {
+
       def feed(chunk: Array[Byte]): Future[Chunk] = {
         val wholeChunk = self.concat(previous, chunk)
 

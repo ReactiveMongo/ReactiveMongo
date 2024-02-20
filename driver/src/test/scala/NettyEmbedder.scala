@@ -112,6 +112,7 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
     chan
       .connect(new java.net.InetSocketAddress(27017))
       .addListener(new ChannelFutureListener {
+
         def operationComplete(op: ChannelFuture) = {
           if (op.isSuccess) ready.success({})
           else ready.failure(op.cause)
@@ -170,6 +171,7 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
     chan
       .connect(new java.net.InetSocketAddress(27017))
       .addListener(new ChannelFutureListener {
+
         def operationComplete(op: ChannelFuture) = {
           if (op.isSuccess) ready.success(chan)
           else ready.failure(op.cause)
@@ -210,6 +212,7 @@ object NettyEmbedder extends LowPriorityNettyEmbedder {
     chan
       .connect(new java.net.InetSocketAddress(27017))
       .addListener(new ChannelFutureListener {
+
         def operationComplete(op: ChannelFuture) = {
           if (op.isSuccess) ready.success(chan)
           else ready.failure(op.cause)

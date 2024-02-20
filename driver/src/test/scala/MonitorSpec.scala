@@ -425,6 +425,7 @@ final class MonitorSpec(
                 c.channel
                   .close()
                   .addListener(new ChannelFutureListener {
+
                     def operationComplete(op: ChannelFuture): Unit = {
                       if (op.isSuccess && count == opts.nbChannelsPerNode) {
                         allClosed.trySuccess({})

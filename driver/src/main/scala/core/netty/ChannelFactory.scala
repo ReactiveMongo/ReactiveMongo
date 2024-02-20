@@ -85,6 +85,7 @@ private[reactivemongo] final class ChannelFactory(
       val resolution = f
         .connect(host, port)
         .addListener(new ChannelFutureListener {
+
           def operationComplete(op: ChannelFuture): Unit = {
             if (!op.isSuccess) {
               val chanId = op.channel.id

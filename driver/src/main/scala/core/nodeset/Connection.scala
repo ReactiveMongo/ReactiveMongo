@@ -35,6 +35,7 @@ private[reactivemongo] class Connection(
       channel
         .write(msg)
         .addListener(new ChannelFutureListener {
+
           def operationComplete(op: ChannelFuture): Unit = {
             onComplete()
             ()
@@ -51,6 +52,7 @@ private[reactivemongo] class Connection(
     channel
       .writeAndFlush(msg)
       .addListener(new ChannelFutureListener {
+
         def operationComplete(op: ChannelFuture): Unit = {
           onComplete()
           ()
