@@ -87,7 +87,7 @@ object Compiler {
           "-Wunused"
         )
       } else {
-        Seq("-Wunused:all", "-language:implicitConversions")
+        Seq("-Wunused:nowarn", "-language:implicitConversions")
       }
     },
     Compile / console / scalacOptions ~= {
