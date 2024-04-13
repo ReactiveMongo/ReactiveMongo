@@ -37,18 +37,15 @@ private[reactivemongo] final class RequestMaker(
     current.result()
   }
 
-  def copyWithChannelIdHint(
-      newChannelIdHint: Option[ChannelId]
-    ): RequestMaker = {
+  @inline def withChannelIdHint(channelId: ChannelId): RequestMaker =
     new RequestMaker(
       kind,
       op,
       payload,
       readPreference,
-      newChannelIdHint,
+      Some(channelId),
       callerSTE
     )
-  }
 
   @inline def apply(requestID: Int): Request =
     Request(

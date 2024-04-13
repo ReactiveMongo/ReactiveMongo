@@ -585,8 +585,7 @@ private[reactivemongo] object DefaultCursor {
         logger.trace(s"Asking for the next batch of $ntr documents on cursor #${reply.cursorID}, after ${nextOffset}: ${reqMaker.op}")
 
         def req = new ExpectingResponse(
-          requestMaker =
-            reqMaker.copyWithChannelIdHint(Some(response.info.channelId)),
+          requestMaker = reqMaker.withChannelIdHint(response.info.channelId),
           pinnedNode = transaction.flatMap(_.pinnedNode)
         )
 
