@@ -37,6 +37,16 @@ private[reactivemongo] final class RequestMaker(
     current.result()
   }
 
+  @inline def withChannelIdHint(channelId: ChannelId): RequestMaker =
+    new RequestMaker(
+      kind,
+      op,
+      payload,
+      readPreference,
+      Some(channelId),
+      callerSTE
+    )
+
   @inline def apply(requestID: Int): Request =
     Request(
       kind,
