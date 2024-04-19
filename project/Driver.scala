@@ -112,7 +112,7 @@ final class Driver(core: Project, actorModule: Project) {
           ("dnsjava" % "dnsjava" % "3.5.3").exclude("org.slf4j", "*"),
           commonsCodec,
           specs.value,
-          "ch.qos.logback" % "logback-classic" % "1.2.13" % Test
+          "ch.qos.logback" % "logback-classic" % "1.5.6" % Test
         ) ++ logApi,
         mimaBinaryIssueFilters ++= {
           import com.typesafe.tools.mima.core._
