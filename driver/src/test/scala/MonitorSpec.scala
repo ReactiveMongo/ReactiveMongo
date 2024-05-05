@@ -89,7 +89,7 @@ final class MonitorSpec(
               nodeset1
                 .pick(ReadPreference.Primary, 1, _ => true)
                 .aka("channel #1") must beSome[(Node, Connection)].like {
-                case (node, con) =>
+                case (node, ncon) =>
                   val primary2 = nodeSet(dbsystem).primary
                   val authCon2 = primary2.toVector.flatMap {
                     _.authenticatedConnections.toList
@@ -102,7 +102,7 @@ final class MonitorSpec(
                     )
                   } and {
                     // After one connection is picked up...
-                    chanId1 = con.channel.id
+                    chanId1 = ncon.channel.id
 
                     authCon2.size aka "authed #2" must_=== 1
                   }
