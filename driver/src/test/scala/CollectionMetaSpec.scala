@@ -103,7 +103,7 @@ trait CollectionMetaSpec { collSpec: CollectionSpec =>
       adminDb <- c.database("admin")
       _ <- adminDb.renameCollection(_db.name, colName, "renamed")
     } yield false).recover({
-      case Code(c) => c == 26 // source doesn't exist
+      case Code(code) => code == 26 // source doesn't exist
     }) must beTrue.await(1, timeout)
   }
 
