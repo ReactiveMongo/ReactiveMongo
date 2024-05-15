@@ -108,7 +108,7 @@ object Compiler {
       } else {
         Seq(
           s"-Wconf:cat=deprecation&msg=($mongo30eol|$rightBiaised):s",
-          s"-Wconf:msg=.*nowarn.*\\ annotation.*:s"
+          "-Wconf:msg=.*nowarn.*\\ annotation.*:s"
         )
       }
     },
@@ -121,7 +121,16 @@ object Compiler {
     Test / console / scalacOptions ~= {
       _.filterNot(excludeOpt)
     },
-    Test / console / scalacOptions += "-Yrepl-class-based"
+    Test / console / scalacOptions += "-Yrepl-class-based",
+    Test / scalacOptions ++= {
+      if (scalaBinaryVersion.value == "2.11") {
+        Seq.empty
+      } else {
+        Seq(
+          "-Wconf:src=.*test/.*&msg=.*type\\ was\\ inferred.*(Any|Object).*:s"
+        )
+      }
+    }
   )
 
   private lazy val excludeOpt: String => Boolean = { opt =>
