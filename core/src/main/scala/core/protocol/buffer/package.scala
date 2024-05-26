@@ -48,12 +48,12 @@ object `package` {
 
   private[protocol] implicit object IntChannelInteroperable
       extends BufferInteroperable[Int] {
-    def apply(buffer: ByteBuf, i: Int) = { buffer writeIntLE i; () }
+    def apply(buffer: ByteBuf, i: Int) = { buffer `writeIntLE` i; () }
   }
 
   private[protocol] implicit object LongChannelInteroperable
       extends BufferInteroperable[Long] {
-    def apply(buffer: ByteBuf, l: Long) = { buffer writeLongLE l; () }
+    def apply(buffer: ByteBuf, l: Long) = { buffer `writeLongLE` l; () }
   }
 
   private[protocol] implicit object StringChannelInteroperable
@@ -62,8 +62,8 @@ object `package` {
     private def writeCString(buffer: ByteBuf, s: String): ByteBuf = {
       val bytes = s.getBytes("utf-8")
 
-      buffer writeBytes bytes
-      buffer writeByte 0
+      buffer `writeBytes` bytes
+      buffer `writeByte` 0
       buffer
     }
 

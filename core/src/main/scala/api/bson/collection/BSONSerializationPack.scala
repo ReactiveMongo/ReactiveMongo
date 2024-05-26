@@ -118,7 +118,7 @@ object BSONSerializationPack extends SerializationPack { self =>
     protected[reactivemongo] val pack = self
 
     def document(elements: Seq[ElementProducer]): Document =
-      BSONDocument(elements: _*)
+      reactivemongo.api.BSONCompat.document(elements)
 
     @inline def elementProducer(doc: Document): ElementProducer = doc
 

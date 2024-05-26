@@ -60,7 +60,15 @@ final class Driver(core: Project, actorModule: Project) {
             val mongo30eol = "MongoDB\\ 3\\.0\\ EOL\\ reached\\ by\\ Feb\\ 2018"
             val rightBiaised = "Either.*\\ right-biased"
 
-            Seq(s"-Wconf:cat=deprecation&msg=.*($mongo30eol|$rightBiaised|MongoWireVersion|reflectiveSelectableFromLangReflectiveCalls|right-biased|scheduleAtFixedRate|filterInPlace|AtlasSearch|Experimental).*:s")
+            Seq(
+              s"-Wconf:cat=deprecation&msg=.*($mongo30eol|$rightBiaised|MongoWireVersion|reflectiveSelectableFromLangReflectiveCalls|right-biased|scheduleAtFixedRate|filterInPlace|AtlasSearch|Experimental).*:s",
+              "-Wconf:msg=.*with\\ as\\ a\\ type\\ operator.*:s",
+              "-Wconf:msg=.*is\\ not\\ declared\\ infix.*:s",
+              "-Wconf:msg=.*is\\ deprecated\\ for\\ wildcard\\ arguments\\ of\\ types.*:s",
+              "-Wconf:msg=.*is\\ no\\ longer\\ supported\\ for\\ vararg\\ splices.*:s",
+              "-Wconf:msg=.*syntax\\ .*function.*\\ is\\ no\\ longer\\ supported.*:s",
+              "-Wconf:msg=.*unused\\ import.*:s"
+            )
           }
         },
         Compile / unmanagedSourceDirectories ++= {

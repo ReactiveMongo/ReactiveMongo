@@ -97,6 +97,8 @@ trait GenericCollection[P <: SerializationPack]
     with GenericCollectionMetaCommands[P]
     with QueryBuilderFactory[P] { self =>
 
+  protected def selfCollection: GenericCollection[P] = this
+
   /** Upper MongoDB version (used for version checks) */
   protected lazy val version = db.connectionState.metadata.maxWireVersion
 
