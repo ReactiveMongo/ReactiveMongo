@@ -56,7 +56,7 @@ object Common extends AutoPlugin {
 
   lazy val scalaVersions: Seq[String] = {
     if (actorModule == "akka") Seq(scala211, scala212, scala213, scala3)
-    else Seq(scala212, scala213)
+    else Seq(scala212, scala213, scala3)
   }
 
   override def projectSettings =

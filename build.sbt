@@ -51,7 +51,7 @@ lazy val `ReactiveMongo-Actors-Pekko` = project
   .settings(
     libraryDependencies ++= Dependencies.pekko.value,
     crossScalaVersions ~= {
-      _.filterNot(v => v.startsWith("2.11") || v.startsWith("3."))
+      _.filterNot(_.startsWith("2.11"))
     }
   )
 
