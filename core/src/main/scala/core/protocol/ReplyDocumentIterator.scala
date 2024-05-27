@@ -61,7 +61,7 @@ private[reactivemongo] object ReplyDocumentIterator
       try {
         val sz = buffer.getIntLE(buffer.readerIndex)
         val cbrb =
-          reactivemongo.api.bson.buffer.ReadableBuffer(buffer readSlice sz)
+          reactivemongo.api.bson.buffer.ReadableBuffer(buffer `readSlice` sz)
 
         pack.readAndDeserialize(cbrb, reader)
       } catch {

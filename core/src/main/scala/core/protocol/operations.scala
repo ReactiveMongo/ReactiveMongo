@@ -128,7 +128,9 @@ private[reactivemongo] case class Update(
     flags: Int)
     extends WriteRequestOp {
   val code = 2001
-  val writeTo = writeTupleToBuffer3((0, fullCollectionName, flags)) _
+
+  val writeTo =
+    writeTupleToBuffer3(Tuple3(0, fullCollectionName, flags))(_: ByteBuf)
   val size = 4 /* int32 = ZERO */ + 4 + fullCollectionName.length + 1
   override val requiresPrimary = true
 }
@@ -152,7 +154,7 @@ private[reactivemongo] case class Insert(
     fullCollectionName: String)
     extends WriteRequestOp {
   val code = 2002
-  val writeTo = writeTupleToBuffer2((flags, fullCollectionName)) _
+  val writeTo = writeTupleToBuffer2(flags -> fullCollectionName)(_: ByteBuf)
   val size = 4 + fullCollectionName.length + 1
   override val requiresPrimary = true
 }
@@ -176,8 +178,8 @@ private[reactivemongo] case class Query(
   val size = 4 + fullCollectionName.length + 1 + 4 + 4
 
   val writeTo: ByteBuf => Unit = writeTupleToBuffer4(
-    (flags, fullCollectionName, numberToSkip, numberToReturn)
-  ) _
+    Tuple4(flags, fullCollectionName, numberToSkip, numberToReturn)
+  )
 }
 
 /**
@@ -253,8 +255,9 @@ private[reactivemongo] case class GetMore(
   override val expectsResponse = true
   val code = 2005
 
-  val writeTo =
-    writeTupleToBuffer4((0, fullCollectionName, numberToReturn, cursorID)) _
+  val writeTo = writeTupleToBuffer4(
+    Tuple4(0, fullCollectionName, numberToReturn, cursorID)
+  )(_: ByteBuf)
 
   val size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4 + 8
 }
@@ -269,7 +272,9 @@ private[reactivemongo] case class Delete(
     flags: Int)
     extends WriteRequestOp {
   val code = 2006
-  val writeTo = writeTupleToBuffer3((0, fullCollectionName, flags)) _
+
+  val writeTo =
+    writeTupleToBuffer3(Tuple3(0, fullCollectionName, flags))(_: ByteBuf)
   val size = 4 /* int32 ZERO */ + fullCollectionName.length + 1 + 4
   override val requiresPrimary = true
 }
@@ -284,11 +289,11 @@ private[reactivemongo] case class KillCursors(cursorIDs: Set[Long])
   val code = 2007
 
   val writeTo: ByteBuf => Unit = { (buffer: ByteBuf) =>
-    buffer writeIntLE 0
-    buffer writeIntLE cursorIDs.size
+    buffer `writeIntLE` 0
+    buffer `writeIntLE` cursorIDs.size
 
     for (cursorID <- cursorIDs) {
-      buffer writeLongLE cursorID
+      buffer `writeLongLE` cursorID
     }
   }
 
@@ -307,9 +312,9 @@ private[reactivemongo] case class CompressedOp(
   val size = 4 + 4 + 1
 
   val writeTo: ByteBuf => Unit = { (buffer: ByteBuf) =>
-    buffer writeIntLE originalOpCode
-    buffer writeIntLE uncompressedSize
-    buffer writeByte compressorId.toInt
+    buffer `writeIntLE` originalOpCode
+    buffer `writeIntLE` uncompressedSize
+    buffer `writeByte` compressorId.toInt
 
     ()
   }

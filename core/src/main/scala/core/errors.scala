@@ -86,7 +86,7 @@ private[reactivemongo] object DatabaseException {
       .orElse {
         decoder.string(doc, "errmsg")
       }
-      .getOrElse(s"message is not present, unknown error: ${pack pretty doc}")
+      .getOrElse(s"message is not present, unknown error: ${pack `pretty` doc}")
 
     lazy val code = decoder.int(doc, "code")
   }

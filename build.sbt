@@ -66,7 +66,14 @@ lazy val `ReactiveMongo-Test` = project
   .in(file("test"))
   .settings(
     description := "ReactiveMongo test helpers",
-    version := (`ReactiveMongo` / version).value
+    version := (`ReactiveMongo` / version).value,
+    scalacOptions ++= {
+      if (scalaBinaryVersion.value == "3") {
+        Seq("-Wconf:msg=.*with\\ as\\ a\\ type\\ operator.*:s")
+      } else {
+        Seq.empty
+      }
+    }
   )
   .dependsOn(`ReactiveMongo`)
 

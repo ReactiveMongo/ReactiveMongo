@@ -25,8 +25,8 @@ private[reactivemongo] class MessageHeader(
     extends ChannelBufferWritable {
 
   val writeTo: ByteBuf => Unit = writeTupleToBuffer4(
-    (messageLength, requestID, responseTo, opCode)
-  ) _
+    Tuple4(messageLength, requestID, responseTo, opCode)
+  )
 
   override val size = MessageHeader.size
 
