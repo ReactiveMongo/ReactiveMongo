@@ -2,7 +2,12 @@ package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
 
-import reactivemongo.api.{ FailoverStrategy, Cursor, ReadPreference, SerializationPack }
+import reactivemongo.api.{
+  FailoverStrategy,
+  Cursor,
+  ReadPreference,
+  SerializationPack
+}
 import reactivemongo.api.commands.{
   CollectionCommand,
   Command,
@@ -14,7 +19,7 @@ import reactivemongo.api.commands.{
 
 /** Collection operations to run commands with */
 private[api] trait GenericCollectionWithCommands[P <: SerializationPack] {
-  //self: GenericCollection[P] =>
+  // self: GenericCollection[P] =>
 
   // Workaround for self-type issue with Scala 3
   // https://github.com/scala/scala3/issues/11226
