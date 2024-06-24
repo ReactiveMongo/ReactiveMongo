@@ -596,7 +596,7 @@ trait QueryBuilderFactory[P <: SerializationPack] extends HintFactory[P] {
         reader: pack.Reader[T],
         ec: ExecutionContext
       ): Future[Option[T]] =
-      copy(batchSize = 1).defaultCursor(readPreference)(reader).headOption
+      copy(batchSize = 1, singleBatch = true).defaultCursor(readPreference)(reader).headOption
 
     /**
      * $requireOneFunction
