@@ -34,6 +34,7 @@ fi
 source "$SCRIPT_DIR/jvmopts.sh"
 
 if [ "x$OS_NAME" = "xosx" ]; then
+    rm -f "$SCRIPT_DIR/../.jvmopts"
     SBT_OPTS="-Dtest.nettyNativeArch=osx"
 fi
 
