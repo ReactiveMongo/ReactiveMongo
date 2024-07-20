@@ -10,6 +10,10 @@ if [ `git grep "$SCRIPT_DIR" $(basename "$SCRIPT_DIR") | grep -v $(basename $0) 
   exit 2
 fi
 
+if [ "x$OS_NAME" = "xosx" ]; then
+    rm -f "$SCRIPT_DIR/../.jvmopts"
+fi
+
 echo "[INFO] Checking dependencies for Scala $SCALA_VERSION ..."
 sbt ++$SCALA_VERSION update
 
@@ -34,7 +38,6 @@ fi
 source "$SCRIPT_DIR/jvmopts.sh"
 
 if [ "x$OS_NAME" = "xosx" ]; then
-    rm -f "$SCRIPT_DIR/../.jvmopts"
     SBT_OPTS="-Dtest.nettyNativeArch=osx"
 fi
 
