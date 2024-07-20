@@ -10,6 +10,10 @@ if [ `git grep "$SCRIPT_DIR" $(basename "$SCRIPT_DIR") | grep -v $(basename $0) 
   exit 2
 fi
 
+if [ "x$OS_NAME" = "xosx" ]; then
+    rm -f "$SCRIPT_DIR/../.jvmopts"
+fi
+
 echo "[INFO] Checking dependencies for Scala $SCALA_VERSION ..."
 sbt ++$SCALA_VERSION update
 
