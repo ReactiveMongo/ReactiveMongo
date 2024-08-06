@@ -34,7 +34,7 @@ object Common extends AutoPlugin {
   val scala211 = "2.11.12"
   val scala212 = "2.12.19"
   val scala213 = "2.13.14"
-  val scala3 = "3.4.1"
+  val scala3 = "3.4.2"
 
   def majorVersion = {
     val Major = """([0-9]+)\.([0-9]+)\..*""".r
@@ -80,9 +80,9 @@ object Common extends AutoPlugin {
           ver
         } else {
           ver.span(_ != '-') match {
-            case (_, "") => s"${ver}.${suffix}"
+            case (_, "") => s"${ver}-${suffix}"
 
-            case (a, b) => s"${a}.${suffix}${b}"
+            case (a, b) => s"${a}-${suffix}.${b stripPrefix "-"}"
           }
         }
       },

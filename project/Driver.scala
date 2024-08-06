@@ -37,7 +37,8 @@ final class Driver(core: Project, actorModule: Project) {
             ver.span(_ != '-') match {
               case (_, "") => s"${ver}.${suffix}"
 
-              case (a, b) => s"${a}.${suffix}${b}"
+              case (a, b) =>
+                s"${a}-${suffix}.${b stripPrefix "-"}"
             }
           }
         },
