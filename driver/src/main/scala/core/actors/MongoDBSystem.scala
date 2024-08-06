@@ -1708,8 +1708,7 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
     if (!reqAuth) info
     else {
-      s"authenticated:${node.authenticatedConnections.size}, authenticating: ${node.connected
-          .count(_.authenticating.isDefined)}, $info"
+      s"authenticated:${node.authenticatedConnections.size}, authenticating: ${node.connected.count(_.authenticating.isDefined)}, $info"
     }
   }
 
