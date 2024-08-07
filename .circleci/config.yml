@@ -6,7 +6,7 @@ commands:
     parameters:
       sbt_version:
         type: string
-        default: "1.10.0"
+        default: "1.10.1"
     steps:
       - restore_cache:
           name: Restore SBT cache
@@ -198,7 +198,7 @@ commands:
                       exit 0
                     fi
 
-                    V=`sbt ';project ReactiveMongo-Core ;show version' | grep -A 1 ReactiveMongo-Core | grep -v ReactiveMongo-Core | cut -d ' ' -f 2`
+                    V=`sbt -J-Dsbt.log.noformat=true ';project ReactiveMongo-Core ;show version' | grep -A 1 ReactiveMongo-Core | grep -v ReactiveMongo-Core | cut -d ' ' -f 2`
 
                     if [ `echo "$V" | grep -- '-SNAPSHOT' | wc -l` -eq 0 ]; then
                       S=`echo "$V" | perl -pe 's/([0-9]+)$/${\($1 + 1)}-SNAPSHOT/'`
