@@ -395,7 +395,7 @@ workflows:
           os: osx
           e: osx
           jdk_version: jdk8
-          scala_version: 2.12.19
+          scala_version: 2.12.20
           shaded: false
 
       - unit_test_suite:
@@ -404,7 +404,7 @@ workflows:
             name: openjdk
             version: 10
           jdk_version: openjdk10
-          scala_version: 2.12.19
+          scala_version: 2.12.20
 
       - unit_test_suite:
           name: unit_linux_openjdk11_scala213_pekko
