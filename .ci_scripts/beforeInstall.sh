@@ -55,7 +55,7 @@ if [ ! -L "$HOME/ssl/lib/libssl.so.$SSL_MAJOR" ] && [ ! -f "$HOME/ssl/lib/libcry
   echo "[INFO] Building OpenSSL $SSL_MAJOR ..."
 
   cd /tmp
-  curl -s -o - "https://www.openssl.org/source/old/$SSL_RELEASE/openssl-$SSL_FULL_RELEASE.tar.gz" | tar -xzf -
+  curl -L -s -o - "https://www.openssl.org/source/old/$SSL_RELEASE/openssl-$SSL_FULL_RELEASE.tar.gz" | tar -xzf -
   cd openssl-$SSL_FULL_RELEASE
   rm -rf "$HOME/ssl" && mkdir "$HOME/ssl"
   ./config -shared enable-ssl2 --prefix="$HOME/ssl" > /dev/null
