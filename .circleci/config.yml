@@ -6,7 +6,7 @@ commands:
     parameters:
       sbt_version:
         type: string
-        default: "1.10.1"
+        default: "1.10.3"
     steps:
       - restore_cache:
           name: Restore SBT cache
@@ -438,6 +438,7 @@ workflows:
 
       - integration_test_suite:
           name: mongo5_openjdk11_scala213_pekko_x509
+          openjdk_version: 11
           mongo_version: 5
           scala_version: 2.13.14
           actor_module: pekko
