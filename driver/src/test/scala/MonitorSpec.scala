@@ -140,13 +140,21 @@ final class MonitorSpec(
           3600000 // disable refreshAll/connectAll during test
       )
 
-      // Disable logging (as simulating errors)
-      val log = org.slf4j.LoggerFactory
-        .getLogger("akka.actor.OneForOneStrategy")
-        .asInstanceOf[ch.qos.logback.classic.Logger]
+      import ch.qos.logback.classic.Level
 
-      val level = log.getLevel
-      log.setLevel(ch.qos.logback.classic.Level.OFF)
+      // Disable logging (as simulating errors)
+      val resetLogLevel = org.slf4j.LoggerFactory.getLogger("akka.actor.OneForOneStrategy") match {
+        case log: ch.qos.logback.classic.Logger => {
+          val level = log.getLevel
+
+          log.setLevel(Level.OFF)
+
+          () => log.setLevel(level)
+        }
+
+        case _ =>
+          () => {}
+      }
       //
 
       withConAndSys(options = opts) { (con, sysRef) =>
@@ -216,7 +224,7 @@ final class MonitorSpec(
             }
           }
         }
-      }.andThen { case _ => log.setLevel(level) }
+      }.andThen { case _ => resetLogLevel() }
         .await(0, timeout * expectFactor)
     }
 
