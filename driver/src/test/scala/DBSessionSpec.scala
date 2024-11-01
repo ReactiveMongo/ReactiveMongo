@@ -6,7 +6,7 @@ trait DBSessionSpec { specs: DatabaseSpec =>
   import Common._
 
   @inline private def _db =
-    Common.connection.database(s"dbsession-${System identityHashCode this}")
+    Common.connection.database(s"dbsession-${System.identityHashCode(this)}")
 
   def sessionSpecs = "manage session" >> {
     section("gt_mongo32")
@@ -47,7 +47,7 @@ trait DBSessionSpec { specs: DatabaseSpec =>
     if (replSetOn) {
       section("ge_mongo4")
       "start & abort transaction" in {
-        val colName = s"tx1_${System identityHashCode this}"
+        val colName = s"tx1_${System.identityHashCode(this)}"
         @volatile var database = Option.empty[DB]
 
         eventually(2, timeout) {
@@ -155,7 +155,7 @@ trait DBSessionSpec { specs: DatabaseSpec =>
       }
 
       "cannot abort transaction after session is killed" in {
-        val colName = s"abort-after-killed${System identityHashCode this}"
+        val colName = s"abort-after-killed${System.identityHashCode(this)}"
 
         (for {
           db <- _db
@@ -186,7 +186,7 @@ trait DBSessionSpec { specs: DatabaseSpec =>
       }
 
       "start & commit transaction" in {
-        val colName = s"tx2_${System identityHashCode this}"
+        val colName = s"tx2_${System.identityHashCode(this)}"
         @volatile var database = Option.empty[DB]
 
         _db.flatMap(_.startSession()).flatMap { sdb =>

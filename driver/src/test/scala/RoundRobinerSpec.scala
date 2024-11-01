@@ -50,7 +50,7 @@ final class RoundRobinerSpec extends org.specs2.mutable.Specification {
       "pick element with filter" in {
         val r = RoundRobiner(elements)
 
-        r.pickWithFilter(_ startsWith "b") must beSome("bar") and {
+        r.pickWithFilter(_.startsWith("b")) must beSome("bar") and {
           r.pickWithFilter(_.size > 3) must beSome("lorem")
         } and {
           // loop again (skip 'foo' and 'bar')
@@ -68,7 +68,7 @@ final class RoundRobinerSpec extends org.specs2.mutable.Specification {
 
         val revOrdering = implicitly[math.Ordering[String]].reverse
 
-        r.pickWithFilterAndPriority(_ startsWith "b", 2) must beSome(
+        r.pickWithFilterAndPriority(_.startsWith("b"), 2) must beSome(
           "bar"
         ) and {
           r.pickWithFilterAndPriority(_.size > 3, 2) must beSome("ipsum")

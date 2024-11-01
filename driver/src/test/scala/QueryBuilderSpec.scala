@@ -156,7 +156,7 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
 
   "Merge" should {
     lazy val coll =
-      _root_.tests.Common.db(s"querybuilder${System identityHashCode this}")
+      _root_.tests.Common.db(s"querybuilder${System.identityHashCode(this)}")
 
     lazy val ver =
       reactivemongo.api.tests.maxWireVersion(_root_.tests.Common.db)
@@ -194,7 +194,7 @@ final class QueryBuilderSpec extends org.specs2.mutable.Specification { specs =>
       val expected = BSONDocument(elements.result())
       val res = builder.merge(ReadPreference.Primary, 10)
 
-      res.aka(BSONDocument pretty res) must_=== expected
+      res.aka(BSONDocument.pretty(res)) must_=== expected
     }
 
     "write with more options" >> {

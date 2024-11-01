@@ -5,7 +5,7 @@ ENV_FILE="$1"
 source "$ENV_FILE"
 export LD_LIBRARY_PATH
 
-MONGOD_PID=`ps -o pid,comm -u $USER | grep 'mongod$' | awk '{ printf("%s\n", $1); }'`
+MONGOD_PID="$(ps -o pid,comm -u $USER | grep 'mongod$' | awk '{ printf("%s\n", $1); }')"
 
 if [ "x$MONGOD_PID" = "x" ]; then
     echo "[ERROR] MongoDB process not found" > /dev/stderr
@@ -14,7 +14,7 @@ if [ "x$MONGOD_PID" = "x" ]; then
 fi
 
 # Check MongoDB connection
-SCRIPT_DIR=`dirname $0 | sed -e "s|^\./|$PWD/|"`
+SCRIPT_DIR="$(dirname $0 | sed -e "s|^\./|$PWD/|")"
 MONGOSHELL_OPTS=""
 
 # prepare SSL options
@@ -41,7 +41,7 @@ if [ "$MONGO_PROFILE" = "mutual-ssl" -o "$MONGO_PROFILE" = "x509" ]; then
 fi
 
 if [ "$MONGO_PROFILE" = "x509" ]; then
-    CLIENT_CERT_SUBJECT=`openssl x509 -in "$SCRIPT_DIR/client-cert.pem" -inform PEM -subject -nameopt RFC2253 | grep subject | awk '{sub("subject= ",""); print}'`
+    CLIENT_CERT_SUBJECT="$(openssl x509 -in "$SCRIPT_DIR/client-cert.pem" -inform PEM -subject -nameopt RFC2253 | grep subject | awk '{sub("subject= ",""); print}')"
     MONGOSHELL_OPTS="$MONGOSHELL_OPTS -u $CLIENT_CERT_SUBJECT"
     MONGOSHELL_OPTS="$MONGOSHELL_OPTS --authenticationMechanism=MONGODB-X509"
     MONGOSHELL_OPTS="$MONGOSHELL_OPTS --authenticationDatabase=\$external"
@@ -58,10 +58,10 @@ while [ $I -lt 3 -a ! "x$MONGODB_NAME" = "xFOO" ]; do
         sleep 10s
     fi
 
-    I=`expr $I + 1`
+    I="$(expr $I + 1)"
     echo "[INFO] Checking MongoDB connection #$I ..."
 
-    MONGODB_NAME=`mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'db.getName()' 2>/dev/null | tail -n 1`
+    MONGODB_NAME="$(mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'db.getName()' 2>/dev/null | tail -n 1)"
 done
 
 if [ ! "x$MONGODB_NAME" = "xFOO" ]; then
@@ -92,14 +92,14 @@ mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'var s=db.serverStatus();s.version' 2
 echo -n "- Security: "
 mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'var s=db.serverStatus();var x=s["security"];(!x)?"_DISABLED_":x["SSLServerSubjectName"];' 2>/dev/null | tail -n 1
 
-if [ ! "v$MONGO_VER" = "v2_6" ]; then
-    echo -n "- Storage engine: "
-    mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'var s=db.serverStatus();JSON.stringify(s["storageEngine"]);' 2>/dev/null | grep '"name"' | cut -d '"' -f 4
-fi
+echo -n "- Storage engine: "
+mongo "$PRIMARY_HOST/FOO" $MONGOSHELL_OPTS 'var s=db.serverStatus();JSON.stringify(s["storageEngine"]);' 2>/dev/null | grep '"name"' | cut -d '"' -f 4
 
 if [ "$MONGO_PROFILE" = "rs" ]; then
-    mongo "$PRIMARY_HOST" $MONGOSHELL_OPTS "rs.initiate({\"_id\":\"testrs0\",\"version\":1,\"members\":[{\"_id\":0,\"host\":\"$PRIMARY_HOST\"}]});" || (
+    mongo "$PRIMARY_HOST" $MONGOSHELL_OPTS "let rsOk = false; try { rsOk = rs.status().ok } catch (e) { }; if (!rsOk) rs.initiate({\"_id\":\"testrs0\",\"version\":1,\"members\":[{\"_id\":0,\"host\":\"$PRIMARY_HOST\"}]});" || (
         echo "[ERROR] Fails to setup the ReplicaSet" > /dev/stderr
+        tail -n 100 /tmp/mongod.log
+
         false
     )
 fi

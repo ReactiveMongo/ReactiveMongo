@@ -75,11 +75,11 @@ final class DatabaseSpec(
             admin <- connection.database("admin", failoverStrategy)
             name1 <- {
               val name =
-                s"foo${System identityHashCode admin}-${System.currentTimeMillis()}"
+                s"foo${System.identityHashCode(admin)}-${System.currentTimeMillis()}"
 
               db.collection(name).create().map(_ => name)
             }
-            name = s"renamed_${System identityHashCode name1}"
+            name = s"renamed_${System.identityHashCode(name1)}"
             c2 <- admin.renameCollection(db.name, name1, name)
           } yield name -> c2.name) must beLike[(String, String)] {
             case (expected, name) => name aka "new name" must_=== expected
@@ -89,7 +89,7 @@ final class DatabaseSpec(
 
       "fail to rename collection if target exists" in eventually(2, timeout) {
         val colName =
-          s"mv_fail_${System identityHashCode ee}-${System.currentTimeMillis()}"
+          s"mv_fail_${System.identityHashCode(ee)}-${System.currentTimeMillis()}"
 
         val c1 = {
           val c = db.collection(colName)
@@ -98,7 +98,7 @@ final class DatabaseSpec(
 
         (for {
           _ <- c1
-          name = s"renamed_${System identityHashCode c1}"
+          name = s"renamed_${System.identityHashCode(c1)}"
           c2 = db.collection(name)
           _ <- c2.create(failsIfExists = false)
         } yield name) must beLike[String] {
@@ -137,13 +137,13 @@ final class DatabaseSpec(
           .aka("drop") must beTypedEqualTo({}).awaitFor(timeout * 4L)
 
       "be dropped with the default connection" in {
-        val dbName = s"databasespec-${System identityHashCode ee}"
+        val dbName = s"databasespec-${System.identityHashCode(ee)}"
 
         dropSpec(connection, dbName, timeout)
       }
 
       "be dropped with the slow connection" in {
-        val dbName = s"slowdatabasespec-${System identityHashCode ee}"
+        val dbName = s"slowdatabasespec-${System.identityHashCode(ee)}"
 
         dropSpec(slowConnection, dbName, slowTimeout)
       }

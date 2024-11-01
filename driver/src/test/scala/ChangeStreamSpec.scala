@@ -73,15 +73,15 @@ final class ChangeStreamSpec(
           // then
           (forkedInsertion.map(_ => {}) must haveCompleted) and (result must {
             {
-              haveField[String]("operationType") that beTypedEqualTo("insert")
+              haveField[String]("operationType").that(beTypedEqualTo("insert"))
             } and {
-              haveField[BSONDocument]("documentKey") that {
-                haveField[String]("_id") that beTypedEqualTo("test")
+              haveField[BSONDocument]("documentKey").that {
+                haveField[String]("_id").that(beTypedEqualTo("test"))
               }
             } and {
-              haveField[BSONDocument]("fullDocument") that beTypedEqualTo(
+              haveField[BSONDocument]("fullDocument").that(beTypedEqualTo(
                 testDocument
-              )
+              ))
             }
           }.await(2, timeout))
         }
@@ -121,15 +121,15 @@ final class ChangeStreamSpec(
           // then
           (forkedInsertion.map(_ => {}) must haveCompleted) and (result must {
             {
-              haveField[String]("operationType") that beTypedEqualTo("insert")
+              haveField[String]("operationType").that(beTypedEqualTo("insert"))
             } and {
-              haveField[BSONDocument]("documentKey") that {
-                haveField[String]("_id") that beTypedEqualTo("resume_test2")
+              haveField[BSONDocument]("documentKey").that {
+                haveField[String]("_id").that(beTypedEqualTo("resume_test2"))
               }
             } and {
-              haveField[BSONDocument]("fullDocument") that beTypedEqualTo(
+              haveField[BSONDocument]("fullDocument").that(beTypedEqualTo(
                 testDocument2
-              )
+              ))
             }
           }.await(2, timeout))
         }
@@ -171,17 +171,17 @@ final class ChangeStreamSpec(
           // then
           (forkedInsertion.map(_ => {}) must haveCompleted) and (result must {
             {
-              haveField[String]("operationType") that beTypedEqualTo("insert")
+              haveField[String]("operationType").that(beTypedEqualTo("insert"))
             } and {
-              haveField[BSONDocument]("documentKey") that {
-                haveField[String]("_id") that beTypedEqualTo(
+              haveField[BSONDocument]("documentKey").that {
+                haveField[String]("_id").that(beTypedEqualTo(
                   "clusterTime_test1"
-                )
+                ))
               }
             } and {
-              haveField[BSONDocument]("fullDocument") that beTypedEqualTo(
+              haveField[BSONDocument]("fullDocument").that(beTypedEqualTo(
                 testDocument1
-              )
+              ))
             }
           }.await(1, timeout))
         }
@@ -205,7 +205,7 @@ final class ChangeStreamSpec(
             // given
             val initialCursor =
               coll.watch[BSONDocument]().cursor[Cursor.WithOps]
-            val id = s"lookup_test${System identityHashCode initialCursor}"
+            val id = s"lookup_test${System.identityHashCode(initialCursor)}"
             val testDocument = BSONDocument("_id" -> id, fieldName -> "bar1")
 
             import coll.AggregationFramework.ChangeStream.ResumeAfter
@@ -261,18 +261,18 @@ final class ChangeStreamSpec(
               insertion must beTypedEqualTo({}).awaitFor(timeout) and {
                 res must {
                   {
-                    haveField[String]("operationType") that beTypedEqualTo(
+                    haveField[String]("operationType").that(beTypedEqualTo(
                       "update"
-                    )
+                    ))
                   } and {
-                    haveField[BSONDocument]("documentKey") that {
-                      haveField[String]("_id") that beTypedEqualTo(id)
+                    haveField[BSONDocument]("documentKey").that {
+                      haveField[String]("_id").that(beTypedEqualTo(id))
                     }
                   } and {
-                    haveField[BSONDocument]("fullDocument") that {
-                      haveField[String](fieldName) that beTypedEqualTo(
+                    haveField[BSONDocument]("fullDocument").that {
+                      haveField[String](fieldName).that(beTypedEqualTo(
                         lastValue
-                      )
+                      ))
                     }
                   }
                 }.await(1, timeout)

@@ -57,8 +57,8 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
                 _.updateAll { n =>
                   val cid = DefaultChannelId.newInstance()
                   val hfun = {
-                    if (n.name startsWith "nodesetspec.node1:") node1Handler _
-                    else node2Handler _
+                    if (n.name.startsWith("nodesetspec.node1:")) node1Handler(_)
+                    else node2Handler(_)
                   }
 
                   val chan = Await.result(
@@ -87,7 +87,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
               updateNodeSet(ref.underlyingActor, "Test") {
                 // Connect the test nodes with "embedded" channels
                 _.updateAll { n =>
-                  if (n.name startsWith "nodesetspec.node2:") {
+                  if (n.name.startsWith("nodesetspec.node2:")) {
                     // Simulate a isMaster timeout for node2
                     n.copy(pingInfo =
                       n.pingInfo.copy(
@@ -105,7 +105,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
             val unregistered = Common.tryUntil((0 to 5).map(_ * 500).toList)(
               nodeSet(ref.underlyingActor).nodes,
               (_: Vector[Node]).exists { node =>
-                if (node.name startsWith "nodesetspec.node2:") {
+                if (node.name.startsWith("nodesetspec.node2:")) {
                   node.status == NodeStatus.Unknown
                 } else false
               }
@@ -163,7 +163,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
           updateNodeSet(ref.underlyingActor, "Test") {
             // Connect the test nodes with "embedded" channels
             _.updateAll { n =>
-              if (n.name startsWith "nodesetspec.node2:") {
+              if (n.name.startsWith("nodesetspec.node2:")) {
                 // Simulate a isMaster timeout for node2
                 val lastTime = System.nanoTime() - nonQueryableTimeout
 
@@ -291,7 +291,7 @@ trait UnresponsiveSecondaryTest { parent: NodeSetSpec =>
     def prim = if (secAvail) isPrim
     else {
       isPrim -- "hosts" ++ ("hosts" -> nodes.filter(
-        _ startsWith "nodesetspec.node1"
+        _.startsWith("nodesetspec.node1")
       ))
     }
 

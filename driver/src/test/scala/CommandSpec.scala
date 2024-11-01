@@ -45,13 +45,13 @@ final class CommandSpec(
         }
 
         "with the default connection" in eventually(2, timeout) {
-          reindexSpec(db, s"commandspec${System identityHashCode db}", timeout)
+          reindexSpec(db, s"commandspec${System.identityHashCode(db)}", timeout)
         }
 
         "with the slow connection" in eventually(2, timeout) {
           reindexSpec(
             slowDb,
-            s"commandspec${System identityHashCode slowDb}",
+            s"commandspec${System.identityHashCode(slowDb)}",
             slowTimeout
           )
 

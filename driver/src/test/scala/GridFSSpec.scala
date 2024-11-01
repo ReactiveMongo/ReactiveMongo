@@ -27,7 +27,7 @@ final class GridFSSpec(
   import Common.{ timeout, slowTimeout }
 
   lazy val (db, slowDb) = Common.databases(
-    s"reactivemongo-gridfs-${System identityHashCode this}",
+    s"reactivemongo-gridfs-${System.identityHashCode(this)}",
     Common.connection,
     Common.slowConnection,
     retries = 1
@@ -38,13 +38,13 @@ final class GridFSSpec(
   // ---
 
   "Default connection" should {
-    val prefix = s"fs${System identityHashCode db}"
+    val prefix = s"fs${System.identityHashCode(db)}"
 
     gridFsSpec(db, prefix, timeout)
   }
 
   "Slow connection" should {
-    val prefix = s"fs${System identityHashCode slowDb}"
+    val prefix = s"fs${System.identityHashCode(slowDb)}"
 
     gridFsSpec(slowDb, prefix, slowTimeout)
   }
@@ -65,7 +65,7 @@ final class GridFSSpec(
     import builder.{ document, elementProducer => elem, string => str }
     implicit def dw: pack.Writer[pack.Document] = pack.IdentityWriter
 
-    val filename1 = s"file1-${System identityHashCode gfs}"
+    val filename1 = s"file1-${System.identityHashCode(gfs)}"
     lazy val file1 = gfs.fileToSave(Some(filename1), Some("application/file"))
 
     lazy val content1 = (1 to 100).view.map(_.toByte).toArray
@@ -91,7 +91,7 @@ final class GridFSSpec(
         .map(_.filename) must beSome(filename1).await(1, timeout)
     }
 
-    val filename2 = s"file2-${System identityHashCode gfs}"
+    val filename2 = s"file2-${System.identityHashCode(gfs)}"
     lazy val file2 = gfs.fileToSave(
       filename = Some(filename2),
       contentType = Some("text/plain"),
@@ -121,7 +121,7 @@ final class GridFSSpec(
       }
     }
 
-    lazy val customField = s"foo-${System identityHashCode content2}"
+    lazy val customField = s"foo-${System.identityHashCode(content2)}"
 
     "update a file metadata" in {
       val update = document(

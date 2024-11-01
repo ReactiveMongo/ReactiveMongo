@@ -41,7 +41,7 @@ final class ReadPreferenceSpec extends org.specs2.mutable.Specification {
         case (pref, mode) =>
           val expected = BSONDocument("mode" -> mode, "tags" -> bsonTags)
 
-          s"be encoded as '${BSONDocument pretty expected}'" in {
+          s"be encoded as '${BSONDocument.pretty(expected)}'" in {
             bson(pref) must_=== expected
           }
       }

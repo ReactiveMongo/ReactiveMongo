@@ -27,13 +27,13 @@ final class CommonUseCases(
   import builder.regex
 
   lazy val (db, slowDb) = Common.databases(
-    s"reactivemongo-usecases-${System identityHashCode this}",
+    s"reactivemongo-usecases-${System.identityHashCode(this)}",
     Common.connection,
     Common.slowConnection,
     retries = 1
   )
 
-  val colName = s"commonusecases${System identityHashCode this}"
+  val colName = s"commonusecases${System.identityHashCode(this)}"
   lazy val collection = db(colName)
   lazy val slowColl = slowDb(colName)
 
