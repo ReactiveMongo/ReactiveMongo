@@ -30,15 +30,15 @@ final class IndexesSpec(
   import Common.{ timeout, slowTimeout }
 
   lazy val (db, slowDb) = Common.databases(
-    s"reactivemongo-gridfs-${System identityHashCode this}",
+    s"reactivemongo-gridfs-${System.identityHashCode(this)}",
     Common.connection,
     Common.slowConnection
   )
 
   def afterAll() = { db.drop(); () }
 
-  lazy val geo = db(s"geo${System identityHashCode this}")
-  lazy val slowGeo = slowDb(s"geo${System identityHashCode slowDb}")
+  lazy val geo = db(s"geo${System.identityHashCode(this)}")
+  lazy val slowGeo = slowDb(s"geo${System.identityHashCode(slowDb)}")
 
   // ---
 
@@ -125,7 +125,7 @@ final class IndexesSpec(
     }
   }
 
-  lazy val geo2DSpherical = db(s"geo2d_${System identityHashCode this}")
+  lazy val geo2DSpherical = db(s"geo2d_${System.identityHashCode(this)}")
 
   "Geo2D indexes" should {
     "insert some points" in {
@@ -164,7 +164,7 @@ final class IndexesSpec(
     }
   }
 
-  lazy val hashed = db(s"hashed_${System identityHashCode this}")
+  lazy val hashed = db(s"hashed_${System.identityHashCode(this)}")
 
   "Hashed indexes" should {
     "insert some data" in {
@@ -226,7 +226,7 @@ final class IndexesSpec(
     }
   }
 
-  lazy val partial = db(s"partial${System identityHashCode this}")
+  lazy val partial = db(s"partial${System.identityHashCode(this)}")
 
   "Index with partial filter" should {
     // See https://docs.mongodb.com/manual/core/index-partial/#partial-index-with-unique-constraints
@@ -304,7 +304,7 @@ final class IndexesSpec(
   }
 
   "Text index" should {
-    lazy val coll = db(s"txtidx${System identityHashCode this}")
+    lazy val coll = db(s"txtidx${System.identityHashCode(this)}")
     lazy val mngr = coll.indexesManager
 
     val name = "mySearchIndex"

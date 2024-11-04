@@ -170,7 +170,7 @@ final class ChannelFactorySpec(
       def actor = new Actor {
         val isMasterReader = IsMasterCommand.reader(pack)
         val receive: Receive = {
-          case msg if (msg.toString startsWith "ChannelConnected(") =>
+          case msg if (msg.toString.startsWith("ChannelConnected(")) =>
             chanConnected.success(Common.logger.info(s"NIO $msg")); ()
 
           case IsMasterResponse(resp) if (chanConnected.isCompleted) => {

@@ -200,7 +200,7 @@ final class MonitorSpec(
 
             tryUntil[Iterable[(Long, String)]](
               List(125, 250, 500, 1000, 2125, 4096)
-            )(history(dbsystem), _.exists(_._2 startsWith "Restart"))
+            )(history(dbsystem), _.exists(_._2.startsWith("Restart")))
               .aka("history #3") must beTrue
 
           } and eventually(1, 3.seconds) { // #4 (see issue 558)
@@ -492,8 +492,8 @@ final class MonitorSpec(
     )(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]
     ): Future[T] = {
     // See AsyncDriver#connect
-    val supervisorName = s"monitorspec-sup-${System identityHashCode ee}"
-    val poolName = s"monitorspec-con-${System identityHashCode f}"
+    val supervisorName = s"monitorspec-sup-${System.identityHashCode(ee)}"
+    val poolName = s"monitorspec-con-${System.identityHashCode(f)}"
 
     implicit def sys: reactivemongo.actors.actor.ActorSystem =
       reactivemongo.api.tests.system(drv)

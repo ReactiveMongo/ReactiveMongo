@@ -101,7 +101,7 @@ final class FindAndModifySpec(
 
         eventually(2, timeout) {
           val colName =
-            s"fam-${System identityHashCode this}-1-${System.currentTimeMillis()}"
+            s"fam-${System.identityHashCode(this)}-1-${System.currentTimeMillis()}"
           val collection = db(colName)
 
           collection
@@ -120,7 +120,7 @@ final class FindAndModifySpec(
 
         eventually(2, timeout) {
           val colName =
-            s"fam-${System identityHashCode this}-2-${System.currentTimeMillis()}"
+            s"fam-${System.identityHashCode(this)}-2-${System.currentTimeMillis()}"
           val slowColl = slowDb(colName)
 
           slowColl.update
@@ -144,7 +144,7 @@ final class FindAndModifySpec(
     "modify a document and fetch its previous value" in {
       eventually(2, timeout) {
         val colName =
-          s"fam${System identityHashCode this}-3-${System.currentTimeMillis()}"
+          s"fam${System.identityHashCode(this)}-3-${System.currentTimeMillis()}"
         val collection = db(colName)
 
         val incrementAge = {
@@ -204,7 +204,7 @@ final class FindAndModifySpec(
         )
 
         val colName =
-          s"fam${System identityHashCode selector}-4-${System.currentTimeMillis()}"
+          s"fam${System.identityHashCode(selector)}-4-${System.currentTimeMillis()}"
         val coll = db.collection(colName)
 
         (for {
@@ -249,7 +249,7 @@ final class FindAndModifySpec(
 
       eventually(2, timeout) {
         val colName =
-          s"FindAndModify${System identityHashCode this}-5-${System.currentTimeMillis()}"
+          s"FindAndModify${System.identityHashCode(this)}-5-${System.currentTimeMillis()}"
         val collection = db(colName)
 
         collection.insert
@@ -293,7 +293,7 @@ final class FindAndModifySpec(
 
     f"fail with invalid $$inc clause" in eventually(2, timeout) {
       val colName =
-        s"fam${System identityHashCode this}-6-${System.currentTimeMillis()}"
+        s"fam${System.identityHashCode(this)}-6-${System.currentTimeMillis()}"
       val collection = db(colName)
 
       val query = BSONDocument(

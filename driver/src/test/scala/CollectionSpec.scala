@@ -37,7 +37,7 @@ final class CollectionSpec(
   import Common.{ timeout, slowTimeout }
 
   lazy val (db, slowDb) = Common.databases(
-    s"reactivemongo-${System identityHashCode this}",
+    s"reactivemongo-${System.identityHashCode(this)}",
     Common.connection,
     Common.slowConnection,
     retries = 2
@@ -77,7 +77,7 @@ final class CollectionSpec(
     }
 
     "expose stats" in {
-      db.collection(s"not_exists_${System identityHashCode collection}")
+      db.collection(s"not_exists_${System.identityHashCode(collection)}")
         .stats()
         .map(_.size > 0 /* since 4.2 stats are returns anyway */ )
         .recover { case _ => false } must beFalse.awaitFor(timeout) and {
@@ -413,7 +413,7 @@ final class CollectionSpec(
       "start & end" in {
         Common.db.startSession() must beLike[DB] {
           case db =>
-            val coll = db.collection(s"session_${System identityHashCode this}")
+            val coll = db.collection(s"session_${System.identityHashCode(this)}")
             val id = System.identityHashCode(db)
             val baseElms = {
               val b = Seq.newBuilder[pack.ElementProducer]
@@ -480,7 +480,7 @@ final class CollectionSpec(
     "use bulks" >> {
       "to insert (including 3 duplicate errors)" >> {
         val nDocs = 1000000
-        def colName(n: Int) = s"bulked${System identityHashCode this}_${n}"
+        def colName(n: Int) = s"bulked${System.identityHashCode(this)}_${n}"
 
         import reactivemongo.api.indexes._
         import reactivemongo.api.indexes.IndexType.Ascending
@@ -556,7 +556,7 @@ final class CollectionSpec(
       }
 
       {
-        lazy val coll = db(s"bulked${System identityHashCode this}_2")
+        lazy val coll = db(s"bulked${System.identityHashCode(this)}_2")
 
         "to insert" in {
           coll
@@ -600,7 +600,7 @@ final class CollectionSpec(
 }
 
 sealed trait CollectionFixtures { specs: CollectionSpec =>
-  val colName = s"bsoncoll${System identityHashCode this}"
+  val colName = s"bsoncoll${System.identityHashCode(this)}"
   protected final lazy val collection = db(colName)
   lazy val slowColl = slowDb(colName)
 

@@ -12,7 +12,7 @@ trait CollectionMetaSpec { collSpec: CollectionSpec =>
 
   def metaSpec = {
     "with the default connection" >> {
-      val colName = s"collmeta${System identityHashCode this}"
+      val colName = s"collmeta${System.identityHashCode(this)}"
 
       "be created" in {
         db(colName).create() must beTypedEqualTo({}).await(1, timeout)
@@ -32,7 +32,7 @@ trait CollectionMetaSpec { collSpec: CollectionSpec =>
     }
 
     "with the slow connection" >> {
-      val colName = s"slowmeta${System identityHashCode db}"
+      val colName = s"slowmeta${System.identityHashCode(db)}"
 
       "be created" in {
         slowDb(colName).create() must beTypedEqualTo({}).await(1, slowTimeout)
@@ -79,7 +79,7 @@ trait CollectionMetaSpec { collSpec: CollectionSpec =>
       timeout: FiniteDuration
     ) =
     "successfully" in {
-      val coll = _db.collection(s"foo_${System identityHashCode timeout}")
+      val coll = _db.collection(s"foo_${System.identityHashCode(timeout)}")
 
       (for {
         adminDb <- c.database("admin")
@@ -87,7 +87,7 @@ trait CollectionMetaSpec { collSpec: CollectionSpec =>
         _ <- adminDb.renameCollection(
           _db.name,
           coll.name,
-          s"renamed${System identityHashCode coll}"
+          s"renamed${System.identityHashCode(coll)}"
         )
 
       } yield ()) must beTypedEqualTo({}).await(0, timeout)
@@ -109,8 +109,8 @@ trait CollectionMetaSpec { collSpec: CollectionSpec =>
 
   def listSpec(db2: DB, timeout: FiniteDuration) = "be listed" in {
     val doc = BSONDocument("foo" -> BSONString("bar"))
-    val name1 = s"collection_one${System identityHashCode doc}"
-    val name2 = s"collection_two${System identityHashCode doc}"
+    val name1 = s"collection_one${System.identityHashCode(doc)}"
+    val name2 = s"collection_two${System.identityHashCode(doc)}"
 
     def i1 = db2(name1).insert.one(doc).map(_.n)
 

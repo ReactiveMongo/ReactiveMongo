@@ -70,6 +70,7 @@ commands:
                     export ACTOR_MODULE="<< parameters.actor_module >>"
                     SHADED="<< parameters.shaded >>"
                     export CI_CATEGORY="<< parameters.category >>"
+                    export JDK_VERSION="<< parameters.jdk_version >>"
 
                     if [ "x$USER" = "x" ]; then
                       export USER=`basename $HOME`
@@ -126,14 +127,14 @@ commands:
         type: string
         default: "INTEGRATION_TESTS"
       mongo_version:
-        type: string
+        type: integer
       mongo_profile:
         type: string
     steps:
       - restore_cache:
           name: Restore MongoDB cache
           keys:
-            - &mongo_cache_key mongo-<< parameters.mongo_version >>-<< parameters.mongo_profile >>
+            - &mongo_cache_key mongo-<< parameters.mongo_version >>.<< parameters.mongo_profile >>_20241104.02
 
       - run:
           name: Prepare integration environment
@@ -144,7 +145,8 @@ commands:
           name: Update MongoDB cache
           paths:
             - ~/ssl
-            - ~/mongodb-linux-x86_64-amazon-<< parameters.mongo_version >>
+            - ~/mongosh
+            - ~/mongodb
           key: *mongo_cache_key
 
       - run:
@@ -329,8 +331,8 @@ jobs:
                     echo "Actor module: $ACTOR_MODULE"
 
       - setup_integration:
-          mongo_version: $MONGO_VER
-          mongo_profile: $MONGO_PROFILE
+          mongo_version: << parameters.mongo_version >>
+          mongo_profile: << parameters.mongo_profile >>
 
       - setup_sbt
 
@@ -348,7 +350,7 @@ jobs:
 
   publish_snapshots:
     docker:
-      - image: circleci/openjdk:8-jdk
+      - image: cimg/openjdk:8.0
 
     working_directory: ~/repo
     
@@ -431,15 +433,16 @@ workflows:
           compressor: zlib
 
       - integration_test_suite:
-          name: mongo5_openjdk10_scala213_akka25_x509
-          mongo_version: 5
+          name: mongo6_openjdk11_scala213_akka25_x509
+          mongo_version: 6
           mongo_profile: x509
+          openjdk_version: 11
           scala_version: 2.13.15
 
       - integration_test_suite:
-          name: mongo5_openjdk11_scala213_pekko_x509
+          name: mongo7_openjdk11_scala213_pekko_x509
           openjdk_version: 11
-          mongo_version: 5
+          mongo_version: 7
           scala_version: 2.13.15
           actor_module: pekko
 
@@ -452,27 +455,30 @@ workflows:
           compressor: zstd
 
       - integration_test_suite:
-          name: mongo7_openjdk10_scala212_akka25_invalidssl
-          mongo_version: 7
-          mongo_profile: invalid-ssl
-
-      - integration_test_suite:
-          name: mongo5_openjdk10_scala212_akka25_mutualssl
-          mongo_version: 5
+          name: mongo8_openjdk17_scala212_akka26_mutualssl
+          openjdk_version: 17
+          akka_version: 2.6.20
+          mongo_version: 8
           mongo_profile: mutual-ssl
 
       - integration_test_suite:
-          name: mongo6_openjdk11_scala3_akka26_rs
-          scala_version: '3.4.2'
-          akka_version: 2.6.20
-          mongo_version: 6
-          mongo_profile: rs
-          shaded: false
-          openjdk_version: 11
+          name: mongo5_openjdk11_scala212_akka25_invalidssl
+          mongo_version: 5
+          mongo_profile: invalid-ssl
 
       - integration_test_suite:
-          name: mongo5_openjdk10_scala212_akka25_x509
-          mongo_version: 5
+          name: mongo8_openjdk17_scala3_akka26_rs
+          scala_version: '3.4.2'
+          akka_version: 2.6.20
+          mongo_version: 8
+          mongo_profile: rs
+          shaded: false
+          openjdk_version: 17
+
+      - integration_test_suite:
+          name: mongo6_openjdk11_scala212_akka25_x509
+          openjdk_version: 11
+          mongo_version: 6
           mongo_profile: x509
 
       - integration_test_suite:
@@ -488,15 +494,16 @@ workflows:
           compressor: snappy
 
       - integration_test_suite:
-          name: mongo7_openjdk11_scala211_akka25_rs
+          name: mongo7_openjdk10_scala211_akka25_rs
           scala_version: 2.11.12
           mongo_version: 7
           mongo_profile: rs
           openjdk_version: 11
 
       - integration_test_suite:
-          name: mongo5_openjdk10_scala211_akka25_x509
+          name: mongo5_openjdk11_scala211_akka25_x509
           scala_version: 2.11.12
+          openjdk_version: 11
           mongo_version: 5
           mongo_profile: x509
 
@@ -508,20 +515,20 @@ workflows:
           requires:
             - unit_osx_jdk8_scala212
             - unit_linux_openjdk10_scala212
+            - unit_linux_openjdk11_scala213_pekko
             - mongo3_openjdk8_scala211_akka23
             - mongo4_openjdk8_scala213_akka25_rs
-            - mongo5_openjdk10_scala213_akka25_x509
-            - mongo6_openjdk11_scala3_akka26
-            - mongo7_openjdk10_scala212_akka25_invalidssl
-            - mongo5_openjdk10_scala212_akka25_mutualssl
-            - mongo6_openjdk11_scala3_akka26_rs
-            - mongo5_openjdk10_scala212_akka25_x509
-            - mongo5_openjdk10_scala211_akka25
             - mongo4_openjdk10_scala211_akka25_mutualssl
-            - mongo7_openjdk11_scala211_akka25_rs
-            - mongo5_openjdk10_scala211_akka25_x509
-            - unit_linux_openjdk11_scala213_pekko
-            - mongo5_openjdk11_scala213_pekko_x509
+            - mongo5_openjdk10_scala211_akka25
+            - mongo5_openjdk11_scala211_akka25_x509
+            - mongo5_openjdk11_scala212_akka25_invalidssl
+            - mongo6_openjdk11_scala212_akka25_x509
+            - mongo6_openjdk11_scala213_akka25_x509
+            - mongo6_openjdk11_scala3_akka26
+            - mongo7_openjdk10_scala211_akka25_rs
+            - mongo7_openjdk11_scala213_pekko_x509
+            - mongo8_openjdk17_scala212_akka26_mutualssl
+            - mongo8_openjdk17_scala3_akka26_rs
 
       - trigger_dependent_builds:
           filters:

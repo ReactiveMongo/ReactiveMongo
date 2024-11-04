@@ -33,7 +33,7 @@ final class ProtocolSpec(
     def buffer = Unpooled.buffer(msg1Bytes.size, msg1Bytes.size)
 
     "be read from Netty buffer" in {
-      readMessageHeader(buffer writeBytes msg1Bytes) must_=== header
+      readMessageHeader(buffer.writeBytes(msg1Bytes)) must_=== header
     }
 
     "be written to Netty buffer" in {
@@ -57,7 +57,7 @@ final class ProtocolSpec(
     def buffer = Unpooled.buffer(byteSize, byteSize)
 
     "be read from Netty buffer (after message)" in {
-      readReply(buffer writeBytes msg1Bytes.drop(header.size)) must_=== reply
+      readReply(buffer.writeBytes(msg1Bytes.drop(header.size))) must_=== reply
     }
   }
 
@@ -100,7 +100,7 @@ final class ProtocolSpec(
           // ... but anyway check request compression there
 
           val expected: Array[Byte] = {
-            if (sys.props("os.name") contains "Linux") {
+            if (sys.props("os.name").contains("Linux")) {
               Array[Byte](60, 56, 4, 0, 0, 0, 97, 100, 109, 105, 110, 46, 36,
                 99, 109, 100, 0, 1, 1, 68, 1, 0, 0, 0, 37, 0, 0, 0, 16, 105,
                 115, 109, 97, 115, 116, 101, 114, 0, 1, 18, 72, 4, 99, 111, 109,
