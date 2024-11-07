@@ -57,7 +57,7 @@ final class AggregationSpec(
   lazy val (db, slowDb) = {
     integration = true
     Common.databases(
-      s"reactivemongo-agg-${System identityHashCode this}",
+      s"reactivemongo-agg-${System.identityHashCode(this)}",
       Common.connection,
       Common.slowConnection
     )
@@ -65,7 +65,7 @@ final class AggregationSpec(
 
   def afterAll(): Unit = if (integration) { db.drop(); () }
 
-  val zipColName = s"zipcodes${System identityHashCode this}"
+  val zipColName = s"zipcodes${System.identityHashCode(this)}"
 
   lazy val coll: BSONCollection = {
     val c: BSONCollection = db(zipColName)
@@ -124,7 +124,7 @@ final class AggregationSpec(
 
       idxAgg must beLike[Option[IndexStatsResult]] {
         case Some(IndexStatsResult("_id_", k2, _, _)) =>
-          sys.error(s"--> ${BSONDocument pretty k2}")
+          sys.error(s"--> ${BSONDocument.pretty(k2)}")
 
         case Some(IndexStatsResult("city_text_state_text", k2, _, _)) =>
           k2.string("_fts") must beSome("text") and {
@@ -188,7 +188,7 @@ final class AggregationSpec(
         import coll.AggregationFramework
         import AggregationFramework.{ Ascending, Group, Match, Sort, SumField }
 
-        val viewName = s"pop10m${System identityHashCode this}"
+        val viewName = s"pop10m${System.identityHashCode(this)}"
 
         def result = for {
           _ <- coll.createView(
@@ -516,10 +516,10 @@ final class AggregationSpec(
 
   "Inventory #1" should {
     lazy val orders: BSONCollection =
-      db.collection(s"agg-orders-1-${System identityHashCode this}")
+      db.collection(s"agg-orders-1-${System.identityHashCode(this)}")
 
     lazy val inventory: BSONCollection =
-      db.collection(s"agg-inv-1-${System identityHashCode orders}")
+      db.collection(s"agg-inv-1-${System.identityHashCode(orders)}")
 
     "be provided with order fixtures" in {
       (for {
@@ -680,10 +680,10 @@ final class AggregationSpec(
 
   "Inventory #2" should {
     lazy val orders: BSONCollection =
-      db.collection(s"agg-order-2-${System identityHashCode this}")
+      db.collection(s"agg-order-2-${System.identityHashCode(this)}")
 
     lazy val inventory: BSONCollection =
-      db.collection(s"agg-inv-2-${System identityHashCode orders}")
+      db.collection(s"agg-inv-2-${System.identityHashCode(orders)}")
 
     "be provided the fixtures" in {
       (for {
@@ -781,7 +781,7 @@ final class AggregationSpec(
     // https://docs.mongodb.com/master/reference/operator/aggregation/out/#example
 
     lazy val books: BSONCollection =
-      db.collection(s"books-1-${System identityHashCode this}")
+      db.collection(s"books-1-${System.identityHashCode(this)}")
 
     "with valid fixtures" in {
       val fixtures = Seq(
@@ -824,7 +824,7 @@ final class AggregationSpec(
     }
 
     "be outputed to collection" in {
-      val outColl = s"authors-1-${System identityHashCode this}"
+      val outColl = s"authors-1-${System.identityHashCode(this)}"
 
       type Author = (String, List[String])
       implicit val authorReader: BSONDocumentReader[(String, List[String])] =
@@ -868,7 +868,7 @@ final class AggregationSpec(
     // https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevPop/#examples
 
     lazy val contest: BSONCollection =
-      db.collection(s"contest-1-${System identityHashCode this}")
+      db.collection(s"contest-1-${System.identityHashCode(this)}")
 
     "with valid fixtures" in {
       /*
@@ -1108,7 +1108,7 @@ final class AggregationSpec(
     // https://docs.mongodb.com/manual/reference/operator/aggregation/stdDevSamp/#example
 
     lazy val contest: BSONCollection =
-      db.collection(s"contest-2-${System identityHashCode this}")
+      db.collection(s"contest-2-${System.identityHashCode(this)}")
 
     "with valid fixtures" in {
       /*
@@ -1157,7 +1157,7 @@ final class AggregationSpec(
     // https://docs.mongodb.com/manual/reference/operator/aggregation/geoNear/#example
 
     lazy val places: BSONCollection =
-      db(s"places${System identityHashCode this}")
+      db(s"places${System.identityHashCode(this)}")
 
     "must be inserted" in {
       import reactivemongo.api.indexes._, IndexType._
@@ -1288,7 +1288,7 @@ final class AggregationSpec(
   "Forecasts" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/redact/
     lazy val forecasts: BSONCollection =
-      db(s"forecasts${System identityHashCode this}")
+      db(s"forecasts${System.identityHashCode(this)}")
 
     "be inserted" in {
       /*
@@ -1452,7 +1452,7 @@ db.forecasts.aggregate(
   "Customer accounts" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/redact/
     lazy val customers: BSONCollection =
-      db(s"customers${System identityHashCode this}")
+      db(s"customers${System.identityHashCode(this)}")
 
     "be inserted" in {
       /*
@@ -1571,7 +1571,7 @@ db.accounts.aggregate([
   "Produce" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/#replaceroot-with-an-embedded-document
     lazy val fruits: BSONCollection =
-      db(s"fruits${System identityHashCode this}")
+      db(s"fruits${System.identityHashCode(this)}")
 
     "be inserted" in {
       /*
@@ -1611,7 +1611,7 @@ db.accounts.aggregate([
   "Contacts" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/replaceRoot/#replaceroot-with-a-newly-created-document
     lazy val contacts: BSONCollection =
-      db(s"contacts${System identityHashCode this}")
+      db(s"contacts${System.identityHashCode(this)}")
 
     "be inserted" in {
       /*
@@ -1672,7 +1672,7 @@ db.accounts.aggregate([
   "Students" should {
     // https://docs.mongodb.com/manual/reference/operator/aggregation/addFields/
     lazy val students: BSONCollection =
-      db(s"students${System identityHashCode this}")
+      db(s"students${System.identityHashCode(this)}")
 
     "be inserted" in {
       students.insert
@@ -1757,7 +1757,7 @@ db.accounts.aggregate([
 
     // See https://docs.mongodb.com/manual/reference/operator/aggregation/slice/#example
     lazy val users: BSONCollection =
-      db(s"users${System identityHashCode userHandler}")
+      db(s"users${System.identityHashCode(userHandler)}")
 
     "be inserted" in {
       users.insert

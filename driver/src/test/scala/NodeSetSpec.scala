@@ -329,8 +329,8 @@ final class NodeSetSpec(
     )(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]
     ): Future[T] = {
     // See AsyncDriver#connect
-    val supervisorName = s"withConAndSys-sup-${System identityHashCode ee}"
-    val poolName = s"withConAndSys-con-${System identityHashCode f}"
+    val supervisorName = s"withConAndSys-sup-${System.identityHashCode(ee)}"
+    val poolName = s"withConAndSys-con-${System.identityHashCode(f)}"
 
     @inline implicit def sys: reactivemongo.actors.actor.ActorSystem =
       reactivemongo.api.tests.system(drv)
@@ -355,7 +355,7 @@ final class NodeSetSpec(
       opts: MongoConnectionOptions = MongoConnectionOptions.default
     )(test: (String, MongoConnection, ActorRef) => MatchResult[T]
     ): org.specs2.execute.Result = {
-    val name = s"withCon-${System identityHashCode opts}"
+    val name = s"withCon-${System.identityHashCode(opts)}"
     val con = md.connect(
       nodes,
       options = opts.copy(credentials =

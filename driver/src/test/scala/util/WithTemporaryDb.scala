@@ -10,7 +10,7 @@ trait WithTemporaryDb extends org.specs2.specification.AfterAll {
   protected implicit def ee: ExecutionEnv
 
   protected final lazy val (db, slowDb) = Common.databases(
-    s"reactivemongo-tmp-${System identityHashCode this}",
+    s"reactivemongo-tmp-${System.identityHashCode(this)}",
     Common.connection,
     Common.slowConnection
   )

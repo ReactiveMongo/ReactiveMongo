@@ -140,13 +140,21 @@ final class MonitorSpec(
           3600000 // disable refreshAll/connectAll during test
       )
 
-      // Disable logging (as simulating errors)
-      val log = org.slf4j.LoggerFactory
-        .getLogger("akka.actor.OneForOneStrategy")
-        .asInstanceOf[ch.qos.logback.classic.Logger]
+      import ch.qos.logback.classic.Level
 
-      val level = log.getLevel
-      log.setLevel(ch.qos.logback.classic.Level.OFF)
+      // Disable logging (as simulating errors)
+      val resetLogLevel = org.slf4j.LoggerFactory.getLogger("akka.actor.OneForOneStrategy") match {
+        case log: ch.qos.logback.classic.Logger => {
+          val level = log.getLevel
+
+          log.setLevel(Level.OFF)
+
+          () => log.setLevel(level)
+        }
+
+        case _ =>
+          () => {}
+      }
       //
 
       withConAndSys(options = opts) { (con, sysRef) =>
@@ -192,7 +200,7 @@ final class MonitorSpec(
 
             tryUntil[Iterable[(Long, String)]](
               List(125, 250, 500, 1000, 2125, 4096)
-            )(history(dbsystem), _.exists(_._2 startsWith "Restart"))
+            )(history(dbsystem), _.exists(_._2.startsWith("Restart")))
               .aka("history #3") must beTrue
 
           } and eventually(1, 3.seconds) { // #4 (see issue 558)
@@ -216,7 +224,7 @@ final class MonitorSpec(
             }
           }
         }
-      }.andThen { case _ => log.setLevel(level) }
+      }.andThen { case _ => resetLogLevel() }
         .await(0, timeout * expectFactor)
     }
 
@@ -484,8 +492,8 @@ final class MonitorSpec(
     )(f: (MongoConnection, TestActorRef[StandardDBSystem]) => Future[T]
     ): Future[T] = {
     // See AsyncDriver#connect
-    val supervisorName = s"monitorspec-sup-${System identityHashCode ee}"
-    val poolName = s"monitorspec-con-${System identityHashCode f}"
+    val supervisorName = s"monitorspec-sup-${System.identityHashCode(ee)}"
+    val poolName = s"monitorspec-con-${System.identityHashCode(f)}"
 
     implicit def sys: reactivemongo.actors.actor.ActorSystem =
       reactivemongo.api.tests.system(drv)

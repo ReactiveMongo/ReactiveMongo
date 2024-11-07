@@ -26,7 +26,7 @@ else
     TEST_OPTS="$TEST_OPTS exclude gt_mongo32,ge_mongo4,unit"
 fi
 
-if [ "v$MONGO_VER" = "v7" ]; then
+if [ "$MONGO_VER" -ge 7 ]; then
     TEST_OPTS="${TEST_OPTS},lt_mongo7"
 fi
 

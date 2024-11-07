@@ -12,12 +12,12 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
   import reactivemongo.api.TestCompat._
   import Common._
 
-  private lazy val updCol1 = db(s"update1${System identityHashCode db}")
-  private lazy val slowUpdCol1 = slowDb(s"slowup1${System identityHashCode db}")
-  private lazy val updCol2 = db(s"update2${System identityHashCode slowDb}")
+  private lazy val updCol1 = db(s"update1${System.identityHashCode(db)}")
+  private lazy val slowUpdCol1 = slowDb(s"slowup1${System.identityHashCode(db)}")
+  private lazy val updCol2 = db(s"update2${System.identityHashCode(slowDb)}")
 
   private lazy val slowUpdCol2 = slowDb(
-    s"slowup2${System identityHashCode slowDb}"
+    s"slowup2${System.identityHashCode(slowDb)}"
   )
 
   def updateSpecs = {
@@ -104,7 +104,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
 
     "update many documents" >> {
       "with the default connection" in {
-        val coll = db(s"update3${System identityHashCode db}")
+        val coll = db(s"update3${System.identityHashCode(db)}")
         val update = coll.update.maxBulkSize(2)
 
         // Fixtures
@@ -206,7 +206,7 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
         "support arrayFilters" in {
           // See https://docs.mongodb.com/manual/reference/command/update/#update-elements-match-arrayfilters-criteria
 
-          val colName = s"UpdateSpec${System identityHashCode this}-5"
+          val colName = s"UpdateSpec${System.identityHashCode(this)}-5"
           val collection = db(colName)
 
           collection.insert
