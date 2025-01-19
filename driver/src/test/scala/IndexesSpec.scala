@@ -205,8 +205,9 @@ final class IndexesSpec(
 
     "be first created" in {
       col.create().flatMap { _ =>
-        col.indexesManager
-          .ensure(index(Seq("token" -> IndexType.Ascending), unique = true))
+        col.indexesManager.ensure(
+          index(Seq("token" -> IndexType.Ascending), unique = true)
+        )
       } aka "index creation" must beTrue.await(1, timeout * 2)
     }
 
