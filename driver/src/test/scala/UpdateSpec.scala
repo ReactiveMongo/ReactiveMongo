@@ -13,7 +13,10 @@ trait UpdateSpec extends UpdateFixtures { collectionSpec: CollectionSpec =>
   import Common._
 
   private lazy val updCol1 = db(s"update1${System.identityHashCode(db)}")
-  private lazy val slowUpdCol1 = slowDb(s"slowup1${System.identityHashCode(db)}")
+
+  private lazy val slowUpdCol1 = slowDb(
+    s"slowup1${System.identityHashCode(db)}"
+  )
   private lazy val updCol2 = db(s"update2${System.identityHashCode(slowDb)}")
 
   private lazy val slowUpdCol2 = slowDb(

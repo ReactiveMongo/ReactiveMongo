@@ -1345,7 +1345,10 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
                 val expected = node.pingInfo.lastIsMasterId
 
                 warn(
-                  s"Received unexpected isMaster from ${node.name} response #$respTo (expected #${if (expected != -1) expected.toString else "<none>"})! Please check connectivity.",
+                  s"Received unexpected isMaster from ${node.name} response #$respTo (expected #${if (
+                      expected != -1
+                    ) expected.toString
+                    else "<none>"})! Please check connectivity.",
                   internalState()
                 )
 
@@ -1968,7 +1971,10 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
           )
           .addListener(
             new OperationHandler(
-              error(s"Fails to send a isMaster request to ${node.name} (channel #${con.channel.id})", _),
+              error(
+                s"Fails to send a isMaster request to ${node.name} (channel #${con.channel.id})",
+                _
+              ),
               { chanId =>
                 trace(s"isMaster request to ${node.toShortString} successful on channel #${chanId}")
               }
