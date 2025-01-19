@@ -143,7 +143,8 @@ final class MonitorSpec(
       import ch.qos.logback.classic.Level
 
       // Disable logging (as simulating errors)
-      val resetLogLevel = org.slf4j.LoggerFactory.getLogger("akka.actor.OneForOneStrategy") match {
+      val resetLogLevel = org.slf4j.LoggerFactory
+        .getLogger("akka.actor.OneForOneStrategy") match {
         case log: ch.qos.logback.classic.Logger => {
           val level = log.getLevel
 
@@ -224,8 +225,7 @@ final class MonitorSpec(
             }
           }
         }
-      }.andThen { case _ => resetLogLevel() }
-        .await(0, timeout * expectFactor)
+      }.andThen { case _ => resetLogLevel() }.await(0, timeout * expectFactor)
     }
 
     "manage channel disconnection while probing isMaster" in eventually(

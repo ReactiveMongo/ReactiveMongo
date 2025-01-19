@@ -147,8 +147,9 @@ private[reactivemongo] object BulkOps {
     case Right(BulkStage(bulk, Some(next))) =>
       unorderedApply(
         next,
-        f(bulk)
-          .recoverWith({ case cause: Exception => recover(cause) }) +: tasks
+        f(bulk).recoverWith({
+          case cause: Exception => recover(cause)
+        }) +: tasks
       )(f, recover)
 
     case Right(BulkStage(bulk, _)) =>

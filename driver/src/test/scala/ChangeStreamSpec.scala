@@ -79,9 +79,11 @@ final class ChangeStreamSpec(
                 haveField[String]("_id").that(beTypedEqualTo("test"))
               }
             } and {
-              haveField[BSONDocument]("fullDocument").that(beTypedEqualTo(
-                testDocument
-              ))
+              haveField[BSONDocument]("fullDocument").that(
+                beTypedEqualTo(
+                  testDocument
+                )
+              )
             }
           }.await(2, timeout))
         }
@@ -127,9 +129,11 @@ final class ChangeStreamSpec(
                 haveField[String]("_id").that(beTypedEqualTo("resume_test2"))
               }
             } and {
-              haveField[BSONDocument]("fullDocument").that(beTypedEqualTo(
-                testDocument2
-              ))
+              haveField[BSONDocument]("fullDocument").that(
+                beTypedEqualTo(
+                  testDocument2
+                )
+              )
             }
           }.await(2, timeout))
         }
@@ -174,14 +178,18 @@ final class ChangeStreamSpec(
               haveField[String]("operationType").that(beTypedEqualTo("insert"))
             } and {
               haveField[BSONDocument]("documentKey").that {
-                haveField[String]("_id").that(beTypedEqualTo(
-                  "clusterTime_test1"
-                ))
+                haveField[String]("_id").that(
+                  beTypedEqualTo(
+                    "clusterTime_test1"
+                  )
+                )
               }
             } and {
-              haveField[BSONDocument]("fullDocument").that(beTypedEqualTo(
-                testDocument1
-              ))
+              haveField[BSONDocument]("fullDocument").that(
+                beTypedEqualTo(
+                  testDocument1
+                )
+              )
             }
           }.await(1, timeout))
         }
@@ -261,18 +269,22 @@ final class ChangeStreamSpec(
               insertion must beTypedEqualTo({}).awaitFor(timeout) and {
                 res must {
                   {
-                    haveField[String]("operationType").that(beTypedEqualTo(
-                      "update"
-                    ))
+                    haveField[String]("operationType").that(
+                      beTypedEqualTo(
+                        "update"
+                      )
+                    )
                   } and {
                     haveField[BSONDocument]("documentKey").that {
                       haveField[String]("_id").that(beTypedEqualTo(id))
                     }
                   } and {
                     haveField[BSONDocument]("fullDocument").that {
-                      haveField[String](fieldName).that(beTypedEqualTo(
-                        lastValue
-                      ))
+                      haveField[String](fieldName).that(
+                        beTypedEqualTo(
+                          lastValue
+                        )
+                      )
                     }
                   }
                 }.await(1, timeout)
