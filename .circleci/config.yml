@@ -425,14 +425,6 @@ workflows:
           mongo_version: 3
 
       - integration_test_suite:
-          name: mongo4_openjdk8_scala213_akka25_rs
-          openjdk_version: 8
-          scala_version: 2.13.15
-          mongo_version: 4
-          mongo_profile: rs
-          compressor: zlib
-
-      - integration_test_suite:
           name: mongo6_openjdk11_scala213_akka25_x509
           mongo_version: 6
           mongo_profile: x509
@@ -447,23 +439,27 @@ workflows:
           actor_module: pekko
 
       - integration_test_suite:
-          name: mongo6_openjdk11_scala3_akka26
+          name: mongo4_openjdk11_scala3_akka26_zstd
           scala_version: '3.5.0'
           akka_version: 2.6.20
           openjdk_version: 11
-          mongo_version: 6
+          mongo_version: 4 # 6
           compressor: zstd
 
       - integration_test_suite:
-          name: mongo8_openjdk17_scala212_akka26_mutualssl
+          name: mongo8_openjdk17_scala212_akka26_mutualssl_zlib
           openjdk_version: 17
           akka_version: 2.6.20
           mongo_version: 8
           mongo_profile: mutual-ssl
+          compressor: zlib
 
       - integration_test_suite:
-          name: mongo5_openjdk11_scala212_akka25_invalidssl
-          mongo_version: 5
+          name: mongo7_openjdk17_scala212_akka26_invalidssl
+          openjdk_version: 17 # 11
+          scala_version: '2.12.18'
+          mongo_version: 7 # 5
+          akka_version: 2.6.20 # rm
           mongo_profile: invalid-ssl
 
       - integration_test_suite:
@@ -476,29 +472,17 @@ workflows:
           openjdk_version: 17
 
       - integration_test_suite:
-          name: mongo6_openjdk11_scala212_akka25_x509
-          openjdk_version: 11
-          mongo_version: 6
-          mongo_profile: x509
-
-      - integration_test_suite:
           name: mongo5_openjdk10_scala211_akka25
           mongo_version: 5
           scala_version: 2.11.12
 
       - integration_test_suite:
-          name: mongo4_openjdk10_scala211_akka25_mutualssl
-          scala_version: 2.11.12
-          mongo_version: 4
-          mongo_profile: mutual-ssl
-          compressor: snappy
-
-      - integration_test_suite:
-          name: mongo7_openjdk10_scala211_akka25_rs
+          name: mongo7_openjdk10_scala211_akka25_rs_snappy
           scala_version: 2.11.12
           mongo_version: 7
           mongo_profile: rs
           openjdk_version: 11
+          compressor: snappy
 
       - integration_test_suite:
           name: mongo5_openjdk11_scala211_akka25_x509
@@ -517,17 +501,14 @@ workflows:
             - unit_linux_openjdk10_scala212
             - unit_linux_openjdk11_scala213_pekko
             - mongo3_openjdk8_scala211_akka23
-            - mongo4_openjdk8_scala213_akka25_rs
-            - mongo4_openjdk10_scala211_akka25_mutualssl
             - mongo5_openjdk10_scala211_akka25
             - mongo5_openjdk11_scala211_akka25_x509
-            - mongo5_openjdk11_scala212_akka25_invalidssl
-            - mongo6_openjdk11_scala212_akka25_x509
+            - mongo7_openjdk17_scala212_akka26_invalidssl
             - mongo6_openjdk11_scala213_akka25_x509
-            - mongo6_openjdk11_scala3_akka26
-            - mongo7_openjdk10_scala211_akka25_rs
+            - mongo4_openjdk11_scala3_akka26_zstd
+            - mongo7_openjdk10_scala211_akka25_rs_snappy
             - mongo7_openjdk11_scala213_pekko_x509
-            - mongo8_openjdk17_scala212_akka26_mutualssl
+            - mongo8_openjdk17_scala212_akka26_mutualssl_zlib
             - mongo8_openjdk17_scala3_akka26_rs
 
       - trigger_dependent_builds:
