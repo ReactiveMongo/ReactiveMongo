@@ -440,7 +440,7 @@ workflows:
 
       - integration_test_suite:
           name: mongo4_openjdk11_scala3_akka26_zstd
-          scala_version: '3.5.0'
+          scala_version: '3.6.3'
           akka_version: 2.6.20
           openjdk_version: 11
           mongo_version: 4 # 6
@@ -464,7 +464,7 @@ workflows:
 
       - integration_test_suite:
           name: mongo8_openjdk17_scala3_akka26_rs
-          scala_version: '3.5.0'
+          scala_version: '3.6.3'
           akka_version: 2.6.20
           mongo_version: 8
           mongo_profile: rs
