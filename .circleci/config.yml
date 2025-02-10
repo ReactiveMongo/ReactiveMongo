@@ -414,7 +414,7 @@ workflows:
             name: openjdk
             version: 11
           jdk_version: openjdk11
-          scala_version: 2.13.15
+          scala_version: 2.13.16
           actor_module: pekko
 
       - integration_test_suite:
@@ -429,13 +429,13 @@ workflows:
           mongo_version: 6
           mongo_profile: x509
           openjdk_version: 11
-          scala_version: 2.13.15
+          scala_version: 2.13.16
 
       - integration_test_suite:
           name: mongo7_openjdk11_scala213_pekko_x509
           openjdk_version: 11
           mongo_version: 7
-          scala_version: 2.13.15
+          scala_version: 2.13.16
           actor_module: pekko
 
       - integration_test_suite:
