@@ -510,8 +510,9 @@ final class AsyncDriver(
           import term.actor
 
           driver.connectionMonitors.remove(actor).foreach { con =>
-            logger
-              .debug(s"[$supervisorName] Connection is terminated: ${con.name}")
+            logger.debug(
+              s"[$supervisorName] Connection is terminated: ${con.name}"
+            )
 
             if (isEmpty) {
               context.stop(self)

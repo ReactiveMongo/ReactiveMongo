@@ -338,7 +338,9 @@ package object tests { self =>
       Option(response).filter(RequestIdGenerator.isMaster.accepts)
   }
 
-  def decodeResponse[T]: Array[Byte] => (Tuple2[ByteBuf, Response] => T) => T = {
+  def decodeResponse[
+      T
+    ]: Array[Byte] => (Tuple2[ByteBuf, Response] => T) => T = {
     val decoder = new ResponseDecoder()
 
     { bytes =>

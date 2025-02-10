@@ -746,8 +746,8 @@ object IndexesManager {
             .flatMap {
               case "ns" | "key" | "name" | "unique" | "background" | "sparse" |
                   "v" | "partialFilterExpression" | "expireAfterSeconds" |
-                  "storageEngine" | "weights" |
-                  "defaultLanguage" | "languageOverride" | "textIndexVersion" |
+                  "storageEngine" | "weights" | "defaultLanguage" |
+                  "languageOverride" | "textIndexVersion" |
                   "2dsphereIndexVersion" | "bits" | "min" | "max" |
                   "bucketSize" | "collation" | "wildcardProjection" =>
                 Seq.empty[pack.ElementProducer]
