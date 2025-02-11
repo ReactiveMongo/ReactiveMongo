@@ -1577,6 +1577,7 @@ trait AggregationFramework[P <: SerializationPack]
 
     import builder.{ document, elementProducer => element }
 
+    @annotation.nowarn // Scala 3 false warning
     protected[reactivemongo] val makePipe: pack.Document = document(
       Seq(
         element(
