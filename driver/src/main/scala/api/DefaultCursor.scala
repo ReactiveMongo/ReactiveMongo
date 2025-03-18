@@ -138,7 +138,7 @@ private[reactivemongo] object DefaultCursor {
 
           val cmdOpts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
             elem("getMore", long(cursorId)),
-            elem(f"$$db", string(database.name)),
+            elem(f"$$db", string(db.name)),
             elem(f"$$readPreference", pref),
             elem("collection", string(collName)),
             elem("batchSize", int(ntr))
@@ -295,6 +295,7 @@ private[reactivemongo] object DefaultCursor {
             val cmd = builder.document(cmdOpts.result())
             val buf = WritableBuffer.empty
 
+            // TODO: buffer.writeByte(0) // OpMsg payload type
             pack.writeToBuffer(buf, cmd)
 
             RequestMaker(
@@ -884,5 +885,89 @@ private[reactivemongo] object DefaultCursor {
         )
       }
     }
+  }
+
+  private[api] def getMoreOpCmd[P <: SerializationPack](
+      pack: P
+    )(// dbName: String,
+      fullCollectionName: String,
+      readPreference: ReadPreference,
+      maxAwaitTimeMs: Option[Long],
+      query: Query,
+      baseElmts: => Seq[pack.ElementProducer]
+    ): Function2[Long, Int, RequestMaker] = {
+    //import reactivemongo.api.collections.QueryCodecs
+
+    val builder = pack.newBuilder // TODO
+    //val writeReadPref = QueryCodecs.writeReadPref(builder)
+
+    val moreQry = query.copy(numberToSkip = 0, numberToReturn = 1)
+    val collName = fullCollectionName.span(_ != '.')._2.tail
+
+    { (cursorId, ntr) =>
+      import builder.{ elementProducer => elem, int, long, string }
+
+      val _ = (collName, cursorId, ntr, baseElmts, maxAwaitTimeMs)
+
+      val cmdOpts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+        elem("getMore", long(cursorId)),
+        elem("collection", string(collName)),
+        elem("batchSize", int(ntr))
+      ) ++= baseElmts
+
+      maxAwaitTimeMs.foreach { ms => cmdOpts += elem("maxTimeMS", long(ms)) }
+
+      val cmd = builder.document(cmdOpts.result())
+      val buf = WritableBuffer.empty
+
+      buf.writeByte(0) // OpMsg payload type
+      pack.writeToBuffer(buf, )
+
+      RequestMaker(
+        kind = CommandKind.Query,
+        op = moreQry,
+        document = buf.buffer,
+        readPreference,
+        channelIdHint = None,
+        callerSTE = Seq.empty
+      )
+    }
+
+    /*
+    // numberToSkip = 0, numberToReturn = 1)
+    val moreQry = query.copy(flags = 0)
+    val collName = fullCollectionName.span(_ != '.')._2.tail
+
+    { (cursorId, ntr) =>
+      import builder.{ elementProducer => elem, int, long, string }
+
+      val pref = writeReadPref(readPreference)
+
+      val cmdOpts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+        elem("getMore", long(cursorId)),
+        elem(f"$$db", string(dbName)),
+        elem(f"$$readPreference", pref),
+        elem("collection", string(collName)),
+        elem("batchSize", int(ntr))
+      ) ++= baseElmts
+
+      maxAwaitTimeMs.foreach { ms => cmdOpts += elem("maxTimeMS", long(ms)) }
+
+      val cmd = builder.document(cmdOpts.result())
+      val buffer = WritableBuffer.empty
+
+      buffer.writeByte(0) // OpMsg payload type
+      pack.writeToBuffer(buffer, cmd)
+
+      RequestMaker(
+        kind = CommandKind.Query,
+        op = moreQry,
+        section = buffer.buffer,
+        readPreference,
+        channelIdHint = None,
+        callerSTE = Seq.empty
+      )
+    }
+     */
   }
 }
