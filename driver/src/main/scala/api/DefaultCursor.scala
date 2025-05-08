@@ -138,7 +138,7 @@ private[reactivemongo] object DefaultCursor {
 
           val cmdOpts = Seq.newBuilder[pack.ElementProducer] ++= Seq(
             elem("getMore", long(cursorId)),
-            elem(f"$$db", string(database.name)),
+            elem(f"$$db", string(db.name)),
             elem(f"$$readPreference", pref),
             elem("collection", string(collName)),
             elem("batchSize", int(ntr))
@@ -279,6 +279,8 @@ private[reactivemongo] object DefaultCursor {
           val moreQry = query.copy(numberToSkip = 0, numberToReturn = 1)
           val collName = fullCollectionName.span(_ != '.')._2.tail
 
+          def gteV6 = version.compareTo(MongoWireVersion.V60) >= 0
+
           { (cursorId, ntr) =>
             import builder.{ elementProducer => elem, int, long, string }
 
@@ -294,6 +296,10 @@ private[reactivemongo] object DefaultCursor {
 
             val cmd = builder.document(cmdOpts.result())
             val buf = WritableBuffer.empty
+
+            if (gteV6) {
+              buf.writeByte(0) // OpMsg payload type
+            }
 
             pack.writeToBuffer(buf, cmd)
 
