@@ -1104,7 +1104,7 @@ object MongoConnection {
         make("rm.failover", opt, state) {
           val (time, unit) = Duration.unapply(Duration(d)) match {
             case Some(dur) => dur
-            case _ =>
+            case _         =>
               throw new URIParsingException(
                 s"Invalid duration 'rm.failover': $opt"
               )

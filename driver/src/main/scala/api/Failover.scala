@@ -108,7 +108,7 @@ private[api] object RetryableFailure {
     case _: PrimaryUnavailableException  => true
     case _: NodeSetNotReachableException => true
     case _: ConnectionException          => true
-    case e: DatabaseException =>
+    case e: DatabaseException            =>
       e.isNotAPrimaryError || e.isUnauthorized
 
     case _ => false
