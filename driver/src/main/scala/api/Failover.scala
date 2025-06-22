@@ -109,7 +109,8 @@ private[api] object RetryableFailure {
     case _: NodeSetNotReachableException => true
     case _: ConnectionException          => true
     case e: DatabaseException =>
-      e.isNotAPrimaryError || e.isUnauthorized
+      e.isNotAPrimaryError || e.isUnauthorized ||
+      e.message.contains("Unknown section kind")
 
     case _ => false
   }
