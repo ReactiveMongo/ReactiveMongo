@@ -3,8 +3,8 @@ package reactivemongo.api.collections
 import scala.concurrent.{ ExecutionContext, Future }
 
 import reactivemongo.api.{
-  FailoverStrategy,
   Cursor,
+  FailoverStrategy,
   ReadPreference,
   SerializationPack
 }
