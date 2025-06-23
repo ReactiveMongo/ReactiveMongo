@@ -630,7 +630,7 @@ private[reactivemongo] object DefaultCursor {
         else if (hasNext(current, maxDocs)) {
           next(current, maxDocs).recoverWith {
             case _: Exceptions.ClosedException => closed
-            case err =>
+            case err                           =>
               Future.failed[Option[Response]](err)
           }
         } else {

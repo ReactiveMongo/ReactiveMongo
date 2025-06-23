@@ -314,7 +314,7 @@ final class CollectionSpec(
           }
           .recover {
             case _: CustomException => -1
-            case e =>
+            case e                  =>
               e.printStackTrace()
               -2
           } aka "write result" must beTypedEqualTo(-1).await(1, timeout)
