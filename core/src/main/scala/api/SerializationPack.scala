@@ -74,7 +74,7 @@ trait SerializationPack extends SerializationPackCompat { self: Singleton =>
     ): Reader[A] = reader[A] { doc =>
     f(doc) match {
       case Some(v) => v
-      case _ =>
+      case _       =>
         throw reactivemongo.api.bson.exceptions
           .ValueDoesNotMatchException(pretty(doc))
     }
