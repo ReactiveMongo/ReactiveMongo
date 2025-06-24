@@ -367,7 +367,7 @@ trait UpdateOps[P <: SerializationPack]
         BulkOps.bulks(Seq(firstUpdate) ++ updates, maxBsonSize, maxBulkSize) {
           up =>
             val v: pack.Value = up.u match {
-              case Left(doc) => doc
+              case Left(doc)       => doc
               case Right(pipeline) =>
                 pack.newBuilder.array(pipeline)
             }
@@ -423,7 +423,7 @@ trait UpdateOps[P <: SerializationPack]
         val bulkProducer = BulkOps.bulks(updates, maxBsonSize, maxBulkSize) {
           up =>
             val v: pack.Value = up.u match {
-              case Left(doc) => doc
+              case Left(doc)       => doc
               case Right(pipeline) =>
                 pack.newBuilder.array(pipeline)
             }

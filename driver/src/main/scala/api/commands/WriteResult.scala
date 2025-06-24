@@ -168,7 +168,7 @@ private[reactivemongo] trait LastErrorFactory[P <: SerializationPack] {
     result match {
       case error: LastError @unchecked => Some(error)
       case _ if (result.ok)            => None
-      case _ =>
+      case _                           =>
         Some(
           new LastError(
             false, // ok
