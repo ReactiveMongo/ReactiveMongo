@@ -108,7 +108,8 @@ object Compiler {
       } else {
         Seq(
           s"-Wconf:cat=deprecation&msg=($mongo30eol|$rightBiaised):s",
-          "-Wconf:msg=.*nowarn.*\\ annotation.*:s"
+          "-Wconf:msg=.*nowarn.*\\ annotation.*:s",
+          "-Wconf:msg=Implicit parameters should be provided with a `using` clause:s"
         )
       }
     },
