@@ -155,7 +155,7 @@ private[reactivemongo] object ScramInitiate {
   // Request utility
   private val rand = new scala.util.Random(this.hashCode)
 
-  private val authChars: Stream[Char] = util.toStream {
+  private val authChars = util.toStream {
     val chars = rand.shuffle(
       """!"#$%&'()*+-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~""".toIndexedSeq
     )
