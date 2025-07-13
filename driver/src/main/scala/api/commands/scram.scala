@@ -155,26 +155,13 @@ private[reactivemongo] object ScramInitiate {
   // Request utility
   private val rand = new scala.util.Random(this.hashCode)
 
-  private val authChars = util.toStream(new Iterator[Char] {
-
+  private val authChars: Stream[Char] = util.toStream {
     val chars = rand.shuffle(
       """!"#$%&'()*+-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~""".toIndexedSeq
     )
 
-    val hasNext = true
-
-    var i = 0
-
-    def next(): Char = {
-      if (i == chars.length) {
-        i = 1
-        chars(0)
-      } else {
-        i += 1
-        chars(i - 1)
-      }
-    }
-  })
+    chars.iterator
+  }
 
   def randomPrefix(seed: Int): String = {
     val pos = ((System.nanoTime() / 1000000L) % 100).toInt // temporal position
