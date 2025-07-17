@@ -32,7 +32,7 @@ object Dependencies {
   }
 
   val pekko = Def.setting[Seq[ModuleID]] {
-    val ver = "1.1.4"
+    val ver = "1.1.5"
 
     Seq(
       "org.apache.pekko" %% "pekko-actor" % ver,
