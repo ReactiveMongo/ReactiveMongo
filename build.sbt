@@ -7,7 +7,7 @@ lazy val `ReactiveMongo-Core` = project
       ("org.reactivemongo" %% "reactivemongo-bson-api" % version.value)
         .exclude("org.slf4j", "*") +: deps ++: Seq(
         "com.github.luben" % "zstd-jni" % "1.5.7-4",
-        "org.xerial.snappy" % "snappy-java" % "1.1.10.7", // .5 causes CI error
+        "org.xerial.snappy" % "snappy-java" % "1.1.10.8", // .5 causes CI error
         Dependencies.specs.value
       )
     },
