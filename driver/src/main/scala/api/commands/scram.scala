@@ -158,7 +158,7 @@ private[reactivemongo] object ScramInitiate {
   private val authChars = util.toStream {
     val chars = """!"#$%&'()*+-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~""".toIndexedSeq
 
-    def cycling: Iterator[Char] = rand.shuffle(chars).iterator ++ cyling
+    def cycling: Iterator[Char] = rand.shuffle(chars).iterator ++ cycling
 
     cycling
   }
