@@ -108,6 +108,7 @@ private[core] object Pack {
         None
     }
 
+  @annotation.nowarn
   @inline private[core] def nio =
     new Pack(() => new NioEventLoopGroup(), classOf[NioSocketChannel])
 
