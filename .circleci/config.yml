@@ -6,12 +6,12 @@ commands:
     parameters:
       sbt_version:
         type: string
-        default: "1.10.3"
+        default: "1.11.4"
     steps:
       - restore_cache:
           name: Restore SBT cache
           keys:
-            - &sbt_cache_key sbt-{{ arch }}-{{ checksum "project/build.properties" }}
+            - &sbt_cache sbt-{{ arch }}-{{ checksum "project/build.properties" }}
 
       - run:
           name: Setup SBT
@@ -26,7 +26,7 @@ commands:
           name: Update SBT cache
           paths:
             - ~/sbt
-          key: *sbt_cache_key
+          key: *sbt_cache
 
   build_n_tests:
     description: Build & Test
@@ -36,7 +36,7 @@ commands:
         default: "openjdk8"
       scala_version:
         type: string
-        default: "2.13.14"
+        default: "2.13.16"
       actor_module:
         type: string
         default: "akka"
@@ -54,12 +54,12 @@ commands:
       - restore_cache:
           name: Restore Scala cache
           keys:
-            - &scala_cache_key scala-{{ .Environment.CIRCLE_JOB }}-<< parameters.shaded >>-{{ checksum "version.sbt" }}_{{ checksum "build.sbt" }}-{{ checksum "project/Common.scala" }}-{{ checksum "project/Dependencies.scala" }}
+            - &scala_cache scala-{{ .Environment.CIRCLE_JOB }}-<< parameters.shaded >>-{{ checksum "version.sbt" }}_{{ checksum "build.sbt" }}-{{ checksum "project/Common.scala" }}-{{ checksum "project/Dependencies.scala" }}
 
       - restore_cache:
           name: Restore compilation cache
           keys:
-          - &compile_cache_key compile-{{ arch }}-{{ .Revision }}-<< parameters.jdk_version >>-<< parameters.scala_version >>
+          - &compile_cache compile-{{ arch }}-{{ .Revision }}-<< parameters.jdk_version >>-<< parameters.scala_version >>
 
       - run:
           name: Build & Test
@@ -109,7 +109,7 @@ commands:
           paths:
             - ~/repo/core/target/*shaded/scala-*
             - ~/repo/driver/target/*shaded/scala-*
-          key: *compile_cache_key
+          key: *compile_cache
 
       - save_cache:
           name: Update Scala cache
@@ -118,7 +118,7 @@ commands:
             - ~/.ivy2
             - ~/.coursier/cache
             - ~/Library/Caches/Coursier
-          key: *scala_cache_key
+          key: *scala_cache
 
   setup_integration:
     description: Setup integration environment
@@ -244,7 +244,7 @@ jobs:
         default: "openjdk8"
       scala_version:
         type: string
-        default: "2.13.14"
+        default: "2.13.16"
       actor_module:
         type: string
         default: "akka"
@@ -283,7 +283,7 @@ jobs:
         default: 10
       scala_version:
         type: string
-        default: "2.12.18"
+        default: "2.12.20"
       akka_version:
         type: string
         default: "2.5.23"
@@ -388,9 +388,8 @@ jobs:
           project: ReactiveMongo-Monitoring
 
 workflows:
-  version: 2
-
   main_suite:
+    max_auto_reruns: 3
     jobs:
       - unit_test_suite:
           name: unit_osx_jdk8_scala212
@@ -440,7 +439,7 @@ workflows:
 
       - integration_test_suite:
           name: mongo4_openjdk11_scala3_akka26_zstd
-          scala_version: '3.7.2'
+          scala_version: '3.3.6'
           akka_version: 2.6.20
           openjdk_version: 11
           mongo_version: 4 # 6
@@ -457,14 +456,14 @@ workflows:
       - integration_test_suite:
           name: mongo7_openjdk17_scala212_akka26_invalidssl
           openjdk_version: 17 # 11
-          scala_version: '2.12.18'
+          scala_version: '2.12.20'
           mongo_version: 7 # 5
           akka_version: 2.6.20 # rm
           mongo_profile: invalid-ssl
 
       - integration_test_suite:
           name: mongo8_openjdk17_scala3_akka26_rs
-          scala_version: '3.7.2'
+          scala_version: '3.3.6'
           akka_version: 2.6.20
           mongo_version: 8
           mongo_profile: rs

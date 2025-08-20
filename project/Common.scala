@@ -14,16 +14,17 @@ object Common extends AutoPlugin {
 
   val baseSettings = Seq(
     organization := "org.reactivemongo",
-    credentials ++= Seq(
+    credentials ++= sys.env.get("SONATYPE_USER").toSeq.map { user =>
       Credentials(
         "", // Empty realm credential - this one is actually used by Coursier!
         "central.sonatype.com",
-        Publish.env("SONATYPE_USER"),
+        user,
         Publish.env("SONATYPE_PASS")
       )
-    ),
+    },
     resolvers ++= Seq(
       "Central Testing repository" at "https://central.sonatype.com/api/v1/publisher/deployments/download",
+      "Sonatype Snapshots" at "https://central.sonatype.com/repository/maven-snapshots/",
       Resolver.typesafeRepo("releases")
     ),
     mimaFailOnNoPrevious := false,
@@ -43,7 +44,7 @@ object Common extends AutoPlugin {
   val scala211 = "2.11.12"
   val scala212 = "2.12.20"
   val scala213 = "2.13.16"
-  val scala3 = "3.7.2"
+  val scala3Lts = "3.3.6"
 
   def majorVersion = {
     val Major = """([0-9]+)\.([0-9]+)\..*""".r
@@ -64,8 +65,8 @@ object Common extends AutoPlugin {
   )
 
   lazy val scalaVersions: Seq[String] = {
-    if (actorModule == "akka") Seq(scala211, scala212, scala213, scala3)
-    else Seq(scala212, scala213, scala3)
+    if (actorModule == "akka") Seq(scala211, scala212, scala213, scala3Lts)
+    else Seq(scala212, scala213, scala3Lts)
   }
 
   override def projectSettings =

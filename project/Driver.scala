@@ -181,7 +181,7 @@ final class Driver(core: Project, actorModule: Project) {
         case Some("osx") =>
           p.settings(
             Seq(
-              libraryDependencies += shadedNative("osx-aarch_64").value % Test
+              libraryDependencies += shadedNative("osx-aarch-64").value % Test
             )
           )
 
@@ -259,9 +259,8 @@ private[reactivemongo] object Trace {
 
       organization.value % s"reactivemongo-shaded-native-${arch}" % v
     } else {
-      val variant = if (arch == "osx-aarch_64") "kqueue" else "epoll"
-      val classifier =
-        if (arch == "osx-aarch_64") "osx-aarch_64" else "linux-x86_64"
+      val variant = if (arch == "osx-aarch-64") "kqueue" else "epoll"
+      val classifier = if (arch == "osx-aarch-64") "osx-aarch_64" else "linux-x86_64"
 
       ("io.netty" % s"netty-transport-native-${variant}" % Dependencies.nettyVer)
         .classifier(classifier)

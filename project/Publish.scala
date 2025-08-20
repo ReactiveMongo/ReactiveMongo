@@ -11,7 +11,7 @@ object Publish {
   @inline def env(n: String): String = sys.env.get(n).getOrElse(n)
 
   private val repoName = env("PUBLISH_REPO_NAME")
-  private val repoUrl = env("PUBLISH_REPO_URL")
+  val repoUrl = env("PUBLISH_REPO_URL")
 
   val previousVersion = "1.0.0-rc.1" // TODO: 1.0.0
 
