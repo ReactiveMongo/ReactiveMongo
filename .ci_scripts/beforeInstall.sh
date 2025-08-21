@@ -79,7 +79,10 @@ if [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libssl.so.$SSL_MAJOR" ] && [ ! -f "$HOME
   echo "[INFO] Building OpenSSL $SSL_MAJOR ..."
 
   cd /tmp
+
+  echo "[INFO] Downloading OpenSSL from $SSL_DL_URL ..."
   curl -L -s -o - "$SSL_DL_URL" | tar -xzf -
+
   cd "openssl-$SSL_FULL_RELEASE"
   rm -rf "$HOME/ssl" && mkdir "$HOME/ssl"
   ./config -shared enable-ssl2 --prefix="$HOME/ssl" > /dev/null
