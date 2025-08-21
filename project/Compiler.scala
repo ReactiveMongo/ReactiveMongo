@@ -107,7 +107,7 @@ object Compiler {
         Seq.empty
       } else {
         Seq(
-          s"-Wconf:cat=deprecation&msg=($mongo30eol|$rightBiaised):s",
+          s"-Wconf:cat=deprecation&msg=($mongo30eol|$rightBiaised|package\\ nio):s",
           "-Wconf:msg=.*nowarn.*\\ annotation.*:s",
           "-Wconf:msg=Implicit\\ parameters.*:s"
         )
