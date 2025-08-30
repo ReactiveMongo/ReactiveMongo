@@ -54,12 +54,12 @@ commands:
       - restore_cache:
           name: Restore Scala cache
           keys:
-            - &scala_cache scala-{{ .Environment.CIRCLE_JOB }}-<< parameters.shaded >>-{{ checksum "version.sbt" }}_{{ checksum "build.sbt" }}-{{ checksum "project/Common.scala" }}-{{ checksum "project/Dependencies.scala" }}
+            - &scala_cache001 scala-{{ .Environment.CIRCLE_JOB }}-<< parameters.shaded >>-{{ checksum "version.sbt" }}_{{ checksum "build.sbt" }}-{{ checksum "project/Common.scala" }}-{{ checksum "project/Dependencies.scala" }}
 
       - restore_cache:
           name: Restore compilation cache
           keys:
-          - &compile_cache compile-{{ arch }}-{{ .Revision }}-<< parameters.jdk_version >>-<< parameters.scala_version >>
+          - &compile_cache001 compile-{{ arch }}-{{ .Revision }}-<< parameters.jdk_version >>-<< parameters.scala_version >>
 
       - run:
           name: Build & Test
@@ -109,7 +109,7 @@ commands:
           paths:
             - ~/repo/core/target/*shaded/scala-*
             - ~/repo/driver/target/*shaded/scala-*
-          key: *compile_cache
+          key: *compile_cache001
 
       - save_cache:
           name: Update Scala cache
@@ -118,7 +118,7 @@ commands:
             - ~/.ivy2
             - ~/.coursier/cache
             - ~/Library/Caches/Coursier
-          key: *scala_cache
+          key: *scala_cache001
 
   setup_integration:
     description: Setup integration environment
