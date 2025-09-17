@@ -260,7 +260,8 @@ private[reactivemongo] object Trace {
       organization.value % s"reactivemongo-shaded-native-${arch}" % v
     } else {
       val variant = if (arch == "osx-aarch-64") "kqueue" else "epoll"
-      val classifier = if (arch == "osx-aarch-64") "osx-aarch_64" else "linux-x86_64"
+      val classifier =
+        if (arch == "osx-aarch-64") "osx-aarch_64" else "linux-x86_64"
 
       ("io.netty" % s"netty-transport-native-${variant}" % Dependencies.nettyVer)
         .classifier(classifier)
