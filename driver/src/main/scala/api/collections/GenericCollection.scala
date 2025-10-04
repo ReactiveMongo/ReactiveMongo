@@ -858,6 +858,7 @@ trait GenericCollection[P <: SerializationPack]
    * @param batchSize $aggBatchSizeParam
    * @param f $aggregationPipelineFunction
    * @param reader $readerParam
+   * @param maxTime $maxTimeParam
    */
   def aggregateWith[T](
       explain: Boolean = false,
@@ -865,7 +866,8 @@ trait GenericCollection[P <: SerializationPack]
       bypassDocumentValidation: Boolean = false,
       readConcern: ReadConcern = this.readConcern,
       readPreference: ReadPreference = ReadPreference.primary,
-      batchSize: Option[Int] = None
+      batchSize: Option[Int] = None,
+      maxTime: Option[FiniteDuration] = None
     )(f: AggregationFramework => AggregationPipeline
     )(implicit
       reader: pack.Reader[T],
@@ -883,7 +885,9 @@ trait GenericCollection[P <: SerializationPack]
       readPreference,
       this.writeConcern,
       batchSize
-    ).prepared[Cursor.WithOps](CursorProducer.defaultCursorProducer[T]).cursor
+    ).withMaxTime(maxTime)
+      .prepared[Cursor.WithOps](CursorProducer.defaultCursorProducer[T])
+      .cursor
 
     cp.produce(aggregateCursor)
   }
