@@ -578,7 +578,7 @@ final class AggregationSpec(
           )
         )
 
-      } yield ()) must beTypedEqualTo({}).await(0, timeout)
+      } yield ()) must beTypedEqualTo({}).awaitFor(timeout)
     }
 
     "perform a simple lookup so the joined documents are returned" in {
@@ -623,7 +623,7 @@ final class AggregationSpec(
           Int.MaxValue,
           Cursor.FailOnError[List[InventoryReport]]()
         )
-        .aka("result") must beTypedEqualTo(expected).await(0, timeout)
+        .aka("result") must beTypedEqualTo(expected).awaitFor(timeout)
 
     }
 
@@ -673,7 +673,7 @@ final class AggregationSpec(
           Int.MaxValue,
           Cursor.FailOnError[List[InventoryReport]]()
         )
-        .aka("result") must beTypedEqualTo(expected).await(0, timeout)
+        .aka("result") must beTypedEqualTo(expected).awaitFor(timeout)
 
     } tag "gt_mongo32"
   }
@@ -729,7 +729,7 @@ final class AggregationSpec(
           )
         )
 
-      } yield ()) must beTypedEqualTo({}).await(0, timeout)
+      } yield ()) must beTypedEqualTo({}).awaitFor(timeout)
     }
 
     "so the joined documents are returned" in {
@@ -765,14 +765,14 @@ final class AggregationSpec(
 
           UnwindField("specs") +: afterUnwind
         }
-        .headOption must beSome(expected).await(0, timeout) and {
+        .headOption must beSome(expected).awaitFor(timeout) and {
         orders
           .aggregateWith[BSONDocument]() { framework =>
             import framework._
 
             Unwind("specs", None, Some(true)) +: afterUnwind
           }
-          .headOption must beSome(expected).await(0, timeout)
+          .headOption must beSome(expected).awaitFor(timeout)
       }
     }
   }
@@ -820,7 +820,7 @@ final class AggregationSpec(
       books.insert
         .many(fixtures)
         .map(_ => {})
-        .aka("fixtures") must beTypedEqualTo({}).await(0, timeout)
+        .aka("fixtures") must beTypedEqualTo({}).awaitFor(timeout)
     }
 
     "be outputed to collection" in {
@@ -846,7 +846,7 @@ final class AggregationSpec(
           )
         }
         .collect[List](Int.MaxValue, Cursor.FailOnError[List[Author]]())
-        .map(_ => {}) must beEqualTo({}).await(0, timeout) and {
+        .map(_ => {}) must beEqualTo({}).awaitFor(timeout) and {
         db.collection[BSONCollection](outColl)
           .find(BSONDocument.empty)
           .sort(BSONDocument("_id" -> -1))
@@ -859,7 +859,7 @@ final class AggregationSpec(
             "Homer" -> List("Iliad", "The Odyssey"),
             "Dante" -> List("Divine Comedy", "Eclogues", "The Banquet")
           )
-        ).await(0, timeout)
+        ).awaitFor(timeout)
       }
     }
   }
@@ -895,7 +895,7 @@ final class AggregationSpec(
 
       Future
         .sequence(fixtures.map { doc => contest.insert.one(doc) })
-        .map(_ => {}) aka "fixtures" must beTypedEqualTo({}).await(0, timeout)
+        .map(_ => {}) aka "fixtures" must beTypedEqualTo({}).awaitFor(timeout)
     }
 
     "return the standard deviation of each quiz" in {
@@ -919,7 +919,7 @@ final class AggregationSpec(
         .collect[List](Int.MaxValue, Cursor.FailOnError[List[QuizStdDev]]())
         .aka(f"$$stdDevPop results") must beTypedEqualTo(
         List(QuizStdDev(1, 8.04155872120988D), QuizStdDev(2, 8.04155872120988D))
-      ).await(0, timeout)
+      ).awaitFor(timeout)
 
       /*
        { "_id" : 1, "stdDev" : 8.04155872120988 }
@@ -1125,7 +1125,7 @@ final class AggregationSpec(
       contest.insert
         .many(fixtures)
         .map(_ => {})
-        .aka("fixtures") must beTypedEqualTo({}).await(0, timeout)
+        .aka("fixtures") must beTypedEqualTo({}).awaitFor(timeout)
     }
 
     "return the standard deviation of user ages" in {
@@ -1149,7 +1149,7 @@ final class AggregationSpec(
             Group(BSONNull)("ageStdDev" -> StdDevSamp(BSONString(f"$$age")))
           )
         }
-        .headOption must beSome(expected).await(0, timeout)
+        .headOption must beSome(expected).awaitFor(timeout)
     }
   }
 
@@ -1210,7 +1210,7 @@ final class AggregationSpec(
               )
             )
           )
-          .map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
+          .map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
       }
     }
 
@@ -1279,7 +1279,7 @@ final class AggregationSpec(
             )
           )
         )
-      ).await(0, timeout)
+      ).awaitFor(timeout)
 
       // { "type" : "public", "loc" : { "type" : "Point", "coordinates" : [ -73.97, 40.77 ] }, "name" : "Central Park", "category" : "Parks", "dist" : { "calculated" : 1147.4220523120696, "loc" : { "type" : "Point", "coordinates" : [ -73.97, 40.77 ] } } }
     }
@@ -1349,7 +1349,7 @@ final class AggregationSpec(
             )
           )
         )
-        .map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
+        .map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
     }
 
     "be redacted" in {
@@ -1445,7 +1445,7 @@ db.forecasts.aggregate(
 }
        */
 
-      result must beSome(expected).await(0, timeout)
+      result must beSome(expected).awaitFor(timeout)
     }
   }
 
@@ -1518,7 +1518,7 @@ db.forecasts.aggregate(
             "status" -> "A"
           )
         )
-        .map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
+        .map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
     }
 
     "be redacted" in {
@@ -1563,7 +1563,7 @@ db.accounts.aggregate([
           "acct_id" -> "xyz123",
           "status" -> "A"
         )
-      ).await(0, timeout)
+      ).awaitFor(timeout)
     }
   }
 
@@ -1591,7 +1591,7 @@ db.accounts.aggregate([
             "on_order" -> document("oranges" -> 35, "apples" -> 75)
           )
         )
-        .map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
+        .map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
     }
 
     f"and reshaped using $$replaceRoot" in {
@@ -1604,7 +1604,7 @@ db.accounts.aggregate([
         .headOption
 
       result must beSome(document("oranges" -> 20, "apples" -> 60))
-        .await(0, timeout)
+        .awaitFor(timeout)
     }
   }
 
@@ -1626,7 +1626,7 @@ db.accounts.aggregate([
             "city" -> "New York"
           )
         )
-        .map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
+        .map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
     }
 
     "and reshaped using $replaceRoot" in {
@@ -1649,7 +1649,7 @@ db.accounts.aggregate([
         .headOption
 
       result must beSome(document("full_name" -> "Gary Sheffield"))
-        .await(0, timeout)
+        .awaitFor(timeout)
     }
 
     "and counted" in {
@@ -1664,7 +1664,7 @@ db.accounts.aggregate([
 
             List(Match(document("first_name" -> "Gary")), Count("foo"))
           }
-          .head must beTypedEqualTo(1).await(0, timeout)
+          .head must beTypedEqualTo(1).awaitFor(timeout)
       }
     }
   }
@@ -1694,7 +1694,7 @@ db.accounts.aggregate([
             )
           )
         )
-        .map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
+        .map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
     }
 
     f"be aggregated with $$sum on array fields" in {
@@ -1748,7 +1748,7 @@ db.accounts.aggregate([
         }
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]())
         .aka("aggregated") must beTypedEqualTo(expectedResults)
-        .await(0, timeout)
+        .awaitFor(timeout)
     }
   }
 
@@ -1781,7 +1781,7 @@ db.accounts.aggregate([
             User(_id = 4, name = "ty", favorites = Seq("ice cream"))
           )
         )
-        .map(_ => {}) must beTypedEqualTo({}).await(0, timeout)
+        .map(_ => {}) must beTypedEqualTo({}).awaitFor(timeout)
 
     }
 
@@ -1823,7 +1823,7 @@ db.accounts.aggregate([
           ),
           User(_id = 4, name = "ty", favorites = Seq("ice cream"))
         )
-      ).await(0, timeout)
+      ).awaitFor(timeout)
     }
   }
   section("gt_mongo32")
