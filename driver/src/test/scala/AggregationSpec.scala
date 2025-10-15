@@ -1747,8 +1747,9 @@ db.accounts.aggregate([
 
         }
         .collect[Set](Int.MaxValue, Cursor.FailOnError[Set[BSONDocument]]())
-        .aka("aggregated") must beTypedEqualTo(expectedResults)
-        .awaitFor(timeout)
+        .aka("aggregated") must beTypedEqualTo(expectedResults).awaitFor(
+        timeout
+      )
     }
   }
 

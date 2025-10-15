@@ -1,4 +1,3 @@
-
 lazy val `ReactiveMongo-Core` = project
   .in(file("core"))
   .settings(
