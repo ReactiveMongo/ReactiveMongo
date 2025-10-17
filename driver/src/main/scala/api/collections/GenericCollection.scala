@@ -191,11 +191,24 @@ trait GenericCollection[P <: SerializationPack]
       skip: Int = 0,
       hint: Option[Hint] = None,
       readConcern: ReadConcern = this.readConcern,
+      maxTime: Option[FiniteDuration] = None,
+      collation: Option[Collation] = None,
+      comment: Option[String] = None,
       readPreference: ReadPreference = this.readPreference
     )(implicit
       ec: ExecutionContext
     ): Future[Long] =
-    countDocuments(selector, limit, skip, hint, readConcern, readPreference)
+    countDocuments(
+      selector,
+      limit,
+      skip,
+      hint,
+      readConcern,
+      maxTime,
+      collation,
+      comment,
+      readPreference
+    )
 
   /**
    * Returns an unordered builder for insert operations.

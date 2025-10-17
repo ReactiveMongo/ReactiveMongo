@@ -1,10 +1,16 @@
 package reactivemongo.api.collections
 
 import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.duration.FiniteDuration
 
 import reactivemongo.core.protocol.MongoWireVersion
 
-import reactivemongo.api.{ ReadConcern, ReadPreference, SerializationPack }
+import reactivemongo.api.{
+  Collation,
+  ReadConcern,
+  ReadPreference,
+  SerializationPack
+}
 import reactivemongo.api.commands.{
   CollectionCommand,
   CommandCodecs,
@@ -25,11 +31,23 @@ private[api] trait CountOp[P <: SerializationPack] {
       skip: Int,
       hint: Option[Hint],
       readConcern: ReadConcern,
+      maxTime: Option[FiniteDuration],
+      collation: Option[Collation],
+      comment: Option[String],
       readPreference: ReadPreference
     )(implicit
       ec: ExecutionContext
     ): Future[Long] = runCommand(
-    new CountCommand(query, limit, skip, hint, readConcern),
+    new CountCommand(
+      query,
+      limit,
+      skip,
+      hint,
+      readConcern,
+      maxTimeMS = maxTime.map(_.toMillis),
+      collation,
+      comment
+    ),
     readPreference
   )
 
@@ -38,7 +56,10 @@ private[api] trait CountOp[P <: SerializationPack] {
       val limit: Option[Int],
       val skip: Int,
       val hint: Option[Hint],
-      val readConcern: ReadConcern)
+      val readConcern: ReadConcern,
+      val maxTimeMS: Option[Long],
+      val collation: Option[Collation],
+      val comment: Option[String])
       extends CollectionCommand
       with CommandWithResult[Long] {
     val commandKind = CommandKind.Count
@@ -56,22 +77,21 @@ private[api] trait CountOp[P <: SerializationPack] {
       CommandCodecs.writeSessionReadConcern(builder)(session)
 
     pack.writer[CountCmd] { count =>
-      import builder.{ document, elementProducer => element, int, string }
+      import builder.{ document, elementProducer => element, int, string, long }
+      import count.command
 
       val elements = Seq.newBuilder[pack.ElementProducer]
 
       elements += element("count", string(count.collection))
-      elements += element("skip", int(count.command.skip))
+      elements += element("skip", int(command.skip))
 
-      count.command.query.foreach { query =>
-        elements += element("query", query)
-      }
+      command.query.foreach { query => elements += element("query", query) }
 
-      count.command.limit.foreach { limit =>
+      command.limit.foreach { limit =>
         elements += element("limit", int(limit))
       }
 
-      count.command.hint.foreach {
+      command.hint.foreach {
         case HintString(name) =>
           elements += element("hint", string(name))
 
@@ -80,6 +100,21 @@ private[api] trait CountOp[P <: SerializationPack] {
       }
 
       elements ++= writeReadConcern(count.command.readConcern)
+
+      command.maxTimeMS.foreach { maxTimeMs =>
+        elements += element("maxTimeMS", long(maxTimeMs))
+      }
+
+      command.collation.foreach { c =>
+        elements += element(
+          "collation",
+          Collation.serializeWith(pack, c)(builder)
+        )
+      }
+
+      command.comment.foreach { comment =>
+        elements += element("comment", string(comment))
+      }
 
       document(elements.result())
     }
