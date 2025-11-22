@@ -54,7 +54,7 @@ commands:
       - restore_cache:
           name: Restore Scala cache
           keys:
-            - &scala_cache001 scala-{{ .Environment.CIRCLE_JOB }}-<< parameters.shaded >>-{{ checksum "version.sbt" }}_{{ checksum "build.sbt" }}-{{ checksum "project/Common.scala" }}-{{ checksum "project/Dependencies.scala" }}
+            - &scala_cache001 scala-{{ .Environment.CIRCLE_JOB }}-<< parameters.shaded >>-{{ checksum "version.sbt" }}_{{ checksum "build.sbt" }}-{{ checksum "project/Common.scala" }}-{{ checksum "pro[...]
 
       - restore_cache:
           name: Restore compilation cache
@@ -220,7 +220,7 @@ commands:
 executors:
   osx:
     macos:
-      xcode: 14.0.1
+      xcode: 14.2.0
   openjdk:
     parameters:
       version:
