@@ -296,7 +296,7 @@ final class DB private[api] (
           case Success(_) =>
             // Dummy find, to make sure a CRUD command is sent
             // with 'startTransaction' right now
-            collection(s"startx${Thread.currentThread().getId}")
+            collection(s"startx${Thread.currentThread().getName.hashCode}")
               .find(pack.newBuilder.document(Seq.empty))
               .one[pack.Document]
               .map(_ => this)
