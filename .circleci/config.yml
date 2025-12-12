@@ -396,7 +396,7 @@ workflows:
           os: osx
           e: osx
           jdk_version: jdk8
-          scala_version: 2.12.20
+          scala_version: 2.12.21
           shaded: false
 
       - unit_test_suite:
@@ -405,7 +405,7 @@ workflows:
             name: openjdk
             version: 10
           jdk_version: openjdk10
-          scala_version: 2.12.20
+          scala_version: 2.12.21
 
       - unit_test_suite:
           name: unit_linux_openjdk11_scala213_pekko
@@ -456,7 +456,7 @@ workflows:
       - integration_test_suite:
           name: mongo7_openjdk17_scala212_akka26_invalidssl
           openjdk_version: 17 # 11
-          scala_version: '2.12.20'
+          scala_version: '2.12.21'
           mongo_version: 7 # 5
           akka_version: 2.6.20 # rm
           mongo_profile: invalid-ssl
