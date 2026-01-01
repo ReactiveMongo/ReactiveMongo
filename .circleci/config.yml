@@ -54,7 +54,7 @@ commands:
       - restore_cache:
           name: Restore Scala cache
           keys:
-            - &scala_cache001 scala-{{ .Environment.CIRCLE_JOB }}-<< parameters.shaded >>-{{ checksum "version.sbt" }}_{{ checksum "build.sbt" }}-{{ checksum "project/Common.scala" }}-{{ checksum "pro[...]
+            - &scala_cache001 scala-{{ .Environment.CIRCLE_JOB }}-<< parameters.shaded >>-{{ checksum "version.sbt" }}_{{ checksum "build.sbt" }}-{{ checksum "project/Common.scala" }}-{{ checksum "project/Dependencies.scala" }}
 
       - restore_cache:
           name: Restore compilation cache
