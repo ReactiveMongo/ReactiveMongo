@@ -57,62 +57,81 @@ esac
 PRIMARY_HOST="$(hostname):27018"
 PRIMARY_SLOW_PROXY="$(hostname):27019"
 
-# OpenSSL - TODO: Remove
+# OpenSSL
+SSL_HOME="${SSL_HOME:-$HOME/ssl}"
+
+if [ -z "$SSL_HOME" ]; then
+  echo "[ERROR] SSL_HOME is empty"
+  exit 1
+fi
+
 SSL_MAJOR="1.0.0"
 SSL_SUFFIX="10"
 SSL_RELEASE="1.0.2"
 SSL_FULL_RELEASE="1.0.2u"
+SSL_GH_TAG="OpenSSL_1_0_2u"
 SSL_LIB_DIRNAME="lib"
 
-SSL_DL_URL="https://www.openssl.org/source/old/$SSL_RELEASE/openssl-$SSL_FULL_RELEASE.tar.gz"
+SSL_DL_URL="https://github.com/openssl/openssl/releases/download/${SSL_GH_TAG}/openssl-${SSL_FULL_RELEASE}.tar.gz"
 
 if [ "v$MONGO_VER" = "v8" ]; then
     SSL_MAJOR="3.0.0"
     SSL_SUFFIX="3"
-    SSL_RELEASE="3.0.15"
+    SSL_RELEASE="3.0.19"
     SSL_FULL_RELEASE="$SSL_RELEASE"
+    SSL_GH_TAG="openssl-3.0.19"
     SSL_LIB_DIRNAME="lib64"
-    SSL_DL_URL="https://github.com/openssl/openssl/releases/download/openssl-${SSL_FULL_RELEASE}/openssl-${SSL_FULL_RELEASE}.tar.gz"
+    SSL_DL_URL="https://github.com/openssl/openssl/releases/download/${SSL_GH_TAG}/openssl-${SSL_FULL_RELEASE}.tar.gz"
 fi
 
-if [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libssl.so.$SSL_MAJOR" ] && [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libcrypto.so.$SSL_MAJOR" ]; then
+SSL_LIB="${SSL_LIB:-$SSL_HOME/$SSL_LIB_DIRNAME}"
+
+resolve_ssl_lib() {
+  local cand
+
+  for cand in "$SSL_LIB" "$SSL_HOME/$SSL_LIB_DIRNAME" "$SSL_HOME/lib64" "$SSL_HOME/lib"; do
+    if [ -d "$cand" ] && [ -f "$cand/libssl.so.$SSL_SUFFIX" ] && [ -f "$cand/libcrypto.so.$SSL_SUFFIX" ]; then
+      SSL_LIB="$cand"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+if ! resolve_ssl_lib; then
   echo "[INFO] Building OpenSSL $SSL_MAJOR ..."
 
   cd /tmp
 
   echo "[INFO] Downloading OpenSSL from $SSL_DL_URL ..."
-  curl -L -s -o - "$SSL_DL_URL" | tar -xzf -
+  curl -fL -s -o - "$SSL_DL_URL" | tar -xzf -
 
-  cd "openssl-$SSL_FULL_RELEASE"
-  rm -rf "$HOME/ssl" && mkdir "$HOME/ssl"
-  ./config -shared enable-ssl2 --prefix="$HOME/ssl" > /dev/null
+  cd "openssl-${SSL_FULL_RELEASE}"
+  rm -rf "$SSL_HOME" && mkdir -p "$SSL_HOME"
+
+  echo "[INFO] Configuring OpenSSL build ..."
+  ./config -shared enable-ssl2 --prefix="$SSL_HOME" > /dev/null
+
+  echo "[INFO] Resolving dependencies for OpenSSL build ..."
   make depend > /dev/null
+
+  echo "[INFO] Building and installing OpenSSL ..."
   make install > /dev/null
+
+  ls
 fi
 
-if [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libssl.so.$SSL_SUFFIX" ]; then
-  echo "[INFO] Setting up OpenSSL $SSL_MAJOR (libssl) ..."
-
-  mkdir -p "$HOME/ssl/${SSL_LIB_DIRNAME}"
-
-  ln -s "$HOME/ssl/${SSL_LIB_DIRNAME}/libssl.so.$SSL_MAJOR" "$HOME/ssl/${SSL_LIB_DIRNAME}/libssl.so.$SSL_SUFFIX"
+if ! resolve_ssl_lib; then
+  echo "[ERROR] OpenSSL libraries are missing in $SSL_LIB"
+  exit 1
 fi
 
-if [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libcrypto.so.$SSL_SUFFIX" ]; then
-  echo "[INFO] Setting up OpenSSL $SSL_MAJOR (libcrypto) ..."
+ln -sf "$SSL_LIB/libssl.so.$SSL_MAJOR" "$SSL_LIB/libssl.so.$SSL_SUFFIX"
+ln -sf "$SSL_LIB/libcrypto.so.$SSL_MAJOR" "$SSL_LIB/libcrypto.so.$SSL_SUFFIX"
 
-  mkdir -p "$HOME/ssl/${SSL_LIB_DIRNAME}"
-
-  ln -s "$HOME/ssl/${SSL_LIB_DIRNAME}/libcrypto.so.$SSL_MAJOR" "$HOME/ssl/${SSL_LIB_DIRNAME}/libcrypto.so.$SSL_SUFFIX"
-fi
-
-export PATH="$HOME/ssl/bin:$PATH"
-
-if [ -z "$LD_LIBRARY_PATH" ]; then
-    export LD_LIBRARY_PATH="$HOME/ssl/${SSL_LIB_DIRNAME}"
-else
-    export LD_LIBRARY_PATH="$HOME/ssl/${SSL_LIB_DIRNAME}:$LD_LIBRARY_PATH"
-fi
+export PATH="$SSL_HOME/bin:$PATH"
+export LD_LIBRARY_PATH="$SSL_LIB:${LD_LIBRARY_PATH:-}"
 
 cd "$HOME"
 
