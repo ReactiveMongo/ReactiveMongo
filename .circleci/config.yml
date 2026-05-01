@@ -134,7 +134,7 @@ commands:
       - restore_cache:
           name: Restore MongoDB cache
           keys:
-            - &mongo_cache_key mongo-<< parameters.mongo_version >>.<< parameters.mongo_profile >>_20241104.02
+            - &mongo_cache_key mongo-<< parameters.mongo_version >>.<< parameters.mongo_profile >>_20260429.01
 
       - run:
           name: Prepare integration environment
