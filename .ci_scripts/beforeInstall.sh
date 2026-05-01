@@ -62,35 +62,39 @@ SSL_MAJOR="1.0.0"
 SSL_SUFFIX="10"
 SSL_RELEASE="1.0.2"
 SSL_FULL_RELEASE="1.0.2u"
+SSL_GH_TAG="OpenSSL_${SSL_FULL_RELEASE//./_}"
+SSL_SRC_DIR="openssl-$SSL_GH_TAG"
 SSL_LIB_DIRNAME="lib"
+USE_CUSTOM_SSL=true
 
-SSL_DL_URL="https://www.openssl.org/source/old/$SSL_RELEASE/openssl-$SSL_FULL_RELEASE.tar.gz"
+SSL_DL_URL="https://codeload.github.com/openssl/openssl/tar.gz/refs/tags/$SSL_GH_TAG"
 
 if [ "v$MONGO_VER" = "v8" ]; then
-    SSL_MAJOR="3.0.0"
-    SSL_SUFFIX="3"
-    SSL_RELEASE="3.0.15"
-    SSL_FULL_RELEASE="$SSL_RELEASE"
-    SSL_LIB_DIRNAME="lib64"
-    SSL_DL_URL="https://github.com/openssl/openssl/releases/download/openssl-${SSL_FULL_RELEASE}/openssl-${SSL_FULL_RELEASE}.tar.gz"
+    # Use system OpenSSL in CI to avoid mixing distro binaries and custom-built libs
+    USE_CUSTOM_SSL=false
 fi
 
-if [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libssl.so.$SSL_MAJOR" ] && [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libcrypto.so.$SSL_MAJOR" ]; then
+if [ "$USE_CUSTOM_SSL" = "true" ] && [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libssl.so.$SSL_MAJOR" ] && [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libcrypto.so.$SSL_MAJOR" ]; then
   echo "[INFO] Building OpenSSL $SSL_MAJOR ..."
 
   cd /tmp
 
-  echo "[INFO] Downloading OpenSSL from $SSL_DL_URL ..."
-  curl -L -s -o - "$SSL_DL_URL" | tar -xzf -
+  SSL_TGZ="/tmp/openssl-$SSL_FULL_RELEASE.tar.gz"
 
-  cd "openssl-$SSL_FULL_RELEASE"
+  echo "[INFO] Downloading OpenSSL from $SSL_DL_URL ..."
+  curl -fL -sS -o "$SSL_TGZ" "$SSL_DL_URL"
+
+  rm -rf "/tmp/$SSL_SRC_DIR"
+  tar -xzf "$SSL_TGZ"
+
+  cd "$SSL_SRC_DIR"
   rm -rf "$HOME/ssl" && mkdir "$HOME/ssl"
   ./config -shared enable-ssl2 --prefix="$HOME/ssl" > /dev/null
   make depend > /dev/null
   make install > /dev/null
 fi
 
-if [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libssl.so.$SSL_SUFFIX" ]; then
+if [ "$USE_CUSTOM_SSL" = "true" ] && [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libssl.so.$SSL_SUFFIX" ]; then
   echo "[INFO] Setting up OpenSSL $SSL_MAJOR (libssl) ..."
 
   mkdir -p "$HOME/ssl/${SSL_LIB_DIRNAME}"
@@ -98,7 +102,7 @@ if [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libssl.so.$SSL_SUFFIX" ]; then
   ln -s "$HOME/ssl/${SSL_LIB_DIRNAME}/libssl.so.$SSL_MAJOR" "$HOME/ssl/${SSL_LIB_DIRNAME}/libssl.so.$SSL_SUFFIX"
 fi
 
-if [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libcrypto.so.$SSL_SUFFIX" ]; then
+if [ "$USE_CUSTOM_SSL" = "true" ] && [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libcrypto.so.$SSL_SUFFIX" ]; then
   echo "[INFO] Setting up OpenSSL $SSL_MAJOR (libcrypto) ..."
 
   mkdir -p "$HOME/ssl/${SSL_LIB_DIRNAME}"
@@ -106,12 +110,14 @@ if [ ! -f "$HOME/ssl/${SSL_LIB_DIRNAME}/libcrypto.so.$SSL_SUFFIX" ]; then
   ln -s "$HOME/ssl/${SSL_LIB_DIRNAME}/libcrypto.so.$SSL_MAJOR" "$HOME/ssl/${SSL_LIB_DIRNAME}/libcrypto.so.$SSL_SUFFIX"
 fi
 
-export PATH="$HOME/ssl/bin:$PATH"
+if [ "$USE_CUSTOM_SSL" = "true" ]; then
+    export PATH="$HOME/ssl/bin:$PATH"
 
-if [ -z "$LD_LIBRARY_PATH" ]; then
-    export LD_LIBRARY_PATH="$HOME/ssl/${SSL_LIB_DIRNAME}"
-else
-    export LD_LIBRARY_PATH="$HOME/ssl/${SSL_LIB_DIRNAME}:$LD_LIBRARY_PATH"
+    if [ -z "$LD_LIBRARY_PATH" ]; then
+        export LD_LIBRARY_PATH="$HOME/ssl/${SSL_LIB_DIRNAME}"
+    else
+        export LD_LIBRARY_PATH="$HOME/ssl/${SSL_LIB_DIRNAME}:$LD_LIBRARY_PATH"
+    fi
 fi
 
 cd "$HOME"
