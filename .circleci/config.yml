@@ -320,7 +320,6 @@ jobs:
 
       - run:
           name: Print integration parameters
-          no_output_timeout: 15m
           command: |
                     echo "MongoDB: version=$MONGO_VER; profile=$MONGO_PROFILE"
                     echo "JDK: openjdk<< parameters.openjdk_version >>"
