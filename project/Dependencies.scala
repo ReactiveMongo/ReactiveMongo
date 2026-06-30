@@ -19,7 +19,7 @@ object Dependencies {
     val ver = sys.env.get("AKKA_VERSION").getOrElse {
       val v = scalaBinaryVersion.value
 
-      if (v startsWith "3") "2.6.18"
+      if (v.startsWith("3")) "2.6.18"
       else if (v == "2.12" || v == "2.13") "2.5.32"
       else "2.3.13"
     }

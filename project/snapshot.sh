@@ -18,12 +18,12 @@ fi
 
 export PUBLISH_PASS
 
-sbt +publish
+sbt --server +publish
 
 ACTOR_MODULE=pekko sbt +publish
 
 export REACTIVEMONGO_SHADED=false
 
-sbt +publish
+sbt --server +publish
 
 ACTOR_MODULE=pekko sbt +publish

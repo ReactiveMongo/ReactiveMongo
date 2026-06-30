@@ -9,6 +9,8 @@ import scala.xml.{
 import sbt._
 import sbt.Keys._
 
+import xsbti.HashedVirtualFileRef
+
 import com.typesafe.tools.mima.plugin.MimaKeys.mimaBinaryIssueFilters
 
 final class Driver(core: Project, actorModule: Project) {
@@ -62,7 +64,7 @@ final class Driver(core: Project, actorModule: Project) {
             val rightBiaised = "Either.*\\ right-biased"
 
             Seq(
-              s"-Wconf:cat=deprecation&msg=.*($mongo30eol|$rightBiaised|MongoWireVersion|reflectiveSelectableFromLangReflectiveCalls|right-biased|scheduleAtFixedRate|filterInPlace|AtlasSearch|Experimental).*:s",
+              s"-Wconf:cat=deprecation&msg=.*($mongo30eol|$rightBiaised|MongoWireVersion|reflectiveSelectableFromLangReflectiveCalls|right-biased|scheduleAtFixedRate|filterInPlace|AtlasSearch|Experimental|NioEventLoopGroup).*:s",
               "-Wconf:msg=.*with\\ as\\ a\\ type\\ operator.*:s",
               "-Wconf:msg=.*is\\ not\\ declared\\ infix.*:s",
               "-Wconf:msg=.*is\\ deprecated\\ for\\ wildcard\\ arguments\\ of\\ types.*:s",
@@ -160,7 +162,7 @@ final class Driver(core: Project, actorModule: Project) {
           val log = streams.value.log
           val objectClass = f"tests.Common$$"
 
-          Tests.Cleanup { cl: ClassLoader =>
+          Tests.Cleanup { (cl: ClassLoader) =>
             import scala.language.reflectiveCalls
 
             val c = cl.loadClass(objectClass)
@@ -174,6 +176,7 @@ final class Driver(core: Project, actorModule: Project) {
         },
         Compile / packageBin / mappings ~= driverFilter
         // mappings in (Compile, packageDoc) ~= driverFilter,
+        ,libraryDependencies ++= Dependencies.akka.value
       )
     )
     .configure { p =>
@@ -195,8 +198,8 @@ final class Driver(core: Project, actorModule: Project) {
         case _ => p
       }
     }
-    .dependsOn(core)
-    .dependsOn(actorModule % "compile->compile;test->test")
+    .dependsOn(sbt.projectToLocalProject(core) % "compile")
+    .dependsOn(sbt.projectToLocalProject(actorModule) % "compile->compile;test->test")
 
   // ---
 
@@ -268,10 +271,10 @@ private[reactivemongo] object Trace {
     }
   }
 
-  private val driverFilter: Seq[(File, String)] => Seq[(File, String)] = {
-    (_: Seq[(File, String)]).filter {
+  private val driverFilter: Seq[(HashedVirtualFileRef, String)] => Seq[(HashedVirtualFileRef, String)] = {
+    (_: Seq[(HashedVirtualFileRef, String)]).filter {
       case (file, name) =>
-        !(name endsWith "external/reactivemongo/StaticListenerBinder.class")
+        !name.endsWith("external/reactivemongo/StaticListenerBinder.class")
     }
   } andThen Common.filter
 
