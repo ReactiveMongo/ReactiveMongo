@@ -6,12 +6,12 @@ commands:
     parameters:
       sbt_version:
         type: string
-        default: "1.11.4"
+        default: "2.0.1"
     steps:
       - restore_cache:
           name: Restore SBT cache
           keys:
-            - &sbt_cache sbt-{{ arch }}-{{ checksum "project/build.properties" }}
+            - &sbt_cache sbt2-{{ arch }}-{{ checksum "project/build.properties" }}
 
       - run:
           name: Setup SBT
@@ -33,10 +33,10 @@ commands:
     parameters:
       jdk_version:
         type: string
-        default: "openjdk8"
+        default: "26.0"
       scala_version:
         type: string
-        default: "2.13.16"
+        default: "2.13"
       actor_module:
         type: string
         default: "akka"
@@ -65,7 +65,7 @@ commands:
           name: Build & Test
           no_output_timeout: 15m
           command: |
-                    export PATH=$PATH:~/sbt/bin
+                    export PATH=~/sbt/bin:$PATH
                     export SCALA_VERSION="<< parameters.scala_version >>"
                     export ACTOR_MODULE="<< parameters.actor_module >>"
                     SHADED="<< parameters.shaded >>"
@@ -189,30 +189,26 @@ commands:
       - deploy:
           name: Publish artifacts to Sonatype Snapshots
           command: |
-                    export JAVA_HOME=/usr/local/openjdk-8/
-                    export PATH=$PATH:~/sbt/bin:$JAVA_HOME/bin
-
-                    cd ~/repo
-                    sbt --version || echo 'Missing SBT'
-
                     if [ ! "${CIRCLE_BRANCH}" = "master" ]; then
                       echo "Skipped on branch ${CIRCLE_BRANCH}"
                       exit 0
                     fi
 
-                    V=`sbt -J-Dsbt.log.noformat=true ';project ReactiveMongo-Core ;show version' | grep -A 1 ReactiveMongo-Core | grep -v ReactiveMongo-Core | cut -d ' ' -f 2`
-
-                    if [ `echo "$V" | grep -- '-SNAPSHOT' | wc -l` -eq 0 ]; then
-                      S=`echo "$V" | perl -pe 's/([0-9]+)$/${\($1 + 1)}-SNAPSHOT/'`
-                      echo "Cannot bump $V to $S"
-                      echo "version in ThisBuild := \"$S\"" > version.sbt
-                    fi
-                    
                     if [ "x$PUBLISH_USER" = "x" -o "x$PUBLISH_PASS" = "x" ]; then
                       echo "Missing publication credentials"
                       exit 1
                     fi
-                    
+
+                    #export JAVA_HOME=/usr/local/openjdk-8/
+                    export PATH=~/sbt/bin:$JAVA_HOME/bin:$PATH
+
+                    V=$(sbt --server 'show version' 2>&1 | sed 's/\x1b\[0[Jm]//g' | grep --color=never '[0-9]\+\.[0-9]\+' | tail -1 | sed 's/\[info\]//' | xargs | tr -cd '[:alnum:]._-')
+
+                    if [[ "$V" != *SNAPSHOT* ]]; then
+                      echo "Skip non snapshot: $V"
+                      exit 0
+                    fi
+                 
                     export SBT_OPTS="$SBT_OPTS -Dreactivemongo.collectThreadTrace=true"
 
                     ./project/snapshot.sh
@@ -224,10 +220,10 @@ executors:
   openjdk:
     parameters:
       version:
-        type: integer
-        default: 8
+        type: string
+        default: '26.0'
     docker:
-      - image: cchantep/circleci-openjdk:<< parameters.version >>-jdk
+      - image: cimg/openjdk:<< parameters.version >>
 
 jobs:
   unit_test_suite:
@@ -241,10 +237,10 @@ jobs:
         default: "linux"
       jdk_version:
         type: string
-        default: "openjdk8"
+        default: "26.0"
       scala_version:
         type: string
-        default: "2.13.16"
+        default: "2.13"
       actor_module:
         type: string
         default: "akka"
@@ -279,11 +275,11 @@ jobs:
 
     parameters:
       openjdk_version:
-        type: integer
-        default: 10
+        type: string
+        default: "26.0"
       scala_version:
         type: string
-        default: "2.12.20"
+        default: "2.12"
       akka_version:
         type: string
         default: "2.5.23"
@@ -304,7 +300,7 @@ jobs:
         default: "default"
 
     docker:
-      - image: cchantep/circleci-openjdk:<< parameters.openjdk_version >>-jdk
+      - image: cimg/openjdk:<< parameters.openjdk_version >>
 
     working_directory: ~/repo
 
@@ -349,7 +345,7 @@ jobs:
 
   publish_snapshots:
     docker:
-      - image: cimg/openjdk:8.0
+      - image: cimg/openjdk:26.0
 
     working_directory: ~/repo
     
@@ -391,101 +387,100 @@ workflows:
     max_auto_reruns: 3
     jobs:
       - unit_test_suite:
-          name: unit_osx_jdk8_scala212
+          name: unit_osx_jdk26_scala212
           os: osx
           e: osx
-          jdk_version: jdk8
-          scala_version: 2.12.21
+          jdk_version: '26.0'
+          scala_version: '2.12'
           shaded: false
 
       - unit_test_suite:
-          name: unit_linux_openjdk10_scala212
+          name: unit_linux_openjdk17_scala212
           e:
             name: openjdk
-            version: 10
-          jdk_version: openjdk10
-          scala_version: 2.12.21
+            version: '17.0'
+          jdk_version: '17.0'
+          scala_version: '2.12'
 
       - unit_test_suite:
-          name: unit_linux_openjdk11_scala213_pekko
+          name: unit_linux_openjdk17_scala213_pekko
           e:
             name: openjdk
-            version: 11
-          jdk_version: openjdk11
-          scala_version: 2.13.18
+            version: '17.0'
+          jdk_version: '17.0'
+          scala_version: '2.13'
           actor_module: pekko
 
       - integration_test_suite:
-          name: mongo3_openjdk8_scala211_akka23
-          openjdk_version: 8
-          scala_version: 2.11.12
+          name: mongo3_openjdk17_scala211_akka23
+          openjdk_version: '17.0'
+          scala_version: '2.11'
           akka_version: 2.3.13
           mongo_version: 3
 
       - integration_test_suite:
-          name: mongo6_openjdk11_scala213_akka25_x509
+          name: mongo6_openjdk17_scala213_akka25_x509
           mongo_version: 6
           mongo_profile: x509
-          openjdk_version: 11
-          scala_version: 2.13.18
+          openjdk_version: '17.0'
+          scala_version: '2.13'
 
       - integration_test_suite:
-          name: mongo7_openjdk11_scala213_pekko_x509
-          openjdk_version: 11
+          name: mongo7_openjdk17_scala213_pekko_x509
+          openjdk_version: '17.0'
           mongo_version: 7
-          scala_version: 2.13.18
+          scala_version: '2.13'
           actor_module: pekko
 
       - integration_test_suite:
-          name: mongo4_openjdk11_scala3_akka26_zstd
-          scala_version: '3.3.6'
+          name: mongo4_openjdk17_scala3_akka26_zstd
+          scala_version: '3.4'
           akka_version: 2.6.20
-          openjdk_version: 11
+          openjdk_version: '17.0'
           mongo_version: 4 # 6
           compressor: zstd
 
       - integration_test_suite:
           name: mongo8_openjdk17_scala212_akka26_mutualssl_zlib
-          openjdk_version: 17
+          openjdk_version: '17.0'
           akka_version: 2.6.20
           mongo_version: 8
           mongo_profile: mutual-ssl
           compressor: zlib
 
       - integration_test_suite:
-          name: mongo7_openjdk17_scala212_akka26_invalidssl
-          openjdk_version: 17 # 11
-          scala_version: '2.12.21'
-          mongo_version: 7 # 5
+          name: mongo7_openjdk26_scala212_akka26_invalidssl
+          scala_version: '2.12'
+          mongo_version: 7
           akka_version: 2.6.20 # rm
           mongo_profile: invalid-ssl
 
       - integration_test_suite:
-          name: mongo8_openjdk17_scala3_akka26_rs
-          scala_version: '3.3.6'
+          name: mongo8_openjdk26_scala3_akka26_rs
+          scala_version: '3.4'
           akka_version: 2.6.20
           mongo_version: 8
           mongo_profile: rs
           shaded: false
-          openjdk_version: 17
+          openjdk_version: '26.0'
 
       - integration_test_suite:
-          name: mongo5_openjdk10_scala211_akka25
+          name: mongo5_openjdk17_scala211_akka25
           mongo_version: 5
-          scala_version: 2.11.12
+          scala_version: '2.11'
 
       - integration_test_suite:
-          name: mongo7_openjdk10_scala211_akka25_rs_snappy
-          scala_version: 2.11.12
+          name: mongo7_openjdk17_scala211_akka25_rs_snappy
+          scala_version: '2.11'
           mongo_version: 7
           mongo_profile: rs
-          openjdk_version: 11
+          openjdk_version: '17.0'
           compressor: snappy
 
       - integration_test_suite:
-          name: mongo5_openjdk11_scala211_akka25_x509
-          scala_version: 2.11.12
-          openjdk_version: 11
+          name: mongo5_openjdk17_scala211_akka25_x509
+          scala_version: '2.11'
+          openjdk_version: '17.0'
           mongo_version: 5
           mongo_profile: x509
 
@@ -495,19 +490,19 @@ workflows:
               only:
                 - master
           requires:
-            - unit_osx_jdk8_scala212
-            - unit_linux_openjdk10_scala212
-            - unit_linux_openjdk11_scala213_pekko
-            - mongo3_openjdk8_scala211_akka23
-            - mongo5_openjdk10_scala211_akka25
-            - mongo5_openjdk11_scala211_akka25_x509
-            - mongo7_openjdk17_scala212_akka26_invalidssl
-            - mongo6_openjdk11_scala213_akka25_x509
-            - mongo4_openjdk11_scala3_akka26_zstd
-            - mongo7_openjdk10_scala211_akka25_rs_snappy
-            - mongo7_openjdk11_scala213_pekko_x509
+            - unit_osx_jdk26_scala212
+            - unit_linux_openjdk17_scala212
+            - unit_linux_openjdk17_scala213_pekko
+            - mongo3_openjdk17_scala211_akka23
+            - mongo5_openjdk17_scala211_akka25
+            - mongo5_openjdk17_scala211_akka25_x509
+            - mongo7_openjdk26_scala212_akka26_invalidssl
+            - mongo6_openjdk17_scala213_akka25_x509
+            - mongo4_openjdk17_scala3_akka26_zstd
+            - mongo7_openjdk17_scala211_akka25_rs_snappy
+            - mongo7_openjdk17_scala213_pekko_x509
             - mongo8_openjdk17_scala212_akka26_mutualssl_zlib
-            - mongo8_openjdk17_scala3_akka26_rs
+            - mongo8_openjdk26_scala3_akka26_rs
 
       - trigger_dependent_builds:
           filters:

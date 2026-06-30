@@ -20,7 +20,7 @@ ThisBuild / version := {
               Seq(maj, min, patch, rc) <- Stable.unapplySeq(previousVer)
               nextPatch <- scala.util.Try(patch.toInt).map(_ + 1).toOption
               nextRc = {
-                if (rc startsWith "-RC") {
+                if (rc.startsWith("-RC")) {
                   scala.util
                     .Try(rc.stripPrefix("-RC").toInt)
                     .map(_ + 1)

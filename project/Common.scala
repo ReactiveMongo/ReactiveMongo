@@ -3,6 +3,7 @@ import scala.xml.{ Elem => XmlElem, Node => XmlNode }
 import sbt._
 import sbt.Keys._
 import sbt.plugins.JvmPlugin
+import xsbti.HashedVirtualFileRef
 
 import com.typesafe.tools.mima.plugin.MimaKeys.mimaFailOnNoPrevious
 
@@ -13,6 +14,9 @@ object Common extends AutoPlugin {
   lazy val actorModule = sys.env.getOrElse("ACTOR_MODULE", "akka")
 
   val baseSettings = Seq(
+    semanticdbEnabled := scalaBinaryVersion.value != "2.11",
+    Global / rootOutputDirectory := (ThisBuild / baseDirectory).value.toPath,
+    Global / cacheVersion := 1L,
     organization := "org.reactivemongo",
     credentials ++= sys.env.get("SONATYPE_USER").toSeq.map { user =>
       Credentials(
@@ -31,7 +35,7 @@ object Common extends AutoPlugin {
     Test / logBuffered := false
   )
 
-  val filter = { (ms: Seq[(File, String)]) =>
+  val filter = { (ms: Seq[(HashedVirtualFileRef, String)]) =>
     ms.filter {
       case (file, path) =>
         path != "logback.xml" && !path.startsWith("toignore") &&
@@ -44,7 +48,7 @@ object Common extends AutoPlugin {
   val scala211 = "2.11.12"
   val scala212 = "2.12.21"
   val scala213 = "2.13.18"
-  val scala3Lts = "3.3.8"
+  val scala3Lts = "3.4.3"
 
   def majorVersion = {
     val Major = """([0-9]+)\.([0-9]+)\..*""".r
@@ -76,8 +80,11 @@ object Common extends AutoPlugin {
       crossVersion := CrossVersion.binary,
       useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
       target := {
-        if (useShaded.value) target.value / "shaded"
-        else target.value / "noshaded"
+        if (useShaded.value) {
+          target.value / "shaded" / s"scala-${scalaBinaryVersion.value}"
+        } else {
+          target.value / "noshaded" / s"scala-${scalaBinaryVersion.value}"
+        }
       },
       version := {
         val ver = (ThisBuild / version).value
