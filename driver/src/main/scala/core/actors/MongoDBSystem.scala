@@ -2029,12 +2029,13 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         new IsMasterRequest(
           node = updated,
           f = sendFresh,
-          error = Some {
-            val cause = new ClosedException(s"$msg ($lnm)")
+          error =
+            Some {
+              val cause = new ClosedException(s"$msg ($lnm)")
 
-            if (!wasPrimary) cause
-            else new PrimaryUnavailableException(supervisor, name, cause)
-          }
+              if (!wasPrimary) cause
+              else new PrimaryUnavailableException(supervisor, name, cause)
+            }
         )
       } else {
         debug(

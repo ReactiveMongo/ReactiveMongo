@@ -174,11 +174,13 @@ final class ChannelFactorySpec(
             chanConnected.success(Common.logger.info(s"NIO $msg")); ()
 
           case IsMasterResponse(resp) if (chanConnected.isCompleted) => {
-            result.tryComplete(scala.util.Try {
-              val bson = pack.readAndDeserialize(resp, pack.IdentityReader)
+            result.tryComplete(
+              scala.util.Try {
+                val bson = pack.readAndDeserialize(resp, pack.IdentityReader)
 
-              pack.deserialize(bson, isMasterReader)
-            })
+                pack.deserialize(bson, isMasterReader)
+              }
+            )
 
             Common.logger.info(s"NIO isMasterResponse: $resp")
           }
