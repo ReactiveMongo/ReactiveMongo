@@ -1411,18 +1411,19 @@ db.forecasts.aggregate(
         title = "123 Department Report",
         tags = List("G", "STLW"),
         year = 2014,
-        subsections = List(
-          Subsection(
-            subtitle = "Section 1: Overview",
-            tags = List("SI", "G"),
-            content = "Section 1: This is the content of section 1."
-          ),
-          Subsection(
-            subtitle = "Section 2: Analysis",
-            tags = List("STLW"),
-            content = "Section 2: This is the content of section 2."
+        subsections =
+          List(
+            Subsection(
+              subtitle = "Section 1: Overview",
+              tags = List("SI", "G"),
+              content = "Section 1: This is the content of section 1."
+            ),
+            Subsection(
+              subtitle = "Section 2: Analysis",
+              tags = List("STLW"),
+              content = "Section 2: This is the content of section 2."
+            )
           )
-        )
       )
       /*
 {
