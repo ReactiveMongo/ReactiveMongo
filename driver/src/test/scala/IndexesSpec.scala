@@ -11,7 +11,7 @@ import reactivemongo.api.tests.{ pack, Pack }
 
 import org.specs2.concurrent.ExecutionEnv
 
-import IndexType.{ Hashed, Geo2D, Geo2DSpherical }
+import IndexType.{ Geo2D, Geo2DSpherical, Hashed }
 
 final class IndexesSpec(
     implicit

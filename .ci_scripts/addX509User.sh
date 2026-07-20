@@ -42,7 +42,7 @@ EOF
 
 mongo "$PRIMARY_HOST" "$ADD_SUBJECT_AS_USER"
 
-killall -9 mongod
+which killall && killall -9 mongod || (kill -9 $(pgrep mongod))
 
 cat >> "$ENV_FILE" <<EOF
 CLIENT_CERT_SUBJECT="$CLIENT_CERT_SUBJECT"
