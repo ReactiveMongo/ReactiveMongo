@@ -48,7 +48,7 @@ object Common extends AutoPlugin {
   val scala211 = "2.11.12"
   val scala212 = "2.12.21"
   val scala213 = "2.13.18"
-  val scala3Lts = "3.4.3"
+  val scala3Lts = "3.8.4"
 
   def majorVersion = {
     val Major = """([0-9]+)\.([0-9]+)\..*""".r
