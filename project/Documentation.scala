@@ -1,14 +1,18 @@
 import sbt._
 import sbt.Keys._
 
+import xsbti.HashedVirtualFileRef
+
 final class Documentation {
 
   val settings = Seq(
-    apiMappings ++= Documentation
-      .mappings("org.scala-lang", "http://scala-lang.org/api/%s/")(
-        "scala-library"
-      )
-      .value,
+    apiMappings ++= Def.uncached {
+      Documentation
+        .mappings("org.scala-lang", "http://scala-lang.org/api/%s/")(
+          "scala-library"
+        )
+        .value
+    },
     Compile / doc / tastyFiles ~= {
       _.filter {
         _.toString.indexOf("/external/") == -1
@@ -22,9 +26,7 @@ final class Documentation {
       }
     },
     Compile / doc / scalacOptions ++= Opts.doc.title("ReactiveMongo API"),
-    Compile / doc / scalacOptions ++= Opts.doc.version(
-      Common.majorVersion.value
-    )
+    Compile / doc / scalacOptions ++= Opts.doc.version(Common.majorVersion.value)
   )
 }
 
@@ -35,14 +37,15 @@ object Documentation {
       location: String,
       revision: String => String = identity
     )(names: String*
-    ) = Def.task[Map[File, URL]] {
+    ) = Def.task[Map[HashedVirtualFileRef, URI]] {
 
     (for {
-      entry: Attributed[File] <- (Compile / fullClasspath).value
-      module: ModuleID <- entry.get(moduleID.key)
+      entry <- (Compile / fullClasspath).value
+      module: ModuleID <- entry
+        .get(moduleIDStr)
+        .map(Classpaths.moduleIdJsonKeyFormat.read)
       if module.organization == org
       if names.exists(module.name.startsWith)
-      rev = revision(module.revision)
-    } yield entry.data -> url(location.format(rev)))(scala.collection.breakOut)
+    } yield entry.data -> url(location.format(revision(module.revision)))).toMap
   }
 }
