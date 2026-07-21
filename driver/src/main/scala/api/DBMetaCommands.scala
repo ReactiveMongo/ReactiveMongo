@@ -12,7 +12,7 @@ import reactivemongo.api.commands.{
 import reactivemongo.api.gridfs.GridFS
 import reactivemongo.api.indexes.IndexesManager
 
-import Serialization.{ Pack, internalSerializationPack, unitReader }
+import Serialization.{ internalSerializationPack, unitReader, Pack }
 
 /** A mixin that provides commands about this database itself. */
 private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>

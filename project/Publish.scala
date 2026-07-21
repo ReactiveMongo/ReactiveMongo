@@ -50,12 +50,7 @@ object Publish {
     pomIncludeRepository := { _ => false },
     autoAPIMappings := true,
     apiURL := Some(url(s"$siteUrl/release/1.x/api/")),
-    licenses := {
-      Seq(
-        "Apache 2.0" ->
-          url("http://www.apache.org/licenses/LICENSE-2.0")
-      )
-    },
+    licenses := Seq(License.Apache2),
     homepage := Some(url(siteUrl)),
     scmInfo := Some(
       ScmInfo(
