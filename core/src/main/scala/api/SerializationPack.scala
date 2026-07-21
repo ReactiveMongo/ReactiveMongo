@@ -172,10 +172,12 @@ object SerializationPack {
         document: pack.Document,
         name: String
       )(implicit
-        @annotation.nowarn ev: T <:< pack.Value,
+        ev: T <:< pack.Value,
         cls: ClassTag[T]
-      ): Option[T] =
+      ): Option[T] = {
+      val _ = ev
       get(document, name).collect { case `cls`(t) => t }
+    }
 
     final def read[T](
         document: pack.Document,

@@ -39,7 +39,7 @@ object Compiler {
       }
     },
     scalacOptions ++= {
-      if (scalaBinaryVersion.value startsWith "2.") {
+      if (scalaBinaryVersion.value.startsWith("2.")) {
         Seq(
           "-Xlint",
           "-g:vars"
@@ -109,6 +109,7 @@ object Compiler {
         Seq(
           s"-Wconf:cat=deprecation&msg=($mongo30eol|$rightBiaised|package\\ nio):s",
           "-Wconf:msg=.*nowarn.*\\ annotation.*:s",
+          "-Wconf:msg=.*filter\\ needs\\ to\\ be\\ a\\ compile-time\\ constant\\ string.*:s",
           "-Wconf:msg=Implicit\\ parameters.*:s"
         )
       }
