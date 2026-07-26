@@ -6,7 +6,7 @@ lazy val `ReactiveMongo-Core` = project
 
       ("org.reactivemongo" %% "reactivemongo-bson-api" % version.value)
         .exclude("org.slf4j", "*") +: deps ++: Seq(
-        "com.github.luben" % "zstd-jni" % "1.5.7-11",
+        "com.github.luben" % "zstd-jni" % "1.5.7-12",
         "org.xerial.snappy" % "snappy-java" % "1.1.10.8", // .5 causes CI error
         Dependencies.specs.value
       )
@@ -100,7 +100,8 @@ lazy val `ReactiveMongo-Root` = project
     `ReactiveMongo-Test`
   )
 
-lazy val benchmarks = project.in(file("benchmarks"))
+lazy val benchmarks = project
+  .in(file("benchmarks"))
   .enablePlugins(JmhPlugin)
   .settings(
     Compiler.settings ++ Seq(
