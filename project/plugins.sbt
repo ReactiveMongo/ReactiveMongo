@@ -1,7 +1,7 @@
 scalacOptions ++= Seq("-deprecation", "-unchecked", "-feature")
 
 resolvers ++= Seq(
-  //Resolver.bintrayIvyRepo("typesafe", "sbt-plugins"),
+  // Resolver.bintrayIvyRepo("typesafe", "sbt-plugins"),
   "Tatami Releases" at "https://raw.github.com/cchantep/tatami/master/releases"
 )
 

@@ -100,7 +100,8 @@ lazy val `ReactiveMongo-Root` = project
     `ReactiveMongo-Test`
   )
 
-lazy val benchmarks = project.in(file("benchmarks"))
+lazy val benchmarks = project
+  .in(file("benchmarks"))
   .enablePlugins(JmhPlugin)
   .settings(
     Compiler.settings ++ Seq(
