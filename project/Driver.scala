@@ -123,7 +123,7 @@ final class Driver(core: Project, actorModule: Project) {
           ("dnsjava" % "dnsjava" % "3.6.5").exclude("org.slf4j", "*"),
           commonsCodec,
           specs.value,
-          "ch.qos.logback" % "logback-classic" % "1.2.13" % Test
+          "ch.qos.logback" % "logback-classic" % "1.6.1" % Test
         ) ++ logApi,
         mimaBinaryIssueFilters ++= {
           import com.typesafe.tools.mima.core._
@@ -176,7 +176,8 @@ final class Driver(core: Project, actorModule: Project) {
         },
         Compile / packageBin / mappings ~= driverFilter
         // mappings in (Compile, packageDoc) ~= driverFilter,
-        ,libraryDependencies ++= Dependencies.akka.value
+        ,
+        libraryDependencies ++= Dependencies.akka.value
       )
     )
     .configure { p =>
@@ -199,7 +200,9 @@ final class Driver(core: Project, actorModule: Project) {
       }
     }
     .dependsOn(sbt.projectToLocalProject(core) % "compile")
-    .dependsOn(sbt.projectToLocalProject(actorModule) % "compile->compile;test->test")
+    .dependsOn(
+      sbt.projectToLocalProject(actorModule) % "compile->compile;test->test"
+    )
 
   // ---
 
