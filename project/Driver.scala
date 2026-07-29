@@ -176,7 +176,8 @@ final class Driver(core: Project, actorModule: Project) {
         },
         Compile / packageBin / mappings ~= driverFilter
         // mappings in (Compile, packageDoc) ~= driverFilter,
-        ,libraryDependencies ++= Dependencies.akka.value
+        ,
+        libraryDependencies ++= Dependencies.akka.value
       )
     )
     .configure { p =>
@@ -199,7 +200,9 @@ final class Driver(core: Project, actorModule: Project) {
       }
     }
     .dependsOn(sbt.projectToLocalProject(core) % "compile")
-    .dependsOn(sbt.projectToLocalProject(actorModule) % "compile->compile;test->test")
+    .dependsOn(
+      sbt.projectToLocalProject(actorModule) % "compile->compile;test->test"
+    )
 
   // ---
 
