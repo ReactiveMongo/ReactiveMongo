@@ -26,7 +26,9 @@ final class Documentation {
       }
     },
     Compile / doc / scalacOptions ++= Opts.doc.title("ReactiveMongo API"),
-    Compile / doc / scalacOptions ++= Opts.doc.version(Common.majorVersion.value)
+    Compile / doc / scalacOptions ++= Opts.doc.version(
+      Common.majorVersion.value
+    )
   )
 }
 
