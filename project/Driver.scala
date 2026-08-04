@@ -174,10 +174,14 @@ final class Driver(core: Project, actorModule: Project) {
             m.close()
           }
         },
-        Compile / packageBin / mappings ~= driverFilter
-        // mappings in (Compile, packageDoc) ~= driverFilter,
-        ,
-        libraryDependencies ++= Dependencies.akka.value
+        Compile / packageBin / mappings ~= driverFilter,
+        libraryDependencies ++= {
+          if (usePekko.value) {
+            Dependencies.pekko.value
+          } else {
+            Dependencies.akka.value
+          }
+        }
       )
     )
     .configure { p =>

@@ -49,12 +49,12 @@ object Publish {
     ),
     pomIncludeRepository := { _ => false },
     autoAPIMappings := true,
-    apiURL := Some(url(s"$siteUrl/release/1.x/api/")),
+    apiURL := Some(uri(s"$siteUrl/release/1.x/api/")),
     licenses := Seq(License.Apache2),
-    homepage := Some(url(siteUrl)),
+    homepage := Some(uri(siteUrl)),
     scmInfo := Some(
       ScmInfo(
-        url("https://github.com/ReactiveMongo/ReactiveMongo"),
+        uri("https://github.com/ReactiveMongo/ReactiveMongo"),
         "scm:git://github.com/ReactiveMongo/ReactiveMongo.git"
       )
     ),
@@ -63,13 +63,13 @@ object Publish {
         id = "sgodbillon",
         name = "Stephane Godbillon",
         email = "",
-        url = url("http://stephane.godbillon.com")
+        url = uri("http://stephane.godbillon.com")
       ),
       Developer(
         id = "cchantep",
         name = "Cédric Chantepie",
         email = "",
-        url = url("http://github.com/cchantep/")
+        url = uri("http://github.com/cchantep/")
       )
     )
   )

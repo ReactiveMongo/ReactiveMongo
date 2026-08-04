@@ -51,6 +51,10 @@ EOF
 export SBT_OPTS
 export JVM_OPTS
 
+if [ ! `uname` = "Darwin" ]; then
+  export _JAVA_OPTIONS="$JVM_OPTS"
+fi
+
 if [ "x$SPECS_TESTS" = "x" ]; then
   SPECS_TESTS="reactivemongo.BsonSpec"
   SPECS_TESTS="$SPECS_TESTS reactivemongo.BulkOpsSpec"

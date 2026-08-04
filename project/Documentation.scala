@@ -48,6 +48,6 @@ object Documentation {
         .map(Classpaths.moduleIdJsonKeyFormat.read)
       if module.organization == org
       if names.exists(module.name.startsWith)
-    } yield entry.data -> url(location.format(revision(module.revision)))).toMap
+    } yield entry.data -> uri(location.format(revision(module.revision)))).toMap
   }
 }

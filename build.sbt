@@ -66,7 +66,7 @@ lazy val `ReactiveMongo-Test` = project
   .in(file("test"))
   .settings(
     description := "ReactiveMongo test helpers",
-    version := (`ReactiveMongo` / version).value,
+    version := (projectToLocalProject(`ReactiveMongo`) / version).value,
     scalacOptions ++= {
       if (scalaBinaryVersion.value == "3") {
         Seq("-Wconf:msg=.*with\\ as\\ a\\ type\\ operator.*:s")
@@ -75,7 +75,7 @@ lazy val `ReactiveMongo-Test` = project
       }
     }
   )
-  .dependsOn(`ReactiveMongo`)
+  .dependsOn(projectToLocalProject(`ReactiveMongo`))
 
 // ---
 
@@ -84,7 +84,9 @@ lazy val `ReactiveMongo-Root` = project
   .enablePlugins(ScalaUnidocPlugin)
   .settings(
     ScalaUnidoc / unidoc / unidocProjectFilter := {
-      inAnyProject -- inProjects(benchmarks, `ReactiveMongo-Core`)
+      inAnyProject -- inProjects(
+        projectToLocalProject(benchmarks), 
+        projectToLocalProject(`ReactiveMongo-Core`))
     },
     mimaPreviousArtifacts := Set.empty,
     publishArtifact := false,
@@ -93,11 +95,11 @@ lazy val `ReactiveMongo-Root` = project
     publish := {}
   )
   .aggregate(
-    `ReactiveMongo-Core`,
-    `ReactiveMongo-Actors-Akka`,
-    `ReactiveMongo-Actors-Pekko`,
-    `ReactiveMongo`,
-    `ReactiveMongo-Test`
+    projectToLocalProject(`ReactiveMongo-Core`),
+    projectToLocalProject(`ReactiveMongo-Actors-Akka`),
+    projectToLocalProject(`ReactiveMongo-Actors-Pekko`),
+    projectToLocalProject(`ReactiveMongo`),
+    projectToLocalProject(`ReactiveMongo-Test`)
   )
 
 lazy val benchmarks = project
@@ -108,4 +110,4 @@ lazy val benchmarks = project
       libraryDependencies += organization.value % "reactivemongo-shaded" % version.value
     )
   )
-  .dependsOn(`ReactiveMongo`)
+  .dependsOn(projectToLocalProject(`ReactiveMongo`))
