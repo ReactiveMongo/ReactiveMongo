@@ -6,7 +6,7 @@ lazy val `ReactiveMongo-Core` = project
 
       ("org.reactivemongo" %% "reactivemongo-bson-api" % version.value)
         .exclude("org.slf4j", "*") +: deps ++: Seq(
-        "com.github.luben" % "zstd-jni" % "1.5.7-12",
+        "com.github.luben" % "zstd-jni" % "1.5.7-13",
         "org.xerial.snappy" % "snappy-java" % "1.1.10.8", // .5 causes CI error
         Dependencies.specs.value
       )
@@ -85,8 +85,9 @@ lazy val `ReactiveMongo-Root` = project
   .settings(
     ScalaUnidoc / unidoc / unidocProjectFilter := {
       inAnyProject -- inProjects(
-        projectToLocalProject(benchmarks), 
-        projectToLocalProject(`ReactiveMongo-Core`))
+        projectToLocalProject(benchmarks),
+        projectToLocalProject(`ReactiveMongo-Core`)
+      )
     },
     mimaPreviousArtifacts := Set.empty,
     publishArtifact := false,
