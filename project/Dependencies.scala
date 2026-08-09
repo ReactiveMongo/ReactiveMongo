@@ -2,7 +2,7 @@ import sbt._
 import sbt.Keys._
 
 object Dependencies {
-  val nettyVer = "4.1.85.Final"
+  val nettyVer = "4.2.15.Final"
   val netty = "io.netty" % "netty-handler" % nettyVer
 
   val shaded = Def.setting[Seq[ModuleID]] {
