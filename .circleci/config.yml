@@ -6,7 +6,7 @@ commands:
     parameters:
       sbt_version:
         type: string
-        default: "2.0.1"
+        default: "2.0.6"
     steps:
       - restore_cache:
           name: Restore SBT cache
@@ -434,7 +434,7 @@ workflows:
 
       - integration_test_suite:
           name: mongo4_openjdk17_scala3_akka26_zstd
-          scala_version: '3.4'
+          scala_version: '3.3'
           akka_version: 2.6.20
           openjdk_version: '17.0'
           mongo_version: 4 # 6
@@ -457,7 +457,7 @@ workflows:
 
       - integration_test_suite:
           name: mongo8_openjdk26_scala3_akka26_rs
-          scala_version: '3.4'
+          scala_version: '3.3'
           akka_version: 2.6.20
           mongo_version: 8
           mongo_profile: rs

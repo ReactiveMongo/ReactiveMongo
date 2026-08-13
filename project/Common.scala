@@ -18,12 +18,12 @@ object Common extends AutoPlugin {
     Global / rootOutputDirectory := (ThisBuild / baseDirectory).value.toPath,
     Global / cacheVersion := 1L,
     organization := "org.reactivemongo",
-    credentials ++= sys.env.get("SONATYPE_USER").toSeq.map { user =>
+    credentials ++= sys.env.get("SONATYPE_USERNAME").toSeq.map { user =>
       Credentials(
         "", // Empty realm credential - this one is actually used by Coursier!
         "central.sonatype.com",
         user,
-        Publish.env("SONATYPE_PASS")
+        Publish.env("SONATYPE_PASSWORD")
       )
     },
     resolvers ++= Seq(
@@ -48,7 +48,7 @@ object Common extends AutoPlugin {
   val scala211 = "2.11.12"
   val scala212 = "2.12.21"
   val scala213 = "2.13.18"
-  val scala3Lts = "3.4.3"
+  val scala3Lts = "3.3.8"
 
   def majorVersion = {
     val Major = """([0-9]+)\.([0-9]+)\..*""".r
