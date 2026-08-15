@@ -39,7 +39,7 @@ private[reactivemongo] object CommandCodecs {
     )(readResult: pack.Document => A
     ): pack.Reader[A] = {
     val decoder = pack.newDecoder
-    val foldRes = foldResult[pack.type, A](decoder) _
+    val foldRes = foldResult[pack.type, A](decoder)(_, _)
 
     pack.reader[A] {
       foldRes(
@@ -70,7 +70,7 @@ private[reactivemongo] object CommandCodecs {
     )(readResult: pack.Document => Option[A]
     ): pack.Reader[A] = {
     val decoder = pack.newDecoder
-    val foldRes = foldResult[pack.type, Option[A]](decoder) _
+    val foldRes = foldResult[pack.type, Option[A]](decoder)(_, _)
 
     pack.readerOpt[A] {
       foldRes(

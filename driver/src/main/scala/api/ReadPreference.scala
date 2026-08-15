@@ -18,7 +18,7 @@ sealed trait ReadPreference {
   // def filterTag: Option[BSONDocument => Boolean]
 }
 
-/** [[ReadPreference]] utilities and factories. */
+/** `ReadPreference` utilities and factories. */
 object ReadPreference {
 
   /** Reads only from the primary. This is the default choice. */

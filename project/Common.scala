@@ -32,7 +32,8 @@ object Common extends AutoPlugin {
       Resolver.typesafeRepo("releases")
     ),
     mimaFailOnNoPrevious := false,
-    Test / logBuffered := false
+    Test / logBuffered := false,
+    Test / closeClassLoaders := false, // See https://github.com/sbt/sbt/issues/9604
   )
 
   val filter = { (ms: Seq[(HashedVirtualFileRef, String)]) =>

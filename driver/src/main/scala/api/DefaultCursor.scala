@@ -717,7 +717,7 @@ private[reactivemongo] object DefaultCursor {
       z,
       makeRequest(maxDocs)(_: ExecutionContext),
       nextResponse(maxDocs),
-      killCursors _,
+      killCursors(_, _),
       suc,
       err,
       maxDocs

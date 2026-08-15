@@ -1,6 +1,7 @@
 package tests
 
 import scala.collection.immutable.ListSet
+import scala.collection.mutable.{ Set => MSet }
 
 import scala.concurrent.{ Await, ExecutionContext }
 import scala.concurrent.duration._
@@ -191,7 +192,7 @@ object Common extends CommonAuth {
         case _ => false
       }
 
-  private val asyncDriverReg = Seq.newBuilder[AsyncDriver]
+  private val asyncDriverReg = MSet.empty[AsyncDriver]
 
   def newAsyncDriver(): AsyncDriver = asyncDriverReg.synchronized {
     val drv = AsyncDriver()
@@ -210,7 +211,15 @@ object Common extends CommonAuth {
   def close(): Unit = {
     import ExecutionContext.Implicits.global
 
-    asyncDriverReg.result().foreach { driver =>
+    val drivers = asyncDriverReg.synchronized {
+      val result = asyncDriverReg.toList
+
+      asyncDriverReg.clear()
+
+      result
+    }
+
+    drivers.foreach { driver =>
       try {
         Await.result(driver.close(timeout), timeout * 1.2D)
       } catch {

@@ -52,13 +52,13 @@ trait QueryBuilderFactory[P <: SerializationPack] extends HintFactory[P] {
   /**
    * A builder that helps to make a fine-tuned query to MongoDB.
    *
-   * When the query is ready, you can call `cursor` to get a [[Cursor]], or `one` if you want to retrieve just one document.
+   * When the query is ready, you can call `cursor` to get a [[reactivemongo.api.Cursor]], or `one` if you want to retrieve just one document.
    *
    * @param skip the number of documents to skip.
    * @param batchSize the upper limit on the number of documents to retrieve per batch (0 for unspecified)
    * @param cursorOptions the cursor options
    * @param readConcern the read concern {@since MongoDB 3.6}
-   * @param readPreference the query [[ReadPreference]]
+   * @param readPreference the query [[reactivemongo.api.ReadPreference]]
    * @param filter the query filter
    * @param projection the [[https://docs.mongodb.com/manual/reference/method/db.collection.find/index.html#projection projection specification]]
    * @param max the optional exclusive [[https://docs.mongodb.com/manual/reference/method/cursor.max/ upper bound]] for a specific index (default: `None`)
@@ -510,7 +510,7 @@ trait QueryBuilderFactory[P <: SerializationPack] extends HintFactory[P] {
     // Cursor
 
     /**
-     * Returns a [[Cursor]] for the result of this query.
+     * Returns a [[reactivemongo.api.Cursor]] for the result of this query.
      *
      * {{{
      * import scala.concurrent.{ ExecutionContext, Future }

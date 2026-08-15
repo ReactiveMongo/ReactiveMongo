@@ -218,7 +218,7 @@ trait Cursor[T] extends CursorCompatAPI[T] {
   )
 
   /**
-   * $getHead, or fails with [[Cursor.NoSuchResultException]] if none.
+   * $getHead, or fails with [[reactivemongo.api.Cursor.NoSuchResultException]] if none.
    *
    * {{{
    * import scala.concurrent.{ ExecutionContext, Future }
@@ -271,12 +271,12 @@ object Cursor {
 
   /**
    * @tparam A the state type
-   * @see [[Cursor.foldWhile]]
+   * @see [[reactivemongo.api.Cursor.foldWhile]]
    */
   type ErrorHandler[A] = (A, Throwable) => State[A]
 
   /**
-   * Error handler to fail on error (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Fail Fail]]).
+   * Error handler to fail on error (see [[reactivemongo.api.Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Fail Fail]]).
    *
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
@@ -287,7 +287,7 @@ object Cursor {
     (v: A, e: Throwable) => { callback(v, e); Fail(e): State[A] }
 
   /**
-   * Error handler to end on error (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Done Done]]).
+   * Error handler to end on error (see [[reactivemongo.api.Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Done Done]]).
    *
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
@@ -298,7 +298,7 @@ object Cursor {
     (v: A, e: Throwable) => { callback(v, e); Done(v): State[A] }
 
   /**
-   * Error handler to continue on error (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Cont Cont]]).
+   * Error handler to continue on error (see [[reactivemongo.api.Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Cont Cont]]).
    *
    * @param callback the callback function applied on last (possibily initial) value and the encountered error
    */
@@ -309,7 +309,7 @@ object Cursor {
     (v: A, e: Throwable) => { callback(v, e); Cont(v): State[A] }
 
   /**
-   * Value handler, ignoring the values (see [[Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Cont Cont]]).
+   * Value handler, ignoring the values (see [[reactivemongo.api.Cursor.foldWhile]] and [[reactivemongo.api.Cursor$.Cont Cont]]).
    *
    * @param callback the callback function applied on each value.
    */

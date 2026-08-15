@@ -171,7 +171,7 @@ final class Driver(core: Project, actorModule: Project) {
 
             log.info(s"Closing $m ...")
 
-            m.close()
+            val _ = m.close()
           }
         },
         Compile / packageBin / mappings ~= driverFilter,

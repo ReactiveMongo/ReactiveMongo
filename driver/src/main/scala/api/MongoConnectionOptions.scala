@@ -61,7 +61,10 @@ final class MongoConnectionOptions private[reactivemongo] (
    */
   @inline def sslAllowsInvalidCert: Boolean = _sslAllowsInvalidCert
 
-  /** Either [[ScramSha1Authentication]] or [[X509Authentication]] */
+  /**
+   * Either [[reactivemongo.api.ScramSha1Authentication]]
+   * or [[reactivemongo.api.X509Authentication]]
+   */
   @inline def authenticationMechanism: AuthenticationMode =
     _authenticationMechanism
 
