@@ -135,14 +135,14 @@ sealed trait GridFS[P <: SerializationPack]
   type FileToSave[Id <: pack.Value] = SF[Id, pack.Document]
 
   @annotation.implicitNotFound("Cannot resolve a file reader: make sure Id type ${Id} is a serialized value (e.g. kind of BSON value) and that a ClassTag instance is implicitly available for")
-  private[api] sealed trait FileReader[Id <: pack.Value] {
+  sealed trait FileReader[Id <: pack.Value] {
     def read(doc: pack.Document): ReadFile[Id]
 
     implicit lazy val reader: pack.Reader[ReadFile[Id]] =
       pack.reader[ReadFile[Id]](read(_))
   }
 
-  private[api] object FileReader {
+  object FileReader {
 
     implicit def default[Id <: pack.Value](
         implicit

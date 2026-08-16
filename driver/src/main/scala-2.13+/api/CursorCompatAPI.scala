@@ -34,7 +34,7 @@ private[api] trait CursorCompatAPI[T] { _self: Cursor[T] =>
    * $collect.
    *
    * @param maxDocs $maxDocsParam.
-   * @param err $errorHandlerParam (default: [[Cursor.FailOnError]])
+   * @param err $errorHandlerParam (default: [[reactivemongo.api.Cursor.FailOnError]])
    *
    * {{{
    * import scala.concurrent.ExecutionContext

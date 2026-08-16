@@ -39,7 +39,7 @@ private[reactivemongo] object SystemControl {
     Try {
       val legacy = underlying.asInstanceOf[Legacy]
 
-      legacy.isTerminated
+      val _ = legacy.isTerminated
 
       legacyControl(legacy)
     }.recoverWith {
@@ -59,7 +59,8 @@ private[reactivemongo] object SystemControl {
       // So, wait for that event.
 
       Try {
-        system.shutdown()
+        val _ = system.shutdown()
+
         system.awaitTermination(time)
       }.recoverWith {
         case e: Throwable if !system.isTerminated =>

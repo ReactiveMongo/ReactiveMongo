@@ -19,7 +19,7 @@ import reactivemongo.api.commands.{
 }
 
 /**
- * @define writeConcernParam the [[https://docs.mongodb.com/manual/reference/write-concern/ writer concern]] to be used
+ * @define writeConcernParam the [[https://www.mongodb.com/docs/manual/reference/write-concern/ write concern]] to be used
  * @define orderedParam the [[https://docs.mongodb.com/manual/reference/method/db.collection.update/#perform-an-unordered-update ordered]] behaviour
  * @define bypassDocumentValidationParam the flag to bypass document validation during the operation
  * @define maxBulkSizeParam the maximum number of document(s) per bulk

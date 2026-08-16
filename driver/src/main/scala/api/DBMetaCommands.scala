@@ -217,7 +217,7 @@ private[api] trait DBMetaCommands extends CreateUserCommand[Pack] { self: DB =>
    * @param digestPassword when true, the mongod instance will create the hash of the user password (default: `true`)
    * @param writeConcern the optional level of [[https://docs.mongodb.com/manual/reference/write-concern/ write concern]]
    * @param restrictions the authentication restriction
-   * @param mechanisms the authentication mechanisms (e.g. [[ScramSha1Authentication]])
+   * @param mechanisms the authentication mechanisms (e.g. [[reactivemongo.api.ScramSha1Authentication]])
    */
   final def createUser[T](
       user: String,

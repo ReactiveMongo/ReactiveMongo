@@ -5,7 +5,7 @@ import scala.collection.Factory
 import scala.concurrent.{ ExecutionContext, Future }
 
 /**
- * '''EXPERIMENTAL:''' Base class to implement test-only/mocked [[Cursor]].
+ * '''EXPERIMENTAL:''' Base class to implement test-only/mocked [[reactivemongo.api.Cursor]].
  *
  * All functions failed future by default,
  * make sure to override the required functions with appropriate results
