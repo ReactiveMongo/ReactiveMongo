@@ -45,13 +45,6 @@ case "v$MONGO_VER" in
         ;;
 esac
     
-# if [ "$AKKA_VERSION" = "2.5.23" ]; then
-#     MONGO_MINOR="4.2.1"
-#     MONGO_VER="4"
-
-#     echo "[WARN] Fix MongoDB version to $MONGO_MINOR (due to Akka Stream version)"
-# fi
-
 # Prepare integration env
 
 PRIMARY_HOST="$(hostname):27018"
