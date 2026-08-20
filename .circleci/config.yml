@@ -271,6 +271,9 @@ jobs:
       akka_version:
         type: string
         default: "2.5.23"
+      pekko_version:
+        type: string
+        default: "1.6.0"
       actor_module:
         type: string
         default: "akka"
@@ -294,6 +297,7 @@ jobs:
 
     environment:
       AKKA_VERSION: << parameters.akka_version >>
+      PEKKO_VERSION: << parameters.pekko_version >>
       ACTOR_MODULE: << parameters.actor_module >>
       MONGO_PROFILE: << parameters.mongo_profile >>
       MONGO_VER: << parameters.mongo_version >>
@@ -311,6 +315,7 @@ jobs:
                     echo "Shaded? << parameters.shaded >>"
                     echo "Compressor: << parameters.compressor>>"
                     echo "Akka: version=$AKKA_VERSION"
+                    echo "Pekko: version=$PEKKO_VERSION"
                     echo "Actor module: $ACTOR_MODULE"
 
       - setup_integration:
@@ -419,6 +424,7 @@ workflows:
           mongo_version: 7
           scala_version: '2.13'
           actor_module: pekko
+          pekko_version: '1.7.0'
 
       - integration_test_suite:
           name: mongo4_openjdk17_scala3_akka26_zstd
