@@ -18,7 +18,7 @@ libraryDependencies ++= Seq(
 
 ## Build manually
 
-To benefit from the latest improvements and fixes, you may want to compile ReactiveMongo from source. You will need a [Git client](http://git-scm.com/) and [SBT](http://www.scala-sbt.org).
+To benefit from the latest improvements and fixes, you may want to compile ReactiveMongo from sources. You will need a [Git client](http://git-scm.com/) and [SBT](http://www.scala-sbt.org).
 
 From the shell, first checkout the source:
 
