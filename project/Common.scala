@@ -33,7 +33,7 @@ object Common extends AutoPlugin {
     ),
     mimaFailOnNoPrevious := false,
     Test / logBuffered := false,
-    Test / closeClassLoaders := false, // See https://github.com/sbt/sbt/issues/9604
+    Test / closeClassLoaders := false // See https://github.com/sbt/sbt/issues/9604
   )
 
   val filter = { (ms: Seq[(HashedVirtualFileRef, String)]) =>
@@ -49,7 +49,7 @@ object Common extends AutoPlugin {
   val scala211 = "2.11.12"
   val scala212 = "2.12.21"
   val scala213 = "2.13.18"
-  val scala3Lts = "3.3.8"
+  val scala3Lts = "3.9.0"
 
   def majorVersion = {
     val Major = """([0-9]+)\.([0-9]+)\..*""".r
