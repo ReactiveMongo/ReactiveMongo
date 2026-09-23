@@ -23,8 +23,8 @@ object Publish {
     case InheritedNewAbstractMethodProblem(_, _) => false
     case IncompatibleResultTypeProblem(old, _)   => old.nonAccessible
     case IncompatibleMethTypeProblem(old, _)     => old.nonAccessible
-    case MissingClassProblem(old)                => !old.isPublic
-    case AbstractClassProblem(old)               => !old.isPublic
+    case MissingClassProblem(old)                => old.isPrivate
+    case AbstractClassProblem(old)               => old.isPrivate
     case _                                       => true
   }
 
