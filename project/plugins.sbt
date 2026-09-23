@@ -15,7 +15,7 @@ addSbtPlugin("com.github.sbt" % "sbt-unidoc" % "0.6.1")
 
 addDependencyTreePlugin
 
-addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "1.2.0")
+addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "1.2.1")
 
 addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.4.8")
 
