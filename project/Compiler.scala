@@ -94,6 +94,7 @@ object Compiler {
         Seq("-Wunused:all", "-language:implicitConversions")
       }
     },
+    Compile / javacOptions ++= Seq("--release", "8"),
     Compile / console / scalacOptions ~= {
       _.filterNot(o => o.startsWith("-X") || o.startsWith("-Y"))
     },
