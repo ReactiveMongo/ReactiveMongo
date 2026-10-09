@@ -16,9 +16,11 @@ import reactivemongo.api.bson.{
   document,
   BSON,
   BSONArray,
+  BSONDateTime,
   BSONDocument,
   BSONDocumentHandler,
   BSONDocumentReader,
+  BSONDouble,
   BSONInteger,
   BSONLong,
   BSONNull,
@@ -2214,6 +2216,420 @@ db.accounts.aggregate([
 
       makePipe(Documents(BSONString(f"$$foo"))) must_=== BSONDocument(
         f"$$documents" -> f"$$foo"
+      )
+    }
+
+    f"be $$densify" >> {
+      import AggregationFramework.{ Densify, DensifyBounds, TimeUnit }
+
+      "with full bounds" in {
+        makePipe(
+          Densify(
+            field = "altitude",
+            range = Densify.Range(
+              step = BSONInteger(200),
+              bounds = DensifyBounds.Full
+            ),
+            partitionByFields = Seq("variety")
+          )
+        ) must_=== BSONDocument(
+          f"$$densify" -> BSONDocument(
+            "field" -> "altitude",
+            "partitionByFields" -> Seq("variety"),
+            "range" -> BSONDocument(
+              "step" -> 200,
+              "bounds" -> "full"
+            )
+          )
+        )
+      }
+
+      "with time range bounds" in {
+        makePipe(
+          Densify(
+            field = "timestamp",
+            range = Densify.Range(
+              step = BSONInteger(1),
+              bounds = DensifyBounds.Range(
+                BSONDateTime(1L),
+                BSONDateTime(2L)
+              ),
+              unit = Some(TimeUnit.Hour)
+            )
+          )
+        ) must_=== BSONDocument(
+          f"$$densify" -> BSONDocument(
+            "field" -> "timestamp",
+            "range" -> BSONDocument(
+              "step" -> 1,
+              "bounds" -> BSONArray(BSONDateTime(1L), BSONDateTime(2L)),
+              "unit" -> "hour"
+            )
+          )
+        )
+      }
+    }
+
+    f"be $$fill" >> {
+      import AggregationFramework.{ Ascending, Fill, FillOutput }
+
+      "with constant values" in {
+        makePipe(
+          Fill(
+            output = Seq(
+              "bootsSold" -> FillOutput.Value(BSONInteger(0)),
+              "sandalsSold" -> FillOutput.Value(BSONInteger(0))
+            )
+          )
+        ) must_=== BSONDocument(
+          f"$$fill" -> BSONDocument(
+            "output" -> BSONDocument(
+              "bootsSold" -> BSONDocument("value" -> 0),
+              "sandalsSold" -> BSONDocument("value" -> 0)
+            )
+          )
+        )
+      }
+
+      "with method and partition" in {
+        makePipe(
+          Fill(
+            output = Seq("score" -> FillOutput.Method.Locf),
+            sortBy = Seq(Ascending("date")),
+            partitionBy = Some(BSONString(f"$$restaurant")),
+            partitionByFields = Seq("foo", "bar")
+          )
+        ) must_=== BSONDocument(
+          f"$$fill" -> BSONDocument(
+            "partitionBy" -> f"$$restaurant",
+            "partitionByFields" -> Seq(f"$$foo", f"$$bar"),
+            "sortBy" -> BSONDocument("date" -> 1),
+            "output" -> BSONDocument(
+              "score" -> BSONDocument("method" -> "locf")
+            )
+          )
+        )
+      }
+    }
+
+    f"be $$setWindowFields" in {
+      import AggregationFramework.{
+        Ascending,
+        SetWindowFields,
+        WindowBoundary,
+        WindowOutput
+      }
+
+      makePipe(
+        SetWindowFields(
+          output = Seq(
+            WindowOutput(
+              field = "cumulativeQuantityForState",
+              operator = f"$$sum",
+              expression = BSONString(f"$$quantity"),
+              window = Some(
+                WindowOutput.Window.documents(
+                  WindowBoundary.Unbounded,
+                  WindowBoundary.Current
+                )
+              )
+            )
+          ),
+          partitionBy = Some(BSONString(f"$$state")),
+          sortBy = Seq(Ascending("orderDate"))
+        )
+      ) must_=== BSONDocument(
+        f"$$setWindowFields" -> BSONDocument(
+          "partitionBy" -> f"$$state",
+          "sortBy" -> BSONDocument("orderDate" -> 1),
+          "output" -> BSONDocument(
+            "cumulativeQuantityForState" -> BSONDocument(
+              f"$$sum" -> f"$$quantity",
+              "window" -> BSONDocument(
+                "documents" -> Seq("unbounded", "current")
+              )
+            )
+          )
+        )
+      )
+    }
+
+    f"be $$listClusterCatalog" in {
+      import AggregationFramework.ListClusterCatalog
+
+      makePipe(
+        ListClusterCatalog(
+          shards = true,
+          balancingConfiguration = false
+        )
+      ) must_=== BSONDocument(
+        f"$$listClusterCatalog" -> BSONDocument(
+          "shards" -> true,
+          "balancingConfiguration" -> false
+        )
+      )
+    }
+
+    f"be $$listSampledQueries" in {
+      import AggregationFramework.ListSampledQueries
+
+      makePipe(
+        ListSampledQueries(namespace = Some("foo.bar"))
+      ) must_=== BSONDocument(
+        f"$$listSampledQueries" -> BSONDocument("namespace" -> "foo.bar")
+      )
+    }
+
+    f"be $$queryStats" in {
+      import AggregationFramework.{ QueryStats, QueryStatsTransformIdentifiers }
+      import reactivemongo.api.bson.{ BSONBinary, Subtype }
+
+      val key = BSONBinary(Array[Byte](1, 2, 3, 4), Subtype.UserDefinedSubtype)
+
+      makePipe(QueryStats()) must_=== BSONDocument(
+        f"$$queryStats" -> BSONDocument.empty
+      ) and {
+        makePipe(
+          QueryStats(
+            transformIdentifiers = Some(
+              QueryStatsTransformIdentifiers(
+                algorithm = "hmac-sha-256",
+                hmacKey = key
+              )
+            )
+          )
+        ) must_=== BSONDocument(
+          f"$$queryStats" -> BSONDocument(
+            "transformIdentifiers" -> BSONDocument(
+              "algorithm" -> "hmac-sha-256",
+              "hmacKey" -> key
+            )
+          )
+        )
+      }
+    }
+
+    f"be $$querySettings" in {
+      import AggregationFramework.QuerySettings
+
+      makePipe(
+        QuerySettings(showDebugQueryShape = true)
+      ) must_=== BSONDocument(
+        f"$$querySettings" -> BSONDocument("showDebugQueryShape" -> true)
+      )
+    }
+
+    f"be $$shardedDataDistribution" in {
+      makePipe(
+        AggregationFramework.ShardedDataDistribution
+      ) must_=== BSONDocument(
+        f"$$shardedDataDistribution" -> BSONDocument.empty
+      )
+    }
+
+    f"be $$changeStreamSplitLargeEvent" in {
+      makePipe(
+        AggregationFramework.ChangeStreamSplitLargeEvent
+      ) must_=== BSONDocument(
+        f"$$changeStreamSplitLargeEvent" -> BSONDocument.empty
+      )
+    }
+
+    f"be $$vectorSearch" in {
+      import AggregationFramework.{
+        VectorSearch,
+        VectorSearchNestedOptions,
+        VectorSearchQuery,
+        VectorSearchScoreMode
+      }
+
+      makePipe(
+        VectorSearch(
+          index = "vector_index",
+          path = "plot_embedding",
+          limit = 10,
+          queryVector = Some(BSONArray(0.1D, 0.2D)),
+          numCandidates = Some(150),
+          filter = Some(BSONDocument("genres" -> "Action")),
+          exact = false,
+          returnStoredSource = false
+        )
+      ) must_=== BSONDocument(
+        f"$$vectorSearch" -> BSONDocument(
+          "index" -> "vector_index",
+          "path" -> "plot_embedding",
+          "limit" -> 10,
+          "exact" -> false,
+          "returnStoredSource" -> false,
+          "queryVector" -> BSONArray(0.1D, 0.2D),
+          "numCandidates" -> 150,
+          "filter" -> BSONDocument("genres" -> "Action")
+        )
+      ) and {
+        makePipe(
+          VectorSearch(
+            index = "autoembed_index",
+            path = "reviews.comments",
+            limit = 5,
+            query = Some(VectorSearchQuery("great location")),
+            model = Some("voyage-4"),
+            numCandidates = Some(100),
+            parentFilter =
+              Some(BSONDocument("bedrooms" -> BSONDocument(f"$$gte" -> 2))),
+            nestedOptions = Some(
+              VectorSearchNestedOptions(scoreMode =
+                Some(VectorSearchScoreMode.Avg)
+              )
+            ),
+            searchNodePreferenceKey = Some("node-a")
+          )
+        ) must_=== BSONDocument(
+          f"$$vectorSearch" -> BSONDocument(
+            "index" -> "autoembed_index",
+            "path" -> "reviews.comments",
+            "limit" -> 5,
+            "exact" -> false,
+            "returnStoredSource" -> false,
+            "query" -> BSONDocument("text" -> "great location"),
+            "model" -> "voyage-4",
+            "numCandidates" -> 100,
+            "parentFilter" -> BSONDocument(
+              "bedrooms" -> BSONDocument(f"$$gte" -> 2)
+            ),
+            "nestedOptions" -> BSONDocument("scoreMode" -> "avg"),
+            "searchNodePreference" -> BSONDocument("key" -> "node-a")
+          )
+        )
+      }
+    }
+
+    f"be $$searchMeta" in {
+      import AggregationFramework.{ AtlasSearch, SearchMeta }
+      import AtlasSearch.Exists
+
+      makePipe(
+        SearchMeta(
+          operator = Exists("title"),
+          index = Some("default"),
+          concurrent = true,
+          count = Some(BSONDocument("type" -> "total")),
+          returnScopePath = Some("embedded"),
+          returnStoredSource = false
+        )
+      ) must_=== BSONDocument(
+        f"$$searchMeta" -> BSONDocument(
+          "exists" -> BSONDocument("path" -> "title"),
+          "index" -> "default",
+          "concurrent" -> true,
+          "count" -> BSONDocument("type" -> "total"),
+          "returnScope" -> BSONDocument("path" -> "embedded"),
+          "returnStoredSource" -> false
+        )
+      )
+    }
+
+    f"be $$listSearchIndexes" in {
+      import AggregationFramework.ListSearchIndexes
+
+      makePipe(ListSearchIndexes(name = Some("default"))) must_=== BSONDocument(
+        f"$$listSearchIndexes" -> BSONDocument("name" -> "default")
+      ) and {
+        makePipe(ListSearchIndexes()) must_=== BSONDocument(
+          f"$$listSearchIndexes" -> BSONDocument.empty
+        )
+      }
+    }
+
+    f"be $$rankFusion" in {
+      import AggregationFramework.{
+        FusionPipelines,
+        FusionWeights,
+        Limit,
+        Match,
+        RankFusion
+      }
+
+      makePipe(
+        RankFusion(
+          pipelines = FusionPipelines(
+            "search" -> List(Match(BSONDocument("foo" -> 1)), Limit(5))
+          ),
+          weights = Some(FusionWeights("search" -> 1.5D)),
+          scoreDetails = true
+        )
+      ) must_=== BSONDocument(
+        f"$$rankFusion" -> BSONDocument(
+          "input" -> BSONDocument(
+            "pipelines" -> BSONDocument(
+              "search" -> List(
+                BSONDocument(f"$$match" -> BSONDocument("foo" -> 1)),
+                BSONDocument(f"$$limit" -> 5)
+              )
+            )
+          ),
+          "scoreDetails" -> true,
+          "combination" -> BSONDocument(
+            "weights" -> BSONDocument("search" -> 1.5D)
+          )
+        )
+      )
+    }
+
+    f"be $$scoreFusion" in {
+      import AggregationFramework.{
+        FusionPipelines,
+        Limit,
+        Match,
+        ScoreFusion,
+        ScoreFusionCombination,
+        ScoreFusionMethod,
+        ScoreNormalization
+      }
+
+      makePipe(
+        ScoreFusion(
+          pipelines = FusionPipelines(
+            "search" -> List(Match(BSONDocument("bar" -> 2)), Limit(3))
+          ),
+          normalization = Some(ScoreNormalization.Sigmoid),
+          combination = Some(
+            ScoreFusionCombination(method = Some(ScoreFusionMethod.Avg))
+          ),
+          scoreDetails = false
+        )
+      ) must_=== BSONDocument(
+        f"$$scoreFusion" -> BSONDocument(
+          "input" -> BSONDocument(
+            "pipelines" -> BSONDocument(
+              "search" -> List(
+                BSONDocument(f"$$match" -> BSONDocument("bar" -> 2)),
+                BSONDocument(f"$$limit" -> 3)
+              )
+            ),
+            "normalization" -> "sigmoid"
+          ),
+          "scoreDetails" -> false,
+          "combination" -> BSONDocument("method" -> "avg")
+        )
+      )
+    }
+
+    f"be $$score" in {
+      makePipe(
+        AggregationFramework.Score(
+          score = BSONString(f"$$myScore"),
+          scoreDetails = true,
+          normalization =
+            Some(AggregationFramework.ScoreNormalization.MinMaxScaler),
+          weight = Some(BSONDouble(0.5D))
+        )
+      ) must_=== BSONDocument(
+        f"$$score" -> BSONDocument(
+          "score" -> f"$$myScore",
+          "scoreDetails" -> true,
+          "normalization" -> "minMaxScaler",
+          "weight" -> 0.5D
+        )
       )
     }
 

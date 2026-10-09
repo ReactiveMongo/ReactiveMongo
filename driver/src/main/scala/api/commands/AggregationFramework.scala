@@ -39,7 +39,8 @@ trait AggregationFramework[P <: SerializationPack]
     with SortAggregation[P]
     with AggregationPipeline[P]
     with ChangeStreamAggregation[P]
-    with AtlasSearchAggregation[P] { self: PackSupport[P] =>
+    with AtlasSearchAggregation[P]
+    with WindowAggregation[P] { self: PackSupport[P] =>
 
   protected final lazy val builder = pack.newBuilder
 
@@ -75,8 +76,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.specifications == null && other.specifications == null) || (this.specifications != null && this.specifications
-          .==(other.specifications))
+        (this.specifications == null && other.specifications == null) || (this.specifications != null && this.specifications == other.specifications)
 
       case _ =>
         false
@@ -305,8 +305,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.outputName == null && other.outputName == null) || (this.outputName != null && this.outputName
-          .==(other.outputName))
+        (this.outputName == null && other.outputName == null) || (this.outputName != null && this.outputName == other.outputName)
 
       case _ =>
         false
@@ -419,8 +418,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.specifications == null && other.specifications == null) || (this.specifications != null && this.specifications
-          .==(other.specifications))
+        (this.specifications == null && other.specifications == null) || (this.specifications != null && this.specifications == other.specifications)
 
       case _ =>
         false
@@ -811,8 +809,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (this.expression != null && this.expression
-          .==(other.expression))
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -846,8 +843,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (this.expression != null && this.expression
-          .==(other.expression))
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -1110,8 +1106,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.predicate == null && other.predicate == null) || (this.predicate != null && this.predicate
-          .==(other.predicate))
+        (this.predicate == null && other.predicate == null) || (this.predicate != null && this.predicate == other.predicate)
 
       case _ =>
         false
@@ -1279,8 +1274,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.collection == null && other.collection == null) || (this.collection != null && this.collection
-          .==(other.collection))
+        (this.collection == null && other.collection == null) || (this.collection != null && this.collection == other.collection)
 
       case _ =>
         false
@@ -1323,8 +1317,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.specifications == null && other.specifications == null) || (this.specifications != null && this.specifications
-          .==(other.specifications))
+        (this.specifications == null && other.specifications == null) || (this.specifications != null && this.specifications == other.specifications)
 
       case _ =>
         false
@@ -1357,8 +1350,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (this.expression != null && this.expression
-          .==(other.expression))
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -1392,8 +1384,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.newRoot == null && other.newRoot == null) || (this.newRoot != null && this.newRoot
-          .==(other.newRoot))
+        (this.newRoot == null && other.newRoot == null) || (this.newRoot != null && this.newRoot == other.newRoot)
 
       case _ =>
         false
@@ -1427,8 +1418,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.newRoot == null && other.newRoot == null) || (this.newRoot != null && this.newRoot
-          .==(other.newRoot))
+        (this.newRoot == null && other.newRoot == null) || (this.newRoot != null && this.newRoot == other.newRoot)
 
       case _ =>
         false
@@ -1462,8 +1452,8 @@ trait AggregationFramework[P <: SerializationPack]
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
         (this.replacementDocument == null &&
-          other.replacementDocument == null) || (this.replacementDocument != null && this.replacementDocument
-          .==(other.replacementDocument))
+          other.replacementDocument == null) || (this.replacementDocument != null &&
+          this.replacementDocument == other.replacementDocument)
 
       case _ =>
         false
@@ -1521,8 +1511,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (this.expression != null && this.expression
-          .==(other.expression))
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -1633,8 +1622,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.expression == null && other.expression == null) || (this.expression != null && this.expression
-          .==(other.expression))
+        (this.expression == null && other.expression == null) || (this.expression != null && this.expression == other.expression)
 
       case _ =>
         false
@@ -1668,8 +1656,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.field == null && other.field == null) || (this.field != null && this.field
-          .==(other.field))
+        (this.field == null && other.field == null) || (this.field != null && this.field == other.field)
 
       case _ =>
         false
@@ -1741,8 +1728,7 @@ trait AggregationFramework[P <: SerializationPack]
     @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
     override def equals(that: Any): Boolean = that match {
       case other: this.type =>
-        (this.field == null && other.field == null) || (this.field != null && this.field
-          .==(other.field))
+        (this.field == null && other.field == null) || (this.field != null && this.field == other.field)
 
       case _ =>
         false
@@ -1893,6 +1879,225 @@ trait AggregationFramework[P <: SerializationPack]
    */
   object Documents {
     def apply(expression: pack.Value): Documents = new Documents(expression)
+  }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/listClusterCatalog/ \$listClusterCatalog]] aggregation stage.
+   *
+   * @since MongoDB 8.1
+   * @param shards when `true`, include the list of shards for each collection (defaults to `false`)
+   * @param balancingConfiguration when `true`, include balancing-related fields (defaults to `false`)
+   */
+  final class ListClusterCatalog private[api] (
+      val shards: Boolean,
+      val balancingConfiguration: Boolean)
+      extends PipelineOperator {
+    import builder.{ boolean, elementProducer => element }
+
+    def makePipe: pack.Document =
+      pipe(
+        f"$$listClusterCatalog",
+        builder.document(
+          Seq(
+            element("shards", boolean(shards)),
+            element(
+              "balancingConfiguration",
+              boolean(balancingConfiguration)
+            )
+          )
+        )
+      )
+
+    private lazy val tupled = shards -> balancingConfiguration
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type => this.tupled == other.tupled
+      case _                => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString: String = s"ListClusterCatalog$tupled"
+  }
+
+  object ListClusterCatalog {
+
+    def apply(
+        shards: Boolean = false,
+        balancingConfiguration: Boolean = false
+      ): ListClusterCatalog =
+      new ListClusterCatalog(shards, balancingConfiguration)
+  }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/listSampledQueries/ \$listSampledQueries]] aggregation stage.
+   *
+   * @since MongoDB 7.0
+   * @param namespace optional `db.collection` namespace filter
+   */
+  final class ListSampledQueries private[api] (val namespace: Option[String])
+      extends PipelineOperator {
+    import builder.{ elementProducer => element }
+
+    def makePipe: pack.Document = {
+      val elms = Seq.newBuilder[pack.ElementProducer]
+
+      namespace.foreach { ns =>
+        elms += element("namespace", builder.string(ns))
+      }
+
+      pipe(f"$$listSampledQueries", builder.document(elms.result()))
+    }
+
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        (this.namespace == null && other.namespace == null) || (this.namespace != null && this.namespace == other.namespace)
+
+      case _ =>
+        false
+    }
+
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
+    override def hashCode: Int =
+      if (namespace == null) -1 else namespace.hashCode
+
+    override def toString: String = s"ListSampledQueries($namespace)"
+  }
+
+  object ListSampledQueries {
+
+    def apply(namespace: Option[String] = None): ListSampledQueries =
+      new ListSampledQueries(namespace)
+  }
+
+  /**
+   * Identifier transformation settings for [[QueryStats]].
+   *
+   * @param algorithm the HMAC algorithm name (e.g. `hmac-sha-256`)
+   * @param hmacKey the HMAC key binary value (MongoDB expects BinData subtype 8)
+   */
+  final class QueryStatsTransformIdentifiers private[api] (
+      val algorithm: String,
+      val hmacKey: pack.Value) {
+
+    private lazy val tupled = algorithm -> hmacKey
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type => this.tupled == other.tupled
+      case _                => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString: String =
+      s"QueryStatsTransformIdentifiers($algorithm, $hmacKey)"
+  }
+
+  object QueryStatsTransformIdentifiers {
+
+    def apply(
+        algorithm: String,
+        hmacKey: pack.Value
+      ): QueryStatsTransformIdentifiers =
+      new QueryStatsTransformIdentifiers(algorithm, hmacKey)
+  }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/queryStats/ \$queryStats]] aggregation stage.
+   *
+   * @since MongoDB 7.1
+   * @param transformIdentifiers optional identifier transformation settings
+   */
+  final class QueryStats private[api] (
+      val transformIdentifiers: Option[QueryStatsTransformIdentifiers])
+      extends PipelineOperator {
+    import builder.{ elementProducer => element }
+
+    def makePipe: pack.Document = {
+      val elms = Seq.newBuilder[pack.ElementProducer]
+
+      transformIdentifiers.foreach { t =>
+        elms += element(
+          "transformIdentifiers",
+          builder.document(
+            Seq(
+              element("algorithm", builder.string(t.algorithm)),
+              element("hmacKey", t.hmacKey)
+            )
+          )
+        )
+      }
+
+      pipe(f"$$queryStats", builder.document(elms.result()))
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        this.transformIdentifiers == other.transformIdentifiers
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = transformIdentifiers.hashCode
+
+    override def toString: String = s"QueryStats($transformIdentifiers)"
+  }
+
+  object QueryStats {
+
+    def apply(
+        transformIdentifiers: Option[QueryStatsTransformIdentifiers] = None
+      ): QueryStats = new QueryStats(transformIdentifiers)
+  }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/querySettings/ \$querySettings]] aggregation stage.
+   *
+   * @since MongoDB 8.0
+   * @param showDebugQueryShape when `true`, include the debug query shape (defaults to `false`)
+   */
+  final class QuerySettings private[api] (val showDebugQueryShape: Boolean)
+      extends PipelineOperator {
+    import builder.{ boolean, elementProducer => element }
+
+    def makePipe: pack.Document =
+      pipe(
+        f"$$querySettings",
+        builder.document(
+          Seq(element("showDebugQueryShape", boolean(showDebugQueryShape)))
+        )
+      )
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        this.showDebugQueryShape == other.showDebugQueryShape
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = showDebugQueryShape.hashCode
+
+    override def toString: String = s"QuerySettings($showDebugQueryShape)"
+  }
+
+  object QuerySettings {
+
+    def apply(showDebugQueryShape: Boolean = false): QuerySettings =
+      new QuerySettings(showDebugQueryShape)
+  }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/shardedDataDistribution/ \$shardedDataDistribution]] aggregation stage.
+   *
+   * @since MongoDB 6.0.3
+   */
+  case object ShardedDataDistribution extends PipelineOperator {
+
+    val makePipe: pack.Document =
+      pipe(f"$$shardedDataDistribution", builder.document(Seq.empty))
   }
 
   /**
