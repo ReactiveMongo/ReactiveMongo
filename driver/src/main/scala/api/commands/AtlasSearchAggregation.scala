@@ -637,7 +637,7 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         fuzzy.foreach { mod =>
           elms += elm(
             "fuzzy",
-            builder.document( // HERE
+            builder.document(
               Seq(
                 elm("maxEdits", builder.int(mod.maxEdits)),
                 elm("prefixLength", builder.int(mod.prefixLength)),
@@ -2385,5 +2385,790 @@ private[commands] trait AtlasSearchAggregation[P <: SerializationPack] {
         ): Span =
         new Span(clause, clauses)
     }
+  }
+
+  /**
+   * Score normalization used by [[Score]] and [[ScoreFusion]].
+   *
+   * @param name `none`, `sigmoid` or `minMaxScaler`
+   */
+  final class ScoreNormalization private[api] (val name: String) {
+
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        (this.name == null && other.name == null) || (this.name != null && this.name
+          .==(other.name))
+
+      case _ =>
+        false
+    }
+
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
+    override def hashCode: Int =
+      if (name == null) -1 else name.hashCode
+
+    override def toString: String = s"ScoreNormalization($name)"
+  }
+
+  /** Factory for [[ScoreNormalization]]. */
+  object ScoreNormalization {
+    val None: ScoreNormalization = new ScoreNormalization("none")
+    val Sigmoid: ScoreNormalization = new ScoreNormalization("sigmoid")
+
+    val MinMaxScaler: ScoreNormalization = new ScoreNormalization(
+      "minMaxScaler"
+    )
+
+    def apply(name: String): ScoreNormalization = new ScoreNormalization(name)
+  }
+
+  /**
+   * Named input pipelines shared by [[RankFusion]] and [[ScoreFusion]].
+   *
+   * @param pipelines the named sub-pipelines
+   */
+  final class FusionPipelines private[api] (
+      val pipelines: Seq[(String, List[PipelineOperator])]) {
+
+    private[api] def document: pack.Document = {
+      import builder.{ elementProducer => element }
+
+      builder.document(pipelines.map {
+        case (name, ops) =>
+          element(name, builder.array(ops.map(_.makePipe)))
+      })
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type => this.pipelines == other.pipelines
+      case _                => false
+    }
+
+    override def hashCode: Int = pipelines.hashCode
+
+    override def toString: String = s"FusionPipelines($pipelines)"
+  }
+
+  object FusionPipelines {
+
+    def apply(
+        pipelines: Seq[(String, List[PipelineOperator])]
+      ): FusionPipelines =
+      new FusionPipelines(pipelines)
+
+    def apply(
+        head: (String, List[PipelineOperator]),
+        rest: (String, List[PipelineOperator])*
+      ): FusionPipelines =
+      new FusionPipelines(head +: rest)
+  }
+
+  /**
+   * Text query input for [[VectorSearch]] auto-embedding.
+   *
+   * Encodes as `{ "text": "<query-text>" }`.
+   *
+   * @param text the natural-language query to embed
+   */
+  final class VectorSearchQuery private[api] (val text: String) {
+
+    private[api] def document: pack.Document = {
+      import builder.{ elementProducer => element }
+
+      builder.document(Seq(element("text", builder.string(text))))
+    }
+
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        (this.text == null && other.text == null) || (this.text != null && this.text == other.text)
+
+      case _ =>
+        false
+    }
+
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
+    override def hashCode: Int =
+      if (text == null) -1 else text.hashCode
+
+    override def toString: String = s"VectorSearchQuery($text)"
+  }
+
+  object VectorSearchQuery {
+
+    def apply(text: String): VectorSearchQuery = new VectorSearchQuery(text)
+  }
+
+  /**
+   * Nested-array score mode for [[VectorSearchNestedOptions]].
+   *
+   * @param name `avg` or `max`
+   */
+  final class VectorSearchScoreMode private[api] (val name: String) {
+
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        (this.name == null && other.name == null) || (this.name != null && this.name == other.name)
+
+      case _ =>
+        false
+    }
+
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
+    override def hashCode: Int =
+      if (name == null) -1 else name.hashCode
+
+    override def toString: String = s"VectorSearchScoreMode($name)"
+  }
+
+  object VectorSearchScoreMode {
+    val Avg: VectorSearchScoreMode = new VectorSearchScoreMode("avg")
+    val Max: VectorSearchScoreMode = new VectorSearchScoreMode("max")
+
+    def apply(name: String): VectorSearchScoreMode =
+      new VectorSearchScoreMode(name)
+  }
+
+  /**
+   * Nested scoring options for [[VectorSearch]].
+   *
+   * @param scoreMode how to score documents that contain nested arrays
+   */
+  final class VectorSearchNestedOptions private[api] (
+      val scoreMode: Option[VectorSearchScoreMode]) {
+
+    private[api] def document: pack.Document = {
+      import builder.{ elementProducer => element }
+
+      val elms = Seq.newBuilder[pack.ElementProducer]
+
+      scoreMode.foreach { m =>
+        elms += element("scoreMode", builder.string(m.name))
+      }
+
+      builder.document(elms.result())
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type => this.scoreMode == other.scoreMode
+      case _                => false
+    }
+
+    override def hashCode: Int = scoreMode.hashCode
+
+    override def toString: String = s"VectorSearchNestedOptions($scoreMode)"
+  }
+
+  object VectorSearchNestedOptions {
+
+    def apply(
+        scoreMode: Option[VectorSearchScoreMode] = None
+      ): VectorSearchNestedOptions =
+      new VectorSearchNestedOptions(scoreMode)
+  }
+
+  /**
+   * Explain options for [[VectorSearch]].
+   *
+   * @param traceDocumentIds document ids to trace in explain output
+   */
+  final class VectorSearchExplainOptions private[api] (
+      val traceDocumentIds: pack.Value) {
+
+    private[api] def document: pack.Document = {
+      import builder.{ elementProducer => element }
+
+      builder.document(
+        Seq(element("traceDocumentIds", traceDocumentIds))
+      )
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        this.traceDocumentIds == other.traceDocumentIds
+
+      case _ =>
+        false
+    }
+
+    override def hashCode: Int = traceDocumentIds.hashCode
+
+    override def toString: String =
+      s"VectorSearchExplainOptions($traceDocumentIds)"
+  }
+
+  object VectorSearchExplainOptions {
+
+    def apply(traceDocumentIds: pack.Value): VectorSearchExplainOptions =
+      new VectorSearchExplainOptions(traceDocumentIds)
+  }
+
+  /**
+   * '''EXPERIMENTAL:'''
+   * [[https://www.mongodb.com/docs/atlas/atlas-vector-search/vector-search-stage/ \$vectorSearch]] aggregation stage.
+   *
+   * Provide either `queryVector` (bring-your-own embedding) or `query`
+   * (auto-embedding text). `numCandidates` is required for ANN search
+   * (`exact = false`).
+   *
+   * @param index the Vector Search index name
+   * @param path the field path to search
+   * @param limit the number of documents to return
+   * @param queryVector optional query embedding vector (array or binData)
+   * @param query optional auto-embedding text query
+   * @param model optional embedding model override for auto-embedding
+   * @param numCandidates number of candidates for ANN search
+   * @param filter optional pre-filter on indexed fields
+   * @param parentFilter optional parent pre-filter for nested paths
+   * @param nestedOptions optional nested-array scoring options
+   * @param explainOptions optional explain tracing options
+   * @param returnStoredSource when `true`, return only stored source fields (defaults to `false`)
+   * @param searchNodePreferenceKey optional search node preference key
+   * @param exact whether to run exact nearest neighbor search (defaults to `false`)
+   * @param quantization optional query-vector quantization mode (e.g. `scalar`)
+   */
+  final class VectorSearch private[api] (
+      val index: String,
+      val path: String,
+      val limit: Int,
+      val queryVector: Option[pack.Value],
+      val query: Option[VectorSearchQuery],
+      val model: Option[String],
+      val numCandidates: Option[Int],
+      val filter: Option[pack.Document],
+      val parentFilter: Option[pack.Document],
+      val nestedOptions: Option[VectorSearchNestedOptions],
+      val explainOptions: Option[VectorSearchExplainOptions],
+      val returnStoredSource: Boolean,
+      val searchNodePreferenceKey: Option[String],
+      val exact: Boolean,
+      val quantization: Option[String])
+      extends PipelineOperator {
+    import builder.{ boolean, elementProducer => element }
+
+    def makePipe: pack.Document = {
+      val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+        element("index", builder.string(index)),
+        element("path", builder.string(path)),
+        element("limit", builder.int(limit)),
+        element("exact", boolean(exact)),
+        element("returnStoredSource", boolean(returnStoredSource))
+      )
+
+      queryVector.foreach { qv => elms += element("queryVector", qv) }
+
+      query.foreach { q => elms += element("query", q.document) }
+
+      model.foreach { m => elms += element("model", builder.string(m)) }
+
+      numCandidates.foreach { n =>
+        elms += element("numCandidates", builder.int(n))
+      }
+
+      filter.foreach { f => elms += element("filter", f) }
+
+      parentFilter.foreach { f => elms += element("parentFilter", f) }
+
+      nestedOptions.foreach { n =>
+        elms += element("nestedOptions", n.document)
+      }
+
+      explainOptions.foreach { e =>
+        elms += element("explainOptions", e.document)
+      }
+
+      searchNodePreferenceKey.foreach { key =>
+        elms += element(
+          "searchNodePreference",
+          builder.document(Seq(element("key", builder.string(key))))
+        )
+      }
+
+      quantization.foreach { q =>
+        elms += element("quantization", builder.string(q))
+      }
+
+      pipe(f"$$vectorSearch", builder.document(elms.result()))
+    }
+
+    private lazy val tupled = (
+      index,
+      path,
+      limit,
+      queryVector,
+      query,
+      model,
+      numCandidates,
+      filter,
+      parentFilter,
+      nestedOptions,
+      explainOptions,
+      returnStoredSource,
+      searchNodePreferenceKey,
+      exact,
+      quantization
+    )
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type => this.tupled == other.tupled
+      case _                => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString: String = s"VectorSearch$tupled"
+  }
+
+  object VectorSearch {
+
+    def apply(
+        index: String,
+        path: String,
+        limit: Int,
+        queryVector: Option[pack.Value] = None,
+        query: Option[VectorSearchQuery] = None,
+        model: Option[String] = None,
+        numCandidates: Option[Int] = None,
+        filter: Option[pack.Document] = None,
+        parentFilter: Option[pack.Document] = None,
+        nestedOptions: Option[VectorSearchNestedOptions] = None,
+        explainOptions: Option[VectorSearchExplainOptions] = None,
+        returnStoredSource: Boolean = false,
+        searchNodePreferenceKey: Option[String] = None,
+        exact: Boolean = false,
+        quantization: Option[String] = None
+      ): VectorSearch =
+      new VectorSearch(
+        index,
+        path,
+        limit,
+        queryVector,
+        query,
+        model,
+        numCandidates,
+        filter,
+        parentFilter,
+        nestedOptions,
+        explainOptions,
+        returnStoredSource,
+        searchNodePreferenceKey,
+        exact,
+        quantization
+      )
+  }
+
+  /**
+   * '''EXPERIMENTAL:'''
+   * [[https://www.mongodb.com/docs/atlas/atlas-search/aggregation-stages/searchMeta/ \$searchMeta]] aggregation stage.
+   *
+   * @param operator the Atlas Search operator/collector
+   * @param index optional index name
+   * @param concurrent concurrent search flag (defaults to `false`)
+   * @param count optional count options document (polymorphic collector options)
+   * @param returnScopePath optional embedded-document path for `returnScope`
+   * @param returnStoredSource stored-source flag (defaults to `false`)
+   */
+  final class SearchMeta private[api] (
+      val operator: AtlasSearch.Operator,
+      val index: Option[String],
+      val concurrent: Boolean,
+      val count: Option[pack.Document],
+      val returnScopePath: Option[String],
+      val returnStoredSource: Boolean)
+      extends PipelineOperator {
+    import builder.{ boolean, elementProducer => elm }
+
+    def makePipe: pack.Document = {
+      val doc = Seq.newBuilder[pack.ElementProducer] += elm(
+        operator.name,
+        operator.document
+      )
+
+      index.foreach { i => doc += elm("index", builder.string(i)) }
+
+      doc += elm("concurrent", boolean(concurrent))
+
+      count.foreach { c => doc += elm("count", c) }
+
+      returnScopePath.foreach { path =>
+        doc += elm(
+          "returnScope",
+          builder.document(Seq(elm("path", builder.string(path))))
+        )
+      }
+
+      doc += elm("returnStoredSource", boolean(returnStoredSource))
+
+      pipe(f"$$searchMeta", builder.document(doc.result()))
+    }
+
+    private lazy val tupled =
+      Tuple6(
+        operator,
+        index,
+        concurrent,
+        count,
+        returnScopePath,
+        returnStoredSource
+      )
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type => this.tupled == other.tupled
+      case _                => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString: String = s"SearchMeta$tupled"
+  }
+
+  object SearchMeta {
+
+    def apply(
+        operator: AtlasSearch.Operator,
+        index: Option[String] = None,
+        concurrent: Boolean = false,
+        count: Option[pack.Document] = None,
+        returnScopePath: Option[String] = None,
+        returnStoredSource: Boolean = false
+      ): SearchMeta =
+      new SearchMeta(
+        operator,
+        index,
+        concurrent,
+        count,
+        returnScopePath,
+        returnStoredSource
+      )
+  }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/listSearchIndexes/ \$listSearchIndexes]] aggregation stage.
+   *
+   * @since MongoDB 7.0
+   * @param id optional index id
+   * @param name optional index name
+   */
+  final class ListSearchIndexes private[api] (
+      val id: Option[String],
+      val name: Option[String])
+      extends PipelineOperator {
+    import builder.{ elementProducer => element }
+
+    def makePipe: pack.Document = {
+      val elms = Seq.newBuilder[pack.ElementProducer]
+
+      id.foreach { i => elms += element("id", builder.string(i)) }
+
+      name.foreach { n => elms += element("name", builder.string(n)) }
+
+      pipe(f"$$listSearchIndexes", builder.document(elms.result()))
+    }
+
+    private lazy val tupled = id -> name
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type => this.tupled == other.tupled
+      case _                => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString: String = s"ListSearchIndexes$tupled"
+  }
+
+  object ListSearchIndexes {
+
+    def apply(
+        id: Option[String] = None,
+        name: Option[String] = None
+      ): ListSearchIndexes = new ListSearchIndexes(id, name)
+  }
+
+  /**
+   * Named numeric weights shared by fusion stages.
+   *
+   * @param values pipeline name to weight pairs
+   */
+  final class FusionWeights private[api] (val values: Seq[(String, Double)]) {
+
+    private[api] def document: pack.Document = {
+      import builder.{ elementProducer => element }
+
+      builder.document(values.map {
+        case (name, weight) => element(name, builder.double(weight))
+      })
+    }
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type => this.values == other.values
+      case _                => false
+    }
+
+    override def hashCode: Int = values.hashCode
+
+    override def toString: String = s"FusionWeights($values)"
+  }
+
+  object FusionWeights {
+
+    def apply(values: Seq[(String, Double)]): FusionWeights =
+      new FusionWeights(values)
+
+    def apply(head: (String, Double), rest: (String, Double)*): FusionWeights =
+      new FusionWeights(head +: rest)
+  }
+
+  /**
+   * Combination method for [[ScoreFusion]].
+   *
+   * @param name `avg` or `expression`
+   */
+  final class ScoreFusionMethod private[api] (val name: String) {
+
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type =>
+        (this.name == null && other.name == null) || (this.name != null && this.name == other.name)
+
+      case _ =>
+        false
+    }
+
+    @SuppressWarnings(Array("ComparingUnrelatedTypes", "NullParameter"))
+    override def hashCode: Int =
+      if (name == null) -1 else name.hashCode
+
+    override def toString: String = s"ScoreFusionMethod($name)"
+  }
+
+  object ScoreFusionMethod {
+    val Avg: ScoreFusionMethod = new ScoreFusionMethod("avg")
+    val Expression: ScoreFusionMethod = new ScoreFusionMethod("expression")
+
+    def apply(name: String): ScoreFusionMethod = new ScoreFusionMethod(name)
+  }
+
+  /**
+   * Combination settings for [[ScoreFusion]].
+   *
+   * @param method optional combination method
+   * @param weights optional pipeline weights
+   * @param expression optional custom combination expression
+   */
+  final class ScoreFusionCombination private[api] (
+      val method: Option[ScoreFusionMethod],
+      val weights: Option[FusionWeights],
+      val expression: Option[pack.Value]) {
+
+    private[api] def document: pack.Document = {
+      import builder.{ elementProducer => element }
+
+      val elms = Seq.newBuilder[pack.ElementProducer]
+
+      method.foreach { m => elms += element("method", builder.string(m.name)) }
+
+      weights.foreach { w => elms += element("weights", w.document) }
+
+      expression.foreach { e => elms += element("expression", e) }
+
+      builder.document(elms.result())
+    }
+
+    private lazy val tupled = Tuple3(method, weights, expression)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type => this.tupled == other.tupled
+      case _                => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString: String = s"ScoreFusionCombination$tupled"
+  }
+
+  object ScoreFusionCombination {
+
+    def apply(
+        method: Option[ScoreFusionMethod] = None,
+        weights: Option[FusionWeights] = None,
+        expression: Option[pack.Value] = None
+      ): ScoreFusionCombination =
+      new ScoreFusionCombination(method, weights, expression)
+  }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/rankFusion/ \$rankFusion]] aggregation stage.
+   *
+   * @since MongoDB 8.0
+   * @param pipelines the named input pipelines
+   * @param weights optional combination weights by pipeline name
+   * @param scoreDetails whether to include score details
+   */
+  final class RankFusion private[api] (
+      val pipelines: FusionPipelines,
+      val weights: Option[FusionWeights],
+      val scoreDetails: Boolean)
+      extends PipelineOperator {
+    import builder.{ boolean, elementProducer => element }
+
+    def makePipe: pack.Document = {
+      val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+        element(
+          "input",
+          builder.document(
+            Seq(element("pipelines", pipelines.document))
+          )
+        ),
+        element("scoreDetails", boolean(scoreDetails))
+      )
+
+      weights.foreach { w =>
+        elms += element(
+          "combination",
+          builder.document(Seq(element("weights", w.document)))
+        )
+      }
+
+      pipe(f"$$rankFusion", builder.document(elms.result()))
+    }
+
+    private lazy val tupled = Tuple3(pipelines, weights, scoreDetails)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type => this.tupled == other.tupled
+      case _                => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString: String = s"RankFusion$tupled"
+  }
+
+  object RankFusion {
+
+    def apply(
+        pipelines: FusionPipelines,
+        weights: Option[FusionWeights] = None,
+        scoreDetails: Boolean = false
+      ): RankFusion = new RankFusion(pipelines, weights, scoreDetails)
+  }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/scoreFusion/ \$scoreFusion]] aggregation stage.
+   *
+   * @since MongoDB 8.2
+   * @param pipelines the named input pipelines
+   * @param normalization optional score normalization
+   * @param combination optional combination settings
+   * @param scoreDetails whether to include score details (defaults to `false`)
+   */
+  final class ScoreFusion private[api] (
+      val pipelines: FusionPipelines,
+      val normalization: Option[ScoreNormalization],
+      val combination: Option[ScoreFusionCombination],
+      val scoreDetails: Boolean)
+      extends PipelineOperator {
+    import builder.{ boolean, elementProducer => element }
+
+    def makePipe: pack.Document = {
+      val inputElms = Seq.newBuilder[pack.ElementProducer] += element(
+        "pipelines",
+        pipelines.document
+      )
+
+      normalization.foreach { n =>
+        inputElms += element("normalization", builder.string(n.name))
+      }
+
+      val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+        element("input", builder.document(inputElms.result())),
+        element("scoreDetails", boolean(scoreDetails))
+      )
+
+      combination.foreach { c => elms += element("combination", c.document) }
+
+      pipe(f"$$scoreFusion", builder.document(elms.result()))
+    }
+
+    private lazy val tupled =
+      Tuple4(pipelines, normalization, combination, scoreDetails)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type => this.tupled == other.tupled
+      case _                => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString: String = s"ScoreFusion$tupled"
+  }
+
+  object ScoreFusion {
+
+    def apply(
+        pipelines: FusionPipelines,
+        normalization: Option[ScoreNormalization] = None,
+        combination: Option[ScoreFusionCombination] = None,
+        scoreDetails: Boolean = false
+      ): ScoreFusion =
+      new ScoreFusion(pipelines, normalization, combination, scoreDetails)
+  }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/score/ \$score]] aggregation stage.
+   *
+   * @since MongoDB 8.2
+   * @param score the score expression
+   * @param scoreDetails whether to include score details (defaults to `false`)
+   * @param normalization optional score normalization
+   * @param weight optional weight expression
+   */
+  final class Score private[api] (
+      val score: pack.Value,
+      val scoreDetails: Boolean,
+      val normalization: Option[ScoreNormalization],
+      val weight: Option[pack.Value])
+      extends PipelineOperator {
+    import builder.{ boolean, elementProducer => element }
+
+    def makePipe: pack.Document = {
+      val elms = Seq.newBuilder[pack.ElementProducer] ++= Seq(
+        element("score", score),
+        element("scoreDetails", boolean(scoreDetails))
+      )
+
+      normalization.foreach { n =>
+        elms += element("normalization", builder.string(n.name))
+      }
+
+      weight.foreach { w => elms += element("weight", w) }
+
+      pipe(f"$$score", builder.document(elms.result()))
+    }
+
+    private lazy val tupled =
+      Tuple4(score, scoreDetails, normalization, weight)
+
+    override def equals(that: Any): Boolean = that match {
+      case other: this.type => this.tupled == other.tupled
+      case _                => false
+    }
+
+    override def hashCode: Int = tupled.hashCode
+
+    override def toString: String = s"Score$tupled"
+  }
+
+  object Score {
+
+    def apply(
+        score: pack.Value,
+        scoreDetails: Boolean = false,
+        normalization: Option[ScoreNormalization] = None,
+        weight: Option[pack.Value] = None
+      ): Score = new Score(score, scoreDetails, normalization, weight)
   }
 }

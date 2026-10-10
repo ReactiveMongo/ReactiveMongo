@@ -156,4 +156,17 @@ trait ChangeStreamAggregation[P <: SerializationPack] {
         fullDocumentStrategy: Option[ChangeStreams.FullDocumentStrategy] = None
       ): ChangeStream = new ChangeStream(offset, fullDocumentStrategy)
   }
+
+  /**
+   * [[https://docs.mongodb.com/manual/reference/operator/aggregation/changeStreamSplitLargeEvent/ \$changeStreamSplitLargeEvent]] aggregation stage.
+   *
+   * Splits large change stream events that exceed 16MB.
+   *
+   * @since MongoDB 7.0
+   */
+  case object ChangeStreamSplitLargeEvent extends PipelineOperator {
+
+    val makePipe: pack.Document =
+      pipe(f"$$changeStreamSplitLargeEvent", builder.document(Seq.empty))
+  }
 }

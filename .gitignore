@@ -1,4 +1,7 @@
 target/
+# sbt 2 content-addressed store + history when rootOutputDirectory is the build base
+value/
+.history
 .ci_scripts/client-cert.crt
 .ci_scripts/client-cert.key
 .ci_scripts/client.pem
