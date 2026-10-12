@@ -15,7 +15,6 @@ object Common extends AutoPlugin {
 
   val baseSettings = Seq(
     semanticdbEnabled := scalaBinaryVersion.value != "2.11",
-    Global / rootOutputDirectory := (ThisBuild / baseDirectory).value.toPath,
     Global / cacheVersion := 1L,
     organization := "org.reactivemongo",
     credentials ++= sys.env.get("SONATYPE_USERNAME").toSeq.map { user =>
@@ -75,16 +74,16 @@ object Common extends AutoPlugin {
   }
 
   override def projectSettings =
-    Defaults.coreDefaultSettings ++ baseSettings ++ Compiler.settings ++ Seq(
+    baseSettings ++ Compiler.settings ++ Seq(
       scalaVersion := scala212,
       crossScalaVersions := scalaVersions,
       crossVersion := CrossVersion.binary,
       useShaded := sys.env.get("REACTIVEMONGO_SHADED").fold(true)(_.toBoolean),
       target := {
         if (useShaded.value) {
-          target.value / "shaded" / s"scala-${scalaBinaryVersion.value}"
+          target.value / "shaded"
         } else {
-          target.value / "noshaded" / s"scala-${scalaBinaryVersion.value}"
+          target.value / "noshaded"
         }
       },
       version := {
