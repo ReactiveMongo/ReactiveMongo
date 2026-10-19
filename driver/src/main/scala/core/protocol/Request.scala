@@ -34,7 +34,7 @@ private[reactivemongo] final class Request private (
     header writeTo buffer
     op writeTo buffer
 
-    buffer writeBytes payload
+    buffer.writeBytes(payload, 0, payloadSize)
 
     ()
   }
@@ -174,7 +174,7 @@ private[reactivemongo] object Request {
 
           req.op writeTo buf
 
-          buf writeBytes req.payload
+          buf.writeBytes(req.payload, 0, req.payload.writerIndex)
 
           f(buf)
         } catch {
