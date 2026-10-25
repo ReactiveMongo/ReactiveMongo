@@ -32,7 +32,7 @@ object Common extends AutoPlugin {
     ),
     mimaFailOnNoPrevious := false,
     Test / logBuffered := false,
-    Test / closeClassLoaders := false, // See https://github.com/sbt/sbt/issues/9604
+    Test / closeClassLoaders := false // See https://github.com/sbt/sbt/issues/9604
   )
 
   val filter = { (ms: Seq[(HashedVirtualFileRef, String)]) =>
