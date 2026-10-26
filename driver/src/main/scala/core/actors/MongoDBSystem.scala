@@ -65,6 +65,7 @@ import reactivemongo.core.protocol.{
   Query,
   QueryFlags,
   Request,
+  RequestMaker,
   Response
 }
 
@@ -878,9 +879,11 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
         s"ChannelConnected($chanId, $statusInfo)"
       }) { ns =>
-        ns.updateByChannelId(chanId)(
-          _.copy(status = ConnectionStatus.Connected)
-        )(_)
+        ns.updateByChannelId(chanId) { con =>
+          sendHandshake(con)
+
+          con.copy(status = ConnectionStatus.Connected)
+        }(_)
       }
 
       ()
@@ -914,6 +917,16 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
         }
 
       resp.foreach(onIsMaster(response, _))
+    }
+
+    case err @ Response.CommandError(_, _, _, cause)
+        if (RequestIdGenerator.handshake accepts err) => {
+      warn(s"Fails to handshake on channel #${err.info.channelId}", cause)
+    }
+
+    case response: Response
+        if (RequestIdGenerator.handshake accepts response) => {
+      trace(s"Handshake done on channel #${response.info.channelId}")
     }
 
     case err @ Response.CommandError(_, _, _, cause)
@@ -1927,6 +1940,48 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
     })
   }
 
+  private def isMasterRequest(
+      client: Option[ClientMetadata],
+      comment: Option[String]
+    ): RequestMaker = {
+    import IsMasterCommand.{ IsMaster, writer }
+    import reactivemongo.api.commands.Command
+
+    Command.buildRequestMaker(BSONSerializationPack)(
+      CommandKind.Hello,
+      new IsMaster(client, options.compressors, comment),
+      writer(BSONSerializationPack),
+      ReadPreference.primaryPreferred,
+      "admin"
+    ) // only "admin" DB for the admin command
+  }
+
+  /**
+   * Sends the initial handshake with the client metadata,
+   * which must be the first message on any new connection
+   * (see [[https://github.com/mongodb/specifications/blob/master/source/mongodb-handshake/handshake.md MongoDB Handshake]]).
+   *
+   * Its response is not used to monitor the node,
+   * which is done only on the signaling connection.
+   */
+  private def sendHandshake(con: Connection): Unit = {
+    con
+      .send(
+        isMasterRequest(Some(clientMetadata), None)(
+          RequestIdGenerator.handshake.next
+        ),
+        compression = ListSet.empty /* cannot compress */
+      )
+      .addListener(
+        new OperationHandler(
+          error(s"Fails to send the handshake (channel #${con.channel.id})", _),
+          { chanId => trace(s"Handshake sent on channel #${chanId}") }
+        )
+      )
+
+    ()
+  }
+
   private class IsMasterRequest(
       val node: Node,
       f: () => Unit = () => (),
@@ -1936,20 +1991,8 @@ private[reactivemongo] trait MongoDBSystem extends Actor { selfSystem =>
 
   private def requestIsMaster(context: String, node: Node): IsMasterRequest =
     node.signaling.fold(new IsMasterRequest(node)) { con =>
-      import IsMasterCommand.{ IsMaster, writer }
-      import reactivemongo.api.commands.Command
-
       lazy val id = RequestIdGenerator.isMaster.next
-      val client: Option[ClientMetadata] =
-        if (node.pingInfo.firstSent) None else Some(clientMetadata)
-
-      lazy val isMaster = Command.buildRequestMaker(BSONSerializationPack)(
-        CommandKind.Hello,
-        new IsMaster(client, options.compressors, Some(id.toString)),
-        writer(BSONSerializationPack),
-        ReadPreference.primaryPreferred,
-        "admin"
-      ) // only "admin" DB for the admin command
+      lazy val isMaster = isMasterRequest(None, Some(id.toString))
 
       val now = System.nanoTime()
 
