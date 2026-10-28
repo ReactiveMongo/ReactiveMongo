@@ -1,7 +1,6 @@
 package reactivemongo.core.nodeset
 
 import scala.util.{ Failure, Success, Try }
-import scala.util.control.NonFatal
 
 import scala.collection.immutable.{ ListSet, Set }
 
@@ -70,7 +69,14 @@ private[reactivemongo] class Connection(
       case Some(compressor) =>
         compress(request, compressor, compression.tail) match {
           case Success(prepared) =>
-            _(prepared, () => prepared.payload.release())
+            _(
+              prepared,
+              () => {
+                if (prepared.payload ne request.payload) {
+                  prepared.payload.release()
+                }
+              }
+            )
 
           case Failure(cause) => {
             val failed = new DefaultChannelPromise(channel)
@@ -91,28 +97,18 @@ private[reactivemongo] class Connection(
       alternatives: ListSet[Compressor]
     ): Try[Request] =
     Request.compress(request, next, channel.alloc.directBuffer(_: Int)) match {
+      // The original payload is not released there,
+      // as it must remain readable to compress again if the request is retried
       case compressed @ Success(_) =>
-        try {
-          compressed
-        } finally {
-          request.payload.release()
-          ()
-        }
+        compressed
 
       case failed @ Failure(_) =>
         alternatives.headOption match {
           case Some(c) =>
             compress(request, c, alternatives.tail)
 
-          case _ => {
-            if (request.payload.refCnt > 0) try {
-              request.payload.release()
-            } catch {
-              case NonFatal(_) =>
-            }
-
+          case _ =>
             failed
-          }
         }
     }
 

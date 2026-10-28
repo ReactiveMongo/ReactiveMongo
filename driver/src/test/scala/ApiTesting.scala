@@ -519,6 +519,20 @@ package object tests { self =>
   def compressRequest(req: Request, compressor: Compressor) =
     Request.compress(req, compressor, Unpooled.directBuffer(_: Int))
 
+  def requestEncoder() = new reactivemongo.core.protocol.RequestEncoder()
+
+  def sendRequest(
+      channel: Channel,
+      req: Request,
+      compressors: ListSet[Compressor]
+    ) = new reactivemongo.core.nodeset.Connection(
+    channel,
+    reactivemongo.core.nodeset.ConnectionStatus.Connected,
+    Set.empty,
+    None,
+    false
+  ).send(req, compressors)
+
   def snappyDecompress(in: ByteBuf, out: ByteBuf) =
     new reactivemongo.core.protocol.buffer.Snappy().decode(in, out)
 }
