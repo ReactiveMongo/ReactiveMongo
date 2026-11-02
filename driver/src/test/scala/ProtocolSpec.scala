@@ -1,3 +1,5 @@
+import scala.collection.immutable.ListSet
+
 import reactivemongo.io.netty.buffer.{ ByteBuf, Unpooled }
 
 import reactivemongo.api.Compressor
@@ -216,6 +218,89 @@ final class ProtocolSpec(
             }
           }
         }
+      }
+    }
+
+    "be written again in full (e.g. when retried)" >> {
+      import reactivemongo.api.tests.isMasterRequest
+
+      "by writeTo" in {
+        val req = isMasterRequest(reqId = 0)
+
+        def written(): Array[Byte] =
+          withBuffer(Unpooled.buffer(req.size)) { buf =>
+            req.writeTo(buf)
+
+            getBytes(buf, buf.writerIndex)
+          }
+
+        val first = written()
+
+        first.size must_=== req.size and {
+          written() must_=== first
+        }
+      }
+
+      "by compression" in {
+        val req = isMasterRequest(reqId = 0)
+
+        def compressed(): Array[Byte] =
+          withBuffer(compressRequest(req, Compressor.Snappy).get.payload) {
+            payload => getBytes(payload, payload.writerIndex)
+          }
+
+        val first = compressed()
+
+        compressed() must_=== first
+      }
+
+      Fragments.foreach(
+        Seq(
+          "without compression" -> ListSet.empty[Compressor],
+          "with snappy compression" -> ListSet[Compressor](Compressor.Snappy),
+          "with noop compression" -> ListSet[Compressor](Compressor.Noop)
+        )
+      ) {
+        case (label, compressors) =>
+          s"by connection $label" in {
+            import reactivemongo.io.netty.channel.embedded.EmbeddedChannel
+            import reactivemongo.api.tests.{ requestEncoder, sendRequest }
+
+            val channel = new EmbeddedChannel(requestEncoder())
+            val req = isMasterRequest(reqId = 0)
+
+            def sent(): (Boolean, Array[Byte], Int) = {
+              val ok = sendRequest(channel, req, compressors).isSuccess
+
+              Option(channel.readOutbound[ByteBuf]()) match {
+                case Some(buf) =>
+                  withBuffer(buf) { b =>
+                    (ok, getBytes(b, b.writerIndex), b.getIntLE(0))
+                  }
+
+                case _ =>
+                  (ok, Array.empty[Byte], -1)
+              }
+            }
+
+            try {
+              val (firstOk, first, firstDeclared) = sent()
+              val (secondOk, second, secondDeclared) = sent()
+
+              firstOk must beTrue and {
+                first.size must_=== firstDeclared
+              } and {
+                secondOk must beTrue
+              } and {
+                second.size must_=== secondDeclared
+              } and {
+                second must_=== first
+              }
+            } finally {
+              channel.finishAndReleaseAll()
+              ()
+            }
+          }
       }
     }
   }
