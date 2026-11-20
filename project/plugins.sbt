@@ -21,4 +21,4 @@ addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.4.8")
 
 addSbtPlugin("cchantep" % "sbt-scaladoc-compiler" % "0.9.1")
 
-addSbtPlugin("com.github.sbt" % "sbt-dynver" % "5.1.1")
+addSbtPlugin("com.github.sbt" % "sbt-dynver" % "5.2.0")
