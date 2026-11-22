@@ -17,7 +17,7 @@ addDependencyTreePlugin
 
 addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "1.2.1")
 
-addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.4.8")
+addSbtPlugin("com.github.sbt" % "sbt-jmh" % "0.4.9")
 
 addSbtPlugin("cchantep" % "sbt-scaladoc-compiler" % "0.9.1")
 
