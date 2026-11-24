@@ -41,7 +41,8 @@ final class NodeSetSpec(
     val ee: ExecutionEnv)
     extends org.specs2.mutable.Specification
     with ConnectAllTest
-    with UnresponsiveSecondaryTest {
+    with UnresponsiveSecondaryTest
+    with ClientHandshakeTest {
 
   "Node set".title
 
@@ -297,6 +298,8 @@ final class NodeSetSpec(
         }
       }
     }
+
+    clientHandshakeSpec
 
     "be closed" in {
       md.close(timeout) must not(throwA[Exception])

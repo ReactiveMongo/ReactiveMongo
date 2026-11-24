@@ -44,6 +44,9 @@ private[reactivemongo] object RequestIdGenerator {
   // all requestIds [2000, 3000[ are for authenticate messages
   val authenticate = new RequestIdGenerator(2000, 2999)
 
-  // all requestIds [3000[ are for common messages
-  val common = new RequestIdGenerator(3000, Int.MaxValue - 1)
+  // all requestIds [3000, 4000[ are for the initial handshake of connections
+  val handshake = new RequestIdGenerator(3000, 3999)
+
+  // all requestIds [4000[ are for common messages
+  val common = new RequestIdGenerator(4000, Int.MaxValue - 1)
 }
